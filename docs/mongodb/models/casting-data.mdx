@@ -1,0 +1,562 @@
+---
+sidebar_position: 3
+---
+
+# Casting Data
+
+As Mongodb nature, any document can literally have any data type. However, when it comes to the data that is being sent to the client, it is important to cast the data to the correct type. This is because the client will be expecting a certain type of data, but making sure the data is inserted in a proper type is more important.
+
+## How to cast data
+
+To make a map for fields that need to be casted, you can use the `cast` property. This function takes in a map of fields and their types. The types can be any of the following:
+
+```ts title="src/models/user.ts"
+import { Model, Casts } from "@mongez/mongodb";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    email: "string",
+    age: "number",
+    isActive: "boolean",
+    birthDate: "date",
+  };
+}
+```
+
+This will ensure that the data is casted to the correct type before being sent to the client.
+
+## Built-in casts
+
+The major data types can be used strings to automatically cast field values.
+
+The following table illustrates the available cast types:
+
+| Type             | Description                                                                                                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `string`         | Casts the value to a **string**.                                                                                                                                               |
+| `number`         | Casts the value to a **number**.                                                                                                                                               |
+| `int` `integer`  | Casts the value to a **integer**.                                                                                                                                              |
+| `float`          | Casts the value to a **float**.                                                                                                                                                |
+| `bool` `boolean` | Casts the value to a **boolean**.                                                                                                                                              |
+| `date`           | Casts the value to a **date**.                                                                                                                                                 |
+| `array`          | Casts the value to an **array**.                                                                                                                                               |
+| `object`         | Casts the value to an **object**.                                                                                                                                              |
+| `any` `mixed`    | Does not cast the value.                                                                                                                                                       |
+| `location`       | Casts the value to a **geo location**.                                                                                                                                         |
+| `localized`      | Making sure the value is stored in array of objects, each object contains `localeCode` and `value` keys where `value` represents the content of the corresponding locale code. |
+
+> If the field's value is missing, it will be stored as default value type as follows:
+
+- `string`: will be stored as empty string `""`.
+- `number`: will be stored as `0`.
+- `integer`: will be stored as `0`.
+- `float`: will be stored as `0`.
+- `boolean`: will be stored as `false`.
+- `date`: will be stored as `null`.
+- `array`: will be stored as empty array `[]`.
+- `object`: will be stored as empty object `{}`.
+- `any` or `mixed`: will be stored as is.
+- `location`: will be stored as `null`.
+- `localized`: will be stored as empty array `[]`.
+
+### Storing geo locations
+
+To store geo locations, you can use the `location` cast type. This will make sure the value is stored as a geo location object.
+
+```ts title="src/models/user.ts"
+import { Model, Casts } from "@mongez/mongodb";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    email: "string",
+    location: "location",
+  };
+}
+```
+
+Now let's create a new user:
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+async function main() {
+  const user = await User.create({
+    name: "John Doe",
+    email: "hassanzohdy@gmail.com",
+    location: {
+      lat: 30.123,
+      lng: 31.123,
+    },
+  });
+
+  console.log(user.get("location")); // will be converted into: { type: "Point", coordinates: [ 30.123, 31.123 ]
+}
+
+main();
+```
+
+The value is going to be stored as a geo location object.
+
+### Localized Values
+
+Localized values are essential if you're Building multilingual app, for example if the application has two languages Arabic and English, then localized fields should be stored in both languages.
+
+```ts title="src/models/user.ts"
+import { Model, Casts } from "@mongez/mongodb";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    email: "string",
+    bio: "localized",
+  };
+}
+```
+
+Now let's create a new user:
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+async function main() {
+  const user = await User.create({
+    name: "John Doe",
+    email: "hassanzohdy@gmail.com",
+    bio: [
+      {
+        localeCode: "en",
+        value: "English bio",
+      },
+      {
+        localeCode: "ar",
+        value: "Arabic bio",
+      },
+    ],
+  });
+}
+
+main();
+```
+
+The `localized` cast will make sure only `localeCode` and `value` keys are stored in the database.
+
+> If the array contains any `non-object` values, it will be ignored.
+
+### Built in Custom casts
+
+Here are some built in custom casts that you can use:
+
+### castModel
+
+Probably this is the most important cast, this cast function receives a model class, it then stores the model data as a sub document to the current model.
+
+For example, a Post has a `category`, all we need to do is to pass the `category` id when we create the post, then category data will be injected into the post.
+
+```ts title="src/models/post.ts"
+import { Model, Casts, castModel } from "@mongez/mongodb";
+import { Category } from "./category";
+
+export class Post extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "posts";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    title: "string",
+    content: "string",
+    category: castModel(Category),
+  };
+}
+```
+
+Now let's create a new post:
+
+```ts title="src/app.ts"
+import { Post } from "./models/post";
+
+async function main() {
+  const post = await Post.create({
+    title: "Hello world",
+    content: "This is the post content",
+    category: 41231,
+  });
+
+  console.log(post.get("category")); // will be converted into: {
+  //        id: 41231,
+  //        name: "Category name",
+  //     }
+}
+
+main();
+```
+
+The data that are stored in the posts are collected from `embeddedData` property, this is a builtin property in the model that contains the data that should be inserted when the model is going to be embedded in another model.
+
+However, you can define another property name by passing the property name as a second argument to the `castModel` function.
+
+```ts title="src/models/post.ts"
+import { Model, Casts, castModel } from "@mongez/mongodb";
+import { Category } from "./category";
+
+export class Post extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "posts";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    title: "string",
+    content: "string",
+    category: castModel(Category, "embedToPost"),
+  };
+}
+```
+
+```ts title="src/models/category.ts"
+import { Model, Casts } from "@mongez/mongodb";
+
+export class Category extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "categories";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    isActive: "boolean",
+  };
+
+  /**
+   * {@inheritDoc}
+   */
+  public embedded = ["id", "name", "isActive"];
+
+  /**
+   * {@inheritDoc}
+   */
+  public get embedToPost() {
+    return this.only(["id", "name"]);
+  }
+}
+```
+
+:::success Note
+Don't worry if you're not aware yet of the `embedded documents`, we will cover it in the next chapters.
+:::
+
+Another good feature of `castModel` is that it handles both types, if the given value is an array then it will return an array of embedded documents, otherwise it will return only one object of embedded data.
+
+Let's see basically how `castModel` works in simple words:
+
+the model that we're going to create should receive the id of the category, the `castModel` already knows what model to look into as we already passed the `Category` model to it.
+
+Now the function will try to find the model that matches the given `id`, if it found it, it will return the embedded data, otherwise it will return `null`.
+
+This applies to both cases, if the given value is an array of ids, then it will return an array of embedded data, otherwise it will return only one embedded data.
+
+#### castEmail
+
+This utility `castEmail` is going to make sure the email is a valid email address, and it will be lowercased.
+
+```ts title="src/models/user.ts"
+import { Model, Casts, castEmail } from "@mongez/mongodb";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    email: castEmail,
+    name: "string",
+  };
+}
+```
+
+If the value is not a valid email address, it will be stored as `null`, otherwise all email characters will be lowercased.
+
+#### oneOf
+
+This is a cool utility that ensure the value that is going to be stored is one of the provided values.
+
+```ts title="src/models/user.ts"
+import { Model, Casts, oneOf } from "@mongez/mongodb";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    gender: oneOf(["male", "female"]),
+  };
+}
+```
+
+If the value is not one of the provided values, it will be stored as `null`.
+
+### arrayOf
+
+Works the same as `oneOf` but it will make sure the value is one of the provided values in the array.
+
+```ts title="src/models/user.ts"
+import { Model, Casts, arrayOf } from "@mongez/mongodb";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    keywords: arrayOf([
+      "git",
+      "programming",
+      "javascript",
+      "typescript",
+      "nodejs",
+    ]),
+  };
+}
+```
+
+### shapedArray
+
+This utility will make sure the value is an array of a type, either a scalar type or an object type.
+
+```ts title="src/models/user.ts"
+import { Model, Casts, shapedArray, ShapedArrayType } from "@mongez/mongodb";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    keywords: shapedArray(ShapedArrayType.String),
+    prices: shapedArray(ShapedArrayType.Number),
+  };
+}
+```
+
+These are the available shaped array types:
+
+```ts
+export enum ShapedArrayType {
+  String = "string",
+  Number = "number",
+  Boolean = "boolean",
+  Date = "date",
+}
+```
+
+You can also pass an object type:
+
+```ts title="src/models/user.ts"
+import { Model, Casts, shapedArray, ShapedArrayType } from "@mongez/mongodb";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    keywords: shapedArray(ShapedArrayType.String),
+    prices: shapedArray(ShapedArrayType.Number),
+    addresses: shapedArray({
+      street: ShapedArrayType.String,
+      city: ShapedArrayType.String,
+      country: ShapedArrayType.String,
+      phoneNumber: ShapedArrayType.Number,
+      apartment: ShapedArrayType.Number,
+    }),
+  };
+}
+```
+
+Any other type will be ignored, if the value is not an array, it will be stored as `null`.
+
+#### randomInteger
+
+This utility will generate a random integer number between the provided range.
+
+```ts title="src/models/user.ts"
+import { Model, Casts, randomInteger } from "@mongez/mongodb";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    verificationCode: randomInteger(1000, 9999),
+  };
+}
+```
+
+This will generate a random integer number between 1000 and 9999.
+
+:::info
+Kindly note that the `randomInteger` utility will not generate a random number if the value is already provided, in the previous example, when verification code is done, you should unset it or set it to null if you want to generate an ew code in the next save.
+:::
+
+### expiresAfter
+
+This utility will make sure the field is expired after the provided number of unit type you provide:
+
+```ts title="src/models/user.ts"
+import { Model, Casts, expiresAfter } from "@mongez/mongodb";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    verificationCode: randomInteger(1000, 9999),
+    verificationCodeExpiration: expiresAfter(1, "hour"),
+  };
+}
+```
+
+## Create your own custom casts
+
+Sometimes we need customize the value of the field that is going to be added to the collection's document, for example encrypting the password before storing it.
+
+```ts title="src/models/casts/cast-password.ts"
+import Password from "@mongez/password";
+
+export default function castPassword(value: string) {
+  return Password.generate(String(value), 12); // 12 is the number of salt rounds
+}
+```
+
+```ts title="src/models/user.ts"
+import { Model, Casts } from "@mongez/mongodb";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    password: castPassword,
+    name: "string",
+    email: "string",
+  };
+}
+```
+
+Now let's create a new user:
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+async function main() {
+  const user = await User.create({
+    name: "John Doe",
+    email: "john@doe.com",
+    password: 123456,
+  });
+
+  console.log(user.get("password")); // will be something like: $2a$12$qwe322eqwdpfkowerpko
+}
+
+main();
+```
+
+:::info
+In cast password example, we used the [@mongez/password](https://github.com/hassanzohdy/mongez-password) package to generate a hashed password, you can use any package you want.
+:::
+
+The cast callback will receive the value of the field and the model instance, you can use the model instance to access other fields.
+
+```ts title="src/models/casts/cast-password.ts"
+import Password from "@mongez/password";
+
+export default function castPassword(value: string, model: Model) {
+  let salt = model.get("salt");
+
+  if (!salt) {
+    salt = 12;
+    model.set("salt", salt);
+  }
+
+  return Password.generate(String(value), salt);
+}
+```
+
+Here we inserted the salt value to the model instance, so we can use it in the next save, this will increase the security of the password.

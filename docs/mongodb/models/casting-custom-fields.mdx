@@ -1,0 +1,55 @@
+---
+sidebar_position: 4
+---
+
+# Casting Custom Fields
+
+Casting custom fields are another common use case for custom fields. For example, we need to generate a `slug` field from the `title` field. We can use the `cast` method to cast the `title` field to a `slug` field, because we don't need to add slug field when creating a new post from outside the model.
+
+```ts title="src/models/post.ts"
+import { Model, Casts } from "@mongez/mongodb";
+import { sluggable } from "./../utils/casts/sluggable";
+
+export class Post extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "posts";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    title: "string",
+    content: "string",    
+  };
+
+  /**
+   * {@inheritDoc}
+   */
+   protected customCasts: CustomCasts = {
+    slug: sluggable("title"),
+  };
+```
+
+The `sluggable` cast is a custom cast that we created to generate a slug from the title. We can use it as follows:
+
+```ts title="src/utils/casts/sluggable.ts"
+import { Model } from "@mongez/mongodb";
+import slug from "@mongez/slug";
+
+/**
+ * Used for model castings
+ */
+export function sluggable(field: string) {
+  return (model: Model) => {
+    let value = model.get(field);
+
+    if (!value) return "";
+
+    return slug(String(value));
+  };
+}
+```
+
+Unlike `casts`, `customCasts` receives directly the model instance in the first argument this is we don't need to pass the field name to the cast function.

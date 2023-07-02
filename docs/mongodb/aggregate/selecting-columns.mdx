@@ -1,0 +1,57 @@
+---
+sidebar_position: 3
+---
+
+# Selecting Columns / Projecting
+
+To select/deselect fields, you can use one of three methods: `select`, `deselect` and `project`.
+
+> Any column in MongoDB accepts dot notation selection by default, so feel free to use it.
+
+## select method
+
+Let's start with `select` method, this method is the most comprehensive and easiest one to use to select or unselect columns.
+
+Method signature:
+
+```ts
+  /**
+   * Select the given columns
+   */
+  public select(columns: string[] | Record<string, 0 | 1 | boolean>): Aggregate;
+```
+
+The method accepts one of two types:
+
+- `array`: an array of strings, each string is a column name that you want to select.
+- `object`: If you want more control to what to select and what not to select use the object instead, this object should have the column name as a key, and the value should be one of the following:
+  - `0`: to exclude the column from the result.
+  - `1`: to include the column in the result.
+  - `true`: to include the column in the result.
+  - `false`: to exclude the column from the result.
+
+## deselect method
+
+Deselect method accepts an array of columns `strings` that you want to exclude from the result.
+
+Method signature:
+
+```ts
+  /**
+   * Deselect the given columns
+   */
+  public deselect(columns: string[]): Aggregate;
+```
+
+## project method
+
+This is the native MongoDB method, it accepts an object that has the column name as a key, and the value could be any acceptable value in [MongoDB Project Stage](https://docs.mongodb.com/manual/reference/operator/aggregation/project/).
+
+Method signature:
+
+```ts
+  /**
+   * Project the given columns
+   */
+  public project(columns: Record<string, any>): Aggregate;
+```

@@ -1,0 +1,161 @@
+---
+sidebar_position: 8
+---
+
+# Lookup (Joins)
+
+Perform lookups (joins) on your collections.
+
+Before we get started, please review the [Lookup Pipeline](https://docs.mongodb.com/manual/reference/operator/aggregation/lookup/#lookup-pipeline) documentation.
+
+## Method Signature
+
+```ts
+public lookup(options: LookupPipelineOptions): this;
+```
+
+Where `LookupOptions` is:
+
+```ts
+export type LookupPipelineOptions = {
+  from: string;
+  localField?: string;
+  foreignField?: string;
+  as?: string;
+  single?: boolean;
+  pipeline?: (Pipeline | GenericObject)[];
+  let?: GenericObject;
+};
+```
+
+## Example
+
+Let's see a basic example, let's see we need to load posts with the updated data of the authors from users collection.
+
+```ts
+const posts = await new Aggregate("posts")
+  .lookup({
+    from: "users",
+    localField: "author.id",
+    foreignField: "id",
+    as: "author",
+    single: true,
+  })
+  .get();
+```
+
+By adding `single` option, it will return the first document in the array.
+
+## Lookup with multiple documents
+
+Let's load posts with their comments.
+
+```ts
+const posts = await new Aggregate("posts")
+  .lookup({
+    from: "comments",
+    localField: "id",
+    foreignField: "postId",
+    as: "comments",
+  })
+  .get();
+```
+
+This will load with each post all the comments that belong to it.
+
+## Lookup with pipeline
+
+Let's load posts with their comments, but we want to load only the comments that have more than 10 likes.
+
+```ts
+const posts = await new Aggregate("posts")
+  .lookup({
+    from: "comments",
+    localField: "id",
+    foreignField: "postId",
+    as: "comments",
+    pipeline: [
+      {
+        $match: {
+          likes: {
+            $gt: 10,
+          },
+        },
+      },
+    ],
+  })
+  .get();
+```
+
+## Calling MongoDB Aggregate stages
+
+Most of MongoDB Aggregate stages are exported separately, so we can use them directly in the pipelines.
+
+Let's load posts with their comments, but we want to load only the comments that have more than 10 likes.
+
+```ts
+import { wherePipeline, parsePipelines } from "@mongez/mongodb";
+
+const posts = await new Aggregate("posts")
+  .lookup({
+    from: "comments",
+    localField: "id",
+    foreignField: "postId",
+    as: "comments",
+    pipeline: parsePipelines([wherePipeline("likes", ">", 10)]),
+  })
+  .get();
+```
+
+### Available stages to use
+
+Here are the available stages to use with `parsePipelines` function:
+
+- `wherePipeline`: Receives same arguments as `where` method.
+- `limitPipeline`: Receives same arguments as `limit` method.
+- `skipPipeline`: Receives same arguments as `skip` method.
+- `sortPipeline`: Receives same arguments as `sort` method.
+- `sortByPipeline`: Receives same arguments as `sortBy` method.
+- `sortRandomPipeline`: Receives same arguments as `random` method.
+- `selectPipeline`: Receives same arguments as `select` method.
+- `deselectPipeline`: Receives same arguments as `deselect` method.
+- `groupByPipeline`: Receives same arguments as `groupBy` method.
+- `lookupPipeline`: Receives same arguments as `lookup` method.
+- `orWherePipeline`: Receives same arguments as `orWhere` method.
+- `unwindPipeline`: Receives same arguments as `unwind` method.
+
+## Lookup with let
+
+Let's load posts with their comments, but we want to load only the comments that have more than 10 likes.
+
+```ts
+const posts = await new Aggregate("posts")
+  .lookup({
+    from: "comments",
+    localField: "id",
+    foreignField: "postId",
+    as: "comments",
+    let: {
+      postId: "$id",
+    },
+    pipeline: [
+      {
+        $match: {
+          $expr: {
+            $and: [
+              {
+                $eq: ["$postId", "$$postId"],
+              },
+              {
+                $gt: ["$likes", 10],
+              },
+            ],
+          },
+        },
+      },
+    ],
+  })
+  .get();
+```
+
+> This is just the native MongoDB syntax, you can use it directly in the `pipeline` option.

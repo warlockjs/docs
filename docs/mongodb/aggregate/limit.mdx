@@ -1,0 +1,21 @@
+---
+sidebar_position: 6
+---
+
+# Limit
+
+Limit the number of documents returned from the collection.
+
+## Method Signature
+
+```ts
+public limit(value: number): this;
+```
+
+## Example
+
+```ts
+const users = await aggregate.limit(10).get();
+```
+
+It will return the first `10` documents from documents.

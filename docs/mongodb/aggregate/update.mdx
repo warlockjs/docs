@@ -1,0 +1,39 @@
+---
+sidebar_position: 9
+---
+
+# Data Update
+
+Update documents using `Aggregate` class.
+
+## Introduction
+
+`Aggregate` class also provides a way to update documents of collection using the `aggregate` framework.
+
+## Example
+
+```ts
+const totalUpdatedUsers = await aggregate
+  .where("age", ">", 18)
+  .update({ isAdult: true });
+```
+
+This will update all users with age greater than 18 and set `isAdult` to `true` and return the number of updated documents.
+
+## Unset fields
+
+We can also unset one field or multiple fields using `unset` method.
+
+Method Signature:
+
+```ts
+public unset(...fields: string[]): this;
+```
+
+Example:
+
+```ts
+const totalUpdatedUsers = await aggregate
+  .where("age", ">", 18)
+  .unset("isAdult");
+```

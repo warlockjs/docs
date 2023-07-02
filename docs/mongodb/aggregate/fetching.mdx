@@ -1,0 +1,122 @@
+---
+sidebar_position: 9
+---
+
+# Fetching Documents
+
+Fetching documents using Mongez Aggregate class.
+
+## Introduction
+
+As we saw, `Aggregate` is a pipeline that hold multiple stages, we saw how to build the pipeline, now let's see how to fetch the documents.
+
+## Using get method
+
+This is the most common method to fetch documents, it will return an array of documents.
+
+Let's see an example
+
+```ts
+import { Aggregate } from "@mongez/mongodb";
+
+const users = await new Aggregate("users").where("id", ">", 1500).get();
+```
+
+This will return list of documents for the users collection.
+
+If we want to map the date before final return, we can pass a callback to the `get` method.
+
+```ts
+const users = await new Aggregate("users").get((user) => {
+  user.age = new Date().getFullYear() - user.birthYear;
+  return user;
+});
+```
+
+## Get first document
+
+To fetch only first matched document, we can use `first` method.
+
+```ts
+const user = await new Aggregate("users").where("id", 1500).first();
+```
+
+If no results found, `null` will be returned.
+
+## Get last document
+
+Return last matched document.
+
+```ts
+const user = await new Aggregate("users").where("id", 1500).last();
+```
+
+## Pagination
+
+Another powerful feature of `Aggregate` is pagination, we can use `paginate` method to paginate the results.
+
+```ts
+const results = await new Aggregate("users").paginate(1, 10);
+```
+
+The first argument is the page number, and the second argument is the limit.
+
+The results contains an object with the following structure:
+
+```ts
+export type PaginationInfo = {
+  /**
+   * Limit of the query
+   */
+  limit: number;
+  /**
+   * Results of the query
+   */
+  result: number;
+  /**
+   * Current page of the query
+   */
+  page: number;
+  /**
+   * total results of the query
+   */
+  total: number;
+  /**
+   * total pages of the query
+   */
+  pages: number;
+};
+/**
+ * The result of the paginate query
+ */
+export type PaginationListing<T> = {
+  /**
+   * Results of the query
+   */
+  documents: T[];
+  /**
+   * The pagination results
+   */
+  paginationInfo: PaginationInfo;
+};
+```
+
+So basically, it returns `documents` and `paginationInfo` object, the `documents` is an array of documents, and the `paginationInfo` contains the pagination information.
+
+## Count documents
+
+To count the number of documents, we can use `count` method.
+
+```ts
+const count = await new Aggregate("users").count();
+```
+
+## Explain
+
+Sometimes we need to know how the query is executed, we can use `explain` method to get the execution plan of the query.
+
+```ts
+const results = await new Aggregate("users").explain();
+```
+
+See [explain](https://www.mongodb.com/docs/manual/reference/method/db.collection.aggregate/#return-information-on-aggregation-pipeline-operation) for more information.

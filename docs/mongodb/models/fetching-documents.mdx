@@ -1,0 +1,214 @@
+---
+sidebar_position: 10
+---
+
+# Fetching Documents
+
+## Introduction
+
+The `Model` class is shipped with powerful methods that allows you to fetch documents from the database, let's see it in depth.
+
+## Getting all documents
+
+To fetch all documents from database, you can use the `list` method:
+
+```ts
+import { User } from "./models/user";
+
+const users = await User.list();
+```
+
+This will fetch all documents from database and return an array of models.
+
+:::warning Not Recommended
+This is not recommended to be used if the collection contains a lot of documents, as it will load all documents into memory and may lead to performance issues, use paginate method instead.
+:::
+
+## Getting documents with certain filters
+
+To fetch documents with certain filters, you can use the same `list` method but with a filter object:
+
+```ts
+import { User } from "./models/user";
+
+const users = await User.list({
+  isActive: true,
+});
+```
+
+:::tip
+You can add any acceptable syntax to the [find method](https://www.mongodb.com/docs/drivers/node/current/usage-examples/find/) in MongoDB, you may also add second argument as options.
+:::
+
+## Finding Document By Id
+
+To find a document by its id, you can use the `find` method:
+
+```ts
+import { User } from "./models/user";
+
+const user = await User.find(5123);
+```
+
+This will return a single model instance, if no document found, it will return `null`.
+
+:::tip
+The `find` method accepts the value of the `id` property not `_id` property.
+:::
+
+## Finding Document By certain field
+
+To find a document by certain field, you can use the `findBy` method:
+
+```ts
+import { User } from "./models/user";
+
+const user = await User.findBy("_id", "5f9d2f5b2c9f6a1e3c9b1b1a");
+```
+
+This will return a single model instance, if no document found, it will return `null`.
+
+## Get first document
+
+To get the first document of the collection, you can use the `first` method:
+
+```ts
+import { User } from "./models/user";
+
+const user = await User.first();
+```
+
+You may pass a filter object to the `first` method to get the first document that matches the filter:
+
+```ts
+import { User } from "./models/user";
+
+const user = await User.first({
+  isActive: true,
+});
+```
+
+## Get last document
+
+To get the last document of the collection, you can use the `last` method:
+
+```ts
+import { User } from "./models/user";
+
+const user = await User.last();
+```
+
+You may pass a filter object to the `last` method to get the last document that matches the filter:
+
+```ts
+import { User } from "./models/user";
+
+const user = await User.last({
+  isActive: true,
+});
+```
+
+## Count collection documents
+
+To count the number of documents in a collection, you can use the `count` method:
+
+```ts
+import { User } from "./models/user";
+
+const count = await User.count();
+```
+
+You may pass a filter object to the `count` method to count the number of documents that matches the filter:
+
+```ts
+import { User } from "./models/user";
+
+const count = await User.count({
+  isActive: true,
+});
+```
+
+:::tip
+The count method may receive a second argument as options, it accepts the same options as the [countDocuments method](https://www.mongodb.com/docs/drivers/node/current/usage-examples/count/) in MongoDB.
+:::
+
+## Get distinct values
+
+To get distinct values of a field in a collection, you can use the `distinct` method:
+
+```ts
+import { User } from "./models/user";
+
+const emails = await User.distinct("email");
+```
+
+This will return an array of distinct values of the `email` field.
+
+To add more filters, you can pass a filter object as a second argument:
+
+```ts
+import { User } from "./models/user";
+
+const activeEmails = await User.distinct("email", {
+  isActive: true,
+});
+```
+
+## Explain query
+
+To get the query explanation, you can use the `explain` method:
+
+```ts
+import { User } from "./models/user";
+
+const explanation = await User.explain({
+  isActive: true,
+});
+```
+
+This will return an object that contains the query explanation.
+
+### Pagination
+
+To paginate the results, you can use the `paginate` method:
+
+```ts
+import { User } from "./models/user";
+
+const { documents: users, paginationInfo } = await User.paginate(1, 10);
+
+console.log(paginationInfo);
+```
+
+This will return an object that contains the paginated documents and pagination information.
+
+The `paginationInfo` will return an object containing the following schema:
+
+```ts
+type PaginationInfo = {
+  /**
+   * Limit of the query
+   */
+  limit: number;
+  /**
+   * Results of the query
+   */
+  result: number;
+  /**
+   * Current page of the query
+   */
+  page: number;
+  /**
+   * total results of the query
+   */
+  total: number;
+  /**
+   * total pages of the query
+   */
+  pages: number;
+};
+```
+
+:::success Please Note That
+The returned documents are an array of models not plain objects.
+:::

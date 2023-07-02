@@ -1,0 +1,120 @@
+---
+sidebar_position: 9
+---
+
+# Sorting
+
+Sorting is the process of arranging documents in a collection in a specific order, The `Aggregate` class provides multiple methods to easily sort your documents.
+
+## Sort method
+
+This is the basic method to sort using a single field.
+
+Method Signature:
+
+```ts
+public sort(field: string, order?: "asc" | "desc" = "asc"): this;
+```
+
+Example:
+
+```ts
+const users = await aggregate.sort("age", "desc").get();
+```
+
+> `orderBy` is an alias for `sort` method.
+
+## sortByDesc method
+
+This method is an alias for `sort` method with `desc` order.
+
+Method Signature:
+
+```ts
+public sortByDesc(field: string): this;
+```
+
+Example:
+
+```ts
+const users = await aggregate.sortByDesc("age").get();
+```
+
+> `orderByDesc` is an alias for `sortByDesc` method.
+
+## Sort By multiple fields
+
+If we want to sort by multiple fields, we can use `sortBy` method.
+
+Method Signature:
+
+```ts
+public sortBy(columns: Record<string, "desc" | "asc">): this;
+```
+
+Example:
+
+```ts
+const users = await aggregate
+  .sortBy({
+    age: "desc",
+    name: "asc",
+  })
+  .get();
+```
+
+This will update documents in the collection to be sorted by `age` in descending order, then by `name` in ascending order.
+
+## Sort randomly
+
+If you want to sort documents randomly, you can use `random` method, however, this method requires a `limit`.
+
+> @see [Sample](https://docs.mongodb.com/manual/reference/operator/aggregation/sample/)
+
+Method Signature:
+
+```ts
+public random(limit: number): this;
+```
+
+Example:
+
+```ts
+const users = await aggregate.random(10).get();
+```
+
+## Sort by latest
+
+We can use `latest` method to sort documents using `createdAt` field.
+
+> We can not rely on `_id` as it would return unexpected results if we used `_id`
+
+Method Signature:
+
+```ts
+public latest(column = "createdAt"): this;
+```
+
+Example:
+
+```ts
+const users = await aggregate.latest().get();
+```
+
+If you want to sort by a different column, you can pass it as the first argument.
+
+## Sort by oldest
+
+Same thing applies here but this time we use `oldest` method, If we need to sort documents by oldest documents first, we can use `oldest` method.
+
+Method Signature:
+
+```ts
+public oldest(column = "createdAt"): this;
+```
+
+Example:
+
+```ts
+const users = await aggregate.oldest().get();
+```

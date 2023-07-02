@@ -1,0 +1,121 @@
+---
+sidebar_position: 9
+---
+
+# Advanced Usage
+
+Aggregate class is also shipped with more useful methods to help you use queries easily.
+
+## Min
+
+To get minimum value of a field, we can use `min` method.
+
+Method Signature:
+
+```ts
+public min(field: string): number;
+```
+
+Example:
+
+```ts
+const minAge = await aggregate.min("age");
+```
+
+This will return the minimum age of all users.
+
+## Get Max value
+
+To get maximum value of a field, we can use `max` method.
+
+Method Signature:
+
+```ts
+public max(field: string): number;
+```
+
+Example:
+
+```ts
+const maxAge = await aggregate.max("age");
+```
+
+## Get Average value
+
+To get average value of a field, we can use `avg` method.
+
+Method Signature:
+
+```ts
+public avg(field: string): number;
+```
+
+Example:
+
+```ts
+const avgAge = await aggregate.avg("age");
+```
+
+> `average` is an alias for `avg` method.
+
+## Get Sum value
+
+To get sum value of a field, we can use `sum` method.
+
+Method Signature:
+
+```ts
+public sum(field: string): number;
+```
+
+Example:
+
+```ts
+const totalSalaries = await aggregate.sum("salary");
+```
+
+We can also use filters with it as well by using `where` method:
+
+```ts
+const totalSalaries = await aggregate.where("age", ">", 20).sum("salary");
+```
+
+## Get distinct values
+
+To get distinct values of a field, we can use `distinct` method.
+
+Method Signature:
+
+```ts
+public distinct(field: string): any[];
+```
+
+Example:
+
+```ts
+const distinctAges = await aggregate.distinct("age");
+```
+
+It will return an array of values.
+
+> Please note that if the field has a null value, it will be returned as well.
+
+You can also use `unique` method as an alias to it.
+
+## Get Distinct Heavy Values
+
+This method is similar to `distinct` method, but it will return the distinct values without the `null` values.
+
+Method Signature:
+
+```ts
+public distinctHeavy(field: string): any[];
+```
+
+Example:
+
+```ts
+const distinctAges = await aggregate.distinctHeavy("age");
+```
+
+> `uniqueHeavy` is an alias for `distinctHeavy` method.

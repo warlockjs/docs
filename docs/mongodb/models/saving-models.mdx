@@ -1,0 +1,213 @@
+---
+sidebar_position: 8
+---
+
+# Saving Models
+
+## Introduction
+
+In previous sections, we saw how to save models using multiple ways, so let's go more in depth here.
+
+## Types of saved models
+
+We have two types of saved models: the new models and the existing models.
+
+### New models
+
+We already discussed and saw to how to save new models, so let's take a quick example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = new Category({
+    name: "Sports",
+    isActive: true,
+  });
+
+  await category.save();
+
+  // or
+
+  const category2 = await Category.create({
+    name: "Sports",
+    isActive: true,
+  });
+}
+
+main();
+```
+
+So if we used the static method `create` it will create a new model and save it or we can do it in two steps by creating a new model and then save it.
+
+### Existing models
+
+We can save existing models by using the `save` method, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = await Category.find(1);
+
+  if (!category) return;
+
+  category.set("name", "Sports");
+
+  await category.save();
+}
+
+main();
+```
+
+So here we are updating the category name and then save it.
+
+We can also use the static method `update` to update a model:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = await Category.update(1, {
+    name: "Sports",
+  });
+}
+
+main();
+```
+
+This will update the category with the id `1` and set the name to `Sports` then returns the updated model instance.
+
+## Passing more data when saving model
+
+We can pass more data when saving a model, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = await Category.find(1);
+
+  if (!category) return;
+
+  category.set("name", "Sports");
+
+  await category.save({
+    refresh: true,
+  });
+}
+
+main();
+```
+
+So here we are passing an object to the `save` method, that we added the `refresh` property to it and set it to `true`.
+
+## Disable castings
+
+In some situations we need to save the model but without triggering the casts, this could be useful if we're updating the model using model events but we need to update only partial data, in this case we can pass to the second argument of the save method `cast` property with false value, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = await Category.find(1);
+
+  if (!category) return;
+
+  category.set("name", "Sports");
+
+  await category.save(
+    {},
+    {
+      cast: false,
+    }
+  );
+}
+
+main();
+```
+
+## Manually Generating the next ID
+
+In some scenarios, you might need to generate the next id even before saving the model, to achieve this we can use the `generateNextId` method, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = new Category({
+    name: "Sports",
+  });
+
+  const nextId = await category.generateNextId();
+
+  console.log(nextId); // 512344
+  console.log(category.id); // 512344
+}
+
+main();
+```
+
+This will generate the next id and assign it to the `id` property of the model.
+
+## Timestamps
+
+By default, when saving a new model, the `createdAt` and `updatedAt` properties will be set to the current date, if the model is being saved as `update` then only the `updatedAt` property will be set to the current date.
+
+You can change the name of timestamp columns in the model, let's take an example:
+
+```ts title="src/models/category.ts"
+import { Model } from "@mongez/mongodb";
+
+export class User extends Model {
+  /**
+   * The collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  public createdAtColumn = "createdAt";
+
+  /**
+   * {@inheritDoc}
+   */
+  public updatedAtColumn = "updatedAt";
+
+  /**
+   * {@inheritDoc}
+   */
+  public deletedAtColumn = "deletedAt";
+}
+```
+
+These are the default values, so if you want to change the name of the columns, you can override these properties.
+
+## Upsert
+
+In some situations, we need to update a model if it exists or create a new one if it doesn't exist, to achieve this we can use the `upsert` method, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = await Category.upsert(
+    {
+      name: "Sports",
+    },
+    {
+      name: "Sports",
+      isActive: true,
+    }
+  );
+}
+```
+
+So here we are trying to find a category with the name `Sports`, if it exists then it will update it, if it doesn't exist then it will create a new one.
+
+:::tip
+The first argument is the `filter` object to search for the model, the second argument is the data to update or create the model with.
+:::
+
+This will create a new model if it doesn't exist or update it if it exists.

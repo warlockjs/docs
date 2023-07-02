@@ -1,0 +1,381 @@
+---
+sidebar_position: 4
+---
+
+# Filtering
+
+Perform filtering on your data using the `where` methods.
+
+Mongez Aggregate class provides various methods to filter your data.
+
+## where
+
+The `where` method is used to filter documents based on a condition. It could take multiple forms:
+
+```ts
+  /**
+   * Add where stage
+   */
+  public where(column: string, value: any): this;
+  public where(column: string, operator: WhereOperator, value: any): this;
+  public where(column: Record<string, any>): this;
+```
+
+Let's have a look at each one of them:
+
+### Simple where stage
+
+If you just want to filter documents based on a single value equality, you can do this:
+
+```ts
+const users = await aggregate.where("id", 10).get();
+```
+
+Just pass the column name and the value you want to filter by.
+
+### Where with operator
+
+Alternatively, if you want to make more conditions, you can use the operator, here are the available operators:
+
+```ts
+const whereOperators = [
+  "=",
+  "!=",
+  "not",
+  ">",
+  ">=",
+  "<",
+  "<=",
+  "in",
+  "nin",
+  "notIn",
+  "all",
+  "exists",
+  "type",
+  "mod",
+  "regex",
+  "geoIntersects",
+  "geoWithin",
+  "near",
+  "between",
+  "notBetween",
+  "nearSphere",
+  "elemMatch",
+  "size",
+  "like",
+  "notLike",
+  "startsWith",
+  "endsWith",
+];
+```
+
+It could be any of the previous operators, let's take some examples:
+
+```ts
+const users = await aggregate.where("id", ">", 10).get();
+const users = await aggregate.where("id", "in", [1, 2, 3]).get();
+const users = await aggregate.where("id", "between", [1, 10]).get();
+```
+
+### Where with object
+
+Another way to filter documents is to pass an object to the `where` method, this object should have the column name as a key, and the value should be the value you want to filter by.
+
+Method signature:
+
+```ts
+public where(column: Record<string, any>): this;
+```
+
+```ts
+const users = await aggregate.where({ id: 10 }).get();
+```
+
+You can also use the built-in Mongodb operators:
+
+```ts
+const users = await aggregate.where({ id: { $gt: 10 } }).get();
+```
+
+:::tip Did you know?
+You can use [$agg utility](./agg) to easily use built-in operators directly.
+:::
+
+## Where null
+
+If you want to filter documents based on a null value, you can use the `whereNull` method:
+
+Method signature:
+
+```ts
+public whereNull(column: string): this;
+```
+
+```ts
+const users = await aggregate.whereNull("id").get();
+```
+
+This will return all users that have `id = null`.
+
+## Where not null
+
+If you want to filter documents based on a not null value, you can use the `whereNotNull` method:
+
+Method signature:
+
+```ts
+public whereNotNull(column: string): this;
+```
+
+```ts
+const users = await aggregate.whereNotNull("id").get();
+```
+
+## Where in
+
+If you want to filter documents based on a list of values, you can use the `whereIn` method:
+
+Method signature:
+
+```ts
+public whereIn(column: string, value: any[]): this;
+```
+
+```ts
+const users = await aggregate.whereIn("id", [1, 2, 3]).get();
+```
+
+If the second argument is a string, then it will be treated as a `column name`.
+
+## Where not in
+
+If you want to filter documents based on a list of values, you can use the `whereNotIn` method:
+
+Method signature:
+
+```ts
+public whereNotIn(column: string, value: any[]): this;
+```
+
+```ts
+const users = await aggregate.whereNotIn("id", [1, 2, 3]).get();
+```
+
+If the second argument is a string, then it will be treated as a `column name`.
+
+## Where between
+
+If you want to filter documents based on a range of values, you can use the `whereBetween` method:
+
+Method signature:
+
+```ts
+public whereBetween(column: string, value: [any, any]): this;
+```
+
+```ts
+const users = await aggregate.whereBetween("id", [1, 10]).get();
+```
+
+## Where not between
+
+If you want to filter documents based on a range of values, you can use the `whereNotBetween` method:
+
+Method signature:
+
+```ts
+public whereNotBetween(column: string, value: [any, any]): this;
+```
+
+```ts
+const users = await aggregate.whereNotBetween("id", [1, 10]).get();
+```
+
+## Where like
+
+If you want to filter documents based on a string pattern, you can use the `whereLike` method:
+
+Method signature:
+
+```ts
+public whereLike(column: string, value: string): this;
+```
+
+```ts
+const users = await aggregate.whereLike("name", "John").get();
+```
+
+This will return all users that have `name` column that contains `John`.
+
+> If the second argument is a string, the value will be case-insensitive.
+
+You can also pass a `regex` object:
+
+```ts
+const users = await aggregate.whereLike("name", /John/i).get();
+```
+
+## Where not like
+
+If you want to filter documents based on a string pattern, you can use the `whereNotLike` method:
+
+Method signature:
+
+```ts
+public whereNotLike(column: string, value: string): this;
+```
+
+```ts
+const users = await aggregate.whereNotLike("name", "John").get();
+```
+
+This will return all users that have `name` column that does not contain `John`.
+
+> If the second argument is a string, the value will be case-insensitive.
+
+## Where starts with
+
+If you want to filter documents based on a string pattern, you can use the `whereStartsWith` method:
+
+Method signature:
+
+```ts
+public whereStartsWith(column: string, value: string): this;
+```
+
+```ts
+const users = await aggregate.whereStartsWith("name", "John").get();
+```
+
+This will return all users that have `name` column that starts with `John`.
+
+> The value will be case-sensitive.
+
+## Where ends with
+
+If you want to filter documents based on a string pattern, you can use the `whereEndsWith` method:
+
+Method signature:
+
+```ts
+public whereEndsWith(column: string, value: string): this;
+```
+
+```ts
+const users = await aggregate.whereEndsWith("name", "John").get();
+```
+
+This will return all users that have `name` column that ends with `John`.
+
+> The value will be case-sensitive.
+
+## Where date between
+
+If you want to filter documents based on a date range, you can use the `whereDateBetween` method:
+
+Method signature:
+
+```ts
+public whereDateBetween(column: string, value: [Date, Date]): this;
+```
+
+```ts
+const users = await aggregate
+  .whereDateBetween("createdAt", [
+    new Date("2020-01-01"),
+    new Date("2020-12-31"),
+  ])
+  .get();
+```
+
+## Where date not between
+
+Filter documents that are not between a date range.
+
+Method signature:
+
+```ts
+public whereDateNotBetween(column: string, value: [Date, Date]): this;
+```
+
+```ts
+const users = await aggregate
+  .whereDateNotBetween("createdAt", [
+    new Date("2020-01-01"),
+    new Date("2020-12-31"),
+  ])
+  .get();
+```
+
+## Where exists
+
+This method will filter documents based on the existence of a column.
+
+Method signature:
+
+```ts
+public whereExists(column: string): this;
+```
+
+```ts
+const users = await aggregate.whereExists("name").get();
+```
+
+## Where not exists
+
+This method will filter documents based on the existence of a column.
+
+Method signature:
+
+```ts
+public whereNotExists(column: string): this;
+```
+
+```ts
+const users = await aggregate.whereNotExists("name").get();
+```
+
+## Where near
+
+This method will filter documents based on the distance between two points.
+
+## Or Where
+
+If we need to filter if any of the conditions is true, we can use `orWhere` method.
+
+```ts
+const users = await aggregate
+  .orWhere({
+    id: 10,
+    name: "John",
+  })
+  .get();
+```
+
+This will return all users that have either `id = 10` or `name = John`.
+
+You can also use the [$agg utility](./agg) to use built-in operators:
+
+Before:
+
+```ts
+const users = await aggregate
+  .orWhere({
+    id: { $gt: 10 },
+    name: { $regex: /john/i },
+  })
+  .get();
+```
+
+After:
+
+```ts
+import { $agg } from "@mongez/mongodb";
+
+const users = await aggregate
+  .orWhere({
+    id: $agg.gt(10),
+    name: $agg.like("john"),
+  })
+  .get();
+```

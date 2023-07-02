@@ -1,0 +1,77 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+Mongez MongoDB is a package that helps you to connect to MongoDB database and perform CRUD operations for nodejs.
+
+## Why Mongez MongoDB?
+
+There are few packages that manages MongoDB for nodejs applications, most popular one is [Mongoose](https://mongoosejs.com/). But Mongoose is in somehow a little bit hard to use,
+also there is [Prisma](https://www.prisma.io/) which is a great package, it manages multiple databases drivers, but not the best for MongoDB.
+
+## Mongez MongoDB Features
+
+- **Easy to use:** Mongez MongoDB is very easy to use, it's just a wrapper around MongoDB driver.
+- **Supports multiple connections:** You can perform multiple connections to different MongoDB connections and use each one of them separately.
+- **Supports multiple databases:** Mongez MongoDB supports multiple databases, you can connect to multiple databases at the same time.
+- **Powerful Aggregate framework:** Mongez MongoDB has a powerful aggregate framework that helps you to perform complex queries.
+- **Basic CRUD operations:** Mongez MongoDB supports basic CRUD operations, you can perform create, read, update and delete operations.
+- **Events Driven:** Mongez MongoDB is events driven, you can listen to events and perform actions, for example before creating, updating or deleting a document.
+- **Powerful Models:** Mongez MongoDB has a powerful models system, a Model is a collection manager document based, it manages a collection's document easily with many utilities.
+- **Learning curve:** Mongez MongoDB has a very small learning curve, you can learn it in few minutes.
+- **Pagination support:** Mongez MongoDB supports pagination, you can paginate your results easily.
+- **Output formatting:** Mongez MongoDB supports output formatting, you can format your output easily when model is sent as a response.
+- **Auto incremented id:** Mongez MongoDB supports auto incremented id, you can use it as a primary key for your documents.
+- **Random or sequential id:** Mongez MongoDB supports random or sequential id.
+- **Recycle Bin:** Reduce collection documents by removing the document entirely from the collection, but move it to a separate collection trash.
+- **Migration system:** Mongez MongoDB has a migration system, you can create migrations and run them easily.
+- **Data casting:** You can cast your data to a specific type or using custom casting.
+
+And many more features.
+
+## Peek inside Mongez MongoDB
+
+Here is a simple example of defining a User model:
+    
+```ts title="src/models/user.ts"
+import { Model } from '@mongez/mongodb';
+
+export class User extends Model {
+    /**
+     * The collection name
+     * Must be defined explicitly.
+    */
+    public static collection = 'users';
+}
+```
+
+And here is how to use it:
+
+```ts title="src/controllers/users.ts"
+
+import { User } from 'src/models/user';
+
+export async function createUser() {
+    const user = await User.create({
+        name: "Hasan Zohdy",
+        email: "hassanzohdy@gmail.com",
+    });
+
+    console.log(user.data);
+}
+```
+
+Outputs something similar to:
+
+```json
+{
+    "id": 1231412,
+    "_id": "fagtrw43qwedasjoijwq",
+    "name": "Hasan Zohdy",
+    "email": "hassanzohdy@gmail.com",
+    createdAt: "2023-06-01 00:00:00",
+    updatedAt: "2023-06-01 00:00:00",
+}
+```

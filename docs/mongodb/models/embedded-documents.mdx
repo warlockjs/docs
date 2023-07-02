@@ -1,0 +1,338 @@
+---
+sidebar_position: 7
+---
+
+# Embedded documents
+
+## Introduction
+
+MongoDB flexibility allows us to store documents inside other documents. This is called embedded documents. In this section, we will learn how to use embedded documents using Mongez MongoDB.
+
+## Embedded data
+
+Let's take a simple example of a category model:
+
+```ts title="src/models/category.ts"
+import { Model, Casts } from "@mongez/mongodb";
+
+export class Category extends Model {
+
+  /**
+   * Collection name
+   */
+  public static collection = "categories";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    isActive: "boolean",
+  };
+}
+```
+
+This category model has a simple structure, let's create a new category:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+    const category = await Category.create({
+        name: "Sports",
+        isActive: true,
+    });
+
+    console.log(category.data);
+}
+
+main();
+```
+
+This will create a new category, and the `category.data` will be something like this:
+
+```json
+{
+    "id": 512312,
+    "_id": "5f9b1b3c1b9c4e0b4c7b23a1",
+    "name": "Sports",
+    "isActive": true,
+    "createdAt": "2020-10-30T12:00:00.000Z",
+    "updatedAt": "2020-10-30T12:00:00.000Z"
+}
+```
+
+The category that we created we need to embed it into our post model.
+
+```ts title="src/models/post.ts"
+import { Model, Casts, castModel } from "@mongez/mongodb";
+import { Category } from "./category";
+
+export class Post extends Model {
+
+  /**
+   * Collection name
+   */
+  public static collection = "posts";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    title: "string",
+    content: "string",
+    category: castModel(Category),
+  };
+}
+```
+
+Now we can create a new post and embed the category into it:
+
+```ts title="src/app.ts"
+import { Post } from "./models/post";
+
+async function main() {
+    const post = await Post.create({
+        title: "Hello world",
+        content: "This is my first post",
+        category: 512312,
+    });
+
+    console.log(post.data);
+}
+
+main();
+```
+
+The output will be something like this:
+
+```json
+{
+    "id": 512312,
+    "_id": "5f9b1b3c1b9c4e0b4c7b23a1",
+    "title": "Hello world",
+    "content": "This is my first post",
+    "category": {
+        "id": 512312,
+        "_id": "5f9b1b3c1b9c4e0b4c7b23a1",
+        "name": "Sports",
+        "isActive": true,
+        "createdAt": "2020-10-30T12:00:00.000Z",
+        "updatedAt": "2020-10-30T12:00:00.000Z"
+    },
+    "createdAt": "2020-10-30T12:00:00.000Z",
+    "updatedAt": "2020-10-30T12:00:00.000Z"
+}
+```
+
+The data of the injected category has some redundant fields such as `_id`, `createdAt`, and `updatedAt`. In that sense, we can specify what data to be embedded from the category model:
+
+## Defining what data to be embedded
+
+Now we illustrated the problem, let's see how to solve it, when we want to specify what data to be embedded when the model is going to be embedded in another document, we can define the getter property `embeddedData` in the category model:
+
+```ts title="src/models/category.ts" 
+import { Model, Casts } from "@mongez/mongodb";
+
+export class Category extends Model {
+
+  /**
+   * Collection name
+   */
+  public static collection = "categories";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    isActive: "boolean",
+  };
+
+  /**
+   * {@inheritDoc}
+   */
+  public get embeddedData() {
+    return this.only(['id', 'name']);
+  }
+}
+```
+
+Now when we create a new post, the category data will be something like this:
+
+```json
+{
+    "id": 512312,
+    "_id": "5f9b1b3c1b9c4e0b4c7b23a1",
+    "title": "Hello world",
+    "content": "This is my first post",
+    "category": {
+        "id": 512312,
+        "name": "Sports",
+    },
+    "createdAt": "2020-10-30T12:00:00.000Z",
+    "updatedAt": "2020-10-30T12:00:00.000Z"
+}
+```
+
+This makes the data more clean and readable and most important we added only what we need.
+
+## Using embedded property.
+
+Mongez `Model` class already implemented the `embeddedData` for you, to make it easier we can define the `embedded` property that receives the array of fields that we need to embed:
+
+```ts title="src/models/category.ts"
+import { Model, Casts } from "@mongez/mongodb";
+
+export class Category extends Model {
+
+  /**
+   * Collection name
+   */
+  public static collection = "categories";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    isActive: "boolean",
+  };
+
+  /**
+   * {@inheritDoc}
+   */
+  public embedded = ['id', 'name'];
+}
+```
+
+This is the same as defining the `embeddedData` getter property but in a more readable and simpler way.
+
+## Embed documents except timestamps
+
+When we embed a document, we don't need to embed the timestamps,  To exclude the timestamps from the embedded document, we can use the `embedAllExceptTimestampsAndUserColumns` property:
+
+```ts title="src/models/category.ts"
+import { Model, Casts } from "@mongez/mongodb";
+
+export class Category extends Model {
+
+  /**
+   * Collection name
+   */
+  public static collection = "categories";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    isActive: "boolean",
+  };
+
+  /**
+   * {@inheritDoc}
+   */
+  public embedAllExceptTimestampsAndUserColumns = true;
+}
+```
+
+## Embed all data except
+
+We can also exclude only some fields from the embedded document, to do that we can use the `embedAllExcept` property:
+
+```ts title="src/models/category.ts"
+import { Model, Casts } from "@mongez/mongodb";
+
+export class Category extends Model {
+
+  /**
+   * Collection name
+   */
+  public static collection = "categories";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    isActive: "boolean",
+  };
+
+  /**
+   * {@inheritDoc}
+   */
+  public embedAllExcept = ['isActive'];
+}
+```
+
+## Default embedded data
+
+If none of the above embedded data properties are defined, then the default embedded data will be the entire document data.
+
+:::warning DO NOT DO THIS
+It's highly recommended to define the embedded data to avoid embedding the entire document data, this will cause a huge performance issue and the database size will increase dramatically.
+:::
+
+## Documents Association
+
+Let's say we have a post, with list of comments, we need to add the comment to the post's comments list, we can do this using `associate` method.
+
+```ts title="src/app.ts"
+import { Post } from "./models/post";
+import { Comment } from "./models/comment";
+
+const post = await Post.first();
+
+const comment = await Comment.create({
+    content: "This is my first comment",
+    post: post.only(['id']),
+});
+
+post.associate('comments', comment);
+
+await post.save();
+```
+
+The `associate` method will add the comment to the post's comments list, and save the post.
+
+:::tip
+If the second argument is an instance of model, then the `associate` method will use the `embeddedData` property to embed the document.
+:::
+
+To add certain fields, you must pass a plain object instead:
+
+```ts title="src/app.ts"
+post.associate('comments', comment.only(['id', 'content']));
+
+// or using plain object
+post.associate('comments', comment.embedToPost); // you need to define it in the comment model
+```
+
+## Re-associate documents
+
+The `associate` method works only when we need to add new document to the list, but what if we need to update the comment inside the post's comments list? we can use the `reAssociate` method:
+
+```ts title="src/app.ts"
+const comment = await Comment.first();
+
+post.reassociate('comments', comment);
+
+await post.save();
+```
+
+:::tip
+You can use the `reassociate` method to add new document to the list, but it's recommended to use the `associate` method instead.
+:::
+
+## Disassociate documents
+
+If you want to pull a document from the list, you can use the `disassociate` method:
+
+```ts title="src/app.ts"
+const comment = await Comment.first();
+
+post.disassociate('comments', comment);
+
+await post.save();
+```

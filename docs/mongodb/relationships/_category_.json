@@ -1,0 +1,8 @@
+{
+  "label": "Relationships",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "description": "How to sync embedded documents in an easy way.",
+  }
+}
