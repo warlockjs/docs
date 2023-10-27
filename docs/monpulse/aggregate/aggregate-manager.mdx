@@ -1,0 +1,21 @@
+---
+sidebar_position: 2
+---
+
+# Aggregate Class
+
+We had a quick overview over the [MongoDB Aggregate Framework](https://docs.mongodb.com/manual/aggregation/), now let's see how we can use it in our application.
+
+## Create a new Aggregate
+
+Let's start by creating a new Aggregate instance:
+
+```ts
+import { Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users"); // pass the collection name
+
+const usersList = await aggregate.where("id", ">=", 10).get();
+```
+
+Consider using the `aggregate` class as a query builder, it will help you build your query in a more readable way.

@@ -1,0 +1,62 @@
+---
+sidebar_position: 3
+---
+
+# Installation
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+<Tabs>
+  <TabItem value="NPM" label="NPM" default>
+
+```bash
+npm i @mongez/monpulse
+```
+
+  </TabItem>
+  <TabItem value="Yarn" label="Yarn">
+
+```bash
+yarn add @mongez/monpulse
+```
+
+  </TabItem>
+  <TabItem value="Pnpm" label="Pnpm">
+
+```bash
+pnpm add @mongez/monpulse
+```
+
+  </TabItem>
+</Tabs>
+
+:::note
+[Mongez Config](https://github.com/hassanzohdy/mongez-config) is a dependency for this package, you can use it to set up your application configuration.
+:::
+
+:::tip
+It's recommended to use Typescript in your project, this documentation will be using Typescript.
+:::
+
+## Timezone
+
+To enable time zone conversion you need to set it up in your application configuration.
+
+```ts {5}
+import config from '@mongez/config';
+
+config.set({
+    app: {
+        timezone: 'Africa/Cairo', 
+    }
+})
+```
+
+## Current MongoDB Version
+
+Current MongoDB version is `6.0.6`, which is the latest version of MongoDB and current version of MongoDB Nodejs Driver is `5.5`.
+
+:::tip
+The package will be updated whenever a new version is released of MongoDB.
+:::

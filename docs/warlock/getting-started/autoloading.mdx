@@ -1,0 +1,50 @@
+---
+sidebar_position: 4
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+# Autoloading
+
+`Warlock` works out of the box by auto-loading all necessary files to be loaded automatically with no need to import them manually.
+
+Here are the files that are being auto-loaded in order:
+
+- `src/config/index.ts`: this file should always export a default `function`
+- `src/main.ts`: loaded after importing the configuration file
+- `src/app/main.ts`: loaded after the http server and database connection is warming up (But not yet connected)
+
+These are the main files that are being loaded, now let's see what happens inside each module.
+
+## Loading modules
+
+As mentioned in the previous chapter, each directory inside the `src/app` directory is considered as a `module`. **Warlock** will try to locate and import the following files from each module:
+
+- `module/main.ts`: this file will be loaded first if exists.
+- `module/utils/locales.ts`: this file will be loaded after calling `module/main.ts` if exists.
+- `module/routes.ts`: this file will be loaded after calling `module/utils/locales.ts` if exists.
+- `module/events`: this directory will be loaded after calling `module/routes.ts` if exists.
+
+## Module localization file
+
+As mentioned each module has a `utils` directory, inside that directory `Warlock` will try to find `locales.ts` file and if it is found it will be imported.
+
+## Module routes file
+
+This file will be called after calling `module/main.ts` and `module/utils/locales.ts` if exists.
+
+The file is responsible for defining the module routes either grouped by middleware, or using restful resources or just basic routes.
+
+## Module Events
+
+The events directory mainly handles all events that needed to be called when certain events are triggered, it's very essential concept you should use in any successful and scalable application.
+
+Loading events can be done via two ways:
+
+1. If the `module/events` has an `index.ts` file. then the file will be loaded.
+2. if the `module/events` has no `index.ts`, then all files located inside the events directory will be imported.
+
+## Autoloading Ordering
+
+Please note that the order of the modules is very important, the modules will be loaded in alphabetical order, so if you have a module called `users` and another module called `posts`, then the `users` module will be loaded first.

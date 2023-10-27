@@ -1,0 +1,439 @@
+---
+sidebar_position: 2
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+# Embedded Documents
+
+Embedded documents concept is a core feature of MongoDB, and it is very useful when you want to store related data in the same document. This is a very common practice in MongoDB, and it is called **Embedded Relationships**.
+
+It makes the query faster because when we fetch the post we don't have to lookup the `users` collection to get the author's data, it is already there.
+
+Before we continue, Let's create three models that we'll use in all of our examples
+
+<Tabs>
+  <TabItem value="user" label="User Model" default>
+
+```ts src/app/models/user.ts
+import { Model, Casts } from "@mongez/monpulse";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    image: "string",
+    email: "string",
+    password: "string",
+  };
+}
+```
+
+  </TabItem>
+  <TabItem value="comment" label="Comment Model">
+
+```ts src/app/models/comment.ts
+import { Model, Casts } from "@mongez/monpulse";
+
+export class Comment extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "comments";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    comment: "string",
+    createdBy: "object",
+  };
+}
+```
+
+  </TabItem>
+  <TabItem value="post" label="Post Model">
+
+```ts src/app/models/post.ts{15,16}
+import { Model, Casts } from "@mongez/monpulse";
+
+export class Post extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "posts";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    title: "string",
+    content: "string",
+    author: "object", // user object
+    comments: "array", // array of comments
+  };
+}
+```
+
+  </TabItem>
+</Tabs>
+
+## Embedding Documents
+
+There are two types of embedded documents:
+
+1. Embedding Single document
+2. Embedding Multiple documents
+
+### Embedding Single Document
+
+Consider embedding single document as a `hasOne` relationship in SQL databases, where the document contains only one embedded document.
+
+For example, the post has an `author` so the author will be embedded inside the post document as a single document, for example:
+
+```json
+{
+  "id": 1,
+  "title": "Hello World",
+  "content": "This is the post body",
+  "author": {
+    "id": 5122,
+    "name": "John Doe",
+    "image": "https://example.com/image.jpg"
+  }
+}
+```
+
+Let's see how we can achieve this using models
+
+```ts src/app.ts {13}
+import { Post } from "./models/post";
+import { User } from "./models/user";
+
+async function main() {
+  const author = await User.create({
+    name: "John Doe",
+    image: "https://example.com/image.jpg",
+  });
+
+  const post = await Post.create({
+    title: "Hello World",
+    content: "This is the post body",
+    author: author.embeddedData, // embed the author data
+  });
+}
+
+main();
+```
+
+What we've done here is we created a new user, which is basically a very simple operation, then we created a new post and we embedded the author's data inside the post document using the `embeddedData` property.
+
+The data of the author that will be stored will be the following:
+
+```json
+{
+  "id": 5122,
+  "name": "John Doe",
+  "image": "https://example.com/image.jpg",
+  "createdAt": "2023-01-01T00:00:00.000Z",
+  "updatedAt": "2023-01-01T00:00:00.000Z"
+}
+```
+
+:::tip Did you know?
+The `embeddedData` property is a getter that returns the embedded data of the model, it is used internally by the model to embed the data, if you do not override it, it will return the whole model data. Thus, you **should override** it to return only the data you want to embed.
+:::
+
+### Specifying the Embedded Data
+
+As mentioned earlier, using `embeddedData` property will embed the whole model data, but what if you want to embed only the `id`, `name` and `image` of the author?
+
+Well, let's then update our `User` model to return only the data we want to embed
+
+```ts src/app/models/user.ts{22,23,24}
+import { Model, Casts } from "@mongez/monpulse";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    image: "string",
+    email: "string",
+    password: "string",
+  };
+
+  /**
+   * {@inheritDoc}
+   */
+  public get embeddedData() {
+    return this.only(["id", "name", "image"]);
+  }
+}
+```
+
+This will reduce the embedded documents when we embed the user data inside the post document to the following:
+
+```json
+{
+  "id": 5122,
+  "name": "John Doe",
+  "image": "https://example.com/image.jpg"
+}
+```
+
+Another way to define the embedded columns is by defining the `embedded` property, it is an array of columns that will be embedded, for example:
+
+```ts src/app/models/user.ts{22}
+import { Model, Casts } from "@mongez/monpulse";
+
+export class User extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    image: "string",
+    email: "string",
+    password: "string",
+  };
+
+  /**
+   * {@inheritDoc}
+   */
+  public embedded = ["id", "name", "image"];
+}
+```
+
+That's how we can embed single documents, let's now see how we can embed multiple documents.
+
+:::tip
+When using [castModel](./../models/casting-data#castmodel), the `embeddedData` property will be used to embed the data, so you don't have to worry about it.
+:::
+
+### Embedding Multiple Documents
+
+Embedding multiple documents is basically adding list of documents inside one column of a parent document, for example we can insert list of comments inside a single post
+
+:::warning
+It's not **recommended** to store large documents like comments inside a single post, if the post has a lot of comments, it will be very slow to retrieve the post data, instead you should use **referencing documents** to store the comments in a separate collection.
+:::
+
+### Associating Documents
+
+To associate documents, we use the `associate` method, it takes three arguments:
+
+1. The column name
+2. The model class
+3. the embedded property name, default to `embeddedData`
+
+Let's see an example
+
+```ts src/app.ts {25}
+import { Post } from "./models/post";
+import { User } from "./models/user";
+import { Comment } from "./models/comment";
+
+async function main() {
+  const author = await User.create({
+    name: "John Doe",
+    image: "https://example.com/image.jpg",
+  });
+
+  // now let's create a new post model
+  const post = new Post({
+    title: "Hello World",
+    content: "This is the post body",
+    author: author.embeddedData,
+  });
+
+  // create new comment
+  const comment = await Comment.create({
+    content: "This is a comment",
+    createdBy: author.embeddedData,
+  });
+
+  // let's add that comment to the post
+  post.associate("comments", comment);
+
+  post.save();
+}
+
+main();
+```
+
+This will inject the comment into our post in `comments` column, we can specify the embedded property name by passing the third argument to the `associate` method
+
+```ts src/app.ts {25}
+import { Post } from "./models/post";
+import { User } from "./models/user";
+import { Comment } from "./models/comment";
+
+async function main() {
+  const author = await User.create({
+    name: "John Doe",
+    image: "https://example.com/image.jpg",
+  });
+
+  // now let's create a new post model
+  const post = new Post({
+    title: "Hello World",
+    content: "This is the post body",
+    author: author.embeddedData,
+  });
+
+  // create new comment
+  const comment = await Comment.create({
+    content: "This is a comment",
+    createdBy: author.embeddedData,
+  });
+
+  // let's add that comment to the post
+  post.associate("comments", comment, "embedToPost");
+
+  post.save();
+}
+
+main();
+```
+
+Let's define that `embedToPost` property in our `Comment` model
+
+```ts src/app/models/comment.ts {28}
+import { Model, Casts } from "@mongez/monpulse";
+
+export class Comment extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "comments";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    content: "string",
+    createdBy: "object",
+  };
+
+  /**
+   * {@inheritDoc}
+   */
+  public get embeddedData() {
+    return this.only(["id", "content", "createdBy"]);
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  public get embedToPost() {
+    return this.only(["id", "content", "createdBy", "createdAt"]);
+  }
+}
+```
+
+> If the `comments` field does not exist, it will be created automatically
+
+### Re-Associating Documents
+
+Consider the `reassociate` method as an update for the document inside the parent document, for example, if the comment's data is updated, we can re-associate it to the post to update the comment data inside the post
+
+```ts src/app.ts {14}
+import { Post } from "./models/post";
+import { User } from "./models/user";
+import { Comment } from "./models/comment";
+
+async function main() {
+  const comment = await Comment.find(1);
+
+  comment.set("comment", "a new comment");
+
+  comment.save();
+
+  const post = await Post.find(1);
+
+  post.reassociate("comments", comment);
+
+  post.save();
+}
+
+main();
+```
+
+The `reassociate` method does multiple things, first off, it checks is the `comments` field exists, if not then it creates a new one, then it checks if the comment exists inside the `comments` field, if not then it pushes it to the `comments` field, if it exists then it updates the comment data inside the `comments` field in the same index.
+
+You may also pass the third argument to the `reassociate` method to specify the embedded property name
+
+```ts src/app.ts {14}
+import { Post } from "./models/post";
+import { User } from "./models/user";
+import { Comment } from "./models/comment";
+
+async function main() {
+  const comment = await Comment.find(1);
+
+  comment.set("comment", "a new comment");
+
+  comment.save();
+
+  const post = await Post.find(1);
+
+  post.reassociate("comments", comment, "embedToPost");
+
+  post.save();
+}
+
+main();
+```
+
+:::tip Did you know?
+The `reassociate` method can work exactly like the `associate` method, so you can use it to associate new documents to the parent document, but its always **recommended** to use the `associate` method to associate new documents.
+:::
+
+### Disassociating Documents
+
+I guess you already know what the `disassociate` method does, it removes the document from the parent document, let's see an example
+
+```ts src/app.ts {13}
+import { Post } from "./models/post";
+import { User } from "./models/user";
+import { Comment } from "./models/comment";
+
+async function main() {
+  const comment = await Comment.find(1);
+
+  const post = await Post.find(1);
+
+  post.reassociate("comments", comment);
+
+  // now let's disassociate (remove) the comment from the post
+  post.disassociate("comments", comment);
+
+  post.save();
+}
+
+main();
+```
+
+:::info Embedded Objects
+Any one of the three methods, should receive the embedded model as second argument, but you may also pass any type of data, for example the field could be an array of strings, or an array of numbers, if the second argument is an object, the methods will look for `id` inside it as a unique identifier, if it's not found, then it will search by the entire value regardless of the type, if not found in `reassociate` method, then it will push it to the array, if not found in `disassociate` method, then it will do nothing.
+:::

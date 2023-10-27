@@ -1,0 +1,263 @@
+---
+sidebar_position: 3
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+# Project Structure
+
+Once the project is done, you'll find two main directories `src` and `storage` with some files, let's see the project tree and go through each file and directory.
+
+<Tabs>
+  <TabItem value="Yarn" label="Simple Structure">
+
+```bash
+├── src
+│   ├── app
+│   │   ├── home
+│   │   │   ├── controllers
+│   │   │   ├── routes.ts
+│   │   ├── uploads
+│   │   │   ├── routes.ts
+│   │   ├── users
+│   │   │   ├── components
+│   │   │   ├── controllers
+│   │   │   │   ├── auth
+│   │   │   │   │   ├── social
+│   │   │   │   ├── profile
+│   │   │   │   ├── restful-users.ts
+│   │   │   ├── events
+│   │   │   ├── mail
+│   │   │   ├── models
+│   │   │   │   ├── user
+│   │   │   ├── output
+│   │   │   ├── repositories
+│   │   │   ├── utils
+│   │   │   ├── validation
+│   │   │   ├── routes.ts
+│   │   ├── users-groups
+│   │   │   ├── controllers
+│   │   │   ├── models
+│   │   │   │   ├── users-group
+│   │   │   ├── output
+│   │   │   ├── repositories
+│   │   │   ├── routes.ts
+│   │   ├── utils
+│   │   ├── main.ts
+│   ├── config
+│   │   ├── app.ts
+│   │   ├── auth.ts
+│   │   ├── cache.ts
+│   │   ├── cors.ts
+│   │   ├── database.ts
+│   │   ├── http.ts
+│   │   ├── index.ts
+│   │   ├── mail.ts
+│   │   ├── upload.ts
+│   │   ├── validation.ts
+│   ├── main.ts
+├── storage
+├── .env
+├── warlock.config.ts
+```
+
+  </TabItem>
+  <TabItem value="NPM" label="Full Structure">
+
+```bash
+├── src
+│   ├── app
+│   │   ├── home
+│   │   │   ├── controllers
+│   │   │   │   ├── admin-home.ts
+│   │   │   │   ├── user-home.ts
+│   │   │   ├── routes.ts
+│   │   ├── uploads
+│   │   │   ├── routes.ts
+│   │   ├── users
+│   │   │   ├── components
+│   │   │   │   ├── VerificationMail.tsx
+│   │   │   ├── controllers
+│   │   │   │   ├── auth
+│   │   │   │   │   ├── social
+│   │   │   │   │   │   ├── facebook-login.ts
+│   │   │   │   │   │   ├── google-login.ts
+│   │   │   │   │   ├── activate-account.ts
+│   │   │   │   │   ├── admin-login.ts
+│   │   │   │   │   ├── create-account.ts
+│   │   │   │   │   ├── forget-password.ts
+│   │   │   │   │   ├── login.ts
+│   │   │   │   │   ├── logout.ts
+│   │   │   │   │   ├── resend-activation-code.ts
+│   │   │   │   │   ├── reset-password.ts
+│   │   │   │   │   ├── verify-forget-password-code.ts
+│   │   │   │   ├── profile
+│   │   │   │   │   ├── change-password.ts
+│   │   │   │   │   ├── my-profile.ts
+│   │   │   │   │   ├── update-profile.ts
+│   │   │   │   ├── restful-users.ts
+│   │   │   ├── events
+│   │   │   │   ├── attach-user-to-response.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── register-current-user-to-model-authors.ts
+│   │   │   │   ├── update-authors.ts
+│   │   │   │   ├── update-user-last-activity.ts
+│   │   │   ├── mail
+│   │   │   │   ├── confirmRegistrationMail.tsx
+│   │   │   │   ├── sendForgetPasswordEmail.ts
+│   │   │   ├── models
+│   │   │   │   ├── user
+│   │   │   │   │   ├── user.ts
+│   │   │   │   │   ├── setup.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   ├── login
+│   │   │   │   │   ├── login.ts
+│   │   │   │   │   ├── setup.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   ├── output
+│   │   │   │   ├── user-output.ts
+│   │   │   ├── repositories
+│   │   │   │   ├── users-repository.ts
+│   │   │   ├── utils
+│   │   │   │   ├── cast-password.ts
+│   │   │   │   ├── locales.ts
+│   │   │   ├── validation
+│   │   │   │   ├── profile-data-rules.ts
+│   │   │   │   ├── validate-user-forget-password-code.ts
+│   │   │   ├── routes.ts
+│   │   ├── users-groups
+│   │   │   ├── controllers
+│   │   │   │   ├── restful-users-groups.ts
+│   │   │   ├── models
+│   │   │   │   ├── users-group
+│   │   │   │   │   ├── users-group.ts
+│   │   │   │   │   ├── setup.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   ├── output
+│   │   │   │   ├── users-group-output.ts
+│   │   │   ├── repositories
+│   │   │   │   ├── users-groups-repository.ts
+│   │   │   ├── routes.ts
+│   │   ├── utils
+│   │   │   ├── output.ts
+│   │   │   ├── router.ts
+│   │   ├── main.ts
+│   ├── config
+│   │   ├── app.ts
+│   │   ├── auth.ts
+│   │   ├── cache.ts
+│   │   ├── cors.ts
+│   │   ├── database.ts
+│   │   ├── http.ts
+│   │   ├── index.ts
+│   │   ├── mail.ts
+│   │   ├── upload.ts
+│   │   ├── validation.ts
+│   ├── main.ts
+├── storage
+├── .env
+├── warlock.config.ts
+```
+
+  </TabItem>
+</Tabs>
+
+Let's highlight the structure of the project:
+
+- `src` directory contains all the source code of the project.
+- `src/app` directory contains all the application code.
+- `src/config` directory contains all the configuration files.
+- `src/main.ts` the entry file that runs at the very beginning of the application.
+- `storage` directory contains all the files, media that needs to be kept secret, including the uploaded files, log files so on.
+- `.env` the environment file that contains all the environment variables.
+- `warlock.config.ts` the configuration file for the warlock.
+
+So this is the basic structure for the project.
+
+## App Directory
+
+The app directory's concept is simple, it contains list of **modules**. Each module has certain structure, let's see the structure of the `users` module:
+
+### App Modules
+
+A module is a `contained` directory that contains all the code related to a certain feature, for example the `users` module contains all the code related to the users, including the controllers, models, routes, events, mail, and so on.
+
+Each module should have similar file/folder structure to make the application's code consistent and easy to understand.
+
+Any directory inside `src/app` directory is considered a module, so you can create as many modules as you want.
+
+Let's see the very basic structure of the `users` module:
+
+```bash
+├── users
+│   ├── controllers
+│   ├── events
+│   ├── models
+│   ├── output
+│   ├── repositories
+│   ├── utils
+│   ├── routes.ts
+```
+
+This should be the minimum structure for each module, let's see what each directory contains:
+
+- `controllers` directory contains all the request controllers/handlers for the module.
+- `events` directory contains all the events that will be triggered by the module.
+- `models` directory contains all the models for the module.
+- `output` directory contains all the output classes for the module.
+- `repositories` directory contains all the repositories for the module.
+- `utils` directory contains all the utilities for the module.
+- `routes.ts` the routes file for the module.
+
+## Configuration Directory
+
+The `src/config/index.ts` file is the very first file that is being imported from the application code, it should contain only all necessary code for configurations.
+
+## Main File
+
+The `src/main.ts` is called after bootstraping the application, you can use it to run any code that you want to use before running the application.
+
+## App main file
+
+When the http server and database connection is warming up (But not yet connected) the `src/app/main.ts` file is called.
+
+## Module main file
+
+This is the main file that will be called in each module, if the file exists, it will be called after calling `src/app/main.ts` file.
+
+## Module localization file
+
+If the application is an international application, then each module should have a localization file, the file should be located inside `module/utils/locales.ts`
+
+## Module routes file
+
+The file is responsible for defining the module routes either grouped by middleware, or using restful resources or just basic routes.
+
+## Module Events
+
+The events directory mainly handles all events that needed to be called when certain events are triggered, it's very essential concept you should use in any successful and scalable application.
+
+## Module Controllers
+
+The controllers directory contains all the controllers for the module, it's very important to keep the controllers as simple as possible, and to keep the business logic away from the controllers, using functions as request handlers/controllers is a good practice most of the time, however, mixing it with classes is also a good practice depending on the use case.
+
+## Module Models
+
+Here we keep our models for the module, each model should be in a separate directory, and each model should have a `setup.ts` file that contains the model migrations, and `index.ts` file that exports the model.
+
+## Module Output
+
+Outputs are classes that are mainly linked with `Models` to decide which data should be return in the response when the model is returned.
+
+## Module Repositories
+
+A repository is an additional layer over the model to perform certain database operations and other stuff, also it can perform some good data caching as well and filtering.
+
+## Module Utils
+
+Any helper functions, classes should be listed here, for example, if you have a function that is used to generate a random string, you can put it here.
+
+## Module flags
+
+Another good practice is to have the static data in a `utils/flags.ts` file, this file should contain all the static data that is used in the module, for example, if you're in the `users` module, you can have a `utils/flags.ts` file that contains all the user roles, and other static data such as `user, admin, moderator` and so on.

@@ -1,0 +1,45 @@
+---
+sidebar_position: 4
+---
+
+# Deleting Documents
+
+We can delete a single document using `deleteOne` method and multiple documents using `delete` method.
+
+## Delete one document
+
+To delete a single document, use the `deleteOne` method:
+
+```ts title="src/app.ts"
+import { query } from "@mongez/monpulse";
+
+const result = await query.deleteOne("users", {
+  _id: "60b9b0b0b0b0b0b0b0b0b0b0",
+});
+```
+
+## Delete multiple documents
+
+To delete multiple documents, use the `delete` method:
+
+```ts title="src/app.ts"
+import { query } from "@mongez/monpulse";
+
+const result = await query.delete("users");
+```
+
+This will delete the entire collection documents, but will not delete the collection itself.
+
+To delete certain documents, pass the filter object as the second argument:
+
+```ts title="src/app.ts"
+import { query } from "@mongez/monpulse";
+
+const result = await query.delete("users", {
+  age: {
+    $gt: 18,
+  },
+});
+```
+
+It will delete all users with age greater than 18.

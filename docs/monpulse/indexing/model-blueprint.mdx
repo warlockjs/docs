@@ -1,0 +1,21 @@
+---
+sidebar_position: 3
+---
+
+# Model Blueprint
+
+Model Blueprint is an extended class of [Blueprint](./blueprint) that allows you to create indexes on your models.
+
+Any model has by default its own blueprint, so you can use it to create indexes on your models.
+
+## Usage
+
+To get a blueprint for a model, use the static `blueprint` method from the model class.
+
+```ts
+import { User } from "./models/user.ts";
+
+const userBlueprint = User.blueprint();
+```
+
+From this point, all methods located in the [Blueprint Class](./blueprint) are available to use.

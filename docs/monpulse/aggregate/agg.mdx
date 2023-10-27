@@ -1,0 +1,844 @@
+---
+sidebar_position: 5
+---
+
+# $agg
+
+The `$agg` utility is a helper that helps you build your aggregate query in a more readable way.
+
+This would be used mostly with the group by stage to build the group by fields.
+
+Let's see an example
+
+## Example of usage
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .groupBy("age", {
+    total: $agg.count(),
+    totalAges: $agg.sum("age"),
+    firstName: $agg.first("name"),
+    lastName: $agg.last("name"),
+  })
+  .get();
+```
+
+## Available methods
+
+Here are the available methods:
+
+### Count total documents
+
+This method counts the total number of documents in the group.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .groupBy("gender", {
+    total: $agg.count(),
+  })
+  .get();
+```
+
+This will return something like this:
+
+```json
+[
+  {
+    "_id": "male",
+    "total": 10
+  },
+  {
+    "_id": "female",
+    "total": 5
+  }
+]
+```
+
+### Sum field
+
+To sum a column's value use `$agg.sum` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .groupBy("gender", {
+    score: $agg.sum("score"),
+  })
+  .get();
+```
+
+### Get Field Average
+
+To get the average of a column's value use `$agg.avg` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .groupBy("gender", {
+    averageScore: $agg.avg("score"),
+  })
+  .get();
+```
+
+Alternatively, you can use `average` method:
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .groupBy("gender", {
+    averageScore: $agg.average("score"),
+  })
+  .get();
+```
+
+### Get Field Minimum Value
+
+To get the minimum value of a column's value use `$agg.min` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .groupBy(null, {
+    score: $agg.min("score"),
+  })
+  .get();
+```
+
+### Get Field Maximum Value
+
+To get the maximum value of a column's value use `$agg.max` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .groupBy(null, {
+    score: $agg.max("score"),
+  })
+  .get();
+```
+
+### Get Field First Value
+
+As working with group by could be tricky, you may want to get the first value of a column, this is where `$agg.first` method comes in handy.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .groupBy(null, {
+    firstName: $agg.first("name"),
+  })
+  .get();
+```
+
+> Read more about [first](https://docs.mongodb.com/manual/reference/operator/aggregation/first/)
+
+### Get Field Last Value
+
+As working with group by could be tricky, you may want to get the last value of a column, this is where `$agg.last` method comes in handy.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .groupBy(null, {
+    lastName: $agg.last("name"),
+  })
+  .get();
+```
+
+> Read more about [last](https://docs.mongodb.com/manual/reference/operator/aggregation/last/)
+
+### Greater than operator
+
+To get the documents where the value of a field is greater than a specific value, use `$agg.gt` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.gt(10),
+  })
+  .get();
+```
+
+Alternatively, you can use `greaterThan` method:
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.greaterThan(10),
+  })
+  .get();
+```
+
+### Greater than or equal operator
+
+To get the documents where the value of a field is greater than or equal a specific value, use `$agg.gte` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.gte(10),
+  })
+  .get();
+```
+
+Alternatively, you can use `greaterThanOrEqual` method:
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.greaterThanOrEqual(10),
+  })
+  .get();
+```
+
+### Less than operator
+
+To get the documents where the value of a field is less than a specific value, use `$agg.lt` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.lt(10),
+  })
+  .get();
+```
+
+Alternatively, you can use `lessThan` method:
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.lessThan(10),
+  })
+  .get();
+```
+
+### Less than or equal operator
+
+To get the documents where the value of a field is less than or equal a specific value, use `$agg.lte` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.lte(10),
+  })
+  .get();
+```
+
+Alternatively, you can use `lessThanOrEqual` method:
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.lessThanOrEqual(10),
+  })
+  .get();
+```
+
+### Equal operator
+
+To get the documents where the value of a field is equal a specific value, use `$agg.eq` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.eq(10),
+  })
+  .get();
+```
+
+Alternatively, you can use `$agg.equal` method:
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.equal(10),
+  })
+  .get();
+```
+
+### Not equal operator
+
+To get the documents where the value of a field is not equal a specific value, use `$agg.ne` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.ne(10),
+  })
+  .get();
+```
+
+Alternatively, you can use `$agg.notEqual` method:
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.notEqual(10),
+  })
+  .get();
+```
+
+### In operator
+
+To get the documents where the value of a field is in a specific array of values, use `$agg.in` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate
+  .where({
+    score: $agg.in([10, 20, 30]),
+  })
+  .get();
+```
+
+### In Array operator
+
+To get the documents where the value of a field is in a specific array of values, use `$agg.inArray` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  score: $agg.inArray([10, 20, 30]),
+});
+```
+
+### Not in operator
+
+To get the documents where the value of a field is not in a specific array of values, use `$agg.nin` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  score: $agg.nin([10, 20, 30]),
+});
+```
+
+Alternatively, you can use `$agg.notIn` method:
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  score: $agg.notIn([10, 20, 30]),
+});
+```
+
+> Also `$agg.notInArray` method is an alias for `$agg.notIn` method.
+
+### Exists operator
+
+To get the documents where the field exists, use `$agg.exists` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  score: $agg.exists(),
+});
+```
+
+### Not exists operator
+
+To get the documents where the field does not exist, use `$agg.notExists` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  score: $agg.notExists(),
+});
+```
+
+### Regex operator
+
+To get the documents where the field matches a specific regular expression, use `$agg.regex` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  name: $agg.regex(/john/i),
+});
+```
+
+### Like operator
+
+This is just a syntactic sugar for `$agg.regex` method, to feel more comfortable with SQL syntax.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  name: $agg.like(/john/i),
+});
+```
+
+The `like` operator will also make the search ignore the case of the given value if the given value is a string.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  name: $agg.like("john"),
+});
+```
+
+### Not like operator
+
+This is just a syntactic sugar for the **negate** of the given value of `$agg.regex` method, to feel more comfortable with SQL syntax.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  name: $agg.notLike(/john/i),
+});
+```
+
+The `notLike` operator will also make the search ignore the case of the given value if the given value is a string.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  name: $agg.notLike("john"),
+});
+```
+
+## Not Null operator
+
+To get the documents where the field is not null, use `$agg.notNull` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  name: $agg.notNull(),
+});
+```
+
+### Is Null operator
+
+To get the documents where the field is null, use `$agg.isNull` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  name: $agg.isNull(),
+});
+```
+
+### Between operator
+
+To get the documents where the field is between two values, use `$agg.between` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  score: $agg.between(10, 20),
+});
+```
+
+### Not between operator
+
+To get the documents where the field is not between two values, use `$agg.notBetween` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.where({
+  score: $agg.notBetween(10, 20),
+});
+```
+
+### Condition Operator
+
+In some scenarios, you want to return a value if a condition is met, and return another value if the condition is not met.
+
+To do so, you can use `$agg.condition` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.select({
+  state: $agg.condition($agg.gte(90, "score"), "great", "bad"),
+});
+```
+
+This will return the value of the `state` based on the users score, if it is greater than or equal 90, it will return `great`, otherwise, it will return `bad`.
+
+> `$agg.cond` method is an alias for `$agg.condition` method.
+
+### Boolean Condition Operator
+
+This is just a an easier way to return `true` if condition is met, and `false` if not.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.select({
+  isGoodUser: $agg.booleanCondition($agg.gte(90, "score")),
+});
+```
+
+### Concat Operator
+
+To concatenate two or more `columns`, use `$agg.concat` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.select({
+  fullName: $agg.concat("$firstName", " ", "$lastName"),
+});
+```
+
+> Please note that here if you want to concat columns, add `$` sign before the column name, otherwise, it will be treated as a string.
+
+### Concat With Operator
+
+To concatenate two or more `columns` with a separator, use `$agg.concatWith` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.select({
+  fullName: $agg.concatWith(" ", "firstName", "lastName"),
+});
+```
+
+You can concatenate as many columns as you want, just pass them as arguments to the `$agg.concat` method.
+
+Here, you don't need to add `$` sign before the column name, because any value will be added after the first argument (`The separator`) will be treated as a column name.
+
+> `$agg.mergeWith` is an alias for `$agg.concatWith` method.
+
+### Year Operator
+
+To get the year of a date, use `$agg.year` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.select({
+  year: $agg.year("createdAt"),
+});
+```
+
+### Month Operator
+
+To get the month of a date, use `$agg.month` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.select({
+  month: $agg.month("createdAt"),
+});
+```
+
+### Day Of Month Operator
+
+To get the day of month of a date, use `$agg.dayOfMonth` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.select({
+  dayOfMonth: $agg.dayOfMonth("createdAt"),
+});
+```
+
+This will return the day of month of the `createdAt` column with `integer` value that represents the day of month.
+
+### Day Of Week Operator
+
+Returns the day of the week for a date as a number between 1 (Sunday) and 7 (Saturday).
+
+To get the day of week of a date, use `$agg.dayOfWeek` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.select({
+  dayOfWeek: $agg.dayOfWeek("createdAt"),
+});
+```
+
+### First Year Operator
+
+To get the first year of a date, use `$agg.firstYear` method, this is useful with `group` stage.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.group(null, {
+  year: $agg.firstYear("createdAt"),
+});
+```
+
+### Last Year Operator
+
+To get the last year of a date, use `$agg.lastYear` method, this is useful with `group` stage.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.group(null, {
+  year: $agg.lastYear("createdAt"),
+});
+```
+
+### First Month Operator
+
+To get the first month of a date, use `$agg.firstMonth` method, this is useful with `group` stage.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.group(null, {
+  month: $agg.firstMonth("createdAt"),
+});
+```
+
+### Last Month Operator
+
+To get the last month of a date, use `$agg.lastMonth` method, this is useful with `group` stage.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.group(null, {
+  month: $agg.lastMonth("createdAt"),
+});
+```
+
+### First Day Of Month Operator
+
+To get the first day of month of a date, use `$agg.firstDayOfMonth` method, this is useful with `group` stage.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.group(null, {
+  dayOfMonth: $agg.firstDayOfMonth("createdAt"),
+});
+```
+
+> Please note that this utility return the first matched value of the day of month not the first day of month of the date.
+
+### Last Day Of Month Operator
+
+To get the last day of month of a date, use `$agg.lastDayOfMonth` method, this is useful with `group` stage.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.group(null, {
+  dayOfMonth: $agg.lastDayOfMonth("createdAt"),
+});
+```
+
+> Please note that this utility return the last matched value of the day of month not the last day of month of the date.
+
+### Push operator
+
+The [Push Operator](https://docs.mongodb.com/manual/reference/operator/aggregation/push/) is used to add a value to an array.
+
+To use it, use `$agg.push` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.group(null, {
+  cities: $agg.push("city"),
+});
+```
+
+## Columns Utility
+
+If you want to add columns list in the `group` stage, you can use `$agg.columns` method, let's first see an example without using it.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.group(null, {
+  country: "$country",
+  city: "$city",
+});
+```
+
+Using `$agg.columns` method, you can write the above code as follows:
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.group(null, $agg.columns("country", "city"));
+```
+
+### columnName utility
+
+If you want to make sure that the column is written as it supposed to be `making sure that it starts with $ sign`, you can use `$agg.columnName` method.
+
+```ts
+import { $agg, Aggregate } from "@mongez/monpulse";
+
+const aggregate = new Aggregate("users");
+
+const users = await aggregate.project({
+  fullName: $agg.concat(
+    $agg.columnName("firstName"),
+    " ",
+    $agg.columnName("lastName")
+  ),
+});
+```
+
+Although it is a little bit long, but could be useful with dynamic column names defined in variables.

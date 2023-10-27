@@ -1,0 +1,83 @@
+---
+sidebar_position: 5
+---
+
+# Environment Variables
+
+`Warlock` is powered by [Mongez Dotenv](https://github.com/hassanzohdy/mongez-dotenv) which is shipped with powerful features, let's see how it works.
+
+## Variables
+
+The project is shipped with a `.env` file, this file contains predefined variables will be used along with [project configurations](./../config/getting-started).
+
+Let's have a look at the default .env file contents:
+
+```bash
+# App Configurations
+APP_NAME="ecommerce"
+
+TIMEZONE=UTC
+
+# Http Configurations
+PORT=2025
+HOST=127.0.0.1
+BASE_URL=http://${HOST}:${PORT}
+
+# Database Configurations
+DB_AUTH=admin
+DB_PORT=27017
+DB_HOST=127.0.0.1
+DB_NAME=ecommerce
+DB_USERNAME=root
+DB_PASSWORD=root
+
+# Mail
+MAIL_HOST=
+MAIL_PORT=465
+MAIL_ENCRYPTION=ssl
+MAIL_SECURE=true
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_FROM_NAME=${APP_NAME}
+MAIL_FROM_ADDRESS=
+```
+
+Let's go through each variable and see what it does.
+
+- `APP_NAME`: This variable is used to set the application name, it will be used in the mailer and other places.
+- `TIMEZONE`: This variable is used to set the timezone for the application, it will be used in the mailer and other places.
+- `PORT`: This variable is used to set the port for the http server.
+- `HOST`: This variable is used to set the host for the http server.
+- `BASE_URL`: This variable is used to set the base url for the application, it will be used with [url functions](./../utils//urls.mdx).
+- `DB_AUTH`: This variable is used to set the authentication database for the database connection.
+- `DB_PORT`: This variable is used to set the port for the database connection.
+- `DB_HOST`: This variable is used to set the host for the database connection.
+- `DB_NAME`: This variable is used to set the database name for the database connection.
+- `DB_USERNAME`: This variable is used to set the username for the database connection.
+- `DB_PASSWORD`: This variable is used to set the password for the database connection.
+- `MAIL_HOST`: This variable is used to set the mail host for the mailer.
+- `MAIL_PORT`: This variable is used to set the mail port for the mailer.
+- `MAIL_ENCRYPTION`: This variable is used to set the mail encryption for the mailer.
+- `MAIL_SECURE`: This variable is used to set the mail secure for the mailer.
+- `MAIL_USERNAME`: This variable is used to set the mail username for the mailer.
+- `MAIL_PASSWORD`: This variable is used to set the mail password for the mailer.
+- `MAIL_FROM_NAME`: This variable is used to set the mail from name for the mailer.
+- `MAIL_FROM_ADDRESS`: This variable is used to set the mail from address for the mailer.
+
+## Environment Files
+
+As mentioned above, the project is crafted with a `.env` file, this is the default environment file that will be loaded when running the project, however, things can get more complicated when you want to run the project in different environments, for example you may want to run the project in `development` environment, and `production` environment.
+
+In this case, create two files `.env` and `.env.production`.
+
+The `.env` file will be loaded when running the project in `development` environment, and the `.env.production` file will be loaded when running the project in `production` environment.
+
+:::tip
+You can use `.env.development` and `.env.production` to distinguish between the environments, but it's recommended to use `.env` and `.env.production` to avoid any confusion.
+:::
+
+## Shared Environment File
+
+In some cases, there are some variables that are shared between all environments, for example the `APP_NAME` variable, you may want to set it once and use it in all environments.
+
+To reduce duplicates between the environment variables in development and in production, create a `.env.shared` file then add all shared variables to it, then add the following line to the `.env` and `.env.production` files, the file will be loaded automatically.

@@ -1,0 +1,25 @@
+---
+sidebar_position: 1
+---
+
+# Indexing
+
+Indexing In Any Database is essential for faster retrieval of data. Indexing is a way to optimize the performance of a database by minimizing the number of disk accesses required when a query is processed. It is a data structure technique which is used to quickly locate and access the data in a database. Indexes are created using a few database columns.
+
+Likely, MongoDB has pretty good indexing support. It supports various types of indexes like single field, compound, multi-key, geospatial, text, hashed, and wildcard indexes. In this section, we will learn about all these indexes in detail.
+
+:::tip
+For more information about indexes, please read the [MongoDB Indexes](https://docs.mongodb.com/manual/indexes/) documentation.
+:::
+
+## Blueprint
+
+`MonPulse` introduces a `Blueprint` class, this class easily allows you to create indexes on your collections. You can create indexes on a single field, multiple fields, and compound indexes.
+
+Full documentation could be found [here](./blueprint).
+
+## Model Blueprint
+
+Alternatively, you can also create indexes on your models. This is a more convenient way to create indexes on your collections if you're using models (Which you should be).
+
+Full documentation could be found [here](./model-blueprint).

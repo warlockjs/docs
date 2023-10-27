@@ -1,0 +1,361 @@
+---
+sidebar_position: 8
+---
+
+# Saving Models
+
+## Introduction
+
+In previous sections, we saw how to save models using multiple ways, so let's go more in depth here.
+
+## Types of saved models
+
+We have two types of saved models: the new models and the existing models.
+
+### New models
+
+We already discussed and saw to how to save new models, so let's take a quick example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = new Category({
+    name: "Sports",
+    isActive: true,
+  });
+
+  await category.save();
+
+  // or
+
+  const category2 = await Category.create({
+    name: "Sports",
+    isActive: true,
+  });
+}
+
+main();
+```
+
+So if we used the static method `create` it will create a new model and save it or we can do it in two steps by creating a new model and then save it.
+
+### Existing models
+
+We can save existing models by using the `save` method, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = await Category.find(1);
+
+  if (!category) return;
+
+  category.set("name", "Sports");
+
+  await category.save();
+}
+
+main();
+```
+
+So here we are updating the category name and then save it.
+
+We can also use the static method `update` to update a model:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = await Category.update(1, {
+    name: "Sports",
+  });
+}
+
+main();
+```
+
+This will update the category with the id `1` and set the name to `Sports` then returns the updated model instance.
+
+## Passing more data when saving model
+
+We can pass more data when saving a model, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = await Category.find(1);
+
+  if (!category) return;
+
+  category.set("name", "Sports");
+
+  await category.save({
+    refresh: true,
+  });
+}
+
+main();
+```
+
+So here we are passing an object to the `save` method, that we added the `refresh` property to it and set it to `true`.
+
+## Disable castings
+
+In some situations we need to save the model but without triggering the casts, this could be useful if we're updating the model using model events but we need to update only partial data, in this case we can pass to the second argument of the save method `cast` property with false value, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = await Category.find(1);
+
+  if (!category) return;
+
+  category.set("name", "Sports");
+
+  await category.save(
+    {},
+    {
+      cast: false,
+    }
+  );
+}
+
+main();
+```
+
+## Model Events
+
+The Model is shipped with powerful events system that allows you to fully interact with model actions, like `onCreating`, `onUpdating`, `onSaving`, `onCreated`, `onUpdated`, `onSaved` and many more events, let's take an example:
+
+```ts title="src/app/main.ts"
+import { Category } from "./models/category";
+
+Category.events()
+  .onCreating((category) => {
+    console.log("Category is being created");
+  })
+  .onUpdating((category, oldCategory) => {
+    console.log("Category is being updated");
+  })
+  .onSaving((category, oldCategory) => {
+    if (oldCategory) {
+      console.log("Category is being updated");
+    } else {
+      console.log("Category is being created");
+    }
+  })
+  .onCreated((category) => {
+    console.log("Category is created");
+  })
+  .onUpdated((category, oldCategory) => {
+    console.log("Category is updated");
+  })
+  .onSaved((category, oldCategory) => {
+    console.log("Category is saved");
+  })
+  .onDeleting((category) => {
+    console.log("Category is being deleted");
+  })
+  .onDeleted((category) => {
+    console.log("Category is deleted");
+  });
+```
+
+This gives us a quick overview of the events system, now let's see a real world example.
+
+If we're working with an `Ecommerce`, we may need to count total products in each category whenever a product is created, updated or deleted, so we can do this using the model events, let's take an example:
+
+```ts title="src/app/main.ts"
+import { Category } from "./models/category";
+import { Product } from "./models/product";
+
+// we need to count the number of products in the category each time a product is updated, created or deleted
+Product.events()
+  .onSaved((product, oldProduct) => {
+    // because onSaved event works in both create and update actions
+    // if we want to know what is the current action, check the oldProduct parameter
+    // if it's undefined then it's a create action, otherwise it's an update action
+    calculateCategoryProducts(product.get("category.id"));
+
+    // if the product's category is changed, we need also to recount the products in the old category
+    if (
+      oldProduct &&
+      oldProduct.get("category.id") !== product.get("category.id")
+    ) {
+      calculateCategoryProducts(oldProduct.get("category.id"));
+    }
+  })
+  .onDeleted((product) => {
+    calculateCategoryProducts(product.get("category.id"));
+  });
+
+async function calculateCategoryProducts(categoryId) {
+  const count = await Product.count({
+    "category.id": categoryId,
+  });
+
+  await Category.update(categoryId, {
+    productsCount: count,
+  });
+}
+```
+
+The good thing about events that, it is split into two types, `synchronous` and `asynchronous` events, for example any event that is triggered before the actual action is called, it will be acted as `synchronous` event, because the model will wait until all event listeners are done, for example, we want to add before saving the product the product slug, we can use it just before the product is being saved, in that sense, the model will wait until the event is fully finished then proceed with the saving process, let's take an example:
+
+```ts title="src/app/main.ts"
+import { Product } from "./models/product";
+
+Product.events().onSaving((product) => {
+  product.set("slug", product.get("name").toLowerCase().replace(/ /g, "-"));
+});
+```
+
+On the other hand, all events that are triggered after the action like `onSaved` event, it will be acted as `asynchronous` event, because there are no need to wait for it until the event listeners are fully called.
+
+This is the perfect behavior based on what you want to do, in our previous example, after the product is created, updated or deleted we want to update total products in the category, this process does not need to be `waited` until its done so it takes place after the action is done and is not being `awaited`.
+
+## Silent Saving
+
+The `silentSaving` method works exactly like `save` method except that, it does not trigger any events, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+Category.events().onSaving((category) => {
+  console.log(
+    "Category is being saved but it will not be called when calling silentSaving method."
+  );
+});
+
+async function main() {
+  const category = await Category.find(1);
+
+  if (!category) return;
+
+  category.set("name", "Sports");
+
+  await category.silentSaving();
+}
+
+main();
+```
+
+This method is useful when we want to perform saving models without the need to trigger the events again.
+
+> Use this method when you're working on the same saved model, otherwise it will go into an infinite loop.
+
+Let's say for example, we have a `quiz` for grade `A` model where it has the `autoSelectQuestions` field with `true`, in that sense after the quiz is saved, we want to fetch all questions for grade `A` then saves these questions into the `quiz` again.
+
+Because this action will happen after the quiz is **saved** and we will save again the quiz with the questions list, we don't want to trigger the `onSaved` event again, so we can use the `silentSaving` method.
+
+Let's take an example:
+
+```ts title="src/app.ts"
+import { Quiz } from "./models/quiz";
+import { Question } from "./models/question";
+
+Quiz.events().onSaved(async (quiz) => {
+  if (quiz.get("autoSelectQuestions")) {
+    const questions = await Question.find({
+      grade: quiz.get("grade"),
+    });
+
+    await quiz.silentSaving({
+      questions,
+    });
+  }
+});
+```
+
+## Manually Generating the next ID
+
+In some scenarios, you might need to generate the next id even before saving the model, to achieve this we can use the `generateNextId` method, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = new Category({
+    name: "Sports",
+  });
+
+  const nextId = await category.generateNextId();
+
+  console.log(nextId); // 512344
+  console.log(category.id); // 512344
+}
+
+main();
+```
+
+This will generate the next id and assign it to the `id` property of the model.
+
+## Timestamps
+
+By default, when saving a new model, the `createdAt` and `updatedAt` properties will be set to the current date, if the model is being saved as `update` then only the `updatedAt` property will be set to the current date.
+
+You can change the name of timestamp columns in the model, let's take an example:
+
+```ts title="src/models/category.ts"
+import { Model } from "@mongez/monpulse";
+
+export class User extends Model {
+  /**
+   * The collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  public createdAtColumn = "createdAt";
+
+  /**
+   * {@inheritDoc}
+   */
+  public updatedAtColumn = "updatedAt";
+
+  /**
+   * {@inheritDoc}
+   */
+  public deletedAtColumn = "deletedAt";
+}
+```
+
+These are the default values, so if you want to change the name of the columns, you can override these properties.
+
+## Upsert
+
+In some situations, we need to update a model if it exists or create a new one if it doesn't exist, to achieve this we can use the `upsert` method, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = await Category.upsert(
+    {
+      name: "Sports",
+    },
+    {
+      name: "Sports",
+      isActive: true,
+    }
+  );
+}
+```
+
+So here we are trying to find a category with the name `Sports`, if it exists then it will update it, if it doesn't exist then it will create a new one.
+
+:::tip
+The first argument is the `filter` object to search for the model, the second argument is the data to update or create the model with.
+:::
+
+This will create a new model if it doesn't exist or update it if it exists.
+
+## A note about saving models
+
+Please note that when calling `save` or `silentSaving` methods, the document in the database will be fully replaced, not updating the available fields, the entire document will be changed.

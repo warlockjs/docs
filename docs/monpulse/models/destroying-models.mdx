@@ -1,0 +1,164 @@
+---
+sidebar_position: 9
+---
+
+# Destroying Models
+
+There are two ways to destroy a model, one when we have an instance of the model and the other when we don't.
+
+## Delete documents
+
+If we don't care of having an instance of the model, we can use the `delete` method to delete documents from the database.
+
+```ts
+await User.delete({ name: "John" });
+```
+
+This will delete all the documents that match the query and return the number of documents deleted.
+
+If we want to delete a document using `id` or `_id`, simply pass the value directly to the `delete` method.
+
+```ts
+await User.delete(1);
+```
+
+> Please note that `_id` must be a string or an instance of `ObjectId` class.
+
+## Destroy model
+
+If we already have an instance of the model we can use `destroy` method.
+
+```ts
+import { User } from "./models/User";
+
+const user = await User.find(1);
+
+await user.destroy();
+```
+
+This will delete the document from the database but you still can work with the instance of the model.
+
+:::tip
+If you tried to save the model after destroying it, it will throw an error.
+:::
+
+## Recycle bin
+
+When using the `destroy` model, by default the model is actually deleted but before that a copy of the model document is taken and moved to the trash collection. This is done to prevent accidental deletion of documents.
+
+The trash collection name is the model's collection name suffixed with `Trash`. For example, if the model's collection name is `users`, the trash collection name will be `usersTrash`.
+
+## Restoring documents
+
+If documents are deleted using Recycle bin `destroy` method, you can restore them using the `restore` method.
+
+```ts
+await User.restore(1);
+```
+
+This will restore the document with the given id and return the restored document.
+
+## Restoring multiple documents
+
+If you want to restore all the documents in the trash collection, you can use the `restoreAll` method.
+
+```ts
+const restoredUsers = await User.restoreAll();
+```
+
+If you want to restore specific documents, you can pass a query to the `restoreAll` method.
+
+```ts
+const restoredUsers = await User.restoreAll({ name: "John" });
+```
+
+## Model Delete Strategies
+
+We saw earlier the `moveToTrash` strategy which is the default strategy. There are two other strategies that you can use.
+
+You can override the model's default delete strategy by setting the `deleteStrategy` property on the model.
+
+```ts
+import { Model, ModelDeleteStrategy } from "@mongez/monpulse";
+
+export class User extends Model {
+  /**
+   * The collection name
+   */
+  public static collection = "users";
+
+  /**
+   * The delete strategy
+   * Delete the documents forever.
+   */
+  public static deleteStrategy = ModelDeleteStrategy.hardDelete;
+}
+```
+
+### hardDelete strategy
+
+This strategy will delete the document without moving it to the trash collection, so it's gone forever.
+
+```ts
+import { Model, ModelDeleteStrategy } from "@mongez/monpulse";
+
+export class User extends Model {
+  /**
+   * The collection name
+   */
+  public static collection = "users";
+
+  /**
+   * The delete strategy
+   * Delete the documents forever.
+   */
+  public static deleteStrategy = ModelDeleteStrategy.hardDelete;
+}
+```
+
+Now whenever you call the `destroy` method, the document will be deleted forever.
+
+```ts
+await User.find(1).destroy();
+```
+
+### softDelete strategy
+
+This strategy will add a `deletedAt` field to the document and set it to the current date and time. This field will be used to determine if the document is deleted or not.
+
+```ts
+import { Model, ModelDeleteStrategy } from "@mongez/monpulse";
+
+export class User extends Model {
+  /**
+   * The collection name
+   */
+  public static collection = "users";
+
+  /**
+   * The delete strategy
+   * Delete the documents forever.
+   */
+  public static deleteStrategy = ModelDeleteStrategy.softDelete;
+}
+```
+
+Now whenever you call the `destroy` method, the document will be soft deleted.
+
+:::tip
+You can use the `restore` and `restoreAll` methods to restore the documents, this will remove the `deletedAt` field from the documents.
+:::
+
+Now whenever you use any [listing method](./fetching-documents) the soft deleted documents will be excluded from the results.
+
+:::info
+If you want to include the deleted documents in your results, pass `withDeleted` option to the listing filters with `true` value.
+:::
+
+```ts
+// fetch all users including the deleted ones
+await User.list({ withDeleted: true });
+
+// fetch all users excluding the deleted ones
+await User.list();
+```

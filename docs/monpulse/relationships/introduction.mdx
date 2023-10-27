@@ -1,0 +1,32 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+Embedding documents inside another documents is a core feature of MongoDB, and it is very useful when you want to store related data in the same document. This is a very common practice in MongoDB, and it is called **Embedded Relationships**.
+
+The main purpose of embedded documents is to reduce the number of queries to the database, and to make faster queries.
+
+:::tip
+Please note that this section covers how embedded and syncing documents work only with [Models](./../models/introduction).
+:::
+
+## Embedding Documents
+
+Assume that we have a `posts` collection where we want to add the `author` of the post, this could be done by two scenarios:
+
+1. Embedding the author's data inside the post document like the id, name, and image.
+2. Embedding the author's id inside the post document, and then query the `users` collection to get the author's data.
+
+Each one of them has its own ups and downs, for example if we added only the author id, each time we want to fetch the post or list of posts we want to lookup (join) the `users` collection to get the author's data, this will increase the number of queries to the database, and it will make it slower.
+
+So second solution here is to embed the author's data inside the post document, this will make the query faster because when we fetch the post we don't have to lookup the `users` collection to get the author's data, it is already there.
+
+This is where [Embedded Documents](./embedded-documents) comes in handy.
+
+## Syncing Models
+
+The previous solution is great when we need to reduce the number of queries over database, but it has a downside, the embedded documents need to be updated whenever the original document is updated.
+
+Here the [Syncing Model Concept](./syncing-models) shines, as it auto updates the embedded documents whenever the original document is updated.

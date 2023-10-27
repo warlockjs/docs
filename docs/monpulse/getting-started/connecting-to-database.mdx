@@ -1,0 +1,90 @@
+---
+sidebar_position: 4
+---
+
+# Connecting To Database
+
+Connecting to a database is easy. You can use the `connectToDatabase` method to connect to a database. The `connect` method accepts a single argument, which is the name of the database you want to connect to.
+
+## Building Url Connection
+
+If you want to make it simple, you can easily pass the database connection url segments, which contains: `host`, `port`, `username`, `password`, and `dbAuth`.
+
+```ts
+import { connectToDatabase } from "@mongez/monpulse";
+
+connectToDatabase({
+  host: "localhost",
+  port: 27017,
+  database: "my-database",
+  username: "my-username",
+  password: "my-password",
+  dbAuth: "admin",
+});
+```
+
+These are the minimum configurations needed to connect to MongoDB server, but you can pass more options to the `connectToDatabase` function that receives the same options as the `MongoClient` instance.
+
+```ts {10,11}
+import { connectToDatabase } from "@mongez/monpulse";
+
+connectToDatabase({
+  host: "localhost",
+  port: 27017,
+  database: "my-database",
+  username: "my-username",
+  password: "my-password",
+  dbAuth: "admin",
+  retryWrites: true,
+  replicaSet: "rs0",
+});
+```
+
+## Using Connection Url
+
+Alternatively, you can pass the connection url directly to the `connectToDatabase` function.
+
+```ts
+import { connectToDatabase } from "@mongez/monpulse";
+
+connectToDatabase({
+  url: "mongodb://localhost:27017/my-database",
+  database: "my-database",
+});
+```
+
+## Singleton Connection
+
+Using `connectToDatabase` will ensure that connection is established only once `Singleton Pattern`, and will ignore any other calls to the `connectToDatabase` function.
+
+:::tip
+If you want to use multiple database, you don't need to create multiple connections, you can use the `useDatabase` method to switch between databases.
+:::
+
+## Creating more than one connection
+
+In some situations, you might need to create multiple connections per project, in that sense you can manually create a new `Connection` instance.
+
+```ts
+import { Connection } from "@mongez/monpulse";
+
+const connection = new Connection();
+
+connection.connect({
+  // same configurations as the connectToDatabase function
+});
+```
+
+## Once connected
+
+Sometimes you want to execute a code when the connection is established, you can use the `onceConnected` method to execute a callback when the connection is established.
+
+```ts
+import { onceConnected } from "@mongez/monpulse";
+
+onceConnected(() => {
+  // do something
+});
+```
+
+If the connection is not established yet, the callback will be added to the queue, and will be executed once the connection is established, otherwise it will be executed immediately.

@@ -1,0 +1,244 @@
+---
+sidebar_position: 6
+---
+
+# Model Data
+
+## Introduction
+
+As mentioned earlier, each model instance represents a document in the database, in this section we'll see how to manage and access the data of the model.
+
+## Getting all data
+
+Let's take a simple example of a user model:
+
+```ts title="src/models/user.ts"
+import { Model, Casts } from "@mongez/monpulse";
+
+export class User extends Model {
+
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    email: "string",
+    password: "string",
+    age: "number",
+    isActive: "boolean",
+  };
+}
+```
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+async function main() {
+    const user = await User.create({
+        name: "Hasan Zohdy",
+        email: "hassanzohdy@gmail.com",
+        age: 25,
+        isActive: true,
+        birthDate: new Date("1995-01-01"),
+    });
+
+    console.log(user.data);
+}
+
+main();
+```
+
+This will create a new user, and the `user.data` will be something like this:
+
+```json
+{
+    "id": 512312,
+    "_id": "5f9b1b3c1b9c4e0b4c7b23a1",
+    "name": "Hasan Zohdy",
+    "email": "hassanzohdy@gmail.com",
+    "age": 25,
+    "isActive": true,
+    "birthDate": "1995-01-01T00:00:00.000Z",
+    "createdAt": "2020-10-30T12:00:00.000Z",
+    "updatedAt": "2020-10-30T12:00:00.000Z"
+}
+```
+
+## Getting model id
+
+To get model id, you can use the `id` property:
+
+```ts
+console.log(user.id); // 512312
+```
+
+:::warning Be aware
+If you're creating a new user using the new operator, the **id** will be `undefined` until you save the model.
+:::
+
+This id is auto generated when the model is saved for the first time, and it's a unique number for each document in the database.
+
+## Getting model _id
+
+This is the builtin MongoDB id, it's a unique string for each document in the database.
+
+To get model _id, you can use the `_id` property:
+
+```ts
+console.log(user._id); // ObjectId("5f9b1b3c1b9c4e0b4c7b23a1")
+```
+
+:::warning Be aware
+If you're creating a new user using the new operator, the **_id** will be `undefined` until you save the model.
+:::
+
+## Getting a specified field
+
+To get a specified field, you can use the `get` method:
+
+```ts
+console.log(user.get("name")); // Hasan Zohdy
+```
+
+If the field doesn't exist, it will return `undefined`, you can then pass a default value as a second argument:
+
+```ts
+console.log(user.get("name", "John Doe")); // Hasan Zohdy
+console.log(user.get("address", "John Doe")); // John Doe
+```
+
+You can also get the field using the dot notation:
+
+```ts
+console.log(user.get("address.city")); // Cairo
+```
+
+## Check if field exists
+
+To check if a field exists, you can use the `has` method:
+
+```ts
+console.log(user.has("name")); // true
+console.log(user.has("address.city")); // false
+```
+
+## Get all data except specific fields
+
+To get all data except specific fields, you can use the `except` method:
+
+```ts
+console.log(user.except(["name", "age"]));
+```
+
+This will return all data except the name and age fields.
+
+## Get only specific fields
+
+To get only specific fields, you can use the `only` method:
+
+```ts
+console.log(user.only(["name", "age"]));
+```
+
+## Set a specified field
+
+To set a specified field, you can use the `set` method:
+
+```ts
+user.set("name", "John Doe");
+```
+
+You can also set a field using the dot notation:
+
+```ts
+user.set("address.city", "Cairo");
+```
+
+## Adding multiple fields
+
+If you want to set multiple fields at once use `merge` method:
+
+```ts
+user.merge({
+    name: "John Doe",
+    age: 25,
+});
+```
+
+This will set or update the name and age fields.
+
+## Unset fields
+
+To unset a field, you can use the `unset` method:
+
+```ts
+user.unset("name");
+```
+
+You can also unset a field using the dot notation:
+
+```ts
+user.unset("address.city");
+```
+
+You can pass as many fields as you want:
+
+```ts
+user.unset("name", "age", "address.city");
+```
+
+## Increment a field
+
+To increment a field, you can use the `increment` method:
+
+```ts
+user.increment("age");
+```
+
+You can also increment a field using the dot notation:
+
+```ts
+user.increment("address.apartment.number");
+```
+
+You may also set the amount of increment:
+
+```ts
+user.increment("age", 5);
+```
+
+## Decrement a field
+
+To decrement a field, you can use the `decrement` method:
+
+```ts
+user.decrement("age");
+```
+
+You can also decrement a field using the dot notation:
+
+```ts
+user.decrement("address.apartment.number");
+```
+
+You may also set the amount of decrement:
+
+```ts
+user.decrement("age", 5);
+```
+
+## Original Data
+
+As data is mutated during the usage of the model, the updated data are accessible via the `data` property.
+
+Original data are the data that were fetched from the database or the onces that was passed to the model constructor, these data are kept untouched, and you can access them using the `original` property:
+
+```ts
+console.log(user.original);
+```
+

@@ -1,0 +1,35 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+Queries over MongoDB has many types, but in this section we will work with the most common ones.
+
+## Query Manager
+
+This is basically the underlying class for other higher levels such as Models and Aggregate framework, so let's see how this work in a nutshell.
+
+## Basic Usage
+
+By default Monpulse is shipped with an instance of the query manager, you can import it directly from the package.
+
+```ts title="src/app.ts"
+import { query } from "@mongez/monpulse";
+
+const users = await query.list("users");
+```
+
+This will return all users in the database, but you can pass a query object to filter the results.
+
+```ts title="src/app.ts"
+import { query } from "@mongez/monpulse";
+
+const users = await query.list("users", {
+    name: "John",
+});
+```
+
+In that sense we can conclude that any query you want to use receives the first argument as the collection name, and rest of arguments depends on the method arguments itself.
+
+In the next sections, we will see each operation of the `CRUD` operations in details.

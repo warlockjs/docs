@@ -6,15 +6,15 @@ const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: "Moonlight",
-  tagline: "Dinosaurs are cool",
-  favicon: "img/favicon.ico",
+  title: "Mongez",
+  tagline: "Mongez ecosystem documentation",
+  favicon: "img/logo.svg",
 
   // Set the production url of your site here
   url: "https://docs.mentoor.io",
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: "/",
+  baseUrl: "/mongez",
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
@@ -60,7 +60,7 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       // Replace with your project's social card
-      image: "img/docusaurus-social-card.jpg",
+      image: "https://mentoor.io/logo.svg",
       navbar: {
         title: "Mongez EcoSystem",
         logo: {
@@ -70,9 +70,15 @@ const config = {
         items: [
           {
             type: "doc",
-            docId: "mongodb/getting-started/introduction",
+            docId: "warlock/getting-started/introduction",
             position: "left",
-            label: "MongoDB",
+            label: "Warlock",
+          },
+          {
+            type: "doc",
+            docId: "monpulse/getting-started/introduction",
+            position: "left",
+            label: "MonPulse",
           },
           {
             href: "https://github.com/hassanzohdy",
@@ -83,25 +89,25 @@ const config = {
       },
       footer: {
         style: "dark",
-        links: [
-          {
-            title: "Community",
-            items: [
-              {
-                label: "Youtube",
-                href: "https://www.youtube.com/channel/UCF0g3jlqqhb1dxPW90twKcw",
-              },
-              {
-                label: "Discord",
-                href: "https://discord.gg/vtZE9YzaFz",
-              },
-              {
-                label: "Facebook",
-                href: "https://facebook.com/mentoor.io",
-              },
-            ],
-          },
-        ],
+        // links: [
+        //   {
+        //     title: "Community",
+        //     items: [
+        //       {
+        //         label: "Youtube",
+        //         href: "https://www.youtube.com/channel/UCF0g3jlqqhb1dxPW90twKcw",
+        //       },
+        //       {
+        //         label: "Discord",
+        //         href: "https://discord.gg/vtZE9YzaFz",
+        //       },
+        //       {
+        //         label: "Facebook",
+        //         href: "https://facebook.com/mentoor.io",
+        //       },
+        //     ],
+        //   },
+        // ],
         copyright: `Copyright © ${new Date().getFullYear()} mentoor.io, Inc.`,
       },
       prism: {

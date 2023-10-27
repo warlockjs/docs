@@ -1,0 +1,244 @@
+---
+sidebar_position: 2
+---
+
+# Blueprint
+
+`MonPulse` introduces a `Blueprint` class, this class easily allows you to create indexes on your collections. You can create indexes on a single field, multiple fields, and compound indexes.
+
+## Creating a new blueprint
+
+To start using `Blueprint`, create an instance of it and pass the collection name to the constructor.
+
+```ts
+import { Blueprint } from "@mongez/monpulse";
+
+const usersBlueprint = new Blueprint("users");
+```
+
+## Creating a new index
+
+To create a single field index, use the `index` method. The first argument is the field name, and the second argument is the index options.
+
+```ts
+await usersBlueprint.index("name"); // creates an index on the name field
+```
+
+This will create an index on the `name` field. The index name will be `users_name_index` to be easier to follow the naming convention.
+
+If you want to specify a custom index name, pass it as the second argument.
+
+```ts
+await usersBlueprint.index("name", { name: "users_name" });
+```
+
+### Creating a compound index
+
+To create a compound index, use the same method, but pass an array of fields instead of a single field.
+
+```ts
+await usersBlueprint.index(["name", "email"]);
+```
+
+This will create a new index in the `users` collection on the `name` and `email` fields. The index name will be `users_name_email_index`.
+
+Again, you can specify a custom index name.
+
+```ts
+await usersBlueprint.index(["name", "email"], { name: "users_name_email" });
+```
+
+### Creating a unique index
+
+Similar to the `index` method, you can use the `unique` method to create a unique index.
+
+```ts
+await usersBlueprint.unique("email");
+```
+
+This will enforce only unique values in the `email` field, if email is duplicated the index will throw an error.
+
+### Creating a text index
+
+A `text` index is used to search for text in a collection. To create a text index, use the `text` method.
+
+```ts
+await usersBlueprint.textIndex("name");
+```
+
+Text indexes are useful when you want to search for text in a collection. For example, if you want to search for users by their name, you can use the text index.
+
+### Creating a Geo Index
+
+A geo index **A.K.A** `2dsphere` index is used to store geo data in a collection. To create a geo index, use the `geoIndex` method.
+
+```ts
+await usersBlueprint.geoIndex("location");
+```
+
+:::info DID YOU KNOW?
+Any `index method` can create a single or compound index. For example, you can create a compound text index by passing an array of fields to any `index method`.
+:::
+
+:::tip Index Options
+Any `index method` receives two parameters, the first one is for the column(s) that will be indexed, the second one is [Index Options](https://docs.mongodb.com/manual/reference/method/db.collection.createIndex/#index-options), so you can freely use it as well.
+:::
+
+## Dropping indexes
+
+Dropping indexes are similar to creating them. To drop an index, use the `dropIndex` method.
+
+```ts
+await usersBlueprint.dropIndex("name");
+```
+
+### Drop unique index
+
+To drop a unique index, use the `dropUnique` method.
+
+```ts
+await usersBlueprint.dropUnique("email");
+```
+
+### Drop text index
+
+To drop a text index, use the `dropTextIndex` method.
+
+```ts
+await usersBlueprint.dropTextIndex("name");
+```
+
+### Drop geo index
+
+To drop a geo index, use the `dropGeoIndex` method.
+
+```ts
+await usersBlueprint.dropGeoIndex("location");
+```
+
+### Drop all indexes
+
+To drop all indexes, use the `dropAllIndexes` method.
+
+```ts
+await usersBlueprint.dropAllIndexes();
+```
+
+## Listing indexes
+
+To list a collection indexes, use the `listIndexes` method.
+
+```ts
+await usersBlueprint.listIndexes();
+```
+
+### Check if index exists
+
+To check if an index exists, use the `indexExists` method.
+
+```ts
+await usersBlueprint.indexExists("name");
+```
+
+## Get indexes information
+
+To get indexes information, use the `indexInformation` method.
+
+```ts
+await usersBlueprint.indexInformation();
+```
+
+This will return an array of indexes information.
+
+:::tip
+Read more about what is being returned from the [MongoDB documentation](https://www.mongodb.com/docs/manual/reference/method/db.collection.getIndexes/#output).
+
+## Truncate collection
+
+To truncate `(Delete all documents)` a collection, use the `truncate` method.
+
+```ts
+await usersBlueprint.truncate();
+```
+
+## Drop collection
+
+To drop a collection, use the `drop` method.
+
+```ts
+await usersBlueprint.drop();
+```
+
+## Get collection stats
+
+To get collection stats, use the `stats` method.
+
+```ts
+await usersBlueprint.stats();
+```
+
+This will return an object with the collection stats.
+
+:::tip
+Read more about what is being returned from the [MongoDB documentation](https://www.mongodb.com/docs/manual/reference/operator/aggregation/collStats/).
+:::
+
+## Get collection size
+
+To get the collection size, use the `size` method.
+
+```ts
+await usersBlueprint.size();
+```
+
+This will return the collection size in bytes.
+
+## Get Indexes Size
+
+To get the indexes size, use the `indexesSize` method.
+
+```ts
+await usersBlueprint.indexesSize();
+```
+
+This will return the indexes size in bytes.
+
+## Get total size
+
+Total size equals the collection size plus the indexes size. To get the total size, use the `totalSize` method.
+
+```ts
+await usersBlueprint.totalSize();
+```
+
+## Get document average size
+
+To get the document average size, use the `averageDocumentSize` method.
+
+```ts
+await usersBlueprint.averageDocumentSize();
+```
+
+:::tip
+`avgDocSize` method is an **alias** for `averageDocumentSize` method.
+:::
+
+## Count documents
+
+To count documents in a collection, use the `count` method.
+
+```ts
+await usersBlueprint.count();
+```
+
+## The `blueprint` function
+
+If you want to instantiate a blueprint for a collection, you can use the `blueprint` function.
+
+```ts
+import { blueprint } from "@mongez/monpulse";
+
+const usersBlueprint = blueprint("users");
+```
+
+Which internally creates a new instance of the `Blueprint` class.
