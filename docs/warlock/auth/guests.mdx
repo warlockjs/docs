@@ -1,0 +1,69 @@
+---
+sidebar_position: 5
+---
+
+# Guests
+
+Guests are users that are not logged in, but has a `JWT`.
+
+## How it works
+
+When a user visits the website for the first time, a `JWT` is generated for him, and this token is sent to the user, and the user will send this token with every request to the server.
+
+## Define guest route
+
+To generate an access token for guests, define a route inside the `routes` file in users directory
+
+```ts title="src/app/users/routes.ts"
+import { router, Request, Response, guestLogin } from "@mongez/warlock";
+
+router.post("/login/guests", guestLogin);
+
+// rest of the routes
+```
+
+The `guestLogin` function will generate a `JWT` for the user and send it to him.
+
+## Guest Model
+
+Guests have separate collection with `Guest` model (guests collection in database) that has basically just the guest id.
+
+Each guest model returns the following response:
+
+```json
+{
+  "id": "int",
+  "userType": "guest"
+}
+```
+
+The `userType` is used to differentiate between guests and logged in users.
+
+Every guest model extends [Auth Model](./auth-model.mdx) to inherit all access token related methods.
+
+## Extending Guest Model
+
+You can extend the guest model to modify or set the output data when called inside guest login.
+
+```ts title="src/app/users/models/guest.ts"
+import { Guest as BaseGuest } from "@mongez/warlock";
+
+export class Guest extends BaseGuest {
+  // do your stuff here
+}
+```
+
+Now modify the `auth.userType` configurations to use the new guest model.
+
+```ts {5} title="src/config/auth.ts"
+import { AuthConfigurations } from "@mongez/warlock";
+import { Guest } from "app/users/models/guest";
+
+const authConfigurations: AuthConfigurations = {
+  userType: {
+    guest: Guest,
+    // other user types
+  },
+  // rest of the configurations
+};
+```

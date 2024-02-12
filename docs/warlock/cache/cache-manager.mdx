@@ -1,0 +1,222 @@
+---
+sidebar_position: 3
+---
+
+# Cache Manager
+
+This is the core of the entire cache ecosystem. It is responsible for managing the cache drivers, and the cache configurations.
+
+You can access the cache manager by importing `cache` from warlock.
+
+## Setting Configurations
+
+After you define [Cache Configurations](./configurations), you can set them using the `setConfigurations` method.
+
+```ts title="src/config/cache.ts"
+import { CacheConfigurations } from "@mongez/warlock";
+const cacheConfigurations: CacheConfigurations = {
+  //...
+};
+
+export default cacheConfigurations;
+```
+
+The configuration will be automatically loaded when the cache manager is initialized.
+
+## Initializing the cache manager
+
+By default `Warlock` initializes the cache manager to start connecting to the default driver when the `http server` is about to start so you don't really need to take any action in this regard.
+
+## Cache Manager is a Cache Driver
+
+All methods that are available on [Cache Driver](./cache-driver-interface) are available on the cache manager so you will be able to use the cache manager as a cache driver.
+
+## Get current driver
+
+If you want to directly access the current cache driver from the cache manager, use `currentDriver` property.
+
+```ts
+import { cache } from "@mongez/warlock";
+
+const currentDriver = cache.currentDriver;
+```
+
+:::info
+If there is no current driver, then the cache manager will use the [NullCacheDriver](./null) instead.
+:::
+
+## Set default driver
+
+To change the default driver, use `use` method, this method accepts the driver name Defined in [ Cache drivers list](./configurations#drivers) or pass the driver object directly.
+
+```ts
+import { cache } from "@mongez/warlock";
+
+cache.use("redis");
+```
+
+:::info
+Please note that `use` method is a `async` method, as if the driver was not loaded before, the cache manager will load it first before using it so make sure to use `await` keyword when calling this method.
+:::
+
+## Get driver
+
+To get another cache driver (but not set it as a default driver) use `driver` method, it accepts the driver name.
+
+```ts title="src/main.ts"
+import { cache } from "@mongez/warlock";
+
+async function main() {
+  const redisDriver = await cache.driver("redis");
+
+  const memoryDriver = await cache.driver("memory");
+}
+
+main();
+```
+
+:::info
+If the driver is not loaded before, the cache manager will load it first before returning it.
+:::
+
+:::danger
+If the given driver name is listed in [ Cache drivers list](./configurations#drivers), it will throw an error.
+:::
+
+## Global prefix
+
+Global prefix option is implemented in all built-in drivers, it highly recommended to use it as a way to avoid key conflicts especially if you're using a common cache driver like redis.
+
+:::info
+Consider a global prefix as a database name in a database server, it is used to separate the keys from each other.
+:::
+
+## Setting a value in the cache
+
+To set a value in the cache, use `set` method, this method accepts three parameters:
+
+- The first one is the key that will be used to store the value in the cache.
+- The second one is the value that will be stored in the cache.
+- The third one is the number of seconds that the value will be stored in the cache.
+
+```ts
+import { cache } from "@mongez/warlock";
+
+// somewhere in the project
+await cache.set("key", "value", 60 * 60 * 24);
+```
+
+The value can be any type of value either a string, number, boolean, or even an object or an array.
+
+```ts
+import { cache } from "@mongez/warlock";
+
+// somewhere in the project
+await cache.set("key", { name: "John Doe" }, 60 * 60 * 24);
+```
+
+The key could be a `string` or an object, if it is an object, it will be converted to a string using [Parse Cache Key utility](./utils#parse-cache-key).
+
+```ts
+import { cache } from "@mongez/warlock";
+
+// somewhere in the project
+await cache.set({ id: 1 }, { name: "John Doe" }, 60 * 60 * 24);
+```
+
+This will result a key like this : `id.1`.
+
+:::tip
+If the global prefix is set, then it will be prefixed with the global prefix.
+:::
+
+If the third parameter is not set `ttl` then the driver will try to capture it from the driver options, if not found then the value will be stored in the cache forever.
+
+## Getting a value from the cache
+
+To get a value from the cache, use `get` method, this method accepts one parameter which is the key that will be used to get the value from the cache.
+
+```ts
+import { cache } from "@mongez/warlock";
+
+// somewhere in the project
+const value = await cache.get("key");
+```
+
+It can also accept an object as a key, it will be converted to a string using [Parse Cache Key utility](./utils#parse-cache-key).
+
+```ts
+import { cache } from "@mongez/warlock";
+
+// somewhere in the project
+const value = await cache.get({ id: 1 }); // this will be converted to id.1
+```
+
+If the key does not exists a `null` value will be returned.
+
+## Removing a value from the cache
+
+To remove a value from the cache, use `remove` method, this method accepts one parameter which is the key that will be used to remove the value from the cache.
+
+```ts
+import { cache } from "@mongez/warlock";
+
+// somewhere in the project
+await cache.remove("key");
+```
+
+It can also accept an object as a key, it will be converted to a string using [Parse Cache Key utility](./utils#parse-cache-key).
+
+```ts
+import { cache } from "@mongez/warlock";
+
+// somewhere in the project
+await cache.remove({ id: 1 }); // this will be converted to id.1
+```
+
+## Removing all values from the cache
+
+To clear the entire cache, use `flush` method.
+
+```ts
+import { cache } from "@mongez/warlock";
+
+// somewhere in the project
+await cache.flush();
+```
+
+## Namespaces
+
+Another good approach that is powered by `Warlock Cache` is namespaces, it allows you easily to categorize all the cached data by a namespace.
+
+A namespace is a string that is suffixed with a `dot` then the key, for example, if we have a namespace called `users`, then the key `1` will be converted to `users.1`.
+
+### Removing all values from a namespace
+
+To clear the entire cache for a namespace, use `removeNamespace` method, this method accepts one parameter which is the namespace that will be used to remove the values from the cache.
+
+```ts
+import { cache } from "@mongez/warlock";
+
+// store a value in the cache
+await cache.set("users.1", {
+  id: 1,
+  name: "John Doe",
+});
+
+await cache.set("users.list", [
+  {
+    id: 1,
+    name: "John Doe",
+  },
+  {
+    id: 2,
+    name: "Jane Doe",
+  },
+]);
+
+// somewhere in the project
+await cache.removeNamespace("users");
+```
+
+This will clear out all the values that are stored under the `users` namespace.

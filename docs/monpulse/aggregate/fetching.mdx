@@ -111,6 +111,30 @@ To count the number of documents, we can use `count` method.
 const count = await new Aggregate("users").count();
 ```
 
+## Chunks
+
+The chunk concept is to split the documents into multiple chunks, this will reduce the loaded documents in the memory especially if we have a large number of documents.
+
+To use chunks, we can use `chunk` method, it receives the `limit` of documents per chunk and a callback to handle the chunk.
+
+```ts
+await new Aggregate("users").chunk(100, (users) => {
+  // handle the chunk
+});
+```
+
+You can also receive the `pagination information` in the second callback argument:
+
+```ts
+await new Aggregate("users").chunk(100, (users, pagination) => {
+  // handle the chunk
+});
+```
+
+:::danger
+If you want to stop the chunking process, you can return `false` from the callback.
+:::
+
 ## Explain
 
 Sometimes we need to know how the query is executed, we can use `explain` method to get the execution plan of the query.

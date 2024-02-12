@@ -1,0 +1,44 @@
+---
+sidebar_position: 16
+---
+
+# Localized
+
+Check if the input value is a localized value.
+
+> The validation rule **requires a value** to run against the input value.
+
+A localized value is an array of objects, each object has two keys:
+
+- `localeCode`: The locale code of the value.
+- `value`: The value of the locale.
+
+If any object failed to match the above structure, the validation will fail.
+
+## Example
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    title: ["required", "localized"],
+  },
+};
+```
+
+Expected input to be something like this:
+
+```json
+{
+  "title": [
+    {
+      "localeCode": "en",
+      "value": "Hello World"
+    },
+    {
+      "localeCode": "ar",
+      "value": "مرحبا بالعالم"
+    }
+  ]
+}
+```

@@ -1,0 +1,60 @@
+---
+sidebar_position: 4
+---
+
+# Cache Driver Interface
+
+The following schema represents the interface of any cache driver implementation.
+
+If you are going to [create a custom cache driver](./make-your-own-cache-driver) make sure to implement this interface.
+
+```ts
+export interface CacheDriver<ClientType, Options> {
+  /**
+   * The cache driver options
+   */
+  options: Options;
+  /**
+   *  Remove all cached items by namespace
+   */
+  removeNamespace(namespace: string): Promise<any>;
+  /**
+   * Set the cache driver options
+   */
+  setOptions(options: Options): any;
+  /**
+   * Parse the key to be used in the cache
+   */
+  parseKey(key: string | GenericObject): string;
+  /**
+   * Set a value in the cache
+   *
+   * @param key The cache key, could be an object or string
+   * @param value The value to be stored in the cache
+   * @param ttl The time to live in seconds
+   */
+  set(key: string | GenericObject, value: any, ttl?: number): Promise<any>;
+  /**
+   * Get a value from the cache
+   */
+  get(key: string | GenericObject): Promise<any>;
+  /**
+   * Remove a value from the cache
+   */
+  remove(key: string | GenericObject): Promise<void>;
+  /**
+   * Flush the entire cache
+   */
+  flush(): Promise<void>;
+  /**
+   * Connect to the cache driver
+   */
+  connect(): Promise<any>;
+  /**
+   * The cache client
+   */
+  client?: ClientType;
+}
+```
+
+The client type here represents a high level access for the cache client, for example the [Redis Cache Driver](./redis)'s client is [Redis Client](https://www.npmjs.com/package/redis).

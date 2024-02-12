@@ -1,0 +1,56 @@
+---
+sidebar_position: 2
+---
+
+# Logging Configurations
+
+To set logging configurations, modify `src/config/log.ts` file.
+
+```ts title="src/config/log.ts"
+import { ConsoleLog } from "@mongez/logger";
+import { LogConfigurations } from "@mongez/warlock";
+
+const consoleLog = new ConsoleLog();
+
+const logConfigurations: LogConfigurations = {
+  enabled: true,
+  channels: [consoleLog],
+};
+
+export default logConfigurations;
+```
+
+This will enable the console logger, and set it as the default logger.
+
+You can add more channels to the `channels` array from [Mongez Logger](https://github.com/hassanzohdy/logger) based on your needs.
+
+## Enable logging
+
+By default logging is enabled in the application, you can control this behavior by setting the `enabled` property in the logger configurations.
+
+## Environment channels
+
+If we want to set different channels for different environments, then add the environment property in our exported object.
+
+```ts title="src/config/log.ts"
+import { FileLog, ConsoleLog } from "@mongez/logger";
+import { LogConfigurations } from "@mongez/warlock";
+
+const consoleLog = new ConsoleLog();
+const fileLog = new FileLog();
+
+const logConfigurations: LogConfigurations = {
+  enabled: true,
+  channels: [consoleLog],
+  production: {
+    channels: [
+      fileLog,
+      ],
+    },
+  },
+};
+
+export default logConfigurations;
+```
+
+In this case, the console logger will be used in all environments except the production environment, where the file logger will be used instead for production only.

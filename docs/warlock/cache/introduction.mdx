@@ -1,0 +1,20 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+Cache is a very important part of any application. It is used to store data that is frequently accessed by the application. This data is stored in memory and is retrieved from the cache instead of the database. This improves the performance of the application.
+
+## Cache Manager
+
+Warlock provides a high level with single API to interact with the cache. The [CacheManager](./cache-manager) object, it wraps any [cache driver](#cache-drivers) and provides a set of methods that you can use to interact with the cache.
+
+## Cache Drivers
+
+Warlock is shipped with the following drivers for caching process:
+
+1. [Redis Cache Driver](./redis)
+2. [File Cache Driver](./file)
+3. [Memory Cache Driver](./memory)
+4. [Null Cache Driver](./null)

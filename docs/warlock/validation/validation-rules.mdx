@@ -1,0 +1,179 @@
+---
+sidebar_position: 3
+---
+
+# Validation Rules
+
+Validation rules are used to validate the request input, it's used to validate the request body, query, and params.
+
+## How it works
+
+Each handler can have special property called `validation`, this property is an object that has two keys:
+
+- `rules`: An object of validation rules.
+- `validate`: [A Custom validator](./custom-validator)
+
+## Example
+
+Let's take an example of validating the login request:
+
+```ts title="src/app/users/controllers/auth/login.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "app/users/models/user";
+
+export default async function login(request: Request, response: Response) {
+  // do logic here
+}
+
+login.validation = {
+  rules: {
+    email: ["required", "email"],
+    password: ["required", "string"],
+  },
+};
+```
+
+In our previous handler, we added `login.validation`, the validator object with `rules` object.
+
+The `rules` object has two keys **email** and **password**, each key has an array of validation rules.
+
+## Defining Validation Rules
+
+There are two ways to use validation rules, either by passing the validation rule name as a string, or by passing a rule object.
+
+All validation rules has its own name, but it must be defined in the [Validation configurations](./configurations). under the rules object.
+
+Each key inside the `rules` object will be used as the rule name indicator, for example:
+
+```ts
+import {
+  EmailRule,
+  InRule,
+  LengthRule,
+  MaxLengthRule,
+  MinLengthRule,
+  RequiredRule,
+  StringRule,
+  ValidationConfigurations,
+} from "@mongez/warlock";
+
+const validationConfigurations: ValidationConfigurations = {
+  rules: {
+    required: RequiredRule,
+    string: StringRule,
+    in: InRule,
+    minLength: MinLengthRule,
+    length: LengthRule,
+    maxLength: MaxLengthRule,
+    email: EmailRule,
+  },
+  // ...
+};
+
+export default validationConfigurations;
+```
+
+In the previous example, we defined the validation rules that we will use in our application.
+
+So to use the Email rule for instance, it is mapped with `email` key, so we can use it as a string:
+
+```ts {3}
+login.validation = {
+  rules: {
+    email: ["required", "email"],
+    password: ["required", "string"],
+  },
+};
+```
+
+## Using Rule Object
+
+Another way to use the validation rules is by passing the rule object instead of the rule name, mostly this is used with [UniqueRule](./rules/unique) and [ExistsRule](./rules/exists).
+
+For example, let's consider the following example:
+
+```ts
+import { ExistsRule } from "@mongez/warlock";
+import { User } from "app/users/models/user";
+
+login.validation = {
+  rules: {
+    email: ["required", "email", new ExistsRule(User)],
+    password: ["required", "string"],
+  },
+};
+```
+
+In the previous example, we used the `ExistsRule` with the `User` model, so the rule will check if the user exists in the database or not.
+
+## Validation Rules List
+
+By default, `Warlock` is shipped with `+30` validation rules.
+
+To see the full list of validation rules, please head to [Validation Rules List](./rules/rules-list).
+
+## Create Your Own Validation Rule
+
+You can create your own validation rule, please head to [Create Your Own Validation Rule](./rules/create-your-own-rule).
+
+## Passing options to validation rules
+
+Any validation rule can receive options (if the rule requires that) by adding `:` after the rule name, and passing the options as a string.
+
+For example, `minLength` requires a value to be passed, so we can pass it like this:
+
+```ts
+login.validation = {
+  rules: {
+    email: ["required", "email"],
+    password: ["required", "string", "minLength:8"],
+  },
+};
+```
+
+To set the options using Rule object,pass an array of options to `setOptions` method.
+
+For example, let's consider the following example:
+
+```ts
+import { MinLengthRule } from "@mongez/warlock";
+
+login.validation = {
+  rules: {
+    email: ["required", "email"],
+    password: ["required", "string", new MinLengthRule().setOptions([8])],
+  },
+};
+```
+
+## Validation error messages
+
+All validation rules are stored under `validation` group name, by default it supports `English` and `Arabic` languages, you can however add your own language.
+
+### ]Default error messages
+
+To override an error message from the default messages, you can use the `groupedTranslations` function, for example:
+
+```ts title="src/app/general/utils/locales.ts"
+import { groupedTranslation } from "@mongez/localization";
+
+groupedTranslation("validation", {
+  required: {
+    en: ":input is mandatory",
+    ar: "يجب ان يحتوي على قيمة :input",
+  },
+});
+```
+
+## Translated input names
+
+Let's say our current app locale code is `ar` which is Arabic, now we want to return an error for `firstName` that indicates it is required which is defined in the validation as follows:
+
+```ts
+groupedTranslation("validation", {
+  required: {
+    en: ":input is required",
+    ar: "مطلوب :input",
+  },
+});
+```

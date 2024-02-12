@@ -1,0 +1,32 @@
+---
+sidebar_position: 6
+---
+
+# Compressing images
+
+Another powerful feature is compressing images after being uploaded and before stored, this will significantly reduce the size of the images and save the storage space.
+
+To enable compression, set the `compress` property to `true`.
+
+```ts title="src/config/uploads.ts"
+import { UploadsConfigurations, requestContext } from "@mongez/warlock";
+
+const uploadsConfigurations: UploadsConfigurations = {
+  /**
+   * Compress the uploaded images
+   */
+  compress: true,
+};
+
+export default uploadsConfigurations;
+```
+
+:::info
+All images regardless its type will be compressed and stored as `webp` format.
+:::
+
+By enabling images compression, the original file will be deleted and replaced with the compressed one.
+
+:::tip
+It's recommended to enable compression in production environment to reduce the storage space and enhance performance.
+:::

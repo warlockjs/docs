@@ -1,0 +1,27 @@
+---
+sidebar_position: 31
+---
+
+# Uploadable
+
+Check if the input value is a hash of [Uploadable](./../../upload/upload-model).
+
+> This rule is a database dependent rule. It requires a database connection to run against the input value.
+
+> The validation rule **requires a value** to run against the input value.
+
+Basically it works by uploading the files in a separate request then attach the upload hash to certain model, i.e user avatar, post image etc.
+
+## Example
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    title: ["required", "stringify"],
+    image: ["required", "uploadable"],
+  },
+};
+```
+
+The rule will fetch the `uploads collection` for the given hash and check if the hash exists, if not exists, the validation will fail.

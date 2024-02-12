@@ -1,0 +1,46 @@
+---
+sidebar_position: 5
+---
+
+# Localization Utils
+
+This section of documentation covers various functions that can be used for localization.
+
+## Get Localized Value
+
+`getLocalized` is a function that receives an array of [Localized data](./introduction#Localized-data) and returns the value of the given locale code.
+
+```ts title="src/app/main.ts"
+import { getLocalized } from "@mongez/warlock";
+
+const name = [
+  {
+    localeCode: "en",
+    value: "John Doe",
+  },
+  {
+    localeCode: "ar",
+    value: "جون دو",
+  },
+];
+
+console.log(getLocalized(name, "en")); // returns "John Doe"
+```
+
+This could be handy function if you want to retrieve the value of a localized data but not to wait to the output to convert it based on current locale code.
+
+If the second argument is not passed and the function is called within a [Request Context](./../http/request-context) then it will return the value of the current locale code.
+
+```ts title="src/app/posts/controllers/get-post.ts"
+import { getLocalized, Request, Response } from "@mongez/warlock";
+import { Post } from "app/posts/models/post";
+
+export default async function getPost(request: Request, response: Response) {
+  const post = await Post.find(request.params.id);
+
+  return {
+    title: getLocalized(post.title),
+    content: getLocalized(post.content),
+  };
+}
+```

@@ -212,3 +212,54 @@ type PaginationInfo = {
 :::success Please Note That
 The returned documents are an array of models not plain objects.
 :::
+
+## Chunk
+
+To chunk the results, you can use the `chunk` method, the idea here is to split the returned documents into chunks, and pass each chunk to a callback function:
+
+```ts
+import { User } from "./models/user";
+
+await User.chunk(10, (users) => {
+  console.log(users);
+});
+```
+
+You may also pass an object of filters, but it **MUST** contain `limit` property:
+
+```ts
+import { User } from "./models/user";
+
+await User.chunk(
+  {
+    limit: 10,
+    isActive: true,
+  },
+  (users) => {
+    console.log(users);
+  }
+);
+```
+
+To get the pagination information, you can pass a second callback function:
+
+```ts
+import { User } from "./models/user";
+
+await User.chunk(
+  {
+    limit: 10,
+    isActive: true,
+  },
+  (users) => {
+    console.log(users);
+  },
+  (paginationInfo) => {
+    console.log(paginationInfo);
+  }
+);
+```
+
+:::note
+To stop executing the chunk, you can return `false` from the callback function.
+:::

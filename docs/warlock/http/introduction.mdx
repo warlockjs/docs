@@ -1,0 +1,62 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+Http Requests is the core of any web application. Warlock provides a simple and easy to use API to make HTTP requests.
+
+## Basic Usage
+
+Following the steps of [Express](https://expressjs.com/) and [Fastify](https://www.fastify.io/), Warlock uses the same concept of `request` and `response` objects.
+
+So when you make a request, Warlock will create a `request` object that contains all the information about the request, and a `response` object that contains all the information about the response.
+
+Let's see a simple example
+
+```ts title="src/app/general/routes.ts"
+import { router, Request, Response } from "@mongez/warlock";
+
+router.get("/", (request: Request, response: Response) => {
+  return response.success({
+    message: "Hello World",
+  });
+});
+```
+
+Nothing special here, we just created a simple route that returns a success response with a message `Hello World`.
+
+## How it works
+
+Simply, we define our [app routes](./routes) to define which handlers will be executed when a request is made to a specific route.
+
+When a request is made, Warlock will check if there is a route that matches the request URL, if there is a match, then it will execute the handler and return the response.
+
+## Middleware
+
+Middleware is a function that will be executed before the handler, it's used to modify the request or the response, or to execute some code before the handler.
+
+So we can define the http cycle as follows:
+
+1. Define the routes
+2. Execute the middleware (if exists)
+3. Execute the handler that receives the request and returns the response
+4. Send the response
+
+## Handler Or Controller?
+
+Both has the same meaning, we prefer to use the term `request handler` but for more other programming languages standards, we store all `handlers` inside the `controllers` directory.
+
+## Function Handlers VS Class Handlers
+
+In such programming language as `Typescript` (Yes typescript not javascript), we can use both paradigms, so let's see the difference between them.
+
+### Using Handlers
+
+Handlers are great for simple routes that does a simple task and for decoupling the code, it makes perfect sense to use it for a `login` route for instance, we just need to validate the request and return the response.
+
+## Using Class Handlers
+
+In `Warlock`, we prefer using `classes` when it comes to `RESTful` APIs, because it makes it easier to maintain the code and to add more features to the same route.
+
+That's why we [introduced Restful Classes](./restful) that makes it easier to create a `RESTful` API with around 6 routes in a single class.

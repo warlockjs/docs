@@ -1,0 +1,702 @@
+---
+sidebar_position: 3
+---
+
+# Request
+
+**Warlock Request** is the incoming request object, it contains all the information about the request, and it is used to get the request body, query string, headers, and more.
+
+## Request params
+
+Request params are the dynamic segments in the request path, for example in the following route:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+
+router.get("/users/:id", getUser);
+```
+
+In this example, when the user requests `/users/1`, the `id` param will be `1`.
+
+Let's see how to access it:
+
+```ts title="src/app/users/controllers/get-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function getUser(request: Request, response: Response) {
+  const user = await User.find(request.params.id);
+  response.success({
+    user,
+  });
+}
+```
+
+## Request query string
+
+Query string is the part of the URL after the `?` character, for example in the following URL:
+
+```
+https://example.com/users?name=John&age=20
+```
+
+The query string is `name=John&age=20`.
+
+Let's see how to access it:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function getUsers(request: Request, response: Response) {
+  const users = await User.find({
+    name: request.query.name,
+    age: request.query.name,
+  });
+
+  response.success({
+    users,
+  });
+}
+```
+
+If the query params has a `[]` as a key suffix, then it will be treated as an array, for example:
+
+`sitename.com/products?brands[]=1&brands[]=2&brands[]=3` will be parsed as:
+
+```ts
+//...
+const brands = request.query.brands; // [1, 2, 3]
+```
+
+## Request body
+
+Request body are the payload data that is being sent in `POST` `PUT` `PATCH` requests, for example in the following request:
+
+```ts title="src/app/users/controllers/create-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function createUser(request: Request, response: Response) {
+  const user = await User.create({
+    name: request.body.name,
+    age: request.body.age,
+  });
+
+  response.success({
+    user,
+  });
+}
+```
+
+As mentioned in the request query, if the request body input has a `[]` as a key suffix, then it will be treated as an array, for example:
+
+```ts title="src/app/users/controllers/create-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function createUser(request: Request, response: Response) {
+  const user = await User.create({
+    name: request.body.name,
+    age: request.body.age,
+    brands: request.body.brands, // [1, 2, 3]
+  });
+
+  response.success({
+    user,
+  });
+}
+```
+
+## Json and Form Data Requests
+
+By default, `Warlock` parses both types out of the box, so you don't need to add additional work, it will parse the request body and make it available in `request.body` property.
+
+# Request Input
+
+This is the recommended way to access any type of data from request wether it is from `params` `query` or `body`.
+
+To access any value from the request, use the `input()` method:
+
+```ts title="src/app/users/controllers/create-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function createUser(request: Request, response: Response) {
+  const user = await User.create({
+    name: request.input("name"),
+    age: request.input("age"),
+  });
+
+  response.success({
+    user,
+  });
+}
+```
+
+:::info
+The `input()` method accepts a default value as a second argument if the input is missing.
+:::
+
+:::tip
+Using `input()` method is the recommended way to access request payload regardless of the request method.
+:::
+
+### Dot Notation Support
+
+When sending a json request, you can use the dot notation to access nested values, for example in the following request:
+
+```json
+{
+  "user": {
+    "name": "John",
+    "age": 20
+  }
+}
+```
+
+To get the `name` value, use the following:
+
+```ts title="src/app/users/controllers/create-user.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function createUser(request: Request, response: Response) {
+  const name = request.input("user.name");
+
+  response.success({
+    name,
+  });
+}
+```
+
+## Int Values
+
+As you already know, any value from the request is a string, but sometimes we need to get an integer value, for example in the following request:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function getUsers(request: Request, response: Response) {
+  const users = await User.find({
+    age: request.int("age"),
+  });
+
+  response.success({
+    users,
+  });
+}
+```
+
+This will convert the `age` value to an integer, if the input is missing or not an integer, it will return `0`.
+
+> You can of course pass the second argument to the `int()` method to set a default value.
+
+## Float Values
+
+Similar to the `int()` method, the `float()` method converts the input value to a float number, if the input is missing or not a float number, it will return `0`.
+
+## Number Values
+
+This method is a combination of `int()` and `float()` methods, it converts the input value to a number, if the input is missing or not a number, it will return `0`.
+
+## Boolean Values
+
+When using `request.bool()` method, If the request input is present, then all values will be marked as **true** except for `false` value.
+
+::info
+When using `bool` method, if the input's value is `false` as a string, it will be converted to `false` as boolean value.
+:::
+
+## Check if request has a value
+
+To check if the request has a value in any payload type, use the `has()` method:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function getUsers(request: Request, response: Response) {
+  const hasAge = request.has("age");
+
+  response.success({
+    hasAge,
+  });
+}
+```
+
+## Set value to request payload
+
+Sometimes we need to update the request payload with additional data, this usually happens in `middleware`, to do so, use `request.set` method
+
+```ts title="src/app/users/middleware/auth.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function auth(request: Request, response: Response) {
+  const authorizationHeader = request.header("Authorization");
+
+  if (!authorizationHeader) {
+    return response.unauthorized();
+  }
+
+  const user = await User.find(request.input("id"));
+
+  request.set("email", user.get("email"));
+}
+```
+
+## Unset values from request
+
+To unset multiple values from the request, use the `unset()` method:
+
+```ts title="src/app/users/middleware/auth.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function auth(request: Request, response: Response) {
+  const authorizationHeader = request.header("Authorization");
+
+  if (!authorizationHeader) {
+    return response.unauthorized();
+  }
+
+  request.unset(["id", "name"]);
+}
+```
+
+## Get entire request payload
+
+To get the entire request payload, use the `all()` method:
+
+```ts title="src/app/users/controllers/create-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function createUser(request: Request, response: Response) {
+  const user = await User.create(request.all());
+
+  response.success({
+    user,
+  });
+}
+```
+
+> Please note that this method will return the entire request payload, including the `params` `query` and `body` but not including request files.
+
+In some situations, you don't want to get the request params, you need only the request query and body, in this case use `allExceptParams` method.
+
+```ts title="src/app/users/controllers/create-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function createUser(request: Request, response: Response) {
+  const user = await User.create(request.allExceptParams());
+
+  response.success({
+    user,
+  });
+}
+```
+
+## Get certain values from request
+
+To get certain values from the request payload, use `only` method, it accepts an array of keys that you want to get from the request payload and returns an object.
+
+```ts title="src/app/users/controllers/create-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function createUser(request: Request, response: Response) {
+  const user = await User.create(request.only(["name", "age"])); // { name: "John", age: 20 }
+
+  response.success({
+    user,
+  });
+}
+```
+
+## Get all values except certain values
+
+To get all values from the request payload except certain values, use `except` method, it accepts an array of keys that you want to exclude from the request payload and returns an object.
+
+```ts title="src/app/users/controllers/create-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function createUser(request: Request, response: Response) {
+  const user = await User.create(
+    request.except(["id", "createdAt", "updatedAt"])
+  ); // { name: "John", age: 20 }
+
+  response.success({
+    user,
+  });
+}
+```
+
+## Get heavy inputs
+
+Sometimes, a request payload may contain inputs but with empty strings, consider the following request url
+
+`example.com/users/1?name=&age=20`
+
+If we use `request.all()` method, it will return the following object:
+
+```json
+{
+  "id": 1,
+  "name": "",
+  "age": 20
+}
+```
+
+To get the heavy inputs, use `request.heavy()` method, it will return the following object:
+
+This will return the following data
+
+```json
+{
+  "id": 1,
+  "age": 20
+}
+```
+
+This will return all data from `params` `query` and `body`.
+
+To get all heavy data except the params data, use `request.heavyExceptParams()` method, it will return the following object:
+
+```json
+{
+  "age": 20
+}
+```
+
+## Request files
+
+When send a `multipart/form-data` request, you can access the files using the `file` method:
+
+```ts title="src/app/users/controllers/create-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function createUser(request: Request, response: Response) {
+  const image = request.file("image");
+}
+```
+
+The `file` method may return a `UploadedFile` instance, or `null` if the file is missing.
+
+If the request contains multiple files with the same name, then the `file` method will return an array of `UploadedFile` instances.
+
+For more details about uploaded files, check it in the [Uploaded Files Section](./uploaded-files).
+
+## Validation
+
+Sometimes you want to [validate](./../validation/introduction) some inputs on a middleware, or in `validation.validate` method, in this case, you can use `request.validate` method, which accepts an object of rules or a [Validation Schema](./../validation/validation-schema):
+
+```ts
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export default async function login(request: Request, response: Response) {
+  //
+}
+
+login.validation = {
+  validate: async (request: Request, response: Response) => {
+    const user = await User.findBy("email", request.input("email"));
+
+    if (!user) {
+      return response.badRequest({
+        email: "Email is not found",
+      });
+    }
+
+    if (user.get("isAdmin")) {
+      const validator = await request.validate({
+        superPassword: ["required", "minLength:8"],
+      });
+
+      // if validation fails, then return the validation by passing the validator to the response
+      if (validator.fails()) {
+        return response.validationFailed(validator);
+      }
+    }
+  },
+};
+```
+
+This case we have to first fetch the user from the database then perform validation, if the user is not found, then we return a bad request response, if the user is found, then we check if the user is an admin, if the user is an admin, then we validate the `superPassword` input, if the validation fails, then we return a validation failed response.
+
+## Get validated inputs only
+
+To get only the validated inputs that are listed in `validation.rules` object, use `request.validated()` method:
+
+```ts
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export default async function login(request: Request, response: Response) {
+  const { email, password } = request.validated(); // will return only the email and password
+}
+
+login.validation = {
+  rules: {
+    email: ["required", "email"],
+    password: ["required"],
+  },
+};
+```
+
+If an input is listed in the `rules` object but not required and missing, then it will not be returned, for example if we added `gender: in:male,female` in this case, the gender input is optional, if not present in the request payload, it will be ignored.
+
+## Request headers
+
+Request headers are the HTTP headers sent with the request, for example the `Accept` header, `Content-Type` header, and more.
+
+To get a single header, use the `header()` method:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const acceptHeader = request.header("Accept");
+
+  response.success({
+    acceptHeader,
+  });
+}
+```
+
+It may accept a default value for second argument if the header is missing:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const acceptHeader = request.header("Accept", "application/json");
+
+  response.success({
+    acceptHeader,
+  });
+}
+```
+
+To get all headers, use the `headers` property:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const headers = request.headers;
+
+  response.success({
+    headers,
+  });
+}
+```
+
+## Request Authorization value
+
+If the `Authorization` header is present in the request, you can get its value using the `authorization` property:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const authorization = request.authorization;
+
+  response.success({
+    authorization,
+  });
+}
+```
+
+It will return the value of the `Authorization` header, if the header is not present, it will return `null`.
+
+### Authorization Value
+
+To get the authorization value use `authorizationValue` property instead, for example if teh request Authorization header is:
+
+`Authorization: key apiKey`
+
+Then the `authorizationValue` will be `apiKey`.
+
+If it contains a `Bearer Token` then the token will be returned directly without the `Bearer` prefix.
+
+## Request path
+
+Get current request path using the `path` property:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const path = request.path;
+
+  response.success({
+    path,
+  });
+}
+```
+
+## Request url
+
+Get current request url using the `url` property:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const url = request.url;
+
+  response.success({
+    url,
+  });
+}
+```
+
+### Get full url
+
+To get the full url (not including the query string) use `fullUrl` property instead:
+
+```ts {7} title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const fullUrl = request.fullUrl;
+
+  response.success({
+    fullUrl, // https://example.com/users
+  });
+}
+```
+
+## Request Ip
+
+To get the request IP, use the `ip` property:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const ip = request.ip;
+
+  response.success({
+    ip,
+  });
+}
+```
+
+This will work as it will return the current ip address, however, if the app is running under a proxy, it will return the proxy ip address, to get the real ip address, use the `realIp` property:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const ip = request.realIp;
+
+  response.success({
+    ip,
+  });
+}
+```
+
+This works by trying to get the ip from the `x-real-ip`, if the header is not found, then a `x-forwarded-for` header is used, if the header is not found, then the default ip will be returned.
+
+## User Agent
+
+To get the user agent, use the `userAgent` property:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const userAgent = request.userAgent;
+
+  response.success({
+    userAgent,
+  });
+}
+```
+
+## Request Referer
+
+To get the request referer, use the `referer` property:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const referer = request.referer;
+
+  response.success({
+    referer,
+  });
+}
+```
+
+## Request Method
+
+To get the request method, use the `method` property:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const method = request.method;
+
+  response.success({
+    method,
+  });
+}
+```
+
+## Request hostname
+
+Request `hostname` property returns the hostname of the request, for example in the following request:
+
+```
+https://example.com/users
+```
+
+The hostname is `example.com`.
+
+> `request.domain` is an alias for `request.hostname`.
+
+If the application is running under a proxy, then use `originalDomain` instead.
+
+## Request Protocol
+
+Request `protocol` property returns the protocol of the request, for example in the following request:
+
+```
+https://example.com/users
+```
+
+```ts
+console.log(request.protocol); // https
+```
+
+## Request Locale Code
+
+When dealing with a multilingual apps, its important to know the current locale code, to get the current locale code, use the `locale` property:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getLocale(request: Request, response: Response) {
+  const locale = request.locale;
+
+  response.success({
+    locale,
+  });
+}
+```
+
+The locale property will try to find one of the following headers in the incoming request to fetch the locale code from
+
+- `translation-locale-code`
+- `locale-code`
+- `locale`
+
+If none of the headers is found, then it will return the default locale code from [Application default Locale Code Configuration](./../getting-started/configurations#localeCode).

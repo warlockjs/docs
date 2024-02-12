@@ -1,0 +1,24 @@
+---
+sidebar_position: 14
+---
+
+# Int
+
+Check if the input value is an integer.
+
+The validation rule **requires a value** to run.
+
+If the input's value is an integer, the validation will fail.
+
+If you want to validate against the value either an integer or a float, use the [`number`](./number) validation rule.
+
+## Example
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+createAccount.validation = {
+  rules: {
+    height: ["required", "int"],
+  },
+};
+```

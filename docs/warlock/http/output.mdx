@@ -1,0 +1,542 @@
+---
+sidebar_position: 8
+---
+
+# Output
+
+Outputs are classes that are used to map the models to the response body.
+
+## How it works
+
+When we return a response from a controller, we send the model instance, for example the user model will be sent to the user.
+
+As mentioned in [Sending Custom Objects](./response#sending-custom-objects-to-response) the response parser does not know what data will be sent from the model, this were Outputs come in handy.
+
+So the output takes a `resource` which could be an instance of a model, or a plain object. then when the response parser start parsing the body, the output class will return the `response data` which is the final output that will be sent to the client.
+
+## Creating an output
+
+Create inside `src/users/output` a file and name it `user-output.ts` with the following content
+
+```ts title="src/users/output/user-output.ts"
+import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+
+export class UserOutput extends Output {
+  /**
+   * Output data
+   */
+  protected output: FinalOutput = {
+    id: "int",
+    name: "string",
+    email: "string",
+    age: "number",
+  };
+}
+```
+
+the output class does not really have to much to do, it just ensures that the output data is sent in the correct format.
+
+Now let's update our user model class to link it with the user output
+
+```ts {12,23} title="src/users/models/user/user.ts"
+import {
+  castEmail,
+  castModel,
+  Casts,
+  CustomCasts,
+  Document,
+  expiresAfter,
+  oneOf,
+} from "@mongez/monpulse";
+import { Auth, uploadable } from "@mongez/warlock";
+import castPassword from "app/users/utils/cast-password";
+import UserOutput from "../../output/user-output";
+
+export class User extends Auth {
+  /**
+   * Collection name
+   */
+  public static collection = "users";
+
+  /**
+   * Output handler
+   */
+  public static output = UserOutput;
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "string",
+    gender: "string",
+    image: uploadable,
+    email: castEmail,
+  };
+}
+```
+
+In the previous model class, we added a static property called `output` and set it to the `UserOutput` class.
+
+Now whenever an instance of the model is sent to the response, the data of the model will be transformed using the `UserOutput` class.
+
+### Outputs in Outputs
+
+Let's take this scenario, a post has a `author` object which is an embedded document for the user,
+and we want to send the post with the author data.
+
+Let's see how we can do this.
+
+First we need to create a new output class for the post, and add the author output to it.
+
+```ts title="src/posts/output/post-output.ts"
+import { FinalOutput, Output } from "@mongez/warlock";
+import { UserOutput } from "app/users/output/user-output";
+
+export class PostOutput extends Output {
+  /**
+   * Output data
+   */
+  protected output: FinalOutput = {
+    id: "int",
+    title: "string",
+    content: "string",
+    author: UserOutput,
+  };
+}
+```
+
+Now let's create a new post model class and link it with the post output
+
+```ts {12,23} title="src/posts/models/post/post.ts"
+import { castModel, Casts, Document } from "@mongez/monpulse";
+import { Model, uploadable } from "@mongez/warlock";
+import { User } from "app/users/models/user/user";
+
+export class Post extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "posts";
+
+  /**
+   * Output handler
+   */
+  public static output = PostOutput;
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    title: "string",
+    content: "string",
+    author: castModel(User),
+  };
+}
+```
+
+Now the post has title, content and the embedded data of the author.
+
+Let's create a new post
+
+```ts title="src/posts/controllers/create-post.ts"
+import { Request, Response } from "@mongez/warlock";
+import { Post } from "../models/post/post";
+import { User } from "app/users/models/user";
+
+export async function createPost(request: Request, response: Response) {
+  const user = await User.find(request.input("authorId"));
+
+  if (!user) {
+    return response.notFound();
+  }
+
+  const post = new Post({
+    title: request.input("title"),
+    content: request.input("content"),
+    user,
+  });
+
+  await post.save();
+
+  return response.success({
+    post,
+  });
+}
+```
+
+Now the post will be returned, the `castModel` in the post model will set the embedded data of the user into the post's author field so the post data in database will look like:
+
+```json
+{
+  "id": 1,
+  "title": "Post title",
+  "content": "Post content",
+  "author": {
+    "id": 1,
+    "image": {
+      "path": "users/1/image.png"
+    },
+    "name": "User name",
+    "email": "my-email@gmail.com"
+  }
+}
+```
+
+Thanks to the `PostOutput` only the needed data will be sent to the response.
+
+But as you can see in the previous example, the post's author has an image, but we didn't define it yet in the user output, most of the time the image is an instance of `Upload` model, which already is built in inside Warlock and has as well `UploadOutput` class.
+
+Let's update the user output to include the image
+
+```ts {12,23} title="src/users/output/user-output.ts"
+import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+
+export class UserOutput extends Output {
+  /**
+   * Output data
+   */
+  protected output: FinalOutput = {
+    id: "int",
+    name: "string",
+    email: "string",
+    age: "number",
+    image: UploadOutput,
+  };
+}
+```
+
+Now the image will be sent to the response as well.
+
+But since the embedded data doesn't include the user `age` then it will not be returned.
+
+### Custom output handler
+
+We can also define a method in the output class to handle the output data.
+
+Let's take this scenario, we want to return the user's full name instead of the first name only.
+
+```ts title="src/users/output/user-output.ts"
+import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+
+export class UserOutput extends Output {
+  /**
+   * Output data
+   */
+  protected output: FinalOutput = {
+    id: "int",
+    email: "string",
+    age: "number",
+    fullName: this.handleFullName,
+  };
+
+  /**
+   * Get the full name
+   */
+  public handleFullName() {
+    return this.get("firstName") + " " + this.get("lastName");
+  }
+}
+```
+
+## Extending output
+
+When the application grows, it gets complicated, so we may face a situation where we need to add a new field to the output, but it requires more than just a simple output key, this where `extend` method comes in handy.
+
+```ts title="src/users/output/user-output.ts"
+import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+
+export class UserOutput extends Output {
+  /**
+   * Output data
+   */
+  protected output: FinalOutput = {
+    id: "int",
+    email: "string",
+    age: "number",
+    fullName: this.handleFullName,
+  };
+
+  /**
+   * Get the full name
+   */
+  public handleFullName() {
+    return this.get("firstName") + " " + this.get("lastName");
+  }
+
+  /**
+   * Extend the output
+   */
+  protected async extend() {
+    if (this.get("id") === 1) {
+      this.set("isAdmin", true);
+    }
+  }
+}
+```
+
+We made a check to see if the user id is 1, then we set the `isAdmin` field to true.
+
+### Working with output without models.
+
+Let's see how it works without a model
+
+```ts title="src/users/controllers/get-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { UserOutput } from "../output/user-output";
+
+export async function getUser(request: Request, response: Response) {
+  const user = {
+    id: 1,
+    firstName: "John",
+    lastName: "Doe",
+  };
+
+  const output = new UserOutput(user);
+
+  return response.success({
+    user: output,
+  });
+}
+```
+
+As you can see, the output class can take a plain object, or an instance of a model, they both are called `output resource`.
+
+### Get value from teh resource
+
+In our previous user output, we used `get` method to get the value from the passed `resource`, this allows us to get any value from the given resource using dot notation.
+
+```ts {29} title="src/users/output/user-output.ts"
+import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+
+export class UserOutput extends Output {
+  /**
+   * Output data
+   */
+  protected output: FinalOutput = {
+    id: "int",
+    email: "string",
+    age: "number",
+    fullName: this.handleFullName,
+  };
+
+  /**
+   * Get the full name
+   */
+  public handleFullName() {
+    return this.get("firstName") + " " + this.get("lastName");
+  }
+
+  /**
+   * Extend the output
+   */
+  protected async extend() {
+    if (this.get("id") === 1) {
+      this.set("isAdmin", true);
+    }
+
+    this.set("address", this.get("location.address"));
+  }
+}
+```
+
+And of course the `set` method is to set a value to the output data that will be sent to the response.
+
+### Output from array
+
+If the data is stored in array, using `UserOutput.collect` static method will return an array of output resources.
+
+```ts title="src/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+import { UserOutput } from "../output/user-output";
+
+export async function getUsers(request: Request, response: Response) {
+  const users = [
+    {
+      id: 1,
+      firstName: "John",
+      lastName: "Doe",
+    },
+    {
+      id: 2,
+      firstName: "Jane",
+      lastName: "Doe",
+    },
+  ];
+
+  const output = UserOutput.collect(users);
+
+  return response.success({
+    users: output,
+  });
+}
+```
+
+### Removing value from the data output
+
+To remove a value from the response data, use `remove` method.
+
+```ts title="src/users/output/user-output.ts"
+import {
+  requestContext,
+  FinalOutput,
+  Output,
+  UploadOutput,
+} from "@mongez/warlock";
+
+export class UserOutput extends Output {
+  /**
+   * Output data
+   */
+  protected output: FinalOutput = {
+    id: "int",
+    email: "string",
+    age: "number",
+    fullName: this.handleFullName,
+    salary: "float",
+  };
+
+  /**
+   * Get the full name
+   */
+  public handleFullName() {
+    return this.get("firstName") + " " + this.get("lastName");
+  }
+
+  /**
+   * Extend the output
+   */
+  protected async extend() {
+    if (this.get("id") === 1) {
+      this.set("isAdmin", true);
+    }
+
+    this.set("address", this.get("location.address"));
+
+    this.remove("location");
+
+    const { user } = requestContext();
+
+    // show salary only for admins
+    if (!user || user.get("isAdmin") === false) {
+      this.remove("salary");
+    }
+  }
+}
+```
+
+In this example, we got the user object from the request context, and we checked if the user is admin or not, if not we removed the salary from the output data.
+
+## Built-in types
+
+Warlock has some built-in types that can be used in the output class.
+
+- `int`: integer number.
+- `float`: float number.
+- `number`: Integer or float number based on the value.
+- `string`: string.
+- `boolean | bool`: boolean.
+- `date`: date.
+- `array`: Makes sure the returned value is an array.
+- `object`: Makes sure the returned value is an object.
+- `localized`: Makes sure the returned value is a string contains the value against the current locale code, [Read more about localization detection from localization section](./../localization/detecting-locale-code).
+- `location`: It will parse MongoDB [GeoJSON](https://www.mongodb.com/docs/manual/reference/geojson/#point/) object and return the latitude and longitude. in `{ lat, lng }` format.
+
+### Date Format
+
+When dealing with date objects, Warlock will format it in multiple formats, so for each date object is sent to the output, the response shape will be like this:
+
+```json
+{
+  "createdAt": {
+    "format": "13-07-2023 07:36:31 AM",
+    "timestamp": 1689222991000,
+    "humanTime": "4 months ago",
+    "text": "July 13, 2023 at 7:36:31 AM",
+    "date": "July 13, 2023"
+  }
+}
+```
+
+This give the client developer (Web or mobile apps) the ability to use the date in the format they want.
+
+To customize the format of the `format` you can override it in the output class by defining `dateFormat` property:
+
+```ts title="src/users/output/user-output.ts"
+import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+
+export class UserOutput extends Output {
+  //...
+  protected dateFormat = "DD-MM-YYYY";
+}
+```
+
+:::note
+Date format is being transformed using [Day.js](https://day.js.org/docs/en/display/format) library.
+:::
+
+### Renaming output key
+
+If we want to send another key instead of the original key in the resource, add the returning key to the response as the key, and the value will be an array contains two values, the first value will be the key that will be taken from the `resource` and the second value will be the format.
+
+```ts {11} title="src/users/output/user-output.ts"
+import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+
+export class UserOutput extends Output {
+  /**
+   * Output data
+   */
+  protected output: FinalOutput = {
+    id: "int",
+    email: "string",
+    age: "number",
+    salary: ["monthlySalary", "float"],
+  };
+}
+```
+
+## Manually using the output class
+
+It's not just related to Warlock response, you can use it to filter the given data and be sent in a certain format based on the output data.
+
+In that sense, you can use it in any place in your application.
+
+```ts title="src/users/controllers/get-user.ts"
+import { UserOutput } from "../output/user-output";
+
+async function main() {
+  const userOutput = new UserOutput({
+    id: 1,
+    firstName: "John",
+    lastName: "Doe",
+    age: new Date().getFullYear() - 1990,
+  });
+
+  const output = await userOutput.toJSON();
+}
+
+main();
+```
+
+## Array Of Outputs
+
+In some scenarios, there is a field where it holds a list of objects, each object may point to an output, for example, a product output may have a list of `options` where each option has an `option` object and a `value` object that are taken from `options` and `optionValues` models/outputs, so in this case we need to use `arrayOf` method to map the `product options` to the `option` and `option value` outputs.
+
+```ts title="src/products/output/product-output.ts"
+import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+import { OptionOutput } from "app/options/output/option-output";
+import { OptionValueOutput } from "app/options/output/option-value-output";
+
+export class ProductOutput extends Output {
+  /**
+   * Output data
+   */
+  protected output: FinalOutput = {
+    id: "int",
+    title: "string",
+    options: this.arrayOf({
+      option: OptionOutput,
+      value: OptionValueOutput,
+    }),
+  };
+}
+```

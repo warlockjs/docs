@@ -1,0 +1,178 @@
+---
+sidebar_position: 4
+---
+
+# Uploaded Files
+
+Uploading files in an API application is crucial, and Warlock provides a simple way to handle file uploads.
+
+## How it works
+
+Uploaded files are used in `multipart/form-data` requests, and Warlock handles them automatically.
+
+## Handling uploaded file
+
+To access a an uploaded file, use `request.file()` method, which returns a `File` object.
+
+```ts title="src/app/users/controllers/upload-avatar.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function uploadAvatar(request: Request, response: Response) {
+  const avatar = request.file("avatar");
+
+  // ...
+}
+```
+
+This method will return an instance of `UploadedFile` if it exists, otherwise it will return `null`.
+
+## UploadedFile
+
+Now we got the uploaded file, let's see what we can do with it.
+
+### Getting the file name
+
+To get the file name, use `name` property.
+
+```ts title="src/app/users/controllers/upload-avatar.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function uploadAvatar(request: Request, response: Response) {
+  const avatar = request.file("avatar");
+
+  if (!avatar) {
+    return response.error("No file uploaded");
+  }
+
+  const fileName = avatar.name;
+}
+```
+
+### Get file extension
+
+To get the file extension, use `extension` property.
+
+```ts title="src/app/users/controllers/upload-avatar.ts"
+//...
+const extension = avatar.extension;
+```
+
+### Get file size
+
+To get the file size, use `size` method.
+
+```ts title="src/app/users/controllers/upload-avatar.ts"
+//...
+const size = await avatar.size();
+```
+
+:::tip
+Please note that the file size is being calculated on demand, it means that the size of the uploaded file will be calculated only when calling `size()` method.
+:::
+
+:::info
+When calling `size()` method multiple times, it will cache the size of the file to avoid calculating it again.
+:::
+
+### Get file mime type
+
+To get the file mime type, use `mimeType` property.
+
+```ts title="src/app/users/controllers/upload-avatar.ts"
+//...
+
+const mimeType = avatar.mimeType;
+```
+
+### Saving files
+
+All uploaded files are stored inside `storage/uploads` directory, in that sense, we need to pass only the relative path to the `saveTo()` method.
+
+```ts title="src/app/users/controllers/upload-avatar.ts"
+//...
+
+const path = await avatar.saveTo("avatars");
+```
+
+This method accepts the relative path to the storage path directory, it will create the directory if it doesn't exist and the file will be saved with the same name.
+
+:::danger
+If the file already exists, it will be overridden.
+:::
+
+The `saveTo` method will return the relative path of the file without the storage path, for example if the storage path is `storage/uploads`, and the file is saved to `storage/uploads/avatars/avatar.png`, the `saveTo` method will return `avatars/avatar.png`.
+
+### Saving files with custom name
+
+If you want to rename the file when saving it, use `saveAs` method, it accept two arguments, the directory that will be saved into and the file name (with the extension).
+
+```ts title="src/app/users/controllers/upload-avatar.ts"
+//...
+const path = await avatar.saveAs("avatars", "avatar.png");
+```
+
+### Saving file with random name
+
+If you are creating an uploading app that you don't really care about the file name, it is best too use random file name to avoid files overriding, in this case use the `save()` method, it accepts only the directory that will be saved into.
+
+```ts title="src/app/users/controllers/upload-avatar.ts"
+//...
+const path = await avatar.save("avatars");
+```
+
+## Get file buffer
+
+Sometime we need to get the file buffer, for example when we need to save the file to the database, or to upload it to a cloud storage service.
+
+To get the file buffer, use `buffer()` method.
+
+```ts title="src/app/users/controllers/upload-avatar.ts"
+//...
+const buffer = await avatar.buffer();
+```
+
+## Working with multiple files
+
+It is pretty much the same as dealing with a single file, except that the return type is an array of `UploadedFile` objects.
+
+```ts title="src/app/users/controllers/upload-avatar.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function uploadAvatar(request: Request, response: Response) {
+  const avatars = request.files("avatars");
+
+  if (!avatars.length) {
+    return response.error("No file uploaded");
+  }
+
+  for (const avatar of avatars) {
+    await avatar.save("avatars");
+  }
+}
+```
+
+::note
+Please note that `request.file()` can handle both single and multiple files, so you can use it instead of `request.files()` if you want to handle both cases.
+:::
+
+## Image Files
+
+To check if the file is an image, use `isImage` property.
+
+```ts title="src/app/users/controllers/upload-avatar.ts"
+//...
+if (avatar.isImage) {
+  // ...
+}
+```
+
+## Get image dimensions
+
+To get the image dimensions, use `dimensions()` method.
+
+```ts title="src/app/users/controllers/upload-avatar.ts"
+//...
+if (avatar.isImage) {
+  const { width, height } = await avatar.dimensions();
+}
+```

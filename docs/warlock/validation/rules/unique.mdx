@@ -1,0 +1,113 @@
+---
+sidebar_position: 30
+---
+
+# Unique
+
+Check if the input value is unique in the database.
+
+> This rule is a database dependent rule. It requires a database connection to run against the input value.
+
+> The validation rule **requires a value** to run against the input value.
+
+For the time being, this rule does not support custom string rule, so the rule class must be called directly.
+
+## Example
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+import { UniqueRule } from "@mongez/warlock";
+import { User } from "../models/user";
+
+createAccount.validation = {
+  rules: {
+    email: ["required", "email", new UniqueRule(User, "email").insensitive()],
+  },
+};
+```
+
+The `insensitive` method is used to make the value case insensitive.
+
+If the second argument is not passed, then it will be matched against the `id` field.
+
+You may also pass the collection name instead of the model class:
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+import { UniqueRule } from "@mongez/warlock";
+
+createAccount.validation = {
+  rules: {
+    email: [
+      "required",
+      "email",
+      new UniqueRule("users", "email").insensitive(),
+    ],
+  },
+};
+```
+
+## Unique Rule with `except` Condition
+
+Ensure that a given value unique in a collection, while also allowing the exclusion of documents where a specific field does not match a specified value. This is achieved using the `except` method, which skips documents where the specified field equals the provided value.
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+import { UniqueRule } from "@mongez/warlock";
+
+createAccount.validation = {
+  rules: {
+    email: [
+      "required",
+      "email",
+      new UniqueRule("users", "email").insensitive().except("isActive", false),
+    ],
+  },
+};
+```
+
+## Except current user
+
+You may also validate the input to match a unique value, except the current user's value, in this case use `exceptCurrentUser` method:
+
+```ts title="src/app/users/controllers/update-profile.ts"
+// ...
+import { UniqueRule } from "@mongez/warlock";
+
+updateProfile.validation = {
+  rules: {
+    email: [
+      "required",
+      "email",
+      new UniqueRule("users", "email").insensitive().exceptCurrentUser(),
+    ],
+  },
+};
+```
+
+This one is useful when you want to update the user's email, and you want to make sure that the email is unique, except the current user's email.
+
+## Perform a custom query
+
+You may also perform a custom query to validate the input value using `query` method:
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+import { UniqueRule } from "@mongez/warlock";
+
+createAccount.validation = {
+  rules: {
+    email: [
+      "required",
+      "email",
+      new UniqueRule("users", "email")
+        .insensitive()
+        .query((query) => query.where("isActive", true)),
+    ],
+  },
+};
+```
+
+## Array values
+
+If the input's value is an array, it will be checked against the database using the `whereIn` method:

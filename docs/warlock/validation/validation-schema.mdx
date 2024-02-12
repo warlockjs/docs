@@ -1,0 +1,195 @@
+---
+sidebar_position: 3
+---
+
+# Validation Schema
+
+> **Added in v1.4.0**.
+
+Validation schema allows you to define the validation rules in but in more convenient way.
+
+## How it works
+
+The `validate.rules` accepts an object of inputs, each input has an array of validation rules, the key difference here is we will wrap that object in a new instance of `ValidationSchema` class:
+
+## Example
+
+Let's take an example of validating the login request:
+
+```ts title="src/app/users/controllers/auth/login.ts"
+import { Request, Response, ValidationSchema } from "@mongez/warlock";
+import { User } from "app/users/models/user";
+
+export default async function login(request: Request, response: Response) {
+  // do logic here
+}
+
+login.validation = {
+  rules: new ValidationSchema({
+    email: ["required", "email"],
+    password: ["required", "string"],
+  },
+});
+```
+
+It works exactly the same with no more differences.
+
+:::warning
+For the current version the `validation.rules` accepts a plain object or an instance of `ValidationSchema` class, but in the next major version it will only accept an instance of `ValidationSchema` class.
+:::
+
+## Make all inputs required
+
+So instead of adding the `required` rule to each input, you can make all inputs required in the validation schema by calling `requiredInputs` method:
+
+```ts
+login.validation = {
+  rules: new ValidationSchema({
+    email: ["email"],
+    password: ["string"],
+  }).requiredInputs(),
+};
+```
+
+This is equivalent to:
+
+```ts
+login.validation = {
+  rules: new ValidationSchema({
+    email: ["required", "email"],
+    password: ["required", "string"],
+  }),
+};
+```
+
+## Array Schema
+
+Let's take a more complex example, let's say we want to validate the following request:
+
+```ts
+{
+  name: 'John Doe',
+  addresses: [
+    {
+      city: "Cairo",
+      address: 'Street 1',
+      buildingNo: 1,
+      flatNo: 1,
+    },
+    }
+  ]
+}
+```
+
+This is an object that has `addresses` which is an array of objects, each object has `city` which is `string` and `address`, `buildingNo`, and `flatNo` which are strings.
+
+So how can we validate array of objects? this is where the `ArraySchema` class comes in handy:
+
+```ts
+import {
+  Request,
+  Response,
+  ValidationSchema,
+  ArraySchema,
+} from "@mongez/warlock";
+import { User } from "app/users/models/user";
+
+export default async function login(request: Request, response: Response) {
+  // do logic here
+}
+
+login.validation = {
+  rules: new ValidationSchema({
+    name: ["required", "string"],
+    addresses: new ArraySchema({
+      city: ["required", "string"],
+      address: ["required", "string"],
+      buildingNo: ["required", "string"],
+      flatNo: ["required", "string"],
+    }),
+  }),
+};
+```
+
+Here we defined the `addresses` as an instance of `ArraySchema` class, and we passed the validation rules as an object to the constructor.
+
+Now what if we want to validate the city as an object? we can do that by passing the validation rules as an instance of `ValidationSchema` class:
+
+```ts
+import {
+  Request,
+  Response,
+  ValidationSchema,
+  ArraySchema,
+} from "@mongez/warlock";
+import { User } from "app/users/models/user";
+
+export default async function login(request: Request, response: Response) {
+  // do logic here
+}
+
+login.validation = {
+  rules: new ValidationSchema({
+    name: ["required", "string"],
+    addresses: new ArraySchema({
+      city: new ValidationSchema({
+        name: ["required", "string"],
+      }),
+      address: ["required", "string"],
+      buildingNo: ["required", "string"],
+      flatNo: ["required", "string"],
+    }),
+  }),
+};
+```
+
+Here we defined the `city` as an instance of `ValidationSchema` class, and we passed the validation rules as an object to the constructor.
+
+So if the `addresses.city.name` is missing, the validation will fai with a message like this:
+
+```json
+{
+  "errors": {
+    "key": "addresses.0.city.name",
+    "message": "The addresses.0.city.name field is required."
+  }
+}
+```
+
+:::tip
+If any of the `ArraySchema` inputs is required, the whole array will be required.
+:::
+
+## Apply rules to all inputs
+
+If we checked the array schema, they all have the `string` rule, we can use `rules` method to add rules to all inputs at once:
+
+```ts
+import {
+  Request,
+  Response,
+  ValidationSchema,
+  ArraySchema,
+} from "@mongez/warlock";
+import { User } from "app/users/models/user";
+
+export default async function login(request: Request, response: Response) {
+  // do logic here
+}
+
+login.validation = {
+  rules: new ValidationSchema({
+    name: ["required", "string"],
+    addresses: new ArraySchema({
+      city: new ValidationSchema({
+        name: ["required"],
+      }),
+      address: ["required"],
+      buildingNo: ["required"],
+      flatNo: ["required"],
+    }).rules(["string"]),
+  }),
+};
+```
+
+> Please note if the input is a validation schema, the rules will be applied to it as well for all its nested inputs, for example all inputs in `city` will have `string` rule as well.

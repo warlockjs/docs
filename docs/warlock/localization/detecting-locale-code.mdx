@@ -1,0 +1,86 @@
+---
+sidebar_position: 3
+---
+
+# Detecting Locale Code
+
+In a multi-language application, you may want to detect the locale code from the request headers.
+
+Warlock tries to locate the locale code from the following sources in the same order:
+
+- `translation-locale-code` header.
+- `locale-code` header.
+- `locale` header.
+- `locale` query string.
+
+## When to use `translation-locale-code` header?
+
+This header has a special usage, especially when working with the admin panel, for example, we are updating a category name which holds the name as an array of localized objects.
+
+But we want to return the entire array to the response and in the same time we want to translate the error messages.
+
+In this case, the `translation-locale-code` header will be used to translate the error messages, while the `locale-code` header will be used to return the localized data.
+
+But if the `locale-code` header is sent, then the output will be returned as a string, not an array of objects.
+
+## Fetching only the current locale's value
+
+If `locale-code` or `locale` headers are found, only the value will be returned.
+
+For example, let's say we have the following category name which is an array of localized objects:
+
+```json
+{
+  "name": [
+    {
+      "localeCode": "en",
+      "value": "Category name"
+    },
+    {
+      "localeCode": "ar",
+      "value": "اسم القسم"
+    }
+  ]
+}
+```
+
+Let's define our category output which extends the base [output](./../http/output) class:
+
+```ts title="src/app/categories/output/category-output.ts"
+import { FinalOutput, Output } from "@mongez/warlock";
+
+export class CategoryOutput extends Output {
+  /**
+   * Output data
+   */
+  protected output: FinalOutput = {
+    id: "int",
+    name: "localized",
+  };
+}
+```
+
+If `locale` header is present in the request with value `en`, then the output of the name will be:
+
+```json
+{
+  "name": "Category name"
+}
+```
+
+If not present then the entire array will be returned:
+
+```json
+{
+  "name": [
+    {
+      "localeCode": "en",
+      "value": "Category name"
+    },
+    {
+      "localeCode": "ar",
+      "value": "اسم القسم"
+    }
+  ]
+}
+```

@@ -1,0 +1,31 @@
+---
+sidebar_position: 9
+---
+
+# Exists
+
+Check if the input value exists in the database.
+
+> This rule is a database dependent rule. It requires a database connection to run against the input value.
+
+> The validation rule **requires a value** to run against the input value.
+
+For the time being, this rule does not support custom string rule, so the rule class must be called directly.
+
+## Example
+
+```ts title="src/app/users/controllers/login.ts"
+// ...
+import { ExistsRule } from "@mongez/warlock";
+import { User } from "../models/user";
+
+login.validation = {
+  rules: {
+    email: ["required", "email", new ExistsRule(User, "email").insensitive()],
+  },
+};
+```
+
+## Extends Unique
+
+Please note that the exists rule extends [Unique Rule](./unique) so any method available in the unique rule is also available in the exists rule.

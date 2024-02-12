@@ -1,0 +1,29 @@
+---
+sidebar_position: 3
+---
+
+# Array Of
+
+Check if the input is an array of the given type.
+
+> The validation rule **requires a value** to run against the input value.
+
+If the input is not an array, the validation will fail.
+
+The type should be one of the following:
+
+- `string`
+- `number`
+- `boolean`
+- `object`
+
+## Example
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    keywords: ["required", "arrayOf:string"],
+  },
+};
+```

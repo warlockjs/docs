@@ -1,0 +1,66 @@
+---
+sidebar_position: 6
+---
+
+# Redis Cache Driver
+
+[Redis](https://redis.io/) is an open source (BSD licensed), in-memory data structure store, used as a database, cache, and message broker.
+
+## Setup
+
+By default `Redis` is shipped with `Warlock` so you don't need to install any dependencies.
+
+## Configurations
+
+Go to the [Cache Configurations](./configurations) file, and add the following:
+
+```ts title="src/config/cache.ts"
+import { env } from "@mongez/dotenv";
+import { CacheConfigurations, RedisCacheDriver } from "@mongez/warlock";
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    redis: RedisCacheDriver,
+  },
+  default: env("CACHE_DRIVER", "redis"),
+  options: {
+    redis: {
+      host: env("REDIS_HOST"),
+      port: env("REDIS_PORT"),
+      username: env("REDIS_USERNAME"),
+      password: env("REDIS_PASSWORD"),
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+:::tip
+Make sure Redis is installed on your local machine and on the server otherwise it will throw an error.
+:::
+
+## Options
+
+- `host`: Redis host, the default value is `localhost`.
+- `port`: Redis port, the default value is `6379`.
+- `url`: If you're using a remote Redis server, you can pass the URL directly, this will override the `host` and `port` options.
+- `username`: Redis username, the default value is `null`.
+- `password`: Redis password, the default value is `null`.
+- `globalPrefix`: A prefix that will be added to all keys. This is useful when you want to use the same cache driver for multiple applications, it could be a `string` or a callback that returns a `string`, if not provided then there will no be prefix for the keys.
+- `clientOptions`: Any additional options that will be passed to the [Redis Configurations](https://github.com/redis/node-redis/blob/a8b81bdd01329252466eb1dd608b2a92b960c3ae/docs/client-configuration.md).
+
+## Accessing the Redis Client
+
+To access the Redis client, use the `client` property on the cache manager or the cache driver.
+
+```ts
+import { cache } from "@mongez/warlock";
+
+// assuming the default driver is redis
+const redisClient = cache.client;
+```
+
+:::note
+Please note that the Redis Cache Drier implements all methods in [Cache Driver Interface](./cache-driver-interface) so you can use it directly as a cache driver.
+:::

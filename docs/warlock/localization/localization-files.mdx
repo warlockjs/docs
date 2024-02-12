@@ -1,0 +1,41 @@
+---
+sidebar_position: 2
+---
+
+# Localization Files
+
+As mentioned previously, localized files are located inside `src/app/moduleName/utils/locales.ts`.
+
+## Example
+
+A very basic example will be something like this:
+
+```ts title="src/app/users/utils/locales.ts"
+import { groupedTranslation } from "@mongez/localization";
+
+groupedTranslation({
+  username: {
+    en: "Username",
+    ar: "اسم المستخدم",
+  },
+});
+```
+
+You can use anyway of defining translations like using [Extend function](https://github.com/hassanzohdy/mongez-localization#extending-translations)
+
+But it's recommended to use the `groupedTranslation` function as it's more readable and easier to maintain.
+
+## Best Practices
+
+To avoid conflicts between similar keys in each module, it's recommended to group any translation related to the module by the module name itself, for example when defining users module translation, use `users` as a namespace for the translation list:
+
+```ts title="src/app/users/utils/locales.ts"
+import { groupedTranslation } from "@mongez/localization";
+
+groupedTranslation("users", {
+  username: {
+    en: "Username",
+    ar: "اسم المستخدم",
+  },
+});
+```

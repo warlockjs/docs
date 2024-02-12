@@ -1,0 +1,38 @@
+---
+sidebar_position: 10
+---
+
+# Null Cache Driver
+
+The null cache driver is a cache driver that does not cache anything. It is useful for testing and debugging purposes.
+
+It does not store, retrieve, or delete anything. It is a cache driver that does nothing.
+
+## Options
+
+This driver does not have any options.
+
+## Driver name
+
+The default name for the driver is `null`.
+
+## Usage
+
+You can use it for testing purposes or when you want to disable the cache.
+
+```ts title="src/config/cache.ts"
+import { cache, NullCacheDriver } from "@mongez/warlock";
+
+cache.setConfigurations({
+  default: "null",
+  drivers: {
+    null: {
+      driver: NullCacheDriver,
+    },
+  },
+});
+```
+
+:::note
+Please note that the Null Cache Drier implements all methods in [Cache Driver Interface](./cache-driver-interface) so you can use it directly as a cache driver.
+:::

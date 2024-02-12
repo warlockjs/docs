@@ -1,0 +1,41 @@
+---
+sidebar_position: 5
+---
+
+# Sluggable
+
+`sluggable` is a custom-cast function that generates a slug from model's value i.e `name` field.
+
+It works with strings and localized values as well.
+
+## Usage
+
+In your post model, add the following:
+
+```ts title="src/app/posts/models/post.ts"
+import { Model, Casts } from "@mongez/monpulse";
+import { sluggable } from "@mongez/warlock";
+
+export class Post extends Model {
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    title: "localized",
+    description: "localized",
+    shortDescription: "localized",
+    isActive: "boolean",
+  };
+
+  /**
+   * {@inheritdoc}
+   */
+  protected customCasts = {
+    slug: sluggable("title"),
+  };
+}
+```
+
+This will generate `slug` value every time the post is saved.
+
+If the `title` field is localized, the slug will be generated from the english locale code (`en`).

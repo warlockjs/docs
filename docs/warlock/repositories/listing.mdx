@@ -1,0 +1,863 @@
+---
+sidebar_position: 3
+---
+
+# Repository Listing
+
+Probably the most common task that the repository is responsible for is listing the records. The `RepositoryManager` class provides a comprehensive set of methods that you can use to retrieve data from the database.
+
+## Listing documents
+
+The `list` method is used to fetch documents from the database. The `list` method accepts a set of options that you can use to filter the results.
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const { documents: users, paginationInfo } = await usersRepository.list({
+  name: "John",
+});
+```
+
+As you can see, the `list` method enables `pagination` by default, well, this is going to be the most common method in the application to call, or any sub-method that internally calls it.
+
+## Pagination First Class Support
+
+As mentioned earlier, we `embraces` pagination due to its importance in the application, so we made it the default behavior for the `list` method.
+
+The list method returns an object with two properties:
+
+- `documents`: an array of documents.
+- `paginationInfo`: an object that contains the pagination information.
+
+The documents returned from any repository method is the model of the repository itself.
+
+## List options
+
+The repository class has a `defaultOptions` which includes pagination information and ordering, the following type indicates the default options:
+
+```ts
+export type RepositoryOptions = {
+  /**
+   * Default limit for listing
+   *
+   * @default 15
+   */
+  defaultLimit?: number;
+  /**
+   * Whether to paginate the results or not
+   *
+   * @default true
+   */
+  paginate?: boolean;
+  /**
+   * If passed, it will be used instead of the default limit
+   *
+   * @default undefined
+   */
+  limit?: number;
+  /**
+   * Page number
+   *
+   * @default 1
+   */
+  page?: number;
+  /**
+   * Select only the passed columns, useful for performance
+   *
+   * @default *
+   */
+  select?: string[];
+  /**
+   * Deselect the given array of columns, useful when need to hide some columns
+   * especially when dealing with conditional data
+   */
+  deselect?: string[];
+  /**
+   * Whether to clear cache, works only when cache is enabled
+   */
+  purgeCache?: boolean;
+  /**
+   * Order the documents.
+   * It can be an object, the key is the column name and the value is the order direction it can be asc or desc
+   * It could also be an array, first item is the column name and the second is the order direction
+   * If set to `random` the documents will be ordered randomly
+   *
+   * @default {id: 'desc'}
+   */
+  orderBy?:
+    | "random"
+    | [string, "asc" | "desc"]
+    | {
+        [key: string]: "asc" | "desc";
+      };
+  /**
+   * Perform a query by using the query aggregate, useful for advanced queries
+   */
+  perform?: (query: ModelAggregate<any>, options: RepositoryOptions) => void;
+  /**
+   * Any additional options to be passed to the list method
+   */
+  [key: string]: any;
+};
+```
+
+So when this options are being called/executed? well, these are the `list` method options that may be passed to the method, for example, if we want to get all documents up to 200 but without pagination, we can do the following:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const { documents: users, paginationInfo } = await usersRepository.list({
+  limit: 200,
+  paginate: false,
+});
+```
+
+### Default options
+
+Now let's see a basic repository with `defaultOptions` property:
+
+```ts {17} title="src/app/users/repositories/users.repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * List default options
+   */
+  protected defaultOptions: RepositoryOptions = {};
+
+  /**
+   * Filter By options
+   */
+  protected filterBy: FilterByOptions = {};
+}
+
+const usersRepository = new UsersRepository();
+
+export default usersRepository;
+```
+
+The `defaultOptions` here is an empty object which means there will no be default options assigned to the options when the `list` method (or one of its siblings) being called.
+
+To add the default options, wrap the object with `withDefaultOptions` method:
+
+```ts {17} title="src/app/users/repositories/users.repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * List default options
+   */
+  protected defaultOptions: RepositoryOptions = this.withDefaultOptions({
+    // override the default options here
+  });
+
+  /**
+   * Filter By options
+   */
+  protected filterBy: FilterByOptions = {};
+}
+```
+
+The `withDefaultOptions` method accepts an object of type `RepositoryOptions` and returns the same object with the default options merged into it.
+
+Default options that are shipped with the method:
+
+```ts
+export const defaultRepositoryOptions: RepositoryOptions = {
+  defaultLimit: 15,
+  paginate: true,
+  orderBy: {
+    id: "desc",
+  },
+};
+```
+
+### Pagination
+
+As mentioned earlier, pagination is enabled by default, you can either disable this behavior by overriding it from the repository `defaultOptions` property, or by passing `paginate: false` to the `list` method options.
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const { documents: users } = await usersRepository.list({
+  paginate: false,
+});
+```
+
+The output will remain the same, except that [paginationInfo](./../../monpulse/aggregate/fetching#pagination) object will not be returned.
+
+## Filter By
+
+Now let's head to the big deal, the filters, that's what makes our repository shine in the sky, the `filterBy` property is an object that contains the filters that you can use to filter the results.
+
+The `filterBy` property is an object that contains the filters that you can use to filter the results.
+
+```ts {22} title="src/app/users/repositories/users.repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * List default options
+   */
+  protected defaultOptions: RepositoryOptions = this.withDefaultOptions();
+
+  /**
+   * Filter By options
+   */
+  protected filterBy: FilterByOptions = {};
+}
+```
+
+So how this works exactly? Let's find out.
+
+### Basic filters
+
+Filters are listed in the `filterBy` property, it is a key/value object, the key is the filter option that will be passed to the `list` method, the value is how the repository going to handle this filter.
+
+Let's take an example of usage:
+
+```ts {22} title="src/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const { documents: users } = await usersRepository.list({
+  name: "John",
+});
+```
+
+Here we passed an option called `name`, now we need to tell the repository listing manager how to deal with this option, so we need to add it to the `filterBy` property:
+
+```ts {22} title="src/app/users/repositories/users.repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * List default options
+   */
+  protected defaultOptions: RepositoryOptions = this.withDefaultOptions();
+
+  /**
+   * Filter By options
+   */
+  protected filterBy: FilterByOptions = {
+    name: "like",
+  };
+}
+```
+
+Now the repository knows how to deal with the `name` option, it will use the `like` filter to filter the results.
+
+If we want to transform it into a query it will look like this:
+
+```ts
+query.where("name", "like", "John");
+
+// OR
+query.whereLike("name", "John");
+```
+
+So what are the other types than `like` that we can add to the `filterBy` property? Well, its a tremendous list, let's see them all.
+
+```ts
+export type FilterOptionType =
+  | "bool"
+  | "boolean"
+  | "number"
+  | "inNumber"
+  | "null"
+  | "notNull"
+  | "!null"
+  | "int"
+  | "int>"
+  | "int>="
+  | "int<"
+  | "int<="
+  | "in"
+  | "!int"
+  | "integer"
+  | "inInt"
+  | "float"
+  | "double"
+  | "inFloat"
+  | "date"
+  | "inDate"
+  | "date>"
+  | "date>="
+  | "date<"
+  | "date<="
+  | "dateBetween"
+  | "dateTime"
+  | "inDateTime"
+  | "dateTime>"
+  | "dateTime>="
+  | "dateTime<"
+  | "dateTime<="
+  | "dateTimeBetween"
+  | "location";
+```
+
+Any of these values can be used as a filter, the key will be teh option name from the list method and also **will be the column that we will search for** and the filter value will be one of the above values.
+
+Let's go through it one by one.
+
+- `bool` or `boolean`: the value will be converted to a boolean value, any value other than `false` and `0` will be converted to `true`.
+- `number`: the value will be converted to a number, any value other than a number will be converted to `0`.
+- `inNumber`: the value will be converted to a number, any value other than a number will be converted to `0`, this will make a query `query.whereIn(column, value)`, the option's value can be a number or an array of number, the listing manager will handle it.
+- `null`: the value will be converted to `null`, query will be `query.whereNull(column)`.
+- `notNull` or `!null`: the value will be converted to `null`, query will be `query.whereNotNull(column)`.
+- `int` or `integer`: the value will be converted to an integer, any value other than an integer will be converted to `0`.
+- `!int`: parse the value to integer, make a query to find results that has value not equal to the passed value, query will be `query.where(column, "!=", value)`.
+- `int>`: parse the value to integer, make a query to find results that has value greater than the passed value, query will be `query.where(column, ">", value)`.
+- `int>=`: parse the value to integer, make a query to find results that has value greater than or equal to the passed value, query will be `query.where(column, ">=", value)`.
+- `int<`: parse the value to integer, make a query to find results that has value less than the passed value, query will be `query.where(column, "<", value)`.
+- `int<=`: parse the value to integer, make a query to find results that has value less than or equal to the passed value, query will be `query.where(column, "<=", value)`.
+- `in`: make a query to find results that has value in the passed value, query will be `query.whereIn(column, value)`, the option's value can be a single value or an array, the listing manager will handle it.
+- `float` or `double`: the value will be converted to a float, any value other than a float will be converted to `0`.
+- `inFloat`: the value will be converted to a float, any value other than a float will be converted to `0`, this will make a query `query.whereIn(column, value)`, the option's value can be a float or an array of float, the listing manager will handle it.
+- `date`: the value must be a [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object or a value that the Date object can parse, it will make a query `query.whereDate(column, value)`.
+- `inDate`: the value must be a [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object or a value that the Date object can parse, it will make a query `query.whereIn(column, value)`, the option's value can be a single value or an array, the listing manager will handle it.
+- `date>`: Find document(s) that the column's date value is greater than the given option's value, the value must be a [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object or a value that the Date object can parse, it will make a query `query.where(column, ">", value)`.
+- `date>=`: Find document(s) that the column's date value is greater than or equal to the given option's value, the value must be a [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object or a value that the Date object can parse, it will make a query `query.where(column, ">=", value)`.
+- `date<`: Find document(s) that the column's date value is less than the given option's value, the value must be a [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object or a value that the Date object can parse, it will make a query `query.where(column, "<", value)`.
+- `date<=`: Find document(s) that the column's date value is less than or equal to the given option's value, the value must be a [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object or a value that the Date object can parse, it will make a query `query.where(column, "<=", value)`.
+- `dateBetween`: Find document(s) that the column's date value is between the given option's value, the value must be an array of two [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) objects or values that the Date object can parse, it will make a query `query.whereBetween(column, value)`.
+- `dateTime`: the value must be a [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object or a value that the Date object can parse, it will make a query `query.whereDateTime(column, value)`.
+- `inDateTime`: the value must be a [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object or a value that the Date object can parse, it will make a query `query.whereIn(column, value)`, the option's value can be a single value or an array, the listing manager will handle it.
+- `dateTime>`: Find document(s) that the column's date time value is greater than the given option's value, the value must be a [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object or a value that the Date object can parse, it will make a query `query.where(column, ">", value)`.
+- `dateTime>=`: Find document(s) that the column's date time value is greater than or equal to the given option's value, the value must be a [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object or a value that the Date object can parse, it will make a query `query.where(column, ">=", value)`.
+- `dateTime<`: Find document(s) that the column's date time value is less than the given option's value, the value must be a [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object or a value that the Date object can parse, it will make a query `query.where(column, "<", value)`.
+- `dateTime<=`: Find document(s) that the column's date time value is less than or equal to the given option's value, the value must be a [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) object or a value that the Date object can parse, it will make a query `query.where(column, "<=", value)`.
+- `dateTimeBetween`: Find document(s) that the column's date time value is between the given option's value, the value must be an array of two [Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date) objects or values that the Date object can parse, it will make a query `query.whereBetween(column, value)`.
+- `location`: the value must be an object that contains `lat` and `lng` properties, it will make a query `query.whereLocation(column, value)`, the value can be an object or an array of objects, the listing manager will handle it.
+
+:::tip
+If the filter is a date type or dateTime type and the passed value is a `string`, make sure that to define the format of that string using `dateFormat` and `dateTimeFormat` properties in the repository class.
+:::
+
+### Using column names
+
+Sometimes the option key may differ from the column name, for example we can set an option `user` but the column will be `createdBy.id` that we will look into, in this case, the filter's value will be an array, the first value will be the filter type and the second will be the column name.
+
+```ts {23} title="src/app/users/repositories/users.repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * List default options
+   */
+  protected defaultOptions: RepositoryOptions = this.withDefaultOptions();
+
+  /**
+   * Filter By options
+   */
+  protected filterBy: FilterByOptions = {
+    user: ["int", "createdBy.id"],
+  };
+}
+```
+
+Now the `list` method will be used like this:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const { documents: users } = await usersRepository.list({
+  user: 1,
+});
+```
+
+Thi will be converted to:
+
+```ts
+query.where("createdBy.id", 1);
+```
+
+### Using custom filters
+
+Another use case is when a value is not that simple to query with, in this case we can `perform` a query on the passed value, for example, a gender is passed to the `SessionsRepository` the passed option is the current user gender, but in sessions, the session has a `gender` column which value will be one of `male`, `female` or `both`.
+
+In this case, we want to run a query to search for the gender of the user + the `both` value as well, so an example of usage will be:
+
+```ts title="src/app/main.ts"
+import { sessionsRepository } from "app/sessions/repositories/sessions.repository";
+
+const { documents: sessions, paginationInfo } = await sessionsRepository.list({
+  gender: "male",
+});
+```
+
+Now let's define the repository filter for the `gender` option to search for the value and also for the `both` value:
+
+```ts {23,24,25} title="src/app/sessions/repositories/sessions.repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { Session } from "../models/session";
+
+export class SessionsRepository extends RepositoryManager<Session> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = Session;
+
+  /**
+   * List default options
+   */
+  protected defaultOptions: RepositoryOptions = this.withDefaultOptions();
+
+  /**
+   * Filter By options
+   */
+  protected filterBy: FilterByOptions = {
+    gender: (gender, query) => {
+      query.whereIn("gender", [gender, "both"]);
+    },
+  };
+}
+
+//...
+```
+
+Here what we did is we added a custom function callback that receives the passed value which is in our case will be `male` that will be passed as the first argument, and the second argument will be the [Aggregate Query](./../../monpulse/aggregate/model-aggregate) so we can perform a query on it.
+
+:::tip
+The third argument to the callback is the entire object of the options passed to the list method.
+:::
+
+### Perform option
+
+In some situations, we may need to `perform` a custom query on a particular `list` method, this would not need an additional `filter` to be added to, in this case, we can pass `perform` callback that receives the [Aggregate Query](./../../monpulse/aggregate/model-aggregate) and the options object, this can be passed directly to the `list options`:
+
+```ts {4,5,6} title="src/app/main.ts"
+import { sessionsRepository } from "app/sessions/repositories/sessions.repository";
+
+const { documents: sessions, paginationInfo } = await sessionsRepository.list({
+  perform: (query) => {
+    query.whereIn("gender", ["male", "both"]);
+  },
+});
+```
+
+## Order By
+
+As we saw in the `RepositoryOptions` type, the `orderBy` options has some nice features to use when ordering the results, let's see them all.
+
+### Order by single column
+
+To order documents by single column, we can do it in two ways: by passing an array or passing an objet:
+
+
+### Order by array
+
+We can order documents by passing `orderBy` with an array, the first item in the array is the column name and the second is the order direction:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const { documents: users, paginationInfo } = await usersRepository.list({
+  orderBy: ["name", "asc"],
+});
+```
+
+This will order the documents by the `name` column in ascending order.
+
+### Order by multiple columns (object)
+
+If we want to order by multiple columns then pass an object to the `orderBy` option, the key will be the column name, the value will be the order direction, either `asc` or `desc`, let's order documents alphabetically by the `name` column and by id descending:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const { documents: users, paginationInfo } = await usersRepository.list({
+  orderBy: {
+    name: "asc",
+    id: "desc",
+  },
+});
+```
+
+
+:::note
+Please note that the order of listed keys matter, as it will first order the user by name ascending, then by id descending.
+:::
+
+### Sort By And Sort Direction
+
+Another way to sort documents is by passing `sortBy` that holds the column's name and `sortByDirection` that holds the order direction, let's see an example:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const { documents: users, paginationInfo } = await usersRepository.list({
+  sortBy: "name",
+  sortByDirection: "asc",
+});
+```
+
+### Order By Randomly
+
+To order documents randomly, pass `random` to the `orderBy` option:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const { documents: users, paginationInfo } = await usersRepository.list({
+  orderBy: "random",
+});
+```
+
+:::warning
+Please note that the random order requires a `limit` to be defined or `defaultLimit`` to be set, otherwise it will throw an error.
+:::
+
+### Overriding the order
+
+You may have advanced ordering criteria, for example, we can give an order map for the frontend team with a meaningful words for ordering, for instance, orderBy value could be: `oldest` `newest` `bestSeller` and so on, in this case, we can override the order by method in the repository list:
+
+```ts {4,5,6,7,8,9,10,11,12,13,14,15,16,17,18} title="src/app/users/repositories/users.repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * List default options
+   */
+  protected defaultOptions: RepositoryOptions = this.withDefaultOptions();
+
+  /**
+   * Filter By options
+   */
+  protected filterBy: FilterByOptions = {};
+
+  /**
+   * {@inheritDoc}
+   */
+  protected orderBy(options: RepositoryOptions) {
+    const orderBy = options.orderBy;
+
+    if (! orderBy) {
+      return; // keep the default order
+    }
+
+    switch (orderBy) {
+      case "oldest":
+        return {
+          createdAt: "asc",
+        };
+      case "newest":
+        return {
+          createdAt: "desc",
+        };
+      case "bestSeller":
+        return {
+          sold: "desc",
+        };
+      default:
+        return orderBy;
+    }
+}
+```
+
+In this case, we can pass `orderBy` with the value of `oldest`, `newest` or `bestSeller` and it will be converted to the corresponding order.
+
+If the method does not return anything, then the default order will be used.
+
+## Select Option
+
+The `select` option is used to select only the passed columns, useful for performance, for example, if we want to select only the `id` and `name` columns from the `users` table, we can do the following:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const { documents: users, paginationInfo } = await usersRepository.list({
+  select: ["id", "name"],
+});
+```
+
+## Deselect Option
+
+The `deselect` option is used to deselect the passed columns, useful when need to hide some columns especially when dealing with conditional data, for example, if we want to hide the `password` column from the `users` table, we can do the following:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const { documents: users, paginationInfo } = await usersRepository.list({
+  deselect: ["password"],
+});
+```
+
+## Default filters
+
+As most collections have common filters, the repository manager can add some default filters to the `filterBy` property, for example, the `isActive` column is a common column in most of the collections, in this case we can use `withDefaultFilters` method that receives same filters object, but defines multiple filters at once.
+
+```ts {22} title="src/app/users/repositories/users.repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * List default options
+   */
+  protected defaultOptions: RepositoryOptions = this.withDefaultOptions();
+
+  /**
+   * Filter By options
+   */
+  protected filterBy: FilterByOptions = this.withDefaultFilters({
+    email: "like",
+  });
+}
+```
+
+The `withDefaultFilters` will add the following filters:
+
+```ts
+  /**
+   * Default filters list
+   */
+  protected defaultFilters: FilterByOptions = {
+    id: "int",
+    ids: ["inInt", "id"],
+    except: (id: any, query) => query.where("id", "!=", Number(id)),
+    createdBy: ["int", "createdBy.id"],
+    isActive: "boolean",
+  };
+```
+
+So you don't need to define a filter for `id` or list of `ids`, `except`, `createdBy` and `isActive` filters, you can of course use it, override it or simple ignore using the `withDefaultFilters` method.
+
+## Get all documents
+
+The `list` method is manly used with pagination, it always return an object that contains `documents` and `paginationInfo` keys, unlike `all` method, it returns only the documents.
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const users = await usersRepository.all();
+```
+
+The `all` methods takes the same options as `list` method.
+
+:::info
+Please note that the `all` method is a syntactic sugar for `list` method with `paginate` option set to `false` and returns the `documents` key from the returned object.
+:::
+
+## Find a document
+
+To find a document by id, use `find` method:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const user = await usersRepository.find(1);
+```
+
+The find method will return the document if found, otherwise it will return `null`.
+
+## Find by
+
+To find a document by another column than the `id` use `findBy` method:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const user = await usersRepository.findBy("name", "John");
+```
+
+:::danger
+Please note the `find` and `findBy` methods do not call use the `repository` options, for example if you passed `name` to find by it, it will make an exact match find and not using the `like` filter in the repository, however it uses the `first` method though.
+:::
+
+## Get document
+
+Another method called `get` is used to find a document by `id`, it may also receive an object of options as second argument, it uses under the hood the `first` method.
+
+## Find first document
+
+To fetch only the first document, use `first` method, it works by passing the same options as the `list` method but it limits the result to one document only.
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const user = await usersRepository.first({
+  name: "John",
+});
+```
+
+If the document is not found, it will return `null`.
+
+:::note
+Please note the `first` method sets the order by to `id` and the order direction is `desc`, so the first document.
+:::
+
+## Find last document
+
+Works exactly like `first` but it reverses the documents order before returning the first document.
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const user = await usersRepository.last({
+  name: "John",
+});
+```
+
+## Get latest documents
+
+To fetch the latest documents, use `latest` method, it works by passing the same options as the `list` method and returns the latest documents, the `orderBy` option will be ignored.
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const user = await usersRepository.latest({
+  name: "John",
+});
+```
+
+## Get oldest documents
+
+Works exactly like `latest` but it orders the documents in ascending order.
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const user = await usersRepository.oldest({
+  name: "John",
+});
+```
+
+## Count documents
+
+To count documents, use `count` method, it works by passing the same options as the `list` method and returns the count of the documents.
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+const count = await usersRepository.count({
+  name: "John",
+});
+```
+
+## Chunks
+
+Sometimes it's best to works with the documents in chunks instead of fetching all of it in the memory, for example this is useful when we want to generate a sitemap or an excel sheet file from large collections, in this case we can use the `chunk` method.
+
+The chunk method receives the same `RepositoryOptions` but it should have at least `limit` or in the `defaultOptions`, if you're using `withDefaultOptions` method, then you're good to go, otherwise define the limit or the function will throw an error, let's see an example:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+await usersRepository.chunk({}, (users) => {
+  // handle the chunk
+});
+```
+
+The first argument is the options, the second argument is a callback that will receive the chunked documents of users, you may also receive the second argument of the callback to get information about current pagination stats:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users.repository";
+
+await usersRepository.chunk({}, (users, pagination) => {
+  // handle the chunk
+  if (pagination.page === pagination.pages) {
+    // we are in the last chunk
+  }
+});
+```
+
+If the callback returned `false`, then it will be the last chunk and the loop will be stopped.
+
+:::note
+The chunk method will stop when the last chunk is reached, or when the callback returns `false`, so if you're doing another processes after calling the chunk, don't forget to `await` it.
+:::
+
+## Active documents
+
+A common usage in `Warlock` is to define `isActive` column in most of the models that need to be controlled by administrators, in this context, the repository manager defines many methods that is exactly the same as the previous ones but only for the active documents, therefore the repository manager is shipped with all previous methods but for `active` documents only, just add `Active` to the end of the method.
+
+The methods are:
+
+- `listActive`
+- `allActive`
+- `findActive`
+- `findByActive`
+- `getActive`
+- `firstActive`
+- `lastActive`
+- `latestActive`
+- `oldestActive`
+- `countActive`
+- `chunkActive`
+
+:::tip Active Cached
+When [Cache is enabled](./caching) the corresponding cache methods for active documents will be enabled as well.
+:::

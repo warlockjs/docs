@@ -1,0 +1,20 @@
+---
+sidebar_position: 4
+---
+
+# Array
+
+Check if the input is an array regardless the content type of the array.
+
+> The validation rule **requires a value** to run against the input value.
+
+## Example
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    keywords: ["required", "array"],
+  },
+};
+```

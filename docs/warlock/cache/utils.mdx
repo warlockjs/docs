@@ -1,0 +1,33 @@
+---
+sidebar_position: 12
+---
+
+# Cache Utilities
+
+This section covers the utilities provided for cache drivers.
+
+## Parse Cache Key
+
+The `parseCacheKey` function parses a cache key either it is a string or an object then sanitizes it from any invalid characters and return a `dot.notation` syntax.
+
+```ts title="src/app/main.ts"
+import { parseCacheKey } from "@mongez/warlock";
+
+console.log(parseCacheKey("users:1")); // users.1
+```
+
+Also if it is an object, it will flat map it like this:
+
+```ts title="src/app/main.ts"
+import { parseCacheKey } from "@mongez/warlock";
+
+const filter = {
+    limit: 3,
+    page: 1,
+    search: 'John',
+};
+
+console.log(parseCacheKey(filter)); // limit.3.page.1.search.John
+```
+
+This will be extremely useful when caching the database queries that are called based on current request filters which is implemented in [Repository Cache](./../repositories/caching)

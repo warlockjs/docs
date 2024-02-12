@@ -1,0 +1,107 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+Almost no application is complete without uploading files, especially images, this section is all about images.
+
+## Setup
+
+Warlock is shipped with [Sharp](https://sharp.pixelplumbing.com) which is a high performance Node.js image processing library.
+
+## Upload an image
+
+When [Uploading images](./../upload/compressing-images) and with the **compress** mode activated, Warlock uses Sharp to compress the images.
+
+## Manual image processing
+
+Warlock provides a simple way to process images using Sharp by wrapping the `Sharp` class by Warlock `Image` class.
+
+## Basic Usage
+
+To use the `Image` class, import it from `@mongez/warlock`:
+
+```ts title="src/app/main.ts"
+import { storagePath, Image } from "@mongez/warlock";
+
+async function main() {
+  const imagePath = storagePath("images/image.jpg");
+
+  const image = new Image(imagePath);
+}
+
+main();
+```
+
+Now let's resize the image:
+
+```ts title="src/app/main.ts"
+import { storagePath, Image } from "@mongez/warlock";
+
+async function main() {
+  const imagePath = storagePath("images/image.jpg");
+
+  const image = new Image(imagePath);
+
+  image.resize(200, 200);
+
+  await image.save(storagePath("images/resized-image.jpg"));
+}
+```
+
+Here we resized the image to 200x200, and saved it to `storage/images/resized-image.jpg`.
+
+## Watermark
+
+Another good and important feature is to add watermarks in the images, luckily, Warlock provides a simple way to do that.
+
+```ts title="src/app/main.ts"
+import { storagePath, Image } from "@mongez/warlock";
+
+async function main() {
+  const imagePath = storagePath("images/image.jpg");
+
+  const image = new Image(imagePath);
+
+  await image.watermark(storagePath("images/watermark.png"), {
+    gravity: "northwest",
+  });
+
+  await image.save(storagePath("images/watermarked-image.jpg"));
+}
+```
+
+The `watermark` method accepts the watermark image path or an instance of `Image` class.
+
+## Multiple Watermarks
+
+In some situations, you may need to add multiple watermarks to the image, for example, you may need to add a watermark to the top left corner, and another one to the bottom right corner.
+
+To do that, you can use the `watermarks` method:
+
+```ts title="src/app/main.ts"
+import { storagePath, Image } from "@mongez/warlock";
+import watermarkImage1 from "./../images/watermark-1.png";
+import watermarkImage2 from "./../images/watermark-2.png";
+import image from "./../images/image.jpg";
+
+async function main() {
+  const imagePath = storagePath("images/image.jpg");
+
+  const image = new Image(imagePath);
+
+  await image.watermarks([
+    {
+      image: watermarkImage1,
+      gravity: "northwest",
+    },
+    {
+      image: watermarkImage2,
+      gravity: "southeast",
+    },
+  ]);
+
+  await image.save(storagePath("images/watermarked-image.jpg"));
+}
+```

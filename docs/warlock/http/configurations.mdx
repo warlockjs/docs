@@ -1,0 +1,129 @@
+---
+sidebar_position: 3
+---
+
+# Http configurations
+
+Http configurations are used to set the default http configurations, like the port, host, and other configurations.
+
+## Defining http configurations
+
+Let's go to our `src/config/http.ts` file and define the http configurations.
+
+```ts title="src/config/http.ts"
+import { env } from "@mongez/dotenv";
+import { HttpConfigurations } from "@mongez/warlock";
+
+const httpConfigurations: HttpConfigurations = {
+  port: env("PORT", 3000),
+  host: env("HOST", "localhost"),
+  log: true,
+  fileUploadLimit: 12 * 1024 * 1024 * 1024,
+  rateLimit: {
+    max: 260,
+    duration: 60 * 1000, // 1 minute
+  },
+  cors: {
+    // allowed origins
+    origin: "*", // change it to the list of allowed origins or a string
+    // allowed methods
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  },
+  middleware: {
+    // apply the middleware to all routes
+    all: [],
+    // apply the middleware to specific routes
+    only: {
+      // Example:
+      // routes: [],
+      // namedRoutes: ["users.list"],
+      // middleware: [authMiddleware("user")],
+      routes: [],
+      namedRoutes: [],
+      middleware: [],
+    },
+    // exclude the middleware from specific routes
+    except: {
+      routes: [],
+      namedRoutes: [],
+      middleware: [],
+    },
+  },
+};
+
+export default httpConfigurations;
+```
+
+Let's break down the above code:
+
+- `port`: The port that the application will run on, default to `3000`.
+- `host`: The host that the application will run on, default to `localhost`.
+- `log`: Enable or disable the http logs, default to `true`.
+- `fileUploadLimit`: The file upload limit, if not defined in env then set it to `12 * 1024 * 1024 * 1024` (12 MB), default is `10 MB`.
+- `rateLimit`: The rate limit configurations, it's used to limit the number of requests per minute, default to `60` requests per minute but we applied it to `260` requests per minute.
+- `middleware`: The middleware configurations, it's used to apply the middleware to all routes, or to specific routes, or to exclude the middleware from specific routes.
+
+### Http port
+
+If port is being used in development mode, then `Warlock` will try to find another port to run the application on.
+
+### Rate Limit
+
+Rate limit is used to limit the number of requests per minute, it's useful to prevent the application from being attacked by sending a lot of requests in a short time.
+
+The default value is `60` requests per minute, but if the application has a lot of requests, then you can increase the value as applied above.
+
+## Cors
+
+Cors stands for `Cross-Origin Resource Sharing`, it's a mechanism that allows a web application running at one origin to access the resources from a server running at a different origin.
+
+### Why Cors?
+
+Cors is used to make sure that the application can access the resources from a different origin, for example, if you have a frontend application running on `https://example.com` and you have an API running on `https://api.example.com` then you need to enable Cors to make sure that the frontend application can access the API.
+
+### Cors configurations
+
+By default, `Warlock` allows all origins, but you can change this behavior by setting the value of `cors` to the list of allowed origins.
+
+### Cors Origin
+
+As mentioned above the `origin` is used to set the list of allowed origins.
+
+If `origin` is set to `*` it will accept all origins, but if you want to set a list of allowed origins you can set it to an array of strings.
+
+```ts title="src/config/http.ts"
+const corsConfigurations = {
+  // allowed origins
+  origin: ["https://example.com", "https://api.example.com"],
+  // allowed methods
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+};
+```
+
+Or you can just pass a string to it.
+
+```ts title="src/config/http.ts"
+const corsConfigurations = {
+  // allowed origins
+  origin: "https://example.com",
+  // allowed methods
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+};
+```
+
+### Cors Methods
+
+Probably you don't need to change this, but if you want to change the allowed methods you can change it by setting the value of `methods` to the list of allowed methods.
+
+```ts title="src/config/http.ts"
+const corsConfigurations = {
+  // allowed origins
+  origin: "*",
+  // allowed methods
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+};
+```
+
+:::warning
+Be aware that browsers use the `OPTIONS` method to check if the API is allowed to be accessed from the frontend application, so make sure to add it to the list of allowed methods.
+:::

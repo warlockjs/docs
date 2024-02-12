@@ -1,0 +1,65 @@
+---
+sidebar_position: 6
+---
+
+# To Json
+
+`toJson` is a utility function that converts a value to a valid json object/array (`not a string`).
+
+This function is heavily used internally in warlock to parse the response body before sending it to the client.
+
+But you may have some situations where you want to get the output value of certain class i.e `CategoryOutput`.
+
+## Usage
+
+Just call the function and pass to it any object/array, it will recursively convert it to a valid json object/array.
+
+```ts title="src/app/main.ts"
+import { toJson } from "@mongez/warlock";
+import { CategoryOutput } from "app/categories/output/category-output";
+import { UserOutput } from "app/users/output/user-output";
+
+const category = new CategoryOutput({
+  id: 1,
+  name: "Category 1",
+  children: [
+    {
+      id: 2,
+      name: "Category 2",
+    },
+  ],
+  createdBy: new UserOutput({
+    id: 1,
+    name: "John Doe",
+  }),
+});
+
+async function main() {
+  console.log(await toJson(category));
+}
+
+main();
+```
+
+This returns:
+
+```json
+{
+  "id": 1,
+  "name": "Category 1",
+  "children": [
+    {
+      "id": 2,
+      "name": "Category 2"
+    }
+  ],
+  "createdBy": {
+    "id": 1,
+    "name": "John Doe"
+  }
+}
+```
+
+:::note
+Please note that this is `async` function, so you need to `await` it.
+:::

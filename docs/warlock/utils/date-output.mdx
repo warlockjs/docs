@@ -1,0 +1,92 @@
+---
+sidebar_position: 1
+---
+
+# Date Output
+
+The `dateOutput` function receives a `Date` object and a list of options, then it returns an expressive object that represents the given date.
+
+## Date Output Options
+
+The following types are the available options that can be passed to the `dateOutput` function:
+
+```ts
+export type DateOutputOptions = {
+  /**
+   * The format to be used for the date
+   * Any dayjs format can be used
+   * If set to false, it will not be returned in the date output object
+   *
+   * @default DD-MM-YYYY hh:mm:ss A
+   */
+  format?: string | false;
+  /**
+   * The timezone to be used for the date
+   * If set to false, it will not converted to the timezone
+   * Default value is from the config file located in app.timezone
+   * @default app.timezone
+   */
+  timezone?: string | false;
+  /**
+   * If set to true, it will return a human readable time
+   *
+   * @default true
+   */
+  humanTime?: boolean;
+  /**
+   * If set to true, it will return a text representation of the date and time
+   *
+   * @default true
+   */
+  text?: boolean;
+  /**
+   * If set to true, it will return the date in UTC timestamp
+   */
+  utcTime?: boolean;
+  /**
+   * If set to true, it will return a text representation of the date only
+   *
+   * @default true
+   */
+  date?: boolean;
+};
+```
+
+The return value of the function is an object that contains the following keys:
+
+```ts
+export type DateOutputReturn = {
+  format?: string;
+  humanTime?: string;
+  text?: string;
+  date?: string;
+  timestamp?: number;
+  utcTime?: number;
+};
+```
+
+## Usage
+
+```ts title="src/app/main.ts"
+import { dateOutput } from "@mongez/warlock";
+
+const date = new Date();
+
+console.log(dateOutput(date));
+```
+
+Will return something like this:
+
+```json
+{
+  "format": "01-01-2021 12:00:00 AM",
+  "humanTime": "a few seconds ago",
+  "text": "January 1, 2021 12:00:00 AM",
+  "date": "January 1, 2021",
+  "timestamp": 1609459200000,
+  "utcTime": 1609459200000
+}
+```
+
+:::danger
+If the given date is not a valid date object it will return the same value passed to the function.

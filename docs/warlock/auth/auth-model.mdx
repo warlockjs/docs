@@ -1,0 +1,96 @@
+---
+sidebar_position: 4
+---
+
+# Auth Model
+
+Auth model is an `abstract` class that is used for generating and validating access tokens.
+
+## Extending Auth Model
+
+The primary use case for extending the auth model is to manage access tokens and password.
+
+## Generate Access Token
+
+The `User` model that extends the `Auth` model can use `generateAccessToken` when the user logs in.
+
+## Verifying user credentials
+
+To verify the user credentials, you can use the `attempt` method from `Auth` model.
+
+This method accepts an object that will be used to fetch the user from the database, the only required key in the object is the `password` that will not be used to fetch the user, but will be used to verify the user password.
+
+## Login Example
+
+Consider the following example:
+
+```ts {7,24} title="src/app/users/controllers/login.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "../models/user";
+
+export default async function login(request: Request, response: Response) {
+  const user: User = request.user;
+
+  const token = await user.generateAccessToken();
+
+  return response.success({
+    user: {
+      accessToken: token,
+      ...(await user.toJSON()),
+    },
+  });
+}
+
+login.validation = {
+  rules: {
+    email: ["required", "email"],
+    password: ["required"],
+  },
+  validate: async (request: Request, response: Response) => {
+    // verify the user credentials
+    const user = await User.attempt(request.only(["email", "password"]));
+
+    if (!user) {
+      return response.badRequest({
+        error: "Invalid credentials",
+      });
+    }
+
+    if (!user.isActive) {
+      return response.badRequest({
+        error: "Your account is not active",
+      });
+    }
+
+    request.user = user;
+  },
+};
+```
+
+We started the `validate` method by verifying the user credentials using `User.attempt` method, this method will return `null` if the user is not found or the password is incorrect.
+
+If the user is found, we check if the user is active, if not, we return an error.
+
+> This is an optional step based on your application logic.
+
+## Removing Access Token
+
+This will be handy in the `logout` request, so we can remove the access token from the database.
+
+```ts {7} title="src/app/users/controllers/logout.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "../models/user";
+
+export default async function logout(
+  request: Request<User>,
+  response: Response
+) {
+  const user: User = request.user;
+
+  await user.removeAccessToken();
+
+  delete request.user;
+
+  return response.success();
+}
+```

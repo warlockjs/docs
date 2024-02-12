@@ -1,0 +1,87 @@
+---
+sidebar_position: 8
+---
+
+# File Cache Driver
+
+File Cache Driver is a cache driver that stores cached data in files.
+
+## Setup
+
+In the [Cache Configurations](./configurations) file, add the following:
+
+```ts title="src/config/cache.ts"
+import { env } from "@mongez/dotenv";
+import { CacheConfigurations, FileCacheDriver } from "@mongez/warlock";
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    file: FileCacheDriver,
+  },
+  default: env("CACHE_DRIVER", "file"),
+  options: {
+    file: {
+      ttl: 60 * 60 * 24, // 24 hours
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+## Options
+
+Cache driver has the following options:
+
+- `globalPrefix`: A prefix that will be added to all keys. This is useful when you want to use the same cache driver for multiple applications, it could be a `string` or a callback that returns a `string`, if not provided then there will no be prefix for the keys.
+- `ttl`: Time to live in seconds, the default value is `Infinity`.
+- `directory`: The directory where the cache files will be stored, the default value is `storage/cache`.
+- `fileName`: The file name that will be used to store the cache data, the default value is `cache.json`.
+
+:::info
+When defining `directory` property, make sure to define the entire path, not just the directory name.
+:::
+
+## Usage
+
+To use the file cache driver, you need to define it in the drivers list in the cache configurations file:
+
+```ts title="src/config/cache.ts"
+import { env } from "@mongez/dotenv";
+import { CacheConfigurations, FileCacheDriver } from "@mongez/warlock";
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    file: FileCacheDriver,
+  },
+  default: env("CACHE_DRIVER", "file"),
+  options: {
+    file: {
+      globalPrefix: "online-store",
+      ttl: 60 * 60 * 24, // 24 hours
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+This will allow the cache manager to pick it if there is no `CACHE_DRIVER` environment variable defined.
+
+## Storing mechanism
+
+Each cache key will be considered as a `directory` that has `cache.json` file, this allows us to easily remove the cache key by removing the directory.
+
+## Expired cache
+
+The driver will validate if there is a `ttl` option in the options, if so, then it will store the expiration time in the cache file, and it will be used to check if the cache is expired or not.
+
+If the cache key is called and it exceeded the cache time, it will be removed.
+
+:::danger
+Cache driver will not make any effort to remove expired cache keys, it will only remove them when they are called.
+:::
+
+:::note
+Please note that the File Cache Drier implements all methods in [Cache Driver Interface](./cache-driver-interface) so you can use it directly as a cache driver.
+:::

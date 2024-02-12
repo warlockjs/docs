@@ -1,0 +1,44 @@
+---
+sidebar_position: 6
+---
+
+# Request Context
+
+Request context is a special function in `Warlock` that allows you to access the request and response objects from anywhere in your application.
+
+## How it works
+
+Any incoming request is wrapped inside a context, a context is a container for the request middle and handler executers that will be executed in order.
+
+In that sense, we can access the request and response objects from anywhere in our application.
+
+## Accessing the request context
+
+To get the request context object, use `requestContext()` method.
+
+```ts title="src/app/users/events/update-author.ts"
+import { requestContext } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+User.events().on("saving", (user) => {
+  const { request } = requestContext();
+
+  if (!request) return;
+
+  const user = request.user;
+
+  user.set("updatedBy", user.id);
+});
+```
+
+:::info
+Whenever you use the request context, you must always check if there is a request object or not, because the request context is not available in the background jobs or inside any other process that is not a request.
+:::
+
+## RequestContext contents
+
+The request context returns three objects if available:
+
+- `request`: The request object.
+- `response`: The response object.
+- `user`: the logged in user, but this is only available if the user is logged in either as a guest or any type of user.

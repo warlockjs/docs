@@ -1,0 +1,33 @@
+---
+sidebar_position: 10
+---
+
+# File
+
+Check if the input value is a file.
+
+The validation rule **requires a value** to run.
+
+## Example
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    title: ["required"],
+    image: ["required", "file"],
+  },
+};
+```
+
+It works also if the input is an array of files:
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    title: ["required"],
+    images: ["required", "file"],
+  },
+};
+```

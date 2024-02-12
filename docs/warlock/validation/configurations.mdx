@@ -1,0 +1,49 @@
+---
+sidebar_position: 2
+---
+
+# Validation Configurations
+
+Validation configurations are used to set the default validation rules, errors strategy and other configurations.
+
+## Define rules list
+
+Let's go to our `src/config/validation.ts` file and define the rules list.
+
+```ts title="src/config/validation.ts"
+import {
+  RequiredRule,
+  UniqueRule,
+  ValidationConfigurations,
+} from "@mongez/warlock";
+
+const validationConfigurations: ValidationConfigurations = {
+  stopOnFirstFailure: true,
+  returnErrorStrategy: "first",
+  responseStatus: 400,
+  rules: {
+    required: RequiredRule,
+    unique: UniqueRule,
+  },
+  keys: {
+    response: "messages",
+    inputKey: "key",
+    inputError: "error",
+    inputErrors: "errors",
+  },
+};
+
+export default validationConfigurations;
+```
+
+Lets break down the above code:
+
+- `stopOnFirstFailure`: Stop the validation process on the first failure so it won't continue to validate the rest of the rules for the same input, default to `true`.
+- `returnErrorStrategy`: if `stopOnFIrstFailure` is set to `false`, then you can decide what errors to be returned, for example if the input has 3 errors, you can return the first error or `all` errors, default to `first`.
+- `responseStatus`: The response status code to be returned when validation fails, default to `400`.
+- `rules`: Rules list that will be used in the `validation.rules` as a `string`, Warlock has a `+30` different rules that will cover most of the validation cases, but you can add your own rules though.
+- `keys`: The keys used to return the errors, you can change it to whatever you want.
+- `keys.response`: The key used to return the errors, default to `messages`.
+- `keys.inputKey`: The key used to return the input key, default to `key`.
+- `keys.inputError`: The key used to return the input error, default to `error`.
+- `keys.inputErrors`: The key used to return the input errors, default to `errors`.

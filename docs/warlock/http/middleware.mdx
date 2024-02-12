@@ -1,0 +1,134 @@
+---
+sidebar_position: 5
+---
+
+# Middleware
+
+A middleware is a function that will be executed before the request is handled by the controller.
+
+## Middleware In Warlock
+
+There are multiple ways to define middleware, by adding it to a route, adding it in a group or define a global middleware.
+
+## How it works
+
+Basically, we define a function that accepts the request and response objects, if the function returns a value, the request life cycle is interrupted and the response is sent back to the client thus the controller is never executed.
+
+```ts title="src/app/users/middleware/validate-user.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function validateUser(request: Request, response: Response) {
+  const user = await User.find(request.input("id"));
+
+  if (!user) {
+    return response.notFound();
+  }
+
+  // Add user to the request object
+  request.user = user;
+}
+```
+
+Now we can use this middleware in our routes:
+
+```ts {5,12} title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import { getUsers } from "./controllers/get-users";
+import { getUser } from "./controllers/get-user";
+import { auth } from "./../middleware/auth";
+import { validateUser } from "./../middleware/validate-user";
+
+router.get("/users", getUsers, {
+  middleware: [auth],
+});
+
+router.get("/users/:id", getUser, {
+  middleware: [auth, validateUser],
+});
+```
+
+So what happens now is when the user requests the `/users/:id` route, the `validateUser` middleware will be executed first, and if the user is not found, the request will be interrupted and the response will be sent back to the client.
+
+And if the user exists, we can now access the user object from the request object:
+
+```ts {2} title="src/app/users/controllers/get-user.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function getUser(request: Request, response: Response) {
+  const user = request.user;
+
+  response.success({
+    user,
+  });
+}
+```
+
+:::tip
+Middleware are sequence of callbacks that are executed in the order they are defined, so if you have multiple middleware, the first one will be executed first, then the second one, and so on, if any middleware returned a value, the request life cycle will be interrupted and the response will be sent back to the client and all other middleware will be ignored.
+:::
+
+## Global middleware
+
+In some situations, we need to execute a middleware for all routes, for example to check if the user is authenticated or not.
+
+To do this, open `src/config/http.ts` file, you'll find there a `middleware` object, add your middleware to the `all` array:
+
+```ts {2,7} title="src/config/http.ts"
+import { HttpConfigurations } from "@mongez/warlock";
+import { auth } from "app/users/middleware/auth";
+
+const httpConfigurations: HttpConfigurations = {
+  // .. other http configurations
+  middleware: {
+    all: [auth],
+  },
+};
+
+export default httpConfigurations;
+```
+
+Now this middleware will be executed for all routes.
+
+## Adding middleware to all routes except...
+
+We can add a list of middleware to all routes except some routes, for example we want to add the `auth` middleware to all routes except the login route.
+
+To do this, use the `middleware.except` object:
+
+```ts {2,7} title="src/config/http.ts"
+import { HttpConfigurations } from "@mongez/warlock";
+import { auth } from "app/users/middleware/auth";
+
+const httpConfigurations: HttpConfigurations = {
+  // .. other http configurations
+  middleware: {
+    except: {
+      routes: ["/login"],
+      middleware: [auth],
+    },
+  },
+};
+
+export default httpConfigurations;
+```
+
+This will execute the `auth` middleware for all routes except the `/login` route.
+
+We can also exclude named routes by using `namedRoutes` instead of `routes`:
+
+```ts {2,7} title="src/config/http.ts"
+import { HttpConfigurations } from "@mongez/warlock";
+import { auth } from "app/users/middleware/auth";
+
+const httpConfigurations: HttpConfigurations = {
+  // .. other http configurations
+  middleware: {
+    except: {
+      namedRoutes: ["login"],
+      middleware: [auth],
+    },
+  },
+};
+
+export default httpConfigurations;
+```

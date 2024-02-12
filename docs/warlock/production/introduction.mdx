@@ -1,0 +1,51 @@
+---
+sidebar_position: 1
+---
+
+# Production
+
+Production is the final step in the application development, it's the step where we deploy the application to the production server.
+
+## Build the application
+
+After finishing the development, we need to build the application, to do that, run the following command:
+
+```bash
+warlock build
+```
+
+This will compile the application and generate the `dist` directory with `app.js` file.
+
+This file could be used to run the application from anywhere.
+
+## Build Configuration
+
+The project is created with a `warlock.config.ts` file, this file contains the build configurations and any other configurations that is not related to the application but to Warlock itself.
+
+## Warlock Configurations
+
+To override the default configurations, update the `warlock.config.ts` file.
+
+```ts title="warlock.config.ts"
+import { defineConfig } from "@mongez/warlock";
+
+export default defineConfig({
+  build: {
+    outFile: "app.js",
+  },
+});
+```
+
+The following options are available under the `build` property:
+
+- `outFile`: specifies the output file name, the default value is `app.js`.
+- `outDirectory`: specifies the output directory, the default value is `dist`.
+- `bundle`: Whether to bundle the dependencies or not, the default value is `false`.
+
+## Bundling the dependencies
+
+When the build is done, it will import all the dependencies from the `node_modules` directory, this will reduce the file size significantly.
+
+But if you want to have the entire application bundled in one file, then you should enable the `bundle` property and set it to **true**.
+
+So an application without bundling would be around `100-200KB` based on the application size, but with bundling, it could go up to `5-6MB`.

@@ -1,0 +1,65 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+[Repository Design Pattern](https://www.umlboard.com/design-patterns/repository.html/) is a popular pattern. It is used to separate the logic that retrieves the data and maps it to the entity model from the business logic that acts on the model. The repository mediates between the data source layer and the business layers of the application.
+
+## Repository with database?
+
+In terms of our application, we highly use Repository as an abstraction layer over the model, thus each repository is tightly coupled with a base model.
+
+## Repository
+
+So how does Warlock leverage this pattern? Warlock provides a `RepositoryManager` class that you can extend to create your own repository. The `RepositoryManager` class provides a set of methods that you can use to interact with the database. The `RepositoryManager` class is a generic class that takes a model as a type parameter. This model is the model that the repository will be interacting with.
+
+```ts title="src/app/users/repositories/users.repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+}
+
+export const usersRepository = new UsersRepository();
+```
+
+This is a very simple repository class, but behind the scenes, it provides a lot of functionality. Let's take a look at some of the methods that the `RepositoryManager` class provides.
+
+Each repository must have `model` property to be defined with the `Model` class, also passing `User` as a generic type will enhance the autocomplete when fetching data from the database using the repository, so you must provide the model class as a generic type as well.
+
+## Repository Responsibilities
+
+Before we proceed with the methods, let's take a look at the responsibilities of the repository.
+
+- Retrieving data from the database.
+- Creating new records in the database.
+- Updating existing records in the database.
+- Deleting records from the database.
+- Cache data to improve performance.
+
+These are the five pillars of the repository. The repository is responsible for all of these tasks. Let's take a look at how the `RepositoryManager` class helps us with these tasks.
+
+## Retrieving Data
+
+[Repository Listing](./listing) is the most common task that the repository is responsible for. The `RepositoryManager` class provides a comprehensive set of methods that you can use to retrieve data from the database.
+
+## Deleting Records
+
+Deleting records is also a common task that the repository is responsible for. The `RepositoryManager` class provides a `delete` method that you can use to delete records from the database.
+
+For more information [Check out the Repository Destroyer](./destroyer).
+
+## Caching Data
+
+The [cache](./../cache/introduction) system is fully integrated with repositories, it allows you to easily cache/recache/uncache any type of data most of the time without any intervention from your side.
+
+For more information [Check out the Repository Caching](./caching).

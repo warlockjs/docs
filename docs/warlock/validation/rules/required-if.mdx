@@ -1,0 +1,33 @@
+---
+sidebar_position: 26
+---
+
+# Required If
+
+Check if the input value is not empty if another input has a specific value.
+
+The validation rule **does not require a value** to run.
+
+## Example
+
+```ts title="src/app/orders/controllers/checkout.ts"
+// ...
+createPost.validation = {
+  rules: {
+    creditCardNumber: ["requiredIf:paymentMethod,creditCard"],
+  },
+};
+```
+
+In this case, the `creditCardNumber` input will be required if the `paymentMethod` input has a value of `creditCard`.
+
+It can also receive an array of values:
+
+```ts title="src/app/orders/controllers/checkout.ts"
+// ...
+createPost.validation = {
+  rules: {
+    creditCardNumber: ["requiredIf:paymentMethod,creditCard,debitCard"],
+  },
+};
+```

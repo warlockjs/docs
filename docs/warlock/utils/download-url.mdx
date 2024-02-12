@@ -1,0 +1,45 @@
+---
+sidebar_position: 2
+---
+
+# Download url
+
+`downloadFileFromUrl` is a function that receives three parameters:
+
+- `url`: The url of the file to download.
+- `destination`: The destination path to save the file to.
+- `fileName`: Optionally The file name to save the file with.
+
+It fetches the file from the given url and saves it to the given destination path.
+
+## Usage
+
+```ts title="src/app/posts/controllers/get-posts.ts"
+import {
+  storagePath,
+  downloadFileFromUrl,
+  Request,
+  Response,
+} from "@mongez/warlock";
+
+export default async function getPosts(request: Request, response: Response) {
+  const response = await downloadFileFromUrl(
+    "https://example.com/image.jpg",
+    storagePath("images")
+  );
+
+  // rest of the code
+}
+```
+
+If the third argument is not passed, then the function will generate a random file name but keep the file extension.
+
+The output of the function is [AxiosResponse](https://github.com/axios/axios#response-schema).
+
+:::danger
+The function will throw an error if the given url is not valid.
+:::
+
+:::warning
+The function is not going to create the directory if it doesn't exist, so make sure to create it before calling the function.
+:::

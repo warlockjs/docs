@@ -11,7 +11,7 @@ import TabItem from "@theme/TabItem";
 
 Here are the files that are being auto-loaded in order:
 
-- `src/config/index.ts`: this file should always export a default `function`
+- `src/config`: All files inside this directory will be loaded first.
 - `src/main.ts`: loaded after importing the configuration file
 - `src/app/main.ts`: loaded after the http server and database connection is warming up (But not yet connected)
 
@@ -47,4 +47,4 @@ Loading events can be done via two ways:
 
 ## Autoloading Ordering
 
-Please note that the order of the modules is very important, the modules will be loaded in alphabetical order, so if you have a module called `users` and another module called `posts`, then the `users` module will be loaded first.
+Please note that the order of the modules is very important, the modules will be loaded in alphabetical order, so if you have a module called `users` and another module called `posts`, then the `posts` module will be loaded first.

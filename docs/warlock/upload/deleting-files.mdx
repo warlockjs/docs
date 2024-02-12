@@ -1,0 +1,35 @@
+---
+sidebar_position: 4
+---
+
+# Deleting Files
+
+To delete uploaded file, use `/uploads/:hash` endpoint with `DELETE` method.
+
+The `:hash` is the file hash returned from the [Upload model](./upload-model).
+
+## Deleting Files from the Database
+
+To delete the file from the database, use the `deleteFile` function from `@mongez/warlock`:
+
+```ts {10} title="src/app/uploads/routes.ts"
+import { router, deleteFile } from "@mongez/warlock";
+import { adminPath, guarded } from "app/utils/router";
+
+guarded(() => {
+  router.post(["/uploads", adminPath("/uploads")], uploadFiles);
+  router.post(
+    ["/uploads/chunks", adminPath("/uploads/chunks")],
+    uploadChunkedFiles
+  );
+  router.delete(["/uploads/:hash", adminPath("/uploads/:hash")], deleteFile);
+});
+```
+
+:::note
+Please note that we used an array of route to allow deleting files apis from either the admin or the front office side.
+:::
+
+:::danger
+If the files should be deleted from the admin side only, then add the `adminPath` function only.
+:::

@@ -1,0 +1,21 @@
+---
+sidebar_position: 5
+---
+
+# Base Cache Driver
+
+The base cache driver is an abstract class that all built-in cache drivers are derived from. It defines the common methods and properties to reduce the amount of code duplication.
+
+## Required properties
+
+The Base Cache Driver implements [CacheDriverInterface](./cache-driver-interface) and requires only one property to be defined the `name` property, this property is used to identify the cache driver name that will be used for logging purposes.
+
+## Implemented methods
+
+It implements the following methods:
+
+- `setOptions`: This method is used to set the cache driver options.
+- `parseKey`: This method is used to parse the cache key.
+- `log`: This method is used to log messages to the logger.
+
+Our base driver will call [Prase Cache Key utility](./utils#parse-cache-key) when implementing the `parseKey` method.

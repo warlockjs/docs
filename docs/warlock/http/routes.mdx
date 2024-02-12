@@ -1,0 +1,285 @@
+---
+sidebar_position: 2
+---
+
+# Routes
+
+Routes are the way to map which request is going to be handled with which handler (controller).
+
+## How it works
+
+Each module inside `src/app` is a module, for this module to have routes, create a `routes.ts` file inside it and it will be automatically loaded.
+
+## Defining a route
+
+Creating routes is super easy, it has mostly the same signature as the `express` and `fastify` router, but with some extra features.
+
+Let's create a simple route file and see how it works.
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import { getUsers } from "./controllers/get-users";
+
+router.get("/users", getUsers);
+```
+
+We defined a route that will handle `GET` requests to `/users` path, and will be handled by the `getUsers` controller.
+
+Now let's create the controller:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function getUsers(request: Request, response: Response) {
+  const usersList = await User.list();
+  response.success({
+    users: usersList,
+  });
+}
+```
+
+The controller is a simple function that accepts the request and response objects, and returns a response.
+
+The `User.list()` method returns a list of users, and we return it as a response body.
+
+:::tip
+To get better understanding of database models, please check [Monpulse Documentation](./../../monpulse//models/introduction.mdx)
+:::
+
+## Route parameters
+
+In the previous example we saw how to return list of users, but what if we want to return a specific user?
+
+```ts {3,6} title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import { getUsers } from "./controllers/get-users";
+import { getUser } from "./controllers/get-user";
+
+router.get("/users", getUsers);
+router.get("/users/:id", getUser);
+```
+
+We added a new route to fetch a single user, let's create the controller:
+
+```ts title="src/app/users/controllers/get-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export async function getUser(request: Request, response: Response) {
+  const user = await User.find(request.input("id"));
+  response.success({
+    user,
+  });
+}
+```
+
+In this example we used the `request.input()` method to get the route parameter `id`, and we used it to fetch the user.
+
+## Adding middleware
+
+Sometimes we need to add a middleware to a specific route, for example to check if the user is authenticated or not.
+
+```ts {3,6} title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import { getUsers } from "./controllers/get-users";
+import { getUser } from "./controllers/get-user";
+import { auth } from "./../middleware/auth";
+
+router.get("/users", getUsers, {
+  middleware: [auth],
+});
+router.get("/users/:id", getUser, {
+  middleware: [auth],
+});
+```
+
+We added the `auth` middleware to both routes, now let's create the middleware:
+
+```ts title="src/app/users/middleware/auth.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function auth(request: Request, response: Response) {
+  const authorizationHeader = request.header("Authorization");
+
+  if (!authorizationHeader) {
+    return response.unauthorized();
+  }
+}
+```
+
+The middleware is a simple function that accepts the request and response objects, and returns a response.
+
+:::info
+When a middleware returns a response, the route handler will not be executed, and the response will be returned directly.
+:::
+
+## Request Methods
+
+The `router` object has the following methods:
+
+- `router.get(path, handler, options?)`: Registers a route that handles `GET` requests.
+- `router.post(path, handler, options?)`: Registers a route that handles `POST` requests.
+- `router.put(path, handler, options?)`: Registers a route that handles `PUT` requests.
+- `router.patch(path, handler, options?)`: Registers a route that handles `PATCH` requests.
+- `router.delete(path, handler, options?)`: Registers a route that handles `DELETE` requests.
+- `router.options(path, handler, options?)`: Registers a route that handles `OPTIONS` requests.
+- `router.head(path, handler, options?)`: Registers a route that handles `HEAD` requests.
+- `router.all(path, handler, options?)`: Registers a route that supports all request methods.
+
+## Multiple routes with same handler
+
+Sometimes we need to register multiple routes with the same handler, a good example for this use case is in the `uploads` module where we need to upload files from the website and admin panel and they both have different routes but the same handler.
+
+To do this, we can pass an array of paths to the `router` methods:
+
+```ts {3,6} title="src/app/uploads/routes.ts"
+import { router } from "@mongez/warlock";
+import { upload } from "./controllers/upload";
+
+router.post(["/uploads", "/admin/uploads"], upload);
+```
+
+## Named Routes
+
+Sometimes we need to generate a URL for a specific route, for example to redirect the user to a specific page after login.
+
+To do this, we can pass a name to the route options:
+
+```ts {3,6} title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import { getUsers } from "./controllers/get-users";
+
+router.get("/users", getUsers, {
+  name: "users.list",
+});
+```
+
+By default if the route `name` property is not defined, it will be the route path without the leading slash and each slash will be replaced with a dot, for example the route `/users/:id` will have the name `users.id`.
+
+Now we can generate the URL for this route using the `route()` helper function:
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response, route } from "@mongez/warlock";
+
+export async function getUsers(request: Request, response: Response) {
+  const usersList = await User.list();
+  response.success({
+    users: usersList,
+    nextPage: route("users.list"),
+  });
+}
+```
+
+The `route()` function accepts the route name as the first argument, and the route parameters as the second argument.
+
+An example for the second parameter is used with a single user route:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import { getUser } from "./controllers/get-user";
+
+router.get("/users/:id", getUser, {
+  name: "users.single",
+});
+```
+
+Now we can generate the URL for this route using the `route()` helper function:
+
+```ts title="src/app/users/controllers/get-user.ts"
+import { Request, Response, route } from "@mongez/warlock";
+
+export async function getUser(request: Request, response: Response) {
+  const user = await User.find(request.input("id"));
+  response.success({
+    user,
+    editPage: route("users.single", { id: user.id }),
+  });
+}
+```
+
+## Grouped Route
+
+As our applications grow, we need to make a more control over it, and one of the ways to do this is to group routes.
+
+For example, we can group all the routes that needs to be authorized before accessing them:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import { getUsers } from "./controllers/get-users";
+import { getUser } from "./controllers/get-user";
+import { auth } from "./../middleware/auth";
+
+router.group(
+  {
+    middleware: [auth],
+  },
+  () => {
+    router.get("/users", getUsers);
+    router.get("/users/:id", getUser);
+  }
+);
+```
+
+The `router.group()` method accepts the following arguments:
+
+- `options`: The options object that will be passed to all routes inside the group.
+- `callback`: The callback function that will be executed to register the routes.
+
+:::info Merged Middleware
+Please note that if the routes registered inside the group have a middleware, it will be merged with the group middleware, the group middleware will have precedence over the route middleware.
+:::
+
+We can also add same prefix for list of groups, i.e we can add `/admin` prefix for all admin routes, we can make it more professional by creating a function called `adminRoutes` that takes the callback function as an argument:
+
+```ts title="src/app/admin/routes.ts"
+import { router } from "@mongez/warlock";
+import { auth } from "./../middleware/auth";
+
+export function adminRoutes(callback) {
+  router.group(
+    {
+      prefix: "/admin",
+      middleware: [auth],
+    },
+    callback
+  );
+}
+```
+
+Now we can use it in our routes:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import { getUsers } from "./controllers/get-users";
+import { getUser } from "./controllers/get-user";
+import { adminRoutes } from "./../admin/routes";
+
+adminRoutes(() => {
+  router.get("/users", getUsers);
+  router.get("/users/:id", getUser);
+});
+```
+
+## Prefix routes
+
+A `router.prefix` method is a syntactic sugar for `router.group` method, it accepts the prefix as the first argument, and the callback function as the second argument:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import { getUsers } from "./controllers/get-users";
+
+router.prefix("/admin", () => {
+  router.get("/users", getUsers);
+}); // route is: /admin/users
+```
+
+## List of routes
+
+To list all registered routes, you can use the `router.list()` method:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+
+router.list();
+```

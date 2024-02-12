@@ -1,0 +1,25 @@
+---
+sidebar_position: 4
+---
+
+# Sleep
+
+`sleep` is a utility function that allows you to pause the execution of the code for a specific amount of time.
+
+## Usage
+
+In anywhere in your code, you can use the `sleep` function as follows:
+
+```ts title="src/app/posts/controllers/get-posts.ts"
+import { sleep, Request, Response } from "@mongez/warlock";
+
+export default async function getPosts(request: Request, response: Response) {
+  await sleep(1000);
+
+  // rest of the code
+}
+```
+
+:::note
+The `sleep` function takes the time in milliseconds.
+:::

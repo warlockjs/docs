@@ -1,0 +1,67 @@
+---
+sidebar_position: 3
+---
+
+# Auth Middleware
+
+Auth middleware is used to verify the user identity, it's used to protect routes from unauthorized access.
+
+## Usage
+
+Import `auth` middleware from `@mongez/warlock` and use it in the route definition.
+
+```ts title="src/app/users/routes.ts"
+import { router, authMiddleware } from "@mongez/warlock";
+import { listUsers } from "./controllers/list-users";
+
+router.get("/users", listUsers, {
+  middleware: authMiddleware(),
+});
+```
+
+The `authMiddleware` will authenticate the current request by verifying the `JWT` token sent with the request.
+
+## Protected Routes for user type
+
+The previous example works for any type of users either an actual user or a [Guest](./guests) user.
+
+Now what if we want to protect a route for a specific user type?
+
+For example, the `update profile` api requires an actual user not a guest user, in this case we can use the `authMiddleware` and pass to it the user type defined in [Auth configurations](./configurations).
+
+```ts title="src/app/users/routes.ts"
+import { router, authMiddleware } from "@mongez/warlock";
+import { updateProfile } from "./controllers/update-profile";
+
+router.post("/users/profile", updateProfile, {
+  middleware: authMiddleware("user"),
+});
+```
+
+This will allow only the user with `userType` equals to **user** to access this route.
+
+We can also use it for reverse guarded, for example, a logged in user can not make a login, create account or forget password request, so we can use the `authMiddleware` to guard these routes for guests only.
+
+```ts title="src/app/users/routes.ts"
+import { router, authMiddleware } from "@mongez/warlock";
+import { login } from "./controllers/login";
+import { createAccount } from "./controllers/create-account";
+import { forgetPassword } from "./controllers/forget-password";
+
+router.group(
+  {
+    middleware: [authMiddleware("guest")],
+  },
+  () => {
+    router.post("/login", login);
+    router.post("/create-account", createAccount);
+    router.post("/forget-password", forgetPassword);
+  }
+);
+```
+
+We used the router group method to add the `authMiddleware` to all routes inside the group.
+
+:::tip
+All of these groups are already stored in `src/app/utils/router.ts`.
+:::

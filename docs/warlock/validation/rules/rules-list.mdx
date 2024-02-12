@@ -1,0 +1,45 @@
+---
+sidebar_position: 1
+---
+
+# Validation Rules List
+
+The following rules are the builtin validation rules in `Warlock`:
+
+- [array](./array): Checks if the input is an array.
+- [arrayOf](./array-of): Checks if the input is an array of the given type.
+- [boolean](./boolean): Checks if the input is a boolean.
+- [confirmed](./confirmed): Checks if the input is confirmed with another input.
+- [date](./date): Checks if the input is a valid date.
+- [exists](./exists): Checks if the input exists in the database.
+- [email](./email): Checks if the input is a valid email.
+- [file](./file): Checks if the input is a file.
+- [float](./float): Checks if the input is a float number.
+- [image](./image): Checks if the input is an image.
+- [in](./in): Checks if the input is one of the given values.
+- [int](./int): Checks if the input is an integer.
+- [length](./length): Checks if the input length is equal to the given value.
+- [localized](./localized): Checks if the input is an array of objects, each object has `localeCode` and `text` properties.
+- [maxLength](./max-length): Checks if the input length is less than or equal to the given value.
+- [max](./max): Checks if the input is less than or equal to the given value.
+- [minLength](./min-length): Checks if the input length is greater than or equal to the given value.
+- [min](./min): Checks if the input is greater than or equal to the given value.
+- [missingIf](./missing-if): The field under validation must be missing or empty if the another field is equal to the given value.
+- [number](./number): Checks if the input is a number.
+- [object](./object): Checks if the input is an object.
+- [pattern](./pattern): Checks if the input matches the given pattern.
+- [required](./required): Checks if the input is not empty.
+- [requiredIf](./required-if): The field under validation must be present and not empty if the another field is equal to the given value.
+- [requiredIfEmpty](./required-if-empty): The field under validation must be present and not empty if the another field is empty.
+- [requiredWith](./required-with): The field under validation must be present and not empty only if any of the other specified fields are present and not empty.
+- [requiredWithAll](./required-with-all): The field under validation must be present and not empty only if all of the other specified fields are present and not empty.
+- [scalar](./scalar): Checks if the input is a string, number or boolean.
+- [string](./string): Checks if the input is a string.
+- [stringify](./stringify): Checks if the input is a string or a number.
+- [unique](./unique): Checks if the input is unique in the database.
+- [uploadable](./uploadable): Checks if the input's value is a hash of [Uploaded File](./../../upload/upload-model.mdx)
+- [url](./url): Checks if the input is a valid URL.
+
+## Create Your Own Validation Rule
+
+To create a new rule, [please head to this page](./create-your-own-rule).

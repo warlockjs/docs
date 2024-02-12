@@ -1,0 +1,22 @@
+---
+sidebar_position: 20
+---
+
+# Min
+
+Check if the input value is greater than or equal to the given minimum value.
+
+> The validation rule **requires a value** to run against the input value.
+
+The `min` rule works against floats and integers.
+
+## Example
+
+```ts title="src/app/users/controllers/create-user.ts"
+// ...
+createUser.validation = {
+  rules: {
+    adultAge: ["required", "min:18"],
+  },
+};
+```

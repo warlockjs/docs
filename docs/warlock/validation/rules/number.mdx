@@ -1,0 +1,20 @@
+---
+sidebar_position: 21
+---
+
+# Number
+
+Check if the input value is a number either an integer or a float.
+
+The validation rule **requires a value** to run.
+
+## Example
+
+```ts title="src/app/products/controllers/create-product.ts"
+// ...
+createProduct.validation = {
+  rules: {
+    price: ["required", "number"],
+  },
+};
+```

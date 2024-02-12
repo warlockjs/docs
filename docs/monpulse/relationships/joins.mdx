@@ -90,7 +90,7 @@ export class Post extends Model {
    * List of joinings
    */
   public static joinings = {
-    author: User.joinable("createdBy.id", "id").single(true).as("author"),
+    author: User.joinable("createdBy.id", "id").single().as("author"),
   };
 }
 ```
@@ -219,11 +219,7 @@ import { Post } from "./models/post";
 
 const posts = await Post.aggregate()
   .joining("author")
-  .joining("comments", {
-    where: {
-      isApproved: true,
-    },
-  })
+  .joining("comments")
   .get();
 ```
 
@@ -383,6 +379,53 @@ const posts = await Post.aggregate()
   .get();
 ```
 
+## Using Aggregate pipeline
+
+So if we need to add more pipeline options to the joining (lookup) collection, we can use the second argument to the `joining` method, it receives a callback function which receives the `Joinable` instance for the joined collection, which we can use any [Aggregate](./../aggregate/introduction) method on it.
+
+### Example
+
+This will be the default setup to join comments for the post:
+
+```ts
+import { Model } from "@mongez/monpulse";
+import { Post } from "./models/post";
+import { Comment } from "./models/comment";
+
+export class Post extends Model {
+  static collectionName = "posts";
+
+  /**
+   * List of joinings
+   */
+  public static joinings = {
+    comments: Comment.joinable("id", "post.id"),
+  };
+}
+```
+
+Now we can get all comments for the post like this:
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate().joining("comments").get();
+```
+
+Or we can get only the approved comments:
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate()
+  .joining("comments", (query) => query.where("isApproved", true))
+  .get();
+```
+
+:::tip
+The query used here will be on the joined collection, which will be applied on the `comments` collection.
+:::
+
 ## Advanced Examples
 
 We have `Post` model, represents **posts collection**, `Comment` model represents **comments collection** and `Like` model represents **likes collection**.
@@ -459,16 +502,8 @@ Let's say we want to count the likes and comments for only the current user, we 
 import { Post } from "./models/post";
 
 const posts = await Post.aggregate()
-  .countJoining("likes", {
-    where: {
-      "createdBy.id": 1,
-    },
-  })
-  .countJoining("comments", {
-    where: {
-      "createdBy.id": 1,
-    },
-  })
+  .countJoining("likes", query => query.where('createdBy.id', 1))
+  .countJoining("comments", query => query.where("createdBy.id": 1))
   .get();
 ```
 
@@ -499,13 +534,7 @@ import { Post } from "./models/post";
 
 const posts = await Post.aggregate()
   .countJoining("likes")
-  .joining("likes", {
-    where: {
-      "createdBy.id": 1,
-    },
-    single: true,
-    as: "userLike",
-  })
+  .joining("likes", join => join.where("createdBy.id", 1).single(true).as("userLike"))
   .addField('liked', $agg.booleanCond($agg.eq("$userLike", null))
   .get();
 ```

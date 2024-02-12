@@ -1,0 +1,683 @@
+---
+sidebar_position: 5
+---
+
+# Response
+
+In Http Request Life Cycle, the last step is sending the response back to the client.
+
+## How it works
+
+There are multiple types of responses, but mainly the heavy type will be The JSON response.
+
+# Response is json by default
+
+By default any of response object methods is used to handle the response body for json responses with different status code, for example `response.success(object)` returns a success response with status code `200` and the object as the response body.
+
+## Sending response
+
+A `Warlock response` object is attached to every request handler/controller and middleware as well.
+
+To send a success json response, use `response.success(data)` which will return a `200` status code.
+
+```ts title="src/app/users/controllers/get-users.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export default async function getUsers(request: Request, response: Response) {
+  const users = await User.list();
+
+  return response.success({
+    users,
+  });
+}
+```
+
+This will return all users in the database.
+
+## Sending custom objects to response
+
+A good example of this case when we send list of users models or even a single model.
+
+As a model is basically an open object, we can't send it directly to the response, we need to convert it to a plain object first.
+
+`Warlock response` will parse every data returned in the response, if the value is a plain then it will be sent as-is, if it is an array it will be looped and parsed each value.
+
+Now what about models or any custom classes?
+
+Let's make a custom class to see how this works
+
+```ts title="src/app/users/controllers/get-user.ts"
+import { Request, Response } from "@mongez/warlock";
+
+class UserData {
+  public name: string;
+  public email: string;
+  public age: number;
+
+  public setAge(age: number) {
+    this.age = age;
+  }
+
+  public getAge() {
+    return this.age;
+  }
+
+  public setName(name: string) {
+    this.name = name;
+  }
+}
+
+export default function getUser(request: Request, response: Response) {
+  const user = new UserData();
+
+  user.setName("John Doe");
+  user.setAge(30);
+
+  return response.success({
+    user,
+  });
+}
+```
+
+In this scenario the `UserData` class will not be parsed as the response parser does not know what will be sent to the final response body.
+
+To determine which data will be sent, add `toJSON()` method to the class.
+
+```ts {20} title="src/app/users/controllers/get-user.ts"
+import { Request, Response } from "@mongez/warlock";
+
+class UserData {
+  public name: string;
+  public email: string;
+  public age: number;
+
+  public setAge(age: number) {
+    this.age = age;
+  }
+
+  public getAge() {
+    return this.age;
+  }
+
+  public setName(name: string) {
+    this.name = name;
+  }
+
+  public toJSON() {
+    return {
+      name: this.name,
+      age: this.age,
+    };
+  }
+}
+
+export default function getUser(request: Request, response: Response) {
+  const user = new UserData();
+
+  user.setName("John Doe");
+  user.setAge(30);
+
+  return response.success({
+    user,
+  });
+}
+```
+
+## Success Created
+
+To return a `201` status code, use `response.successCreate(data)` method.
+
+```ts title="src/app/users/controllers/create-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export default async function createUser(request: Request, response: Response) {
+  const user = await User.create(request.all());
+
+  return response.successCreate({
+    user,
+  });
+}
+```
+
+In terms of REST standards, its better to send a `201` status code when creating a new resource.
+
+## Not found
+
+To return a `404` status code, use `response.notFound()` method.
+
+```ts title="src/app/users/controllers/get-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export default async function getUser(request: Request, response: Response) {
+  const user = await User.find(request.input("id"));
+
+  if (!user) {
+    return response.notFound();
+  }
+
+  return response.success({
+    user,
+  });
+}
+```
+
+You can also send data with the response:
+
+```ts title="src/app/users/controllers/get-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export default async function getUser(request: Request, response: Response) {
+  const user = await User.find(request.input("id"));
+
+  if (!user) {
+    return response.notFound({
+      message: "User not found",
+    });
+  }
+
+  return response.success({
+    user,
+  });
+}
+```
+
+## Unauthorized response
+
+To return a `401` status code, use `response.unauthorized()` method.
+
+```ts title="src/app/users/middleware/auth.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function auth(request: Request, response: Response) {
+  const authorizationHeader = request.header("Authorization");
+
+  if (!authorizationHeader) {
+    return response.unauthorized();
+  }
+}
+```
+
+## Forbidden response
+
+Forbidden response is used when the user is authenticated but not authorized to access the requested resource.
+
+The `response.forbidden()` method returns a `403` status code.
+
+```ts title="src/app/users/middleware/auth.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function auth(request: Request, response: Response) {
+  const authorizationHeader = request.header("Authorization");
+
+  if (!authorizationHeader) {
+    return response.unauthorized();
+  }
+
+  const user = await User.find(request.input("id"));
+
+  if (!user) {
+    return response.forbidden();
+  }
+}
+```
+
+You may of course send data with the response:
+
+```ts title="src/app/users/middleware/auth.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function auth(request: Request, response: Response) {
+  const authorizationHeader = request.header("Authorization");
+
+  if (!authorizationHeader) {
+    return response.unauthorized();
+  }
+
+  const user = await User.find(request.input("id"));
+
+  if (!user) {
+    return response.forbidden({
+      message: "You are not authorized to access this resource",
+    });
+  }
+}
+```
+
+## Bad request response
+
+To return a `400` status code, use `response.badRequest()` method.
+
+```ts title="src/app/users/controllers/create-user.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "./../models/user";
+
+export default async function createUser(request: Request, response: Response) {
+  const name = request.input("name");
+
+  if (!name) {
+    return response.badRequest({
+      error: "Name is required",
+    });
+  }
+
+  const email = request.input("email");
+
+  if (!email) {
+    return response.badRequest({
+      error: "Email is required",
+    });
+  }
+
+  const user = await User.create(request.all());
+
+  return response.successCreate({
+    user,
+  });
+}
+```
+
+## Server error response
+
+To return a `500` status code, use `response.serverError()` method.
+
+```ts title="src/app/users/controllers/create-user.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function createUser(request: Request, response: Response) {
+  try {
+    const database = await connectToDatabase();
+    //...
+  } catch (error) {
+    return response.serverError({
+      error: error.message,
+    });
+  }
+}
+```
+
+Usually you won't need this method, but it's good to know that it exists.
+
+## Send File
+
+To send a file, use `response.sendFile()` method.
+
+```ts title="src/app/users/controllers/download-avatar.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function downloadAvatar(
+  request: Request,
+  response: Response
+) {
+  const avatar = await Avatar.find(request.input("id"));
+
+  if (!avatar) {
+    return response.notFound();
+  }
+
+  return response.sendFile(avatar.path);
+}
+```
+
+You may set a cache time in seconds as a second parameter:
+
+```ts title="src/app/users/controllers/download-avatar.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function downloadAvatar(
+  request: Request,
+  response: Response
+) {
+  const avatar = await Avatar.find(request.input("id"));
+
+  if (!avatar) {
+    return response.notFound();
+  }
+
+  return response.sendFile(avatar.path, 3600); // 1 hour
+}
+```
+
+An alias method `sendCachedFile` works exactly the same but sets the cache time to 1 year.
+
+```ts title="src/app/users/controllers/download-avatar.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function downloadAvatar(
+  request: Request,
+  response: Response
+) {
+  const avatar = await Avatar.find(request.input("id"));
+
+  if (!avatar) {
+    return response.notFound();
+  }
+
+  return response.sendCachedFile(avatar.path);
+}
+```
+
+## Send xml response
+
+To send a xml response, use `response.xml()` method.
+
+```ts title="src/app/general/controllers/sitemap.ts"
+import { Request, Response } from "@mongez/warlock";
+import sitemap from "./../sitemap";
+
+export default async function sitemap(request: Request, response: Response) {
+  return response.xml(sitemap);
+}
+```
+
+This will send a response with Content Type `application/xml`.
+
+## Send text response
+
+To send a text response, use `response.text()` method.
+
+```ts title="src/app/general/controllers/robots.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function robots(request: Request, response: Response) {
+  return response.text("User-agent: *\nDisallow: /");
+}
+```
+
+This will send a response with Content Type `text/plain`.
+
+## Send html response
+
+To send a html response, use `response.html()` method.
+
+```ts title="src/app/general/controllers/home.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function home(request: Request, response: Response) {
+  return response.html("<h1>Hello World</h1>");
+}
+```
+
+This will send a response with Content Type `text/html`.
+
+## Redirect
+
+To redirect the user to another page, use `response.redirect()` method.
+
+```ts title="src/app/users/controllers/login.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function login(request: Request, response: Response) {
+  const user = await User.find(request.input("id"));
+
+  if (!user) {
+    return response.notFound();
+  }
+
+  return response.redirect("/users");
+}
+```
+
+By default this will make a `temporary redirect` with `302` status code, you can change this by passing the status code as the second parameter:
+
+```ts title="src/app/users/controllers/login.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function login(request: Request, response: Response) {
+  const user = await User.find(request.input("id"));
+
+  if (!user) {
+    return response.notFound();
+  }
+
+  return response.redirect("/users", 301);
+}
+```
+
+To send a `permanent redirect` with `301` status code, use `response.permanentRedirect()` method.
+
+```ts title="src/app/users/controllers/login.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function login(request: Request, response: Response) {
+  const user = await User.find(request.input("id"));
+
+  if (!user) {
+    return response.notFound();
+  }
+
+  return response.permanentRedirect("/users");
+}
+```
+
+## Set Header
+
+To set a header, use `response.header()` method.
+
+```ts title="src/app/users/controllers/download-avatar.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function downloadAvatar(
+  request: Request,
+  response: Response
+) {
+  const avatar = await Avatar.find(request.input("id"));
+
+  if (!avatar) {
+    return response.notFound();
+  }
+
+  response.header(
+    "Content-Disposition",
+    `attachment; filename="${avatar.name}"`
+  );
+
+  return response.sendFile(avatar.path);
+}
+```
+
+## Set multiple headers
+
+To set multiple headers, use `response.headers()` method.
+
+```ts title="src/app/users/controllers/download-avatar.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function downloadAvatar(
+  request: Request,
+  response: Response
+) {
+  const avatar = await Avatar.find(request.input("id"));
+
+  if (!avatar) {
+    return response.notFound();
+  }
+
+  response.headers({
+    "Content-Disposition": `attachment; filename="${avatar.name}"`,
+    "Content-Type": avatar.mimeType,
+  });
+
+  return response.sendFile(avatar.path);
+}
+```
+
+## Remove header
+
+To remove a header, use `response.removeHeader()` method.
+
+```ts title="src/app/users/controllers/download-avatar.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function downloadAvatar(
+  request: Request,
+  response: Response
+) {
+  const avatar = await Avatar.find(request.input("id"));
+
+  if (!avatar) {
+    return response.notFound();
+  }
+
+  response.removeHeader("Content-Type");
+
+  return response.sendFile(avatar.path);
+}
+```
+
+## Get response headers
+
+To get all response headers, use `response.getHeaders()` method.
+
+```ts title="src/app/users/controllers/download-avatar.ts"
+// ...
+const headers = response.getHeaders();
+```
+
+This will return an object with all headers.
+
+## Get response header
+
+To get a specific response header, use `response.header()` method.
+
+```ts title="src/app/users/controllers/download-avatar.ts"
+// ...
+const contentType = response.header("Content-Type");
+```
+
+## Set status code
+
+To set a status code, use `response.setStatusCode()` method.
+
+```ts title="src/app/users/controllers/download-avatar.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function downloadAvatar(
+  request: Request,
+  response: Response
+) {
+  const avatar = await Avatar.find(request.input("id"));
+
+  if (!avatar) {
+    return response.notFound();
+  }
+
+  response.setStatusCode(200);
+
+  return response.sendFile(avatar.path);
+}
+```
+
+## Set Content Type
+
+You don't really need to do it manually, but if you want to, you can.
+
+To set a Content Type, use `response.setContentType()` method.
+
+```ts title="src/app/users/controllers/download-avatar.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function downloadAvatar(
+  request: Request,
+  response: Response
+) {
+  const avatar = await Avatar.find(request.input("id"));
+
+  if (!avatar) {
+    return response.notFound();
+  }
+
+  response.setContentType(avatar.mimeType);
+
+  return response.sendFile(avatar.path);
+}
+```
+
+## Stream file
+
+Sometimes we want to send large files, in that case we need to stream the file.
+
+To stream a file, use `response.streamFile()` method.
+
+```ts title="src/app/users/controllers/download-avatar.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export default async function downloadAvatar(
+  request: Request,
+  response: Response
+) {
+  const avatar = await Avatar.find(request.input("id"));
+
+  if (!avatar) {
+    return response.notFound();
+  }
+
+  return response.streamFile(avatar.path);
+}
+```
+
+## Get response body
+
+Getting response body, status code, headers and content type are likely will be needed when working with [Response Events](#response-events).
+
+To get the response body, use `response.body` property.
+
+```ts title="src/app/users/controllers/get-users.ts"
+// ...
+const body = response.body;
+```
+
+The response body will return the final output of the body.
+
+## Get response status code
+
+To get the current status code, use `response.statusCode` property.
+
+```ts title="src/app/users/controllers/get-users.ts"
+// ...
+const statusCode = response.statusCode;
+```
+
+## Response Events
+
+Now let's talk about response events, which is one of the most important features in Warlock.
+
+Why would i need to listen to response events?
+
+Well, for many reasons, for example:
+
+- Modify the response before sending it.
+- Add more data to each response dynamically, for example sending current user data in each response.
+- After sending response, perform some logging or any other action.
+
+### Listen to response events
+
+In any `src/general/events` directory, create `send-app-version-to-response.ts` file:
+
+```ts title="src/general/events/send-app-version-to-response.ts"
+import { Response } from "@mongez/warlock";
+
+Response.on("sending", (response) => {
+  response.body.appVersion = "1.0.0";
+});
+```
+
+If we want to perform something after the response is sent, use `on("sent")` event
+
+```ts title="src/general/events/log-request.ts"
+import { storagePath, Response } from "@mongez/warlock";
+import { putJsonFileAsync } from "@mongez/fs";
+
+Response.on("sent", (response) => {
+  const request = response.request;
+
+  putJsonFileAsync(storagePath(`logs/${Date.now()}.json`), request.all());
+});
+```
+
+This will log the request body in a json file.
+
+> Using `putJsonFileAsync` will not block io operations, so it's safe to use it in response events.

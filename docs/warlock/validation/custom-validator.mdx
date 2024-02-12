@@ -1,0 +1,50 @@
+---
+sidebar_position: 4
+---
+
+# Custom Validator
+
+Consider a custom validator as the final middleware interceptor before processing the request, it's used to validate the request after the validation rules.
+
+## How it works
+
+After running all validation rules, `Warlock` will try to identify the request handler `validate` method, if exists, it will run it, and pass the request and response objects to it.
+
+The `validate` method acts as a [middleware](./../http/middleware), it receives the request and response objects, if it returns a response object, then the request will be terminated, and the response will be sent back to the client, otherwise, the request will be processed normally.
+
+## Example
+
+Let's take an example of the `login` request:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import { login } from "./controllers/auth/login";
+
+router.post("/login", login);
+```
+
+The `login` function is the request handler, and it's located at `src/app/users/controllers/auth/login.ts`:
+
+```ts {9} title="src/app/users/controllers/auth/login.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "app/users/models/user";
+
+export default async function login(request: Request, response: Response) {
+  // do logic here
+}
+
+login.validation = {
+  validate: async (request: Request, response: Response) => {
+    // custom validation here
+    const user = await User.attempt(request.only(["email", "password"]));
+
+    if (!user) {
+      return response.unauthorized();
+    }
+
+    // inject the user object to the request object
+    // Make sure to not return a value, otherwise the request will be terminated
+    request.user = user;
+  },
+};
+```

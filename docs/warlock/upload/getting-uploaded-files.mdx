@@ -1,0 +1,31 @@
+---
+sidebar_position: 5
+---
+
+# Getting Uploaded Files
+
+There are two ways to get the uploaded file, either using the file path directly, or using the file hash.
+
+## Getting Uploaded File using the File Path
+
+This way is a little bit performant as it ignores the database query, and it's used to get the uploaded file using the file path directly.
+
+To get the uploaded file using the file path, use `/uploads/*` endpoint with `GET` method.
+
+### Example
+
+```ts {3} title="src/app/uploads/routes.ts"
+import { router, getUploadedFile } from "@mongez/warlock";
+
+router.get("/uploads/*", getUploadedFile);
+```
+
+## Images resizing
+
+Any image url that is being served by `getUploadedFile` endpoint can be resized for `width` and `height` by adding `w` and `h` respectively to query parameters.
+
+```
+https://example.com/uploads/images/image.jpg?w=200&h=200
+```
+
+We can send either `w` or `h` or both, if we send only one of them, the other will be calculated automatically.

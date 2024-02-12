@@ -1,0 +1,266 @@
+---
+sidebar_position: 4
+---
+
+# Repository Caching
+
+Caching is crucial when it comes to performance. Warlock provides a simple way to cache your repositories.
+
+## Prerequisites
+
+Make sure that you're already [Configured Cache](./../cache/introduction) and it is activated.
+
+## Introduction
+
+The concept here is simple, the repository will fetch data either from the cache or get a fresh copy from the database then cache it, the most important that `Warlock` will clear the cache each time an update occurred to the attached model either by creating, updating, or deleting a model, this will give us the most recent data and make sure the data in the cache are persistent.
+
+## Usage
+
+Every method in [Repository listing](./listing) has a corresponding method suffixed with `cached`, for example the `list` cache method is `listCached`, the `all` method has `allCached`, it's the same for the rest of the methods.
+
+## Available methods
+
+Here are the available cache methods:
+
+- `listCached`
+- `allCached`
+- `listActiveCached`
+- `getCached`
+- `getActiveCached`
+- `oldestCached`
+- `oldestActiveCached`
+- `latestCached`
+- `latestActiveCached`
+- `firstCached`
+- `firstActiveCached`
+- `lastCached`
+- `lastActiveCached`
+
+## Disable Repository Caching
+
+To disable the cache even if it is activated in the app, set `isCacheable` property to false:
+
+```ts title="src/app/users/repositories/users-repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * Whether to enable or disable cache
+   */
+  public isCacheable = false;
+}
+```
+
+## Set cache driver
+
+By default the cache driver of the repository will be the [Cache Manager](./../cache/cache-manager), however, you can set a different cache driver for the repository by setting the `cacheDriverName` property to the desired cache:
+
+```ts title="src/app/users/repositories/users-repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * The cache driver to use
+   */
+  public cacheDriverName = "redis";
+}
+```
+
+This will change the cache driver to `redis` instead of the default cache driver.
+
+## Clear repository cache
+
+Each repository has its own namespace, which is `repositories` followed by the model's collection name, in that sense if we want to clear the entire cache related to the repository, then call `clearCache` method will do the job:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "./users/repositories/users-repository";
+
+usersRepository.clearCache();
+```
+
+:::tip
+The cache is automatically cleared whenever a model is created, updated, or deleted.
+:::
+
+## Manually cache data
+
+This could be useful if you're going to implement a custom list method and you want to cache the data, for example, let's fetch and cache all male users:
+
+```ts title="src/app/users/repositories/users-repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * List all male users
+   */
+  public async allMale(options: RepositoryOptions) {
+    // generate cache key for the list method
+    const cacheKey = this.cacheKey("male", options);
+
+    // check if the data is already cached
+    const users = await this.cacheDriver.get(cacheKey);
+
+    if (users) {
+      // if so then return the cached data but map it into list of models first
+      return this.mapModels(users);
+    }
+
+    // if we reached here then the data is not cached yet, so we need to fetch it from database first
+    const maleUsers = await this.allActive({
+      gender: "male",
+    });
+
+    // cache the data
+    // please note that models can not be serialized, thus we need to store only the document data itself
+    // we don't need to await the cache driver to finish caching the data so we will not add the await keyword
+    this.cacheDriver.set(
+      cacheKey,
+      maleUsers.map((user) => user.data)
+    );
+
+    // return the list of models
+    return maleUsers;
+  }
+}
+```
+
+Let's break down the code above:
+
+- First we generate a cache key for the list method, it's important to use `cacheKey` method to link the cache to the repository (needed for recaching or clearing the cache) the `cacheKey` method takes a cache key, and optionally list of options that will serialized to be appended to the cache key.
+- Then we check if the data is already cached, if so then we return the cached data but first we need to map it into list of models.
+- If the data is not cached yet, then we fetch it from the database.
+- Then we cache the data, please note that models can not be serialized, thus we need to store only the document data itself.
+- Finally we return the list of models.
+
+We can also use the `cacheAll` method, that will do all the dirty job for us:
+
+```ts title="src/app/users/repositories/users-repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * List all male users
+   */
+  public allMale(options: RepositoryOptions) {
+    return this.cacheAll({
+      ...options,
+      gender: "male",
+    });
+  }
+}
+```
+
+## Cache list
+
+The `cacheAll` method will cache the list of models based on the given options without pagination, it will return direct documents list, if you want to cache the list with pagination, then use `cacheList` method:
+
+```ts title="src/app/users/repositories/users-repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * List all male users
+   */
+  public allMale(options: RepositoryOptions) {
+    return this.cacheList({
+      ...options,
+      gender: "male",
+    });
+  }
+}
+```
+
+This will return an object contains `documents` and `paginationInfo` properties, the `documents` property contains the list of documents, and the `paginationInfo` contains the pagination information.
+
+### Expire time
+
+In either `cacheAll` or `cacheList` we can set the amount of time to expire after (AKA TTL), in this case, we pass to the object `expiresAfter` key:
+
+```ts title="src/app/users/repositories/users-repository.ts"
+import {
+  FilterByOptions,
+  RepositoryManager,
+  RepositoryOptions,
+} from "@mongez/warlock";
+import { User } from "../models/user";
+
+export class UsersRepository extends RepositoryManager<User> {
+  /**
+   * {@inheritDoc}
+   */
+  public model = User;
+
+  /**
+   * List all male users
+   */
+  public allMale(options: RepositoryOptions) {
+    return this.cacheList({
+      ...options,
+      gender: "male",
+      expiresAfter: 60 * 60 * 24, // 24 hours
+    });
+  }
+}
+```
+
+:::note
+Please note that the `expiresAfter` value is in seconds.
+:::
+
+### Purging the cache
+
+Purging the cache with fetching means if the list is cached then it will be returned from the cache and it will be deleted after fetching, also if it is set to true, then the method will not cache the list if it wast not in the cache.
+
+## Cache model
+
+To cache a single model, use `cacheModel`, it takes an instance of a model and cache it's data.

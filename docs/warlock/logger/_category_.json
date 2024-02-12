@@ -1,0 +1,8 @@
+{
+  "label": "Log",
+  "position": 8,
+  "link": {
+    "type": "generated-index",
+    "description": "Logging In Warlock"
+  }
+}

@@ -1,0 +1,52 @@
+---
+sidebar_position: 6
+---
+
+# JWT
+
+JWT stands for JSON Web Token, it's a standard for creating access tokens that can be used for authentication.
+
+## Generating JWT
+
+Access token are tightly coupled with users models such as `User` and `Guest` which both should extends [Auth Model](./auth-model).
+
+The `Auth` model has a `generateAccessToken` method that creates and store the access token in the database related to that user.
+
+## Manually generating JWT
+
+If you would like to generate an access token away from the Auth model, you can import `jwt` object from `Warlock`
+
+```ts title="src/app/main.ts"
+import { jwt } from "@mongez/warlock";
+
+async function main() {
+  const token = await jwt.generate({
+    id: 1,
+    userType: "user",
+  });
+}
+```
+
+This will generate a JWT for the user with id `1` and type `user`.
+
+:::note
+JWT is generating using [Fastify JWT](https://github.com/fastify/fastify-jwt) so any options supported by it can be passed to the `generate` method.
+:::
+
+## Verifying JWT
+
+To validate a JWT, you can use the `verify` method from `jwt` object.
+
+```ts title="src/app/main.ts"
+import { jwt } from "@mongez/warlock";
+
+async function main() {
+  const token = await jwt.verify("token");
+}
+```
+
+## Storing Access Tokens
+
+Kindly note that `jwt.generate` does not store the access token in the database, it just generates it, so you need to store it manually.
+
+By default `Warlock` has `AccessToken` model that is being used by [Auth Model](./auth-model) to store the access token in the database.

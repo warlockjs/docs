@@ -1,0 +1,91 @@
+---
+sidebar_position: 2
+---
+
+# Cache Configurations
+
+Cache configurations are used to define the cache drivers, and the default driver and each driver's options.
+
+## Usage
+
+In the `src/config` directory, make sure to create `cache.ts` file if not created already.
+
+```ts title="src/config/cache.ts"
+import { env } from "@mongez/dotenv";
+import { CacheConfigurations, RedisCacheDriver } from "@mongez/warlock";
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    redis: RedisCacheDriver,
+  },
+  default: env("CACHE_DRIVER", "redis"),
+  options: {
+    redis: {
+      host: env("REDIS_HOST"),
+      port: env("REDIS_PORT"),
+      password: env("REDIS_PASSWORD"),
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+## Configurations
+
+The cache configurations object has the following properties:
+
+- `default`: This is the default driver that will be used if no driver is specified.
+- `drivers`: This is an object that holds the cache drivers, the key is the driver name, and the value is the driver class.
+- `options`: This is an object that holds the options for each driver, the key is the driver name, and the value is the driver options.
+
+## Default Driver
+
+The `default` property is used to define the default driver that will be called on application boot.
+
+It should be a driver name that is named under the `drivers` property.
+
+For example, we can set the default cache driver to `redis` which is declared under the `drivers` property.
+
+```ts title="src/config/cache.ts"
+import { env } from "@mongez/dotenv";
+import { CacheConfigurations, RedisCacheDriver } from "@mongez/warlock";
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    redis: RedisCacheDriver,
+  },
+  default: env("CACHE_DRIVER", "redis"),
+  options: {
+    redis: {
+      host: env("REDIS_HOST"),
+      port: env("REDIS_PORT"),
+      password: env("REDIS_PASSWORD"),
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+:::info
+If no default driver is defined, then the cache manager will use the [NullCacheDriver](./null) instead.
+:::
+
+## Drivers
+
+This is where we define all drivers that might be used in the application, usually, we define only the default driver, but based on the application needs, we might need to define more than one driver.
+
+the `driver` property is an object that holds the cache drivers, the key is the driver name, and the value is the driver class.
+
+:::note
+Please note we define the driver class, not an instance of the driver as it is lazy instantiated by the cache manager.
+:::
+
+:::info
+Please check [All Available Drivers](./introduction#cache-drivers) to know more about the available drivers.
+:::
+
+## Options
+
+In the `options` property, we define the options for each driver, the key is the driver name, and the value is the driver options that will be used when the cache driver is loaded.

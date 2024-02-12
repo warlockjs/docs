@@ -73,3 +73,13 @@ const { documents: users, paginationInfo } = await User.aggregate()
   .where("age", ">", 18)
   .paginate(1, 10);
 ```
+
+## Chunk
+
+Chunk method is also available, it works exactly like the `Aggregate.chunk` method but the returned documents are instances of the model.
+
+```ts
+await User.aggregate().where("age", ">", 18).chunk(10, (users) => {
+  console.log(users);
+});
+```

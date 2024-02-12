@@ -1,0 +1,173 @@
+---
+sidebar_position: 3
+---
+
+# Paths
+
+This section covers all functions that can be used to generate a full path to a file or a directory.
+
+## Root Path
+
+`rootPath` is a function that returns the root path of the project.
+
+```ts title="src/main.ts"
+import { rootPath } from "@mongez/warlock";
+
+console.log(rootPath()); // returns the root path of the project
+```
+
+You can also pass a path to the `rootPath` function to get the full path of the given path.
+
+```ts title="src/main.ts"
+import { rootPath } from "@mongez/warlock";
+
+console.log(rootPath("src")); // returns the full path of the src directory
+```
+
+## Src Path
+
+`srcPath` is a function that returns the full path of the `src` directory.
+
+```ts title="src/main.ts"
+import { srcPath } from "@mongez/warlock";
+
+console.log(srcPath()); // returns the full path of the src directory
+```
+
+You can also pass a path to the `srcPath` function to get the full path of the given path.
+
+```ts title="src/main.ts"
+import { srcPath } from "@mongez/warlock";
+
+console.log(srcPath("app")); // returns the full path of the src/app directory
+```
+
+## App Path
+
+`appPath` is a function that returns the full path of the `app` directory.
+
+```ts title="src/main.ts"
+import { appPath } from "@mongez/warlock";
+
+console.log(appPath()); // returns the full path of the app directory
+```
+
+You can also pass a path to the `appPath` function to get the full path of the given path.
+
+```ts title="src/main.ts"
+import { appPath } from "@mongez/warlock";
+
+console.log(appPath("users")); // returns the full path of the app/users directory
+```
+
+## Public Path
+
+`publicPath` is a function that returns the full path of the `public` directory.
+
+```ts title="src/main.ts"
+import { publicPath } from "@mongez/warlock";
+
+console.log(publicPath()); // returns the full path of the public directory
+```
+
+You can also pass a path to the `publicPath` function to get the full path of the given path.
+
+```ts title="src/main.ts"
+import { publicPath } from "@mongez/warlock";
+
+console.log(publicPath("images")); // returns the full path of the public/images directory
+```
+
+## Storage Path
+
+`storagePath` is a function that returns the full path of the `storage` directory.
+
+```ts title="src/main.ts"
+import { storagePath } from "@mongez/warlock";
+
+console.log(storagePath()); // returns the full path of the storage directory
+```
+
+You can also pass a path to the `storagePath` function to get the full path of the given path.
+
+```ts title="src/main.ts"
+import { storagePath } from "@mongez/warlock";
+
+console.log(storagePath("images")); // returns the full path of the storage/images directory
+```
+
+## Uploads Path
+
+`uploadsPath` is a function that returns the full path of the `uploads` directory.
+
+```ts title="src/main.ts"
+import { uploadsPath } from "@mongez/warlock";
+
+console.log(uploadsPath()); // returns the full path of the uploads directory
+```
+
+You can also pass a path to the `uploadsPath` function to get the full path of the given path.
+
+```ts title="src/main.ts"
+import { uploadsPath } from "@mongez/warlock";
+
+console.log(uploadsPath("images")); // returns the full path of the uploads/images directory
+```
+
+:::note
+Kindly note that the uploads path is a subdirectory of the storage path.
+:::
+
+## Temp Path
+
+`tempPath` is a function that returns the full path of the `temp` directory.
+
+```ts title="src/main.ts"
+import { tempPath } from "@mongez/warlock";
+
+console.log(tempPath()); // returns the full path of the temp directory
+```
+
+You can also pass a path to the `tempPath` function to get the full path of the given path.
+
+```ts title="src/main.ts"
+import { tempPath } from "@mongez/warlock";
+
+console.log(tempPath("images")); // returns the full path of the temp/images directory
+```
+
+:::note
+Kindly note that the temp path is a subdirectory of the storage path.
+:::
+
+## Cache Path
+
+`cachePath` is a function that returns the full path of the `cache` directory.
+
+```ts title="src/main.ts"
+import { cachePath } from "@mongez/warlock";
+
+console.log(cachePath()); // returns the full path of the cache directory
+```
+
+You can also pass a path to the `cachePath` function to get the full path of the given path.
+
+```ts title="src/main.ts"
+import { cachePath } from "@mongez/warlock";
+
+console.log(cachePath("users")); // returns the full path of the cache/users directory
+```
+
+:::note
+Kindly note that the cache path is a subdirectory of the storage path.
+:::
+
+## Sanitize Path
+
+The `sanitizePath` function is a utility function that removes any invalid characters from the given path.
+
+```ts title="src/main.ts"
+import { sanitizePath } from "@mongez/warlock";
+
+console.log(sanitizePath("user:name")); // returns username
+```

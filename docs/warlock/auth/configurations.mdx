@@ -1,0 +1,55 @@
+---
+sidebar_position: 3
+---
+
+# Auth configurations
+
+Auth configurations are basically related to current user either it is a logged in user or a guest user, warlock embraces the concept of guest users, so it is important to define the guest user configurations.
+
+- `userType`: The user type model, it's used to identify the current user type, it's required when using [Auth Middleware](./../auth/auth-middleware).
+- `jwt.secret`: JWT Secret key to sign and verify the JWT token.
+
+### User Types
+
+[Auth Middleware](./../auth/auth-middleware) requires a user type that should be defined inside the `auth.userType` configurations, so it can identifies the current model to work with it.
+
+For default installation, there are two user types: `User` and `Guest` models, but you can add more user types, and you can define the default user type.
+
+Each key inside the `auth.userType` represents the user type name, and the value represents the user type model.
+
+:::info
+Each user type MUST extend [Auth model](./../auth/auth-model) because it generates and stores the JWT token
+:::
+
+```ts title="src/config/auth.ts"
+import { AuthConfigurations, Guest } from "@mongez/warlock";
+import { User } from "app/users/models/user";
+
+const authConfigurations: AuthConfigurations = {
+  userType: {
+    guest: Guest,
+    user: User,
+  },
+  jwt: {
+    secret: "secret",
+  },
+};
+
+export default authConfigurations;
+```
+
+Guest is a simple model that extends the [Auth model](./../auth/auth-model) and it's used to identify the guest user.
+
+## JWT Configurations
+
+Any options supported by [Fastify JWT](https://github.com/fastify/fastify-jwt) can be passed to the `jwt` object.
+
+### Secret Key
+
+The jwt secret key is generated automatically inside the `.env` file, so make sure to change it in the production environment.
+
+Secret key can be primitive (string) or can be an object contains `public` and `private` keys, it's used to sign and verify the JWT token.
+
+This is the only required option for JWT configurations.
+
+Check the [JWT Documentation](https://github.com/fastify/fastify-jwt#secret-required) for more information.

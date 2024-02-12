@@ -1,0 +1,66 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+Uploading is a common task in web applications, it's used to upload images, videos, documents, and other types of files.
+
+## How it works
+
+When creating a new `Warlock` project, it is shipped with `uploads` module to lift up the uploading process hassle from you.
+
+## Uploads Module
+
+Let's head to `src/app/uploads/routes.ts` and see what's inside:
+
+```ts title="src/app/uploads/routes.ts"
+import {
+  deleteFile,
+  getUploadedFile,
+  getUploadedFileUsingHash,
+  router,
+  uploadChunkedFiles,
+  uploadFiles,
+} from "@mongez/warlock";
+import { adminPath, guarded } from "app/utils/router";
+
+guarded(() => {
+  // Upload files
+  router.post(["/uploads", adminPath("/uploads")], uploadFiles);
+  // Upload chunked files
+  router.post(
+    ["/uploads/chunks", adminPath("/uploads/chunks")],
+    uploadChunkedFiles
+  );
+  // Delete file by hash from the database
+  router.delete(["/uploads/:hash", adminPath("/uploads/:hash")], deleteFile);
+});
+
+// Get uploaded file using the file path directly
+router.get("/uploads/*", getUploadedFile);
+// Get uploaded file using hash
+router.get("/uploads/:hash", getUploadedFileUsingHash);
+```
+
+Let's break it down into pieces:
+
+## Uploading Files
+
+Warlock has two ways to upload files, either uploading a one or more files, or uploading a chunked file.
+
+[Read more about uploading files](./uploading-files)
+
+## Deleting Files
+
+As a result of the uploading files, each uploaded file will return an object contains the [Upload Output](./upload-model#upload-output) which contains the file hash.
+
+This hash is used to delete the file from the database, and the file itself from the storage.
+
+[Read more about deleting files](./deleting-files)
+
+## Getting Uploaded Files
+
+There are two ways to get the uploaded file, either using the file path directly, or using the file hash.
+
+[Read more about getting uploaded files](./getting-uploaded-files)

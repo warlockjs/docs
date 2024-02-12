@@ -1,0 +1,610 @@
+---
+sidebar_position: 9
+---
+
+# Restful API
+
+Warlock embraces the RESTful API design, and provides a set of tools to help you build RESTful APIs.
+
+One of them is the `Restful` class.
+
+## Restful class
+
+The `Restful` class is a base class for RESTful API controllers. It provides a set of methods to help you build RESTful APIs.
+
+## Declaring a Restful controller
+
+You can use [Generator Z](https://marketplace.visualstudio.com/items?itemName=hassanzohdy.gnz) to generate a Restful controller by right click on the `controllers` directory then `Generate Warlock Module` then `Generate Warlock Restful Request`.
+
+Or you can create it manually, which we will do now.
+
+First off, restful controllers heavily depends on [Repositories](./../repositories/introduction), so get to know it before continuing this section.
+
+Now let's create our `restfulUsers` controller
+
+```ts title="app/users/controllers/restful-users.ts"
+import { Restful } from '@mongez/warlock';
+import { User } from "app/users/models/user":
+import userRepository from "app/users/repositories/users-repository";
+
+class RestfulUsers<User> extends Restful {
+  /**
+   * {@inheritDoc}
+   */
+  protected repository = usersRepository;
+}
+
+const restfulUsers = new RestfulUsers();
+
+export default restfulUsers;
+```
+
+Let's break down this code:
+
+- We imported the `Restful` class from `@mongez/warlock` package.
+- We imported the `User` model from `app/users/models/user`, which will be used for typescript type checking.
+- We imported the `usersRepository` from `app/users/repositories/users-repository`, which will be used to operate on the database.
+- We extended the `Restful` class, and set the `repository` property to `usersRepository`.
+- We created an instance of the `RestfulUsers` class.
+- We exported the `restfulUsers` instance.
+
+Now our controller is ready to use.
+
+## Restful methods
+
+By default a Restful controller has the following methods:
+
+- `list`: To list records.
+- `create`: To create a new record.
+- `update`: To update an existing record.
+- `delete`: To delete an existing record.
+- `bulkDelete`: To delete multiple records.
+- `patch`: To update an existing record partially.
+
+Now let's see how to define our restful and its corresponding methods.
+
+## Defining restful routes
+
+Warlock's router system has a builtin `restfulResource` method that accepts the base path of the resource, and the controller instance.
+
+```ts title="app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import restfulUsers from "app/users/controllers/restful-users";
+
+router.restfulResource("users", restfulUsers);
+```
+
+This will create routes for the previous methods as follows:
+
+| Request Method | Path           | Restful Method       | Description             |
+| -------------- | -------------- | -------------------- | ----------------------- |
+| GET            | **/users**     | `restful.list`       | List users              |
+| POST           | **/users**     | `restful.create`     | Create a new user       |
+| GET            | **/users/:id** | `restful.get`        | Get a user              |
+| PUT            | **/users/:id** | `restful.update`     | Update a user           |
+| PATCH          | **/users/:id** | `restful.patch`      | Partially update a user |
+| DELETE         | **/users/:id** | `restful.delete`     | Delete a user           |
+| DELETE         | **/users**     | `restful.bulkDelete` | Delete multiple users   |
+
+## List Method
+
+The `list` method is used to list records, it sends all request inputs to the repository's `list` method.
+
+> If [Cache](./../cache/introduction) is enabled then `repository.listCached` method will be used instead of `repository.list`.
+
+By default when calling `/users` the response will be returned with pagination (Because list method has default pagination option to **true**) so there will be two keys that will be sent to the response:
+
+> The sent inputs from the request to the repository list methods will be used against [Request Heavy method](./request#get-heavy-inputs).
+
+- `records`: list of records that are fetched from the database.
+- [paginationInfo](./../../monpulse/aggregate/fetching#pagination): The pagination info that is returned from the repository.
+
+Records that are sent are instance of the repository's model, so in our case users, it will be list of `User` models.
+
+### Change default records key
+
+To send another key instead of `records`, define `recordsListName` property in the controller.
+
+```ts title="app/users/controllers/restful-users.ts"
+import { Restful } from '@mongez/warlock';
+import { User } from "app/users/models/user":
+import userRepository from "app/users/repositories/users-repository";
+
+class RestfulUsers<User> extends Restful {
+  /**
+   * {@inheritDoc}
+   */
+  protected repository = usersRepository;
+
+  /**
+   * {@inheritDoc}
+   */
+  protected recordsListName = 'users';
+}
+
+const restfulUsers = new RestfulUsers();
+
+export default restfulUsers;
+```
+
+This will return an object contains `users` and `paginationInfo` keys.
+
+### List middleware
+
+To define a middleware to be executed before calling the `restful.list` method, define `middleware` property in the restful users controller.
+
+```ts title="app/users/controllers/restful-users.ts"
+
+import {Request, Response, Restful } from '@mongez/warlock';
+import { User } from "app/users/models/user":
+import userRepository from "app/users/repositories/users-repository";
+
+class RestfulUsers<User> extends Restful {
+  /**
+   * {@inheritDoc}
+   */
+  protected repository = usersRepository;
+
+  /**
+   * {@inheritDoc}
+   */
+  protected recordsListName = 'users';
+  /**
+   * Middleware
+   */
+  protected middleware = {
+    list: [
+      // middleware
+      this.isSuperAdmin.bind(this),
+    ],
+  };
+
+  protected isSuperAdmin(request: Request, response: Response) {
+    // check if the user is super admin
+    if (request.user.isSuperAdmin === false) {
+      return response.forbidden();
+    }
+  }
+}
+
+const restfulUsers = new RestfulUsers();
+
+export default restfulUsers;
+```
+
+This way we can interrupt the request and return a response before calling the `restful.list` method.
+
+## Get Method
+
+To fetch a single user, a GET request to `/users/:id` is sent, and the `restful.get` method is called.
+
+The `restful.get` method sends the `id` to the repository's `find` method.
+
+If the record is not found, a `404` response is returned.
+
+> If [Cache](./../cache/introduction) is enabled then `repository.findCached` method will be used instead of `repository.find`.
+
+### Get middleware
+
+Same as the `list` method, you can define a middleware to be executed before calling the `restful.get` method.
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+class RestfulUsers<User> extends Restful {
+  //...
+  /**
+   * Middleware
+   */
+  protected middleware = {
+    get: [
+      // middleware
+      this.isSuperAdmin.bind(this),
+    ],
+  };
+  //...
+}
+//...
+```
+
+### Get response key
+
+If the record is found, it will be returned in `record` key, to change the response key define `recordName` property in the controller.
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+class RestfulUsers<User> extends Restful {
+  //...
+  /**
+   * {@inheritDoc}
+   */
+  protected recordName = "user";
+  //...
+}
+//...
+```
+
+This will return an object contains `user` key.
+
+## Create Method
+
+To create a new user, a POST request to `/users` is sent, and the `restful.create` method is called.
+
+The `restful.create` method sends all request inputs to the repository's `create` method.
+
+If the record is created successfully, a `201` response is returned with the created record.
+
+### Create Validation
+
+So the validation here is a little different than normal function handler, but to the better, in our restful class, there will be `validation` property defined automatically (if generated using the generator), and it will look like:
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+import { RouteResource } from "@mongez/warlock";
+
+class RestfulUsers<User> extends Restful {
+  //...
+
+  /**
+   * {@inheritDoc}
+   */
+  public validation: RouteResource["validation"] = {
+    create: {
+      rules: {
+        firstName: ["required", "min:2"],
+        lastName: ["required", "min:2"],
+      },
+    },
+  };
+  //...
+}
+//...
+```
+
+This is way we defined a validation for the `create` method, and it will be executed before calling the `restful.create` method.
+
+We can use another rules like `UniqueRule` as follows:
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+import { UniqueRule, RouteResource } from "@mongez/warlock";
+
+class RestfulUsers<User> extends Restful {
+  //...
+
+  /**
+   * {@inheritDoc}
+   */
+  public validation: RouteResource["validation"] = {
+    create: {
+      rules: {
+        firstName: ["required", "min:2"],
+        lastName: ["required", "min:2"],
+        email: ["required", "email", new UniqueRule(User)],
+      },
+    },
+  };
+  //...
+}
+```
+
+Of course we can define a custom validation method by passing to the `middleware.create` object a `validate` callback.
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+import { RouteResource } from "@mongez/warlock";
+
+class RestfulUsers<User> extends Restful {
+  //...
+
+  /**
+   * {@inheritDoc}
+   */
+  public validation: RouteResource["validation"] = {
+    create: {
+      validate: this.validate.bind(this),
+    },
+  };
+
+  protected validate(request: Request, response: Response) {
+    // validate the request
+  }
+  //...
+}
+```
+
+### Create Events
+
+Restful class by default triggers multiple events, and they are as follows:
+
+- `beforeCreate(request: Request)`: Triggered before creating the record.
+- `beforeSave(request: Request)`: Triggered before creating or update the record.
+- `onCreate(request: Request, record: Model)`: Triggered after creating the record.
+- `onSave(request: Request, record: Model)`: Triggered after creating or updating the record.
+
+> Please note that any `xSave` event is triggered in three case: create, update, and patch.
+
+An example of usage for `onSave` event will be as follows:
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+
+class RestfulUsers<User> extends Restful {
+  //...
+
+  /**
+   * {@inheritDoc}
+   */
+  public validation: RouteResource["validation"] = {
+    create: {
+      rules: {
+        firstName: ["required", "min:2"],
+        lastName: ["required", "min:2"],
+      },
+    },
+  };
+
+  /**
+   * {@inheritDoc}
+   */
+  public onSave(request: Request, record: Model) {
+    // update the current user if it is the same user that was updated
+    if (request.user.id === record.id) {
+      request.user = record;
+    }
+  }
+  //...
+}
+```
+
+### Return Type
+
+When creating a new record, you can return two types of responses:
+
+- `Single Record`: The newly created record, **this is the default behavior**.
+- `List`: which calls the `list` method and returns the list of records.
+
+To change the default behavior, define a `returnOn` property with `create` key in the controller.
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+class RestfulUsers<User> extends Restful {
+  //...
+  /**
+   * {@inheritDoc}
+   */
+  protected returnOn = {
+    create: "record", // record | records
+  };
+  //...
+}
+```
+
+## Update Method
+
+Pretty much the same as the `create` method, but it calls the `restful.update` method.
+
+### Update Validation
+
+Instead of defining a validation for the `create` method, we define it for the `update` method.
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+
+class RestfulUsers<User> extends Restful {
+  //...
+
+  /**
+   * {@inheritDoc}
+   */
+  public validation: RouteResource["validation"] = {
+    update: {
+      rules: {
+        firstName: ["required", "min:2"],
+        lastName: ["required", "min:2"],
+      },
+    },
+  };
+  //...
+}
+```
+
+We can also use the `UniqueRule` as well:
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+import { UniqueRule, RouteResource } from "@mongez/warlock";
+
+class RestfulUsers<User> extends Restful {
+  //...
+
+  /**
+   * {@inheritDoc}
+   */
+  public validation: RouteResource["validation"] = {
+    update: {
+      rules: {
+        firstName: ["required", "min:2"],
+        lastName: ["required", "min:2"],
+        email: ["required", "email", new UniqueRule(User).exceptCurrentUser()],
+      },
+    },
+  };
+  //...
+}
+```
+
+Using `exceptCurrentUser` will validate the rule against all records except the current record.
+
+### Update Events
+
+Same as the `create` method, but with different names:
+
+- `beforeUpdate(request: Request, model: Model)`: Triggered before updating the record.
+- `beforeSave(request: Request, model: Model)`: Triggered before creating or update the record.
+- `onUpdate(request: Request, model: Model, oldModel: Model)`: Triggered after updating the record.
+- `onSave(request: Request, model: Model, oldModel: Model)`: Triggered after creating or updating the record.
+
+When updating model, the old data of the model will be sent to events `onUpdate` and `onSave` methods.
+
+### Return Type
+
+When updating an existing record, you can return two types of responses:
+
+- `Single Record`: The updated record, **this is the default behavior**.
+- `List`: which calls the `list` method and returns the list of records.
+
+To change the default behavior, define a `returnOn` property with `update` key in the controller.
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+class RestfulUsers<User> extends Restful {
+  //...
+  /**
+   * {@inheritDoc}
+   */
+  protected returnOn = {
+    update: "record", // record | records
+  };
+  //...
+}
+```
+
+## Patch Method
+
+The `patch` method is used to update a record partially, it calls the `restful.patch` method.
+
+### Patch Validation
+
+Same as the `create` and `update` methods, but with different name:
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+
+class RestfulUsers<User> extends Restful {
+  //...
+
+  /**
+   * {@inheritDoc}
+   */
+  public validation: RouteResource["validation"] = {
+    patch: {
+      rules: {
+        firstName: ["required", "min:2"],
+        lastName: ["required", "min:2"],
+      },
+    },
+  };
+  //...
+}
+```
+
+### Patch Events
+
+Same as the `create` and `update` methods, but with different name:
+
+- `beforePatch(request: Request, model: Model)`: Triggered before patching the record.
+- `beforeSave(request: Request, model: Model)`: Triggered before creating or update the record.
+- `onPatch(request: Request, model: Model, oldModel: Model)`: Triggered after patching the record.
+- `onSave(request: Request, model: Model, oldModel: Model)`: Triggered after creating or patching the record.
+
+When patching model, the old data of the model will be sent to events `onPatch` and `onSave` methods.
+
+### Return Type
+
+When patching an existing record, you can return two types of responses:
+
+- `Single Record`: The patched record, **this is the default behavior**.
+- `List`: which calls the `list` method and returns the list of records.
+
+To change the default behavior, define a `returnOn` property with `patch` key in the controller.
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+
+class RestfulUsers<User> extends Restful {
+  //...
+  /**
+   * {@inheritDoc}
+   */
+  protected returnOn = {
+    patch: "record", // record | records
+  };
+  //...
+}
+```
+
+## Validate All
+
+If you noticed in our previous create and update examples, the rules are pretty much the same, to avoid this, we can define a `validation.all` property in the controller.
+
+```ts title="app/users/controllers/restful-users.ts"
+//...
+
+class RestfulUsers<User> extends Restful {
+  //...
+
+  /**
+   * {@inheritDoc}
+   */
+  public validation: RouteResource["validation"] = {
+    all: {
+      rules: {
+        firstName: ["required", "min:2"],
+        lastName: ["required", "min:2"],
+      },
+    },
+  };
+  //...
+}
+```
+
+This validation will be applied on the three methods: `create`, `update`, and `patch`.
+
+## Delete single record
+
+The `delete` method will be called when a request to `/users/:id` is sent with `DELETE` method.
+
+If the record does not exist, a `404` response is returned.
+
+- `beforeDelete(model: Model)` event is triggered before deleting the record.
+- `onDelete(model: Model)` event is triggered after deleting the record.
+
+The return type will be either to return all records from the `restful.list` method or just return success response.
+
+## Bulk Delete
+
+The `bulkDelete` method will be called when a request to `/users` is sent with `DELETE` method.
+
+It's very beneficial when you want to delete multiple records at once, this will reduce the round trips to the server.
+
+Simple send a `/users` with `DELETE` method with the following body:
+
+```json
+{
+  "id": [1, 2, 3]
+}
+```
+
+This will delete all records with ids `1`, `2`, and `3`.
+
+> Same events and return type as the `delete` method, the events will be applied on every single record that will be deleted.
+
+If the return type is not `records` then total deleted models will be returned in response key `deleted`.
+
+## Replacing resource methods
+
+In some situation we want to use the same restful object, but we need to use another method for certain request, for example we can use the same restful class for users and customers which they are both the same collection, except that in the `customers` request we want to add `isCustomer` with value `true` to the request inputs.
+
+To do so we can use the `replace` object when defining the route resource to update the `list` method
+
+```ts title="app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import restfulUsers from "app/users/controllers/restful-users";
+import ListCustomers from "app/users/controllers/list-customers";
+
+router.restfulResource("users", restfulUsers, {
+  replace: {
+    list: ListCustomers,
+  },
+});
+```

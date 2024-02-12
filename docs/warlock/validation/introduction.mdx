@@ -1,0 +1,71 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+Validation is a common task in web applications, it's used to validate the user input, and make sure it's valid before processing it.
+
+## How it works
+
+There are two ways of validating a request, either by using [Validation Rules](#validation-rules) or by using [Custom Validator](#custom-validator).
+
+Each request handler can add it's validation criteria by extending the function with a static property called `validation`.
+
+The `validation` object has two keys:
+
+- `rules`: An object that contains the validation rules, which acts exactly like a [validation rules](./validation-rules).
+- `validate`: A function that accepts the request and response objects, which acts exactly like a [middleware](./../http/middleware).
+
+## Validation Rules
+
+Validation rules are rules that are used to validate the request input, it's used to validate the request body, query, and params.
+
+[Read more about validation rules](./validation-rules)
+
+## Custom Validator
+
+Consider a custom validator as the final middleware interceptor before processing the request, it's used to validate the request after the validation rules.
+
+[Read more about custom validator](./custom-validator)
+
+## Example
+
+Let's consider using the login request as an example:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@mongez/warlock";
+import { login } from "./controllers/auth/login";
+
+router.post("/login", login);
+```
+
+Now let's head to `src/app/users/controllers/auth/login.ts` and see what's inside:
+
+```ts title="src/app/users/controllers/auth/login.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "app/users/models/user";
+
+export default async function login(request: Request, response: Response) {
+  // do logic here
+}
+
+login.validation = {
+  rules: {
+    email: ["required", "email"],
+    password: ["required", "string"],
+  },
+  validate: async (request: Request, response: Response) => {
+    // custom validation here
+    const user = await User.attempt(request.only(["email", "password"]));
+
+    if (!user) {
+      return response.unauthorized();
+    }
+
+    // inject the user object to the request object
+    // Make sure to not return a value, otherwise the request will be terminated
+    request.user = user;
+  },
+};
+```

@@ -1,0 +1,82 @@
+---
+sidebar_position: 4
+---
+
+# Configurations
+
+Configurations are crucial for any application, and Warlock provides a simple way to manage your application configurations.
+
+## Config directory
+
+All configurations are located inside `src/config` directory, they are automatically loaded when the application starts.
+
+## Environment variables
+
+Before we proceed, there is an important note to be taken into consideration, which is the environment variables.
+
+[Environment Variables](./environment) are important to any application to distinguish between different environments, like development, staging and production.
+
+In that sense, when we define the app configurations, make sure to not include the information directly, use environment variables instead.
+
+## Configurations Types
+
+Application configurations are the general application configurations, it contains the following types:
+
+1. [app](#app-configurations): General application configurations, like the application name, the application URL ...etc.
+2. [Auth configurations](./../auth/configurations): Authentication configurations
+3. [Cache configurations](./../cache/configurations): Cache configurations
+4. [Database configurations](./../database/configurations): Database configurations
+5. [Http + cors configurations](./../http/configurations): CORS configurations
+6. [Log configurations](./../logger/configurations): Logger configurations
+7. [Validation configurations](./../validation/configurations): Validation configurations
+8. [uploads](./../upload/configurations): Uploads configurations
+
+## Configuration Files
+
+Because the configurations here are automatically loaded, each config file name is a special name that is used to load the configurations.
+
+Here is the list of all available files that can be loaded:
+
+- `app.ts`: This file is used to define the [App Configurations](#app-configurations).
+- `auth.ts`: This file is used to define the [Auth Configurations](./../auth/configurations).
+- `cache.ts`: This file is used to define the [Cache Configurations](./../cache/configurations).
+- `database.ts`: This file is used to define the [Database Configurations](./../database/configurations).
+- `http.ts`: This file is used to define the [Http Configurations](./../http/configurations).
+- `log.ts`: This file is used to define the [Log Configurations](./../logger/configurations).
+- `mail.ts`: This file is used to define the [Mail Configurations](./../mail/configurations).
+- `validation.ts`: This file is used to define the [Validation Configurations](./../validation/configurations).
+- `uploads.ts`: This file is used to define the [Uploads Configurations](./../upload/configurations).
+
+:::note
+All configuration files must export a default object that contains the configurations.
+:::
+
+:::danger
+Please note that each file in the config directory must be named as the way it was defined in the [Configurations Types](#configurations-types) section.
+:::
+
+## App configurations
+
+The app configurations contains simple data, like the application name, the application URL, debug mode ...etc.
+
+- `baseUrl`: The application base URL, it's used to generate the full URL for the application, you can not miss it, it is required.
+- `timezone`: The application timezone, it's used to set the timezone for the application, defaults to `UTC`.
+- `localeCode`: Default locale code
+
+### Base Url
+
+Base Url is used to generate [Urls](./../utils/urls) to make sure it generates a proper URL for each generated url.
+
+### Timezone
+
+Timezone is used to set the default timezone for the application, it's used to make sure that all dates are generated with the correct timezone.
+
+:::tip
+Monpulse depends on this timezone to generate the correct date for each user, so make sure to set it correctly.
+:::
+
+### localeCode
+
+Locale code is used when the app is a multilingual (has more than one language) application, so make sure to provide the default locale code for the application.
+
+This will be used as a default fallback when api is requested with invalid locale code or with no locale code at at all.

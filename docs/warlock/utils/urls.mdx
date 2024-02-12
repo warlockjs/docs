@@ -1,0 +1,47 @@
+---
+sidebar_position: 7
+---
+
+# Urls
+
+This section covers all function that could be used to generate a url.
+
+## Setting base url
+
+To make any of the incoming functions work, make sure to add in your `.env` file the following:
+
+```env
+BASE_URL=http://localhost:3000
+```
+
+Then to import it in the [App configurations](./../getting-started/configurations#app-configurations).
+
+## Get url path
+
+To generate a full url for a given path, use the `url` function.
+
+```ts title="src/main.ts"
+import { url } from "@mongez/warlock";
+
+console.log(url("posts")); // returns http://localhost:3000/posts
+```
+
+## Get public url
+
+To generate a full url for a given path, use the `publicUrl` function, it will generate a url with the `public` path.
+
+```ts title="src/main.ts"
+import { publicUrl } from "@mongez/warlock";
+
+console.log(publicUrl("images")); // returns http://localhost:3000/public/images
+```
+
+## Uploads url
+
+To generate a full url for a given path, use the `uploadsUrl` function, it will generate a url with the `uploads` path.
+
+```ts title="src/main.ts"
+import { uploadsUrl } from "@mongez/warlock";
+
+console.log(uploadsUrl("images")); // returns http://localhost:3000/uploads/images
+```

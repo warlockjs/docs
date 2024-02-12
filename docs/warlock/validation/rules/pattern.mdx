@@ -1,0 +1,51 @@
+---
+sidebar_position: 23
+---
+
+# Pattern
+
+Check if the input value matches a given pattern.
+
+The validation rule **requires a value** to run.
+
+The pattern rule can not be used as a string, it must be declared as a rule class:
+
+## Example
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+import { PatternRule } from "@mongez/warlock";
+
+const usernamePattern = /^[a-z0-9_-]{3,16}$/;
+
+createAccount.validation = {
+  rules: {
+    username: ["required", new PatternRule(usernamePattern)],
+  },
+};
+```
+
+## Pass the translation key
+
+If the validation failed, the error message will be something like this:
+
+```ts
+username must match the following pattern: [[a-z0-9_-]{3,16}].
+```
+
+To override the pattern, pass the second argument as the translation key:
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+import { PatternRule } from "@mongez/warlock";
+
+const usernamePattern = /^[a-z0-9_-]{3,16}$/;
+
+createAccount.validation = {
+  rules: {
+    username: ["required", new PatternRule(usernamePattern, "usernamePattern")],
+  },
+};
+```
+
+Now you should translate the `usernamePattern` in any of your localization files.

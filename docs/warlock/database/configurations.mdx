@@ -1,0 +1,28 @@
+---
+sidebar_position: 2
+---
+
+# Database Configurations
+
+Make sure to add the database configurations in the `src/config/database.ts` file.
+
+```ts title="src/config/database.ts"
+import { env } from "@mongez/dotenv";
+import { DatabaseConfigurations } from "@mongez/monpulse";
+
+const databaseConfigurations: DatabaseConfigurations = {
+  host: env("DB_HOST", "localhost"),
+  port: env("DB_PORT", 27017),
+  username: env("DB_USERNAME"),
+  password: env("DB_PASSWORD"),
+  database: env("DB_NAME"),
+  dbAuth: env("DB_AUTH"),
+  url: env("DB_URL"),
+};
+
+export default databaseConfigurations;
+```
+
+If the url is provided, then the other configurations will be ignored, otherwise, the url will be generated from the other configurations.
+
+For more information about database configurations, please read [MonPulse Configurations](./../../monpulse/getting-started/connecting-to-database).

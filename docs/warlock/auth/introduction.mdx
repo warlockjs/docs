@@ -1,0 +1,35 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+Auth is a very important part of any web application, `Warlock` embraces API that provides a simple and easy to use API to manage users and authentication.
+
+## Authentication
+
+Authentication is the process of verifying the identity of a user, so when a user logs in, we need to verify that this user is who he claims to be.
+
+## JWT
+
+As `warlock` embraces API, it uses `JWT` as the main authentication method, so when a user logs in, a `JWT` token will be generated and sent to the user, and the user will send this token with every request to the server.
+
+## How it works
+
+First off, we need to generate a JWT (JSON Web Token) for the user, this token will be sent to the user and the user will send it with every request to the server.
+
+When the user sends a request to the server, the server will check if the token is valid, if it's valid, then the user is authenticated, if not, then the user is not authenticated.
+
+## User Management
+
+We can generate a JWT for logged in user, but also could be generated for [Guests](./guests).
+
+`Warlock` deals with guests as normal users, but with a special role, so we can use the same API for both guests and logged in users.
+
+So the cycle with Guest users is as follows:
+
+1. For first time visit, `Guest` token is generated and sent to the user using for example `/login/guests` request.
+2. Any public request will require at a `JWT`, either for guests or actual logged in users.
+3. When the user logs in, a `JWT` is generated for him and sent to him.
+4. The user will send this token with every request to the server.
+5. When user decides to logout, the token will be deleted from the database by sending a request to `/logout` endpoint.

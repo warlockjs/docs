@@ -1,0 +1,31 @@
+---
+sidebar_position: 5
+---
+
+# Promise All Object
+
+`promiseAllObject` is a utility function that allows you to run multiple promises at once, and return the results as an object.
+
+This is a more convenient way to use `Promise.all` when you need to return the results as an object.
+
+## Usage
+
+In anywhere in your code, you can use the `promiseAllObject` function as follows:
+
+```ts title="src/app/posts/controllers/get-posts.ts"
+import { promiseAllObject, Request, Response } from "@mongez/warlock";
+import postsRepository from "./../repositories/posts";
+import categoriesRepository from "app/categories/repositories/categories";
+
+export default async function getPosts(request: Request, response: Response) {
+  const { posts, categories } = await promiseAllToObject({
+    categories: categoriesRepository.all(),
+    posts: postsRepository.all(),
+  });
+  // rest of the code
+}
+```
+
+:::note
+Please note that you should not use the `await` keyword beside each promise, because `promiseAllObject` will do that for you.
+:::

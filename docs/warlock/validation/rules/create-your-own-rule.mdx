@@ -1,0 +1,141 @@
+---
+sidebar_position: 33
+---
+
+# Create Your Own Rule
+
+To create a new rule, you need to create a class that extends the `Rule` class.
+
+Let's create a rule that validates phone number to start with `+2` as optional then `01` then `0|1|2|5` then 8 digits.
+
+```ts title="src/app/general/validation/phone.ts"
+import { Rule } from "@mongez/warlock";
+
+export class PhoneNumberRule extends Rule {
+  /**
+   * Rule name
+   */
+  public static ruleName = "phoneNumber";
+
+  /**
+   * Validate the rule
+   */
+  public async validate() {
+    const phoneNumber = this.value; // the input value
+    const regex = /^(?:\+2)?01[0125]\d{8}$/;
+
+    this.isValid = regex.test(phoneNumber);
+  }
+
+  /**
+   * Get error message
+   */
+  public error() {
+    return this.trans("phoneNumber");
+  }
+}
+```
+
+Let's explain the code above:
+
+First, we defined the `ruleName`, it's mandatory to be unique to not make any conflicts with other validation rules.
+
+Then we defined the `validate` method, this is async method that will be called when validating the input.
+
+The `value` property is the input's value that is taken from the request payload.
+
+Then we wrote down our regular expression to validate the phone number.
+
+Finally, `isValid` property is used to indicate if the input is valid or not.
+
+## Error method
+
+The `error` method is used to return the error message if the input is invalid.
+
+We used `trans` method that is inherited from the `Rule` class, this method is used to translate the error message.
+
+The `trans` method receives the validation key error that will be used for translation, in our case we'll call it `phoneNumber`, now let's define the validation error message.
+
+Go to `src/app/general/utils/locales.ts` and add the following:
+
+```ts title="src/app/general/utils/locales.ts"
+import { groupedTranslation } from "@mongez/localization":
+
+groupedTranslation("validation", {
+    phoneNumber: {
+        en: "Invalid phone number",
+        ar: "رقم الهاتف غير صحيح",
+        // any other locale code
+    }
+});
+```
+
+Now let's add it to our validation configurations:
+
+```ts title="src/config/validation.ts"
+import { PhoneNumberRule } from "app/general/validation/phone";
+import type { ValidationConfigurations } from "@mongez/warlock";
+
+const validationConfigurations: ValidationConfigurations = {
+  rules: {
+    phoneNumber: PhoneNumberRule,
+    // rest of rules
+  },
+  //...
+};
+```
+
+## Usage
+
+To use it, add it to the validation rules in any handler, let's do it in the `create-account` handler:
+
+```ts title="src/app/users/controllers/auth/create-account.ts"
+import { Request, Response } from "@mongez/warlock";
+import { User } from "app/users/models/user";
+
+export default async function createAccount(
+  request: Request,
+  response: Response
+) {
+  // do logic here
+}
+
+createAccount.validation = {
+  rules: {
+    email: ["required", "email"],
+    password: ["required", "string"],
+    phoneNumber: ["required", "phoneNumber"],
+  },
+};
+```
+
+## Error placeholder
+
+When calling any error, it receives a placeholder object that contains by default `input` key which contains the input name and `value` which holds the current input value.
+
+Also, we can pass to `trans` method an object to add more placeholders, for example this is the `error` method in the [minLength Rule](./min-length)
+
+```ts
+
+
+  /**
+   * Get error message
+   */
+  public error() {
+    return this.trans("minLength", {
+      min: this.options[0],
+    });
+  }
+```
+
+By defining this we can now use the following placeholder in the translation:
+
+```ts
+groupedTranslation("validation", {
+  minLength: {
+    en: "The :input must be at least :min characters",
+    ar: "يجب أن يكون :input على الأقل :min أحرف",
+    // any other locale code
+  },
+});
+```

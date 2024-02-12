@@ -1,0 +1,199 @@
+---
+sidebar_position: 4
+---
+
+# Validation errors
+
+All validation rules are stored under `validation` group name, by default it supports `English` and `Arabic` languages, you can however add your own language.
+
+## Default error messages
+
+The following code is the default validation messages for all builtin validation rules:
+
+```ts
+import { groupedTranslations } from "@mongez/localization";
+
+groupedTranslations("validation", {
+  required: {
+    en: "The :input field is required.",
+    ar: ":input مطلوب.",
+  },
+  unique: {
+    en: "The :input has already been taken.",
+    ar: ":input مستخدم من قبل.",
+  },
+  object: {
+    en: ":input must be an object.",
+    ar: ":input يجب أن يكون كائن.",
+  },
+  exists: {
+    en: "The selected :input does not exist in our database records.",
+    ar: ":input المحدد غير موجود في سجلات قاعدة البيانات الخاصة بنا.",
+  },
+  confirmed: {
+    en: ":input must match :confirmationInput.",
+    ar: ":input يجب أن يتطابق مع :confirmationInput.",
+  },
+  min: {
+    en: ":input must be at least :min.",
+    ar: ":input يجب أن يكون على الأقل :min.",
+  },
+  file: {
+    en: ":input must be a file.",
+    ar: ":input يجب أن يكون ملف.",
+  },
+  files: {
+    en: ":input must be an array of files.",
+    ar: ":input يجب أن يكون مجموعة من الملفات.",
+  },
+  max: {
+    en: ":input must be at most :max.",
+    ar: ":input يجب أن يكون على الأكثر :max.",
+  },
+  minLength: {
+    en: ":input must be at least :min characters.",
+    ar: ":input يجب أن يكون على الأقل :min حرف.",
+  },
+  maxLength: {
+    en: ":input must be at most :max characters.",
+    ar: ":input يجب أن يكون على الأكثر :max حرف.",
+  },
+  email: {
+    en: "The :input must be a valid email address.",
+    ar: ":input يجب أن يكون بريد إلكتروني صالح.",
+  },
+  localized: {
+    en: ":input must be a an array of objects, each object has localeCode and text properties.",
+    ar: ":input يجب أن يكون مصفوفة من الكائنات، كل كائن يحتوي على خصائص localeCode و text.",
+  },
+  in: {
+    en: ":input accepts only the following values: :values.",
+    ar: ":input يقبل القيم التالية فقط: :values.",
+  },
+  string: {
+    en: ":input must be a string.",
+    ar: ":input يجب أن يكون سلسلة.",
+  },
+  number: {
+    en: ":input must be a number.",
+    ar: ":input يجب أن يكون رقم.",
+  },
+  integer: {
+    en: ":input must be an integer.",
+    ar: ":input يجب أن يكون عدد صحيح.",
+  },
+  float: {
+    en: ":input must be a float.",
+    ar: ":input يجب أن يكون عدد عائم.",
+  },
+  boolean: {
+    en: ":input must be a boolean.",
+    ar: ":input يجب أن يكون منطقي.",
+  },
+  pattern: {
+    en: ":input must match the following pattern: :pattern.",
+    ar: ":input يجب أن يتطابق مع النمط التالي: :pattern.",
+  },
+  array: {
+    en: ":input must be an array.",
+    ar: ":input يجب أن يكون مصفوفة.",
+  },
+  arrayOf: {
+    en: ":input must be an array of :type.",
+    ar: ":input يجب أن يكون مصفوفة من :type.",
+  },
+  url: {
+    en: ":input must be a valid URL.",
+    ar: ":input يجب أن يكون رابط صالح.",
+  },
+  length: {
+    en: ":input must be :length characters.",
+    ar: ":input يجب أن يكون :length حرف.",
+  },
+  scalar: {
+    en: ":input must be a string, number or boolean",
+    ar: ":input يجب أن يكون رقم أو نص أو قيمة منطقية",
+  },
+  stringify: {
+    en: ":input must be number, string",
+    ar: ":input يجب أن يكون رقم أو نص ",
+  },
+});
+```
+
+## Overriding error messages
+
+To override an error message from the default messages, you can use the `groupedTranslations` function in your own code base.
+
+```ts title="src/app/general/utils/locales.ts"
+import { groupedTranslation } from "@mongez/localization";
+
+groupedTranslation("validation", {
+  required: {
+    en: ":input is mandatory",
+    ar: "يجب ان يحتوي على قيمة :input",
+  },
+});
+```
+
+## Add new language support
+
+To add a new language validation message, use [extend](https://github.com/hassanzohdy/mongez-localization#extending-translations) function.
+
+For example, let's add the French language:
+
+```ts title="src/app/general/utils/locales.ts"
+import { extend } from "@mongez/localization";
+
+extend("fr", {
+  validation: {
+    required: ":input est obligatoire",
+    email: ":input doit être une adresse email valide",
+    // rest of messages
+  },
+});
+```
+
+## Translated input names
+
+Let's say our current app locale code is `ar` which is Arabic, now we want to return an error for `firstName` that indicates it is required which is defined in the validation as follows:
+
+```ts
+groupedTranslation("validation", {
+  required: {
+    en: ":input is required",
+    ar: "مطلوب :input",
+  },
+});
+```
+
+This will result to the following error message:
+
+```ts
+مطلوب firstName
+```
+
+To translate input names, use `inputs` key in the validation group:
+
+```ts title="src/app/general/utils/locales.ts"
+groupedTranslation("inputs", {
+  firstName: {
+    en: "First name",
+    ar: "الاسم الأول",
+  },
+  lastName: {
+    en: "Last name",
+    ar: "الاسم الأخير",
+  },
+});
+```
+
+Now when the validation error is returned, it will be translated to the following:
+
+```ts
+الاسم الأول مطلوب
+```
+
+:::tip
+You can add in each module its own inputs, but be aware to not override the same input name in another module.
+:::

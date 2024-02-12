@@ -1,0 +1,57 @@
+---
+sidebar_position: 3
+---
+
+# Database Decorators
+
+Decorators are a way to add metadata to a class, property, or method declaration, and make the class, property, or method declaration more expressive.
+
+## Sluggable
+
+The `Sluggable` decorator is used to generate a slug from a string property, it uses under the hood [sluggable](./../utils/sluggable) utility function.
+
+### Example
+
+```ts title="src/app/products/models/product.ts"
+import { castModel, Casts, Model } from "@mongez/monpulse";
+import { Sluggable, uploadable } from "@mongez/warlock";
+
+@Sluggable("title")
+export default class Post extends Model {
+  // ...
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    title: "localized",
+    description: "localized",
+    shortDescription: "localized",
+    isActive: "boolean",
+  };
+}
+```
+
+This will create `slug` field whenever the post is saved (created or updated), the slug will be generated from the `title` field.
+
+You can generate the slug from another column by passing the column name to the `Sluggable` decorator.
+
+```ts title="src/app/products/models/product.ts"
+import { castModel, Casts, Model } from "@mongez/monpulse";
+import { Sluggable, uploadable } from "@mongez/warlock";
+
+@Sluggable("name")
+export default class Post extends Model {
+  // ...
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    name: "localized",
+    description: "localized",
+    shortDescription: "localized",
+    isActive: "boolean",
+  };
+}
+```

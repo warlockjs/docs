@@ -1,0 +1,24 @@
+---
+sidebar_position: 21
+---
+
+# Missing If
+
+The input must be not present or empty if another input is equal to the given value.
+
+> The validation rule **does not require a value** to run against the input value.
+
+The `min` rule works against floats and integers.
+
+## Example
+
+```ts title="src/app/products/controllers/create-product.ts"
+// ...
+createProduct.validation = {
+  rules: {
+    category: ["missingIf:type,variation"],
+  },
+};
+```
+
+The previous validation works in a good use case, where you have an online store with multiple type of products, in this use case, the variation (child product) should not have a category because the parent product already has a category.

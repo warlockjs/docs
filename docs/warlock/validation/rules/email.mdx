@@ -1,0 +1,20 @@
+---
+sidebar_position: 8
+---
+
+# Email
+
+Check if the input value is a valid email address.
+
+> The validation rule **requires a value** to run against the input value.
+
+## Example
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+createAccount.validation = {
+  rules: {
+    email: ["required", "email"],
+  },
+};
+```

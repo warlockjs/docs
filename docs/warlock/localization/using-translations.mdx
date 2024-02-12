@@ -1,0 +1,72 @@
+---
+sidebar_position: 4
+---
+
+# Using Translations
+
+After declaring the translations list, now we need to use it in our application.
+
+There are couple of ways to do this:
+
+## Using Request Object
+
+To access the translations list, you can use the `request` object, which is available in all controllers, services, and middlewares.
+
+To access the translations list, use the `t` method:
+
+```ts {8} title="src/app/users/controllers/create-account.ts"
+import { Request, Response } from "@mongez/warlock";
+
+export async function createAccount(request: Request, response: Response) {
+  try {
+    // create user
+
+    return response.success({
+      message: request.t("users.successCreate"),
+    });
+  } catch (error) {
+    return response.badRequest({
+      error: error.message,
+    });
+  }
+}
+```
+
+Now we need to update our `users` localization file:
+
+```ts title="src/app/users/utils/locales.ts"
+import { groupedTranslation } from "@mongez/localization";
+
+groupedTranslation("users", {
+  successCreate: {
+    en: "User created successfully",
+    ar: "تم إنشاء المستخدم بنجاح",
+  },
+});
+```
+
+## Using t function
+
+Another shorthand function to use current translation is by using `t` function, this function can be used anywhere in the application.
+
+```ts title="src/app/users/controllers/create-account.ts"
+import { t } from "@mongez/warlock";
+
+export async function createAccount(request: Request, response: Response) {
+  try {
+    // create user
+
+    return response.success({
+      message: t("users.successCreate"),
+    });
+  } catch (error) {
+    return response.badRequest({
+      error: error.message,
+    });
+  }
+}
+```
+
+:::tip
+Please note that you should not use the [trans function](https://github.com/hassanzohdy/mongez-localization#translating-keywords) directly from the `@mongez/localization` package, as it will not work as expected.
+:::
