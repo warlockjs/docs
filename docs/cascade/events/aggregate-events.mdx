@@ -1,0 +1,35 @@
+---
+sidebar_position: 4
+title: Aggregate Events
+---
+
+## Introduction
+
+Aggregate events are triggered when performing aggregate operations.
+
+## Types of Events
+
+There are three types of events in the Aggregate:
+
+1. `fetching`: This event is triggered when calling `get`, `first`, `latest`, `oldest` or `count` methods.
+2. `updating`: This event is triggered when calling `update` method.
+3. `deleting`: This event is triggered when calling `delete` method.
+
+## Accessing Aggregate Events
+
+To access the Aggregate events manager, call the `events()` method on the Aggregate class `(not the instance)`.
+
+```ts title="src/app.ts"
+import { Aggregate } from "@warlock.js/cascade";
+
+Aggregate.events()
+  .onFetching((aggregate) => {
+    // do something
+  })
+  .onUpdating((aggregate) => {
+    // do something
+  })
+  .onDeleting((aggregate) => {
+    // do something
+  });
+```

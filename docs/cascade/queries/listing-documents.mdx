@@ -1,0 +1,193 @@
+---
+sidebar_position: 2
+---
+
+# Listing Documents
+
+There are multiple ways to list documents using the `Query` manager, let's see them all.
+
+## Listing documents
+
+To list all documents for collection `users` use the method `list`:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const users = await query.list("users");
+```
+
+To filter these documents, pass the filter object as the second argument:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const users = await query.list("users", {
+  isActive: true,
+});
+```
+
+## Get first document
+
+To get the first document, use the `first` method:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const user = await query.first("users", {
+  isActive: true,
+});
+```
+
+## Get last document
+
+To get the last document, use the `last` method:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const user = await query.last("users", {
+  isActive: true,
+});
+```
+
+## Get latest documents
+
+To get the latest documents, use the `latest` method:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const users = await query.latest("users", {
+  isActive: true,
+});
+```
+
+:::tip
+The `latest` method return the documents in descending order for the `id` field.
+:::
+
+## Get distinct values
+
+To get distinct values for a field, use the `distinct` method:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const emails = await query.distinct("users", "email");
+```
+
+## Count documents
+
+To count documents, use the `count` method:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const count = await query.count("users");
+```
+
+You may pass the filter object as the second argument:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const count = await query.count("users", {
+  isActive: true,
+});
+```
+
+## Explain query
+
+To get the query execution plan, use the `explain` method:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const plan = await query.explain("users", {
+  isActive: true,
+});
+
+console.log(plan);
+```
+
+Will output something like this:
+
+```json
+{
+  "queryPlanner": {
+    "plannerVersion": 1,
+    "namespace": "test.users",
+    "indexFilterSet": false,
+    "parsedQuery": {
+      "isActive": {
+        "$eq": true
+      }
+    },
+    "winningPlan": {
+      "stage": "COLLSCAN",
+      "filter": {
+        "isActive": {
+          "$eq": true
+        }
+      },
+      "direction": "forward"
+    },
+    "rejectedPlans": []
+  },
+  "serverInfo": {
+    "host": "DESKTOP-5QJ8Q7J",
+    "port": 27017,
+    "version": "4.4.6",
+    "gitVersion": "72e66213c2c3eab37d9358d5e78ad7f5c1d0d0d7"
+  },
+  "ok": 1
+}
+```
+
+## Perform aggregate operations
+
+To perform aggregate operations, use the `aggregate` method:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const pipelines = [
+  {
+    $match: {
+      isActive: true,
+    },
+  },
+  {
+    $group: {
+      _id: "$country",
+      count: {
+        $sum: 1,
+      },
+    },
+  },
+];
+
+const result = await query.aggregate("users", pipelines);
+
+const users = result.toArray();
+```
+
+## Get distinct values
+
+To get distinct values for a field, use the `distinct` method:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const emails = await query.distinct("users", "email");
+```
+
+You may pass the filter object as the third argument:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const emails = await query.distinct("users", "email", {
+  isActive: true,
+});
+```

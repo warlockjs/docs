@@ -12,7 +12,7 @@ Navigate to `src/config/mail.ts` file, and add the following:
 
 ```ts title="src/config/mail.ts"
 import { env } from "@mongez/dotenv";
-import { MailConfigurations } from "@mongez/warlock";
+import { MailConfigurations } from "@warlock.js/core";
 
 const mailConfigurations: MailConfigurations = {
   host: env("MAIL_HOST"),

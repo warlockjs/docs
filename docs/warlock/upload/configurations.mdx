@@ -13,7 +13,7 @@ All files are stored inside `storage directory` under the `uploads` directory `s
 The default path for any uploaded file is `DD-MM-YYYY/{Hash}` directory, but you can change this behavior by setting the `saveTo` property to a function that returns the path to save the file to.
 
 ```ts title="src/config/uploads.ts"
-import { UploadsConfigurations, requestContext } from "@mongez/warlock";
+import { UploadsConfigurations, requestContext } from "@warlock.js/core";
 
 const uploadsConfigurations: UploadsConfigurations = {
   /**

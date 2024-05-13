@@ -19,7 +19,7 @@ So the output takes a `resource` which could be an instance of a model, or a pla
 Create inside `src/users/output` a file and name it `user-output.ts` with the following content
 
 ```ts title="src/users/output/user-output.ts"
-import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+import { FinalOutput, Output, UploadOutput } from "@warlock.js/core";
 
 export class UserOutput extends Output {
   /**
@@ -47,8 +47,8 @@ import {
   Document,
   expiresAfter,
   oneOf,
-} from "@mongez/monpulse";
-import { Auth, uploadable } from "@mongez/warlock";
+} from "@warlock.js/cascade";
+import { Auth, uploadable } from "@warlock.js/core";
 import castPassword from "app/users/utils/cast-password";
 import UserOutput from "../../output/user-output";
 
@@ -89,7 +89,7 @@ Let's see how we can do this.
 First we need to create a new output class for the post, and add the author output to it.
 
 ```ts title="src/posts/output/post-output.ts"
-import { FinalOutput, Output } from "@mongez/warlock";
+import { FinalOutput, Output } from "@warlock.js/core";
 import { UserOutput } from "app/users/output/user-output";
 
 export class PostOutput extends Output {
@@ -108,8 +108,8 @@ export class PostOutput extends Output {
 Now let's create a new post model class and link it with the post output
 
 ```ts {12,23} title="src/posts/models/post/post.ts"
-import { castModel, Casts, Document } from "@mongez/monpulse";
-import { Model, uploadable } from "@mongez/warlock";
+import { castModel, Casts, Document } from "@warlock.js/cascade";
+import { Model, uploadable } from "@warlock.js/core";
 import { User } from "app/users/models/user/user";
 
 export class Post extends Model {
@@ -139,7 +139,7 @@ Now the post has title, content and the embedded data of the author.
 Let's create a new post
 
 ```ts title="src/posts/controllers/create-post.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { Post } from "../models/post/post";
 import { User } from "app/users/models/user";
 
@@ -189,7 +189,7 @@ But as you can see in the previous example, the post's author has an image, but 
 Let's update the user output to include the image
 
 ```ts {12,23} title="src/users/output/user-output.ts"
-import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+import { FinalOutput, Output, UploadOutput } from "@warlock.js/core";
 
 export class UserOutput extends Output {
   /**
@@ -216,7 +216,7 @@ We can also define a method in the output class to handle the output data.
 Let's take this scenario, we want to return the user's full name instead of the first name only.
 
 ```ts title="src/users/output/user-output.ts"
-import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+import { FinalOutput, Output, UploadOutput } from "@warlock.js/core";
 
 export class UserOutput extends Output {
   /**
@@ -243,7 +243,7 @@ export class UserOutput extends Output {
 When the application grows, it gets complicated, so we may face a situation where we need to add a new field to the output, but it requires more than just a simple output key, this where `extend` method comes in handy.
 
 ```ts title="src/users/output/user-output.ts"
-import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+import { FinalOutput, Output, UploadOutput } from "@warlock.js/core";
 
 export class UserOutput extends Output {
   /**
@@ -281,7 +281,7 @@ We made a check to see if the user id is 1, then we set the `isAdmin` field to t
 Let's see how it works without a model
 
 ```ts title="src/users/controllers/get-user.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { UserOutput } from "../output/user-output";
 
 export async function getUser(request: Request, response: Response) {
@@ -306,7 +306,7 @@ As you can see, the output class can take a plain object, or an instance of a mo
 In our previous user output, we used `get` method to get the value from the passed `resource`, this allows us to get any value from the given resource using dot notation.
 
 ```ts {29} title="src/users/output/user-output.ts"
-import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+import { FinalOutput, Output, UploadOutput } from "@warlock.js/core";
 
 export class UserOutput extends Output {
   /**
@@ -346,7 +346,7 @@ And of course the `set` method is to set a value to the output data that will be
 If the data is stored in array, using `UserOutput.collect` static method will return an array of output resources.
 
 ```ts title="src/users/controllers/get-users.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { UserOutput } from "../output/user-output";
 
 export async function getUsers(request: Request, response: Response) {
@@ -381,7 +381,7 @@ import {
   FinalOutput,
   Output,
   UploadOutput,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 
 export class UserOutput extends Output {
   /**
@@ -462,7 +462,7 @@ This give the client developer (Web or mobile apps) the ability to use the date 
 To customize the format of the `format` you can override it in the output class by defining `dateFormat` property:
 
 ```ts title="src/users/output/user-output.ts"
-import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+import { FinalOutput, Output, UploadOutput } from "@warlock.js/core";
 
 export class UserOutput extends Output {
   //...
@@ -479,7 +479,7 @@ Date format is being transformed using [Day.js](https://day.js.org/docs/en/displ
 If we want to send another key instead of the original key in the resource, add the returning key to the response as the key, and the value will be an array contains two values, the first value will be the key that will be taken from the `resource` and the second value will be the format.
 
 ```ts {11} title="src/users/output/user-output.ts"
-import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+import { FinalOutput, Output, UploadOutput } from "@warlock.js/core";
 
 export class UserOutput extends Output {
   /**
@@ -522,7 +522,7 @@ main();
 In some scenarios, there is a field where it holds a list of objects, each object may point to an output, for example, a product output may have a list of `options` where each option has an `option` object and a `value` object that are taken from `options` and `optionValues` models/outputs, so in this case we need to use `arrayOf` method to map the `product options` to the `option` and `option value` outputs.
 
 ```ts title="src/products/output/product-output.ts"
-import { FinalOutput, Output, UploadOutput } from "@mongez/warlock";
+import { FinalOutput, Output, UploadOutput } from "@warlock.js/core";
 import { OptionOutput } from "app/options/output/option-output";
 import { OptionValueOutput } from "app/options/output/option-value-output";
 

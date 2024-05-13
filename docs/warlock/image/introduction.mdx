@@ -20,10 +20,10 @@ Warlock provides a simple way to process images using Sharp by wrapping the `Sha
 
 ## Basic Usage
 
-To use the `Image` class, import it from `@mongez/warlock`:
+To use the `Image` class, import it from `@warlock.js/core`:
 
 ```ts title="src/app/main.ts"
-import { storagePath, Image } from "@mongez/warlock";
+import { storagePath, Image } from "@warlock.js/core";
 
 async function main() {
   const imagePath = storagePath("images/image.jpg");
@@ -37,7 +37,7 @@ main();
 Now let's resize the image:
 
 ```ts title="src/app/main.ts"
-import { storagePath, Image } from "@mongez/warlock";
+import { storagePath, Image } from "@warlock.js/core";
 
 async function main() {
   const imagePath = storagePath("images/image.jpg");
@@ -57,7 +57,7 @@ Here we resized the image to 200x200, and saved it to `storage/images/resized-im
 Another good and important feature is to add watermarks in the images, luckily, Warlock provides a simple way to do that.
 
 ```ts title="src/app/main.ts"
-import { storagePath, Image } from "@mongez/warlock";
+import { storagePath, Image } from "@warlock.js/core";
 
 async function main() {
   const imagePath = storagePath("images/image.jpg");
@@ -81,7 +81,7 @@ In some situations, you may need to add multiple watermarks to the image, for ex
 To do that, you can use the `watermarks` method:
 
 ```ts title="src/app/main.ts"
-import { storagePath, Image } from "@mongez/warlock";
+import { storagePath, Image } from "@warlock.js/core";
 import watermarkImage1 from "./../images/watermark-1.png";
 import watermarkImage2 from "./../images/watermark-2.png";
 import image from "./../images/image.jpg";

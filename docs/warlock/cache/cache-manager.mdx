@@ -13,7 +13,7 @@ You can access the cache manager by importing `cache` from warlock.
 After you define [Cache Configurations](./configurations), you can set them using the `setConfigurations` method.
 
 ```ts title="src/config/cache.ts"
-import { CacheConfigurations } from "@mongez/warlock";
+import { CacheConfigurations } from "@warlock.js/core";
 const cacheConfigurations: CacheConfigurations = {
   //...
 };
@@ -36,7 +36,7 @@ All methods that are available on [Cache Driver](./cache-driver-interface) are a
 If you want to directly access the current cache driver from the cache manager, use `currentDriver` property.
 
 ```ts
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 const currentDriver = cache.currentDriver;
 ```
@@ -50,7 +50,7 @@ If there is no current driver, then the cache manager will use the [NullCacheDri
 To change the default driver, use `use` method, this method accepts the driver name Defined in [ Cache drivers list](./configurations#drivers) or pass the driver object directly.
 
 ```ts
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 cache.use("redis");
 ```
@@ -64,7 +64,7 @@ Please note that `use` method is a `async` method, as if the driver was not load
 To get another cache driver (but not set it as a default driver) use `driver` method, it accepts the driver name.
 
 ```ts title="src/main.ts"
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 async function main() {
   const redisDriver = await cache.driver("redis");
@@ -100,7 +100,7 @@ To set a value in the cache, use `set` method, this method accepts three paramet
 - The third one is the number of seconds that the value will be stored in the cache.
 
 ```ts
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 // somewhere in the project
 await cache.set("key", "value", 60 * 60 * 24);
@@ -109,7 +109,7 @@ await cache.set("key", "value", 60 * 60 * 24);
 The value can be any type of value either a string, number, boolean, or even an object or an array.
 
 ```ts
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 // somewhere in the project
 await cache.set("key", { name: "John Doe" }, 60 * 60 * 24);
@@ -118,7 +118,7 @@ await cache.set("key", { name: "John Doe" }, 60 * 60 * 24);
 The key could be a `string` or an object, if it is an object, it will be converted to a string using [Parse Cache Key utility](./utils#parse-cache-key).
 
 ```ts
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 // somewhere in the project
 await cache.set({ id: 1 }, { name: "John Doe" }, 60 * 60 * 24);
@@ -137,7 +137,7 @@ If the third parameter is not set `ttl` then the driver will try to capture it f
 To get a value from the cache, use `get` method, this method accepts one parameter which is the key that will be used to get the value from the cache.
 
 ```ts
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 // somewhere in the project
 const value = await cache.get("key");
@@ -146,7 +146,7 @@ const value = await cache.get("key");
 It can also accept an object as a key, it will be converted to a string using [Parse Cache Key utility](./utils#parse-cache-key).
 
 ```ts
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 // somewhere in the project
 const value = await cache.get({ id: 1 }); // this will be converted to id.1
@@ -159,7 +159,7 @@ If the key does not exists a `null` value will be returned.
 To remove a value from the cache, use `remove` method, this method accepts one parameter which is the key that will be used to remove the value from the cache.
 
 ```ts
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 // somewhere in the project
 await cache.remove("key");
@@ -168,7 +168,7 @@ await cache.remove("key");
 It can also accept an object as a key, it will be converted to a string using [Parse Cache Key utility](./utils#parse-cache-key).
 
 ```ts
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 // somewhere in the project
 await cache.remove({ id: 1 }); // this will be converted to id.1
@@ -179,7 +179,7 @@ await cache.remove({ id: 1 }); // this will be converted to id.1
 To clear the entire cache, use `flush` method.
 
 ```ts
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 // somewhere in the project
 await cache.flush();
@@ -196,7 +196,7 @@ A namespace is a string that is suffixed with a `dot` then the key, for example,
 To clear the entire cache for a namespace, use `removeNamespace` method, this method accepts one parameter which is the namespace that will be used to remove the values from the cache.
 
 ```ts
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 // store a value in the cache
 await cache.set("users.1", {

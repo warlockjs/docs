@@ -13,8 +13,8 @@ The `Sluggable` decorator is used to generate a slug from a string property, it 
 ### Example
 
 ```ts title="src/app/products/models/product.ts"
-import { castModel, Casts, Model } from "@mongez/monpulse";
-import { Sluggable, uploadable } from "@mongez/warlock";
+import { castModel, Casts, Model } from "@warlock.js/cascade";
+import { Sluggable, uploadable } from "@warlock.js/core";
 
 @Sluggable("title")
 export default class Post extends Model {
@@ -37,8 +37,8 @@ This will create `slug` field whenever the post is saved (created or updated), t
 You can generate the slug from another column by passing the column name to the `Sluggable` decorator.
 
 ```ts title="src/app/products/models/product.ts"
-import { castModel, Casts, Model } from "@mongez/monpulse";
-import { Sluggable, uploadable } from "@mongez/warlock";
+import { castModel, Casts, Model } from "@warlock.js/cascade";
+import { Sluggable, uploadable } from "@warlock.js/core";
 
 @Sluggable("name")
 export default class Post extends Model {

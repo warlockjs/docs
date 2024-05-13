@@ -17,7 +17,7 @@ The `validate.rules` accepts an object of inputs, each input has an array of val
 Let's take an example of validating the login request:
 
 ```ts title="src/app/users/controllers/auth/login.ts"
-import { Request, Response, ValidationSchema } from "@mongez/warlock";
+import { Request, Response, ValidationSchema } from "@warlock.js/core";
 import { User } from "app/users/models/user";
 
 export default async function login(request: Request, response: Response) {
@@ -91,7 +91,7 @@ import {
   Response,
   ValidationSchema,
   ArraySchema,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 import { User } from "app/users/models/user";
 
 export default async function login(request: Request, response: Response) {
@@ -121,7 +121,7 @@ import {
   Response,
   ValidationSchema,
   ArraySchema,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 import { User } from "app/users/models/user";
 
 export default async function login(request: Request, response: Response) {
@@ -170,7 +170,7 @@ import {
   Response,
   ValidationSchema,
   ArraySchema,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 import { User } from "app/users/models/user";
 
 export default async function login(request: Request, response: Response) {

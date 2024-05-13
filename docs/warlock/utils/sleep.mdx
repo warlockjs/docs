@@ -11,7 +11,7 @@ sidebar_position: 4
 In anywhere in your code, you can use the `sleep` function as follows:
 
 ```ts title="src/app/posts/controllers/get-posts.ts"
-import { sleep, Request, Response } from "@mongez/warlock";
+import { sleep, Request, Response } from "@warlock.js/core";
 
 export default async function getPosts(request: Request, response: Response) {
   await sleep(1000);

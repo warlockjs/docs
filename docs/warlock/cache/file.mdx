@@ -12,7 +12,7 @@ In the [Cache Configurations](./configurations) file, add the following:
 
 ```ts title="src/config/cache.ts"
 import { env } from "@mongez/dotenv";
-import { CacheConfigurations, FileCacheDriver } from "@mongez/warlock";
+import { CacheConfigurations, FileCacheDriver } from "@warlock.js/core";
 
 const cacheConfigurations: CacheConfigurations = {
   drivers: {
@@ -48,7 +48,7 @@ To use the file cache driver, you need to define it in the drivers list in the c
 
 ```ts title="src/config/cache.ts"
 import { env } from "@mongez/dotenv";
-import { CacheConfigurations, FileCacheDriver } from "@mongez/warlock";
+import { CacheConfigurations, FileCacheDriver } from "@warlock.js/core";
 
 const cacheConfigurations: CacheConfigurations = {
   drivers: {

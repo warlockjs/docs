@@ -15,7 +15,7 @@ When a user visits the website for the first time, a `JWT` is generated for him,
 To generate an access token for guests, define a route inside the `routes` file in users directory
 
 ```ts title="src/app/users/routes.ts"
-import { router, Request, Response, guestLogin } from "@mongez/warlock";
+import { router, Request, Response, guestLogin } from "@warlock.js/core";
 
 router.post("/login/guests", guestLogin);
 
@@ -46,7 +46,7 @@ Every guest model extends [Auth Model](./auth-model.mdx) to inherit all access t
 You can extend the guest model to modify or set the output data when called inside guest login.
 
 ```ts title="src/app/users/models/guest.ts"
-import { Guest as BaseGuest } from "@mongez/warlock";
+import { Guest as BaseGuest } from "@warlock.js/core";
 
 export class Guest extends BaseGuest {
   // do your stuff here
@@ -56,7 +56,7 @@ export class Guest extends BaseGuest {
 Now modify the `auth.userType` configurations to use the new guest model.
 
 ```ts {5} title="src/config/auth.ts"
-import { AuthConfigurations } from "@mongez/warlock";
+import { AuthConfigurations } from "@warlock.js/core";
 import { Guest } from "app/users/models/guest";
 
 const authConfigurations: AuthConfigurations = {

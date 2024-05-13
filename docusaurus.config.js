@@ -6,21 +6,20 @@ const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: "Mongez",
-  tagline: "Mongez ecosystem documentation",
+  title: "Warlock Js",
+  tagline: "Warlock Js ecosystem documentation",
   favicon: "img/logo.svg",
 
   // Set the production url of your site here
-  url: "https://docs.mentoor.io",
+  url: "https://warlock.js.org",
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: "/mongez",
+  baseUrl: "/",
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: "mentoor.io", // Usually your GitHub org/user name.
-  projectName: "Mongez", // Usually your repo name.
-
+  projectName: "Warlock Js", // Usually your repo name.
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
 
@@ -62,7 +61,7 @@ const config = {
       // Replace with your project's social card
       image: "https://mentoor.io/logo.svg",
       navbar: {
-        title: "Mongez EcoSystem",
+        title: "Warlock Js EcoSystem",
         logo: {
           alt: "mentoor.io",
           src: "https://mentoor.io/logo.svg",
@@ -76,9 +75,9 @@ const config = {
           },
           {
             type: "doc",
-            docId: "monpulse/getting-started/introduction",
+            docId: "cascade/getting-started/introduction",
             position: "left",
-            label: "MonPulse",
+            label: "Cascade",
           },
           {
             href: "https://github.com/hassanzohdy",

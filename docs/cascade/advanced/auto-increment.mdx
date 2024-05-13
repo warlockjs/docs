@@ -1,0 +1,107 @@
+---
+sidebar_position: 11
+---
+
+# Auto Increment
+
+## Introduction
+
+Model `id` is an integer field that is auto-incremented by default, which is fully managed by the model class, you can manually assign value to it or manually generate it as well.
+
+:::tip
+The id is generated if and only if the model does not have an `id` value in its data, this means it works only with newly created models.
+:::
+
+## Auto Incrementing
+
+By default, the `id` field is auto-incremented, which means that when saving a new model, the `id` field will be automatically generated, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = new Category({
+    name: "Sports",
+  });
+
+  await category.save();
+
+  console.log(category.id); // 512344
+}
+
+main();
+```
+
+This will auto generate a random id for the model by default.
+
+## Auto Incrementing with a custom start value
+
+By default the initial id value is randomly generated for an integer between `10000` and `499999`, you can change this value by setting the `initialId` property in the model class, let's take an example:
+
+```ts title="src/models/category.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Category extends Model {
+  /**
+   * The collection name
+   */
+  public static collection = "categories";
+
+  /**
+   * The initial id value
+   */
+  public static initialId = 1;
+}
+```
+
+This will start the auto incrementing from `1` instead of a random value.
+
+## The next auto generated id
+
+Same applies to the next generated id, it is generated randomly and sums the initial id with a random number between `1000` and `9999`, you can change this value by setting the `incrementIdBy` property in the model class, let's take an example:
+
+```ts title="src/models/category.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Category extends Model {
+  /**
+   * The collection name
+   */
+  public static collection = "categories";
+
+  /**
+   * The initial id value
+   */
+  public static initialId = 1;
+
+  /**
+   * The increment value
+   */
+  public static incrementIdBy = 1;
+}
+```
+
+In that example, our category model will mostly interact exactly like the typical auto incrementing id in SQL databases, however, for large scale applications, it is recommended to use a random id instead of an auto incrementing one so guessing the next id will be impossible.
+
+## Manually Generating the next ID
+
+In some scenarios, you might need to generate the next id even before saving the model, to achieve this we can use the `generateNextId` method, let's take an example:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+async function main() {
+  const category = new Category({
+    name: "Sports",
+  });
+
+  const nextId = await category.generateNextId();
+
+  console.log(nextId); // 512344
+  console.log(category.id); // 512344
+}
+
+main();
+```
+
+This will generate the next id and assign it to the `id` property of the model.

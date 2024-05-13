@@ -22,7 +22,7 @@ Each user type MUST extend [Auth model](./../auth/auth-model) because it generat
 :::
 
 ```ts title="src/config/auth.ts"
-import { AuthConfigurations, Guest } from "@mongez/warlock";
+import { AuthConfigurations, Guest } from "@warlock.js/core";
 import { User } from "app/users/models/user";
 
 const authConfigurations: AuthConfigurations = {

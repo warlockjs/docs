@@ -21,7 +21,7 @@ A `Warlock response` object is attached to every request handler/controller and 
 To send a success json response, use `response.success(data)` which will return a `200` status code.
 
 ```ts title="src/app/users/controllers/get-users.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { User } from "./../models/user";
 
 export default async function getUsers(request: Request, response: Response) {
@@ -48,7 +48,7 @@ Now what about models or any custom classes?
 Let's make a custom class to see how this works
 
 ```ts title="src/app/users/controllers/get-user.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 class UserData {
   public name: string;
@@ -85,7 +85,7 @@ In this scenario the `UserData` class will not be parsed as the response parser 
 To determine which data will be sent, add `toJSON()` method to the class.
 
 ```ts {20} title="src/app/users/controllers/get-user.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 class UserData {
   public name: string;
@@ -129,7 +129,7 @@ export default function getUser(request: Request, response: Response) {
 To return a `201` status code, use `response.successCreate(data)` method.
 
 ```ts title="src/app/users/controllers/create-user.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { User } from "./../models/user";
 
 export default async function createUser(request: Request, response: Response) {
@@ -148,7 +148,7 @@ In terms of REST standards, its better to send a `201` status code when creating
 To return a `404` status code, use `response.notFound()` method.
 
 ```ts title="src/app/users/controllers/get-user.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { User } from "./../models/user";
 
 export default async function getUser(request: Request, response: Response) {
@@ -167,7 +167,7 @@ export default async function getUser(request: Request, response: Response) {
 You can also send data with the response:
 
 ```ts title="src/app/users/controllers/get-user.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { User } from "./../models/user";
 
 export default async function getUser(request: Request, response: Response) {
@@ -190,7 +190,7 @@ export default async function getUser(request: Request, response: Response) {
 To return a `401` status code, use `response.unauthorized()` method.
 
 ```ts title="src/app/users/middleware/auth.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export async function auth(request: Request, response: Response) {
   const authorizationHeader = request.header("Authorization");
@@ -208,7 +208,7 @@ Forbidden response is used when the user is authenticated but not authorized to 
 The `response.forbidden()` method returns a `403` status code.
 
 ```ts title="src/app/users/middleware/auth.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export async function auth(request: Request, response: Response) {
   const authorizationHeader = request.header("Authorization");
@@ -228,7 +228,7 @@ export async function auth(request: Request, response: Response) {
 You may of course send data with the response:
 
 ```ts title="src/app/users/middleware/auth.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export async function auth(request: Request, response: Response) {
   const authorizationHeader = request.header("Authorization");
@@ -252,7 +252,7 @@ export async function auth(request: Request, response: Response) {
 To return a `400` status code, use `response.badRequest()` method.
 
 ```ts title="src/app/users/controllers/create-user.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { User } from "./../models/user";
 
 export default async function createUser(request: Request, response: Response) {
@@ -285,7 +285,7 @@ export default async function createUser(request: Request, response: Response) {
 To return a `500` status code, use `response.serverError()` method.
 
 ```ts title="src/app/users/controllers/create-user.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function createUser(request: Request, response: Response) {
   try {
@@ -306,7 +306,7 @@ Usually you won't need this method, but it's good to know that it exists.
 To send a file, use `response.sendFile()` method.
 
 ```ts title="src/app/users/controllers/download-avatar.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
@@ -325,7 +325,7 @@ export default async function downloadAvatar(
 You may set a cache time in seconds as a second parameter:
 
 ```ts title="src/app/users/controllers/download-avatar.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
@@ -344,7 +344,7 @@ export default async function downloadAvatar(
 An alias method `sendCachedFile` works exactly the same but sets the cache time to 1 year.
 
 ```ts title="src/app/users/controllers/download-avatar.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
@@ -365,7 +365,7 @@ export default async function downloadAvatar(
 To send a xml response, use `response.xml()` method.
 
 ```ts title="src/app/general/controllers/sitemap.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import sitemap from "./../sitemap";
 
 export default async function sitemap(request: Request, response: Response) {
@@ -380,7 +380,7 @@ This will send a response with Content Type `application/xml`.
 To send a text response, use `response.text()` method.
 
 ```ts title="src/app/general/controllers/robots.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function robots(request: Request, response: Response) {
   return response.text("User-agent: *\nDisallow: /");
@@ -394,7 +394,7 @@ This will send a response with Content Type `text/plain`.
 To send a html response, use `response.html()` method.
 
 ```ts title="src/app/general/controllers/home.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function home(request: Request, response: Response) {
   return response.html("<h1>Hello World</h1>");
@@ -408,7 +408,7 @@ This will send a response with Content Type `text/html`.
 To redirect the user to another page, use `response.redirect()` method.
 
 ```ts title="src/app/users/controllers/login.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function login(request: Request, response: Response) {
   const user = await User.find(request.input("id"));
@@ -424,7 +424,7 @@ export default async function login(request: Request, response: Response) {
 By default this will make a `temporary redirect` with `302` status code, you can change this by passing the status code as the second parameter:
 
 ```ts title="src/app/users/controllers/login.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function login(request: Request, response: Response) {
   const user = await User.find(request.input("id"));
@@ -440,7 +440,7 @@ export default async function login(request: Request, response: Response) {
 To send a `permanent redirect` with `301` status code, use `response.permanentRedirect()` method.
 
 ```ts title="src/app/users/controllers/login.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function login(request: Request, response: Response) {
   const user = await User.find(request.input("id"));
@@ -458,7 +458,7 @@ export default async function login(request: Request, response: Response) {
 To set a header, use `response.header()` method.
 
 ```ts title="src/app/users/controllers/download-avatar.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
@@ -484,7 +484,7 @@ export default async function downloadAvatar(
 To set multiple headers, use `response.headers()` method.
 
 ```ts title="src/app/users/controllers/download-avatar.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
@@ -510,7 +510,7 @@ export default async function downloadAvatar(
 To remove a header, use `response.removeHeader()` method.
 
 ```ts title="src/app/users/controllers/download-avatar.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
@@ -553,7 +553,7 @@ const contentType = response.header("Content-Type");
 To set a status code, use `response.setStatusCode()` method.
 
 ```ts title="src/app/users/controllers/download-avatar.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
@@ -578,7 +578,7 @@ You don't really need to do it manually, but if you want to, you can.
 To set a Content Type, use `response.setContentType()` method.
 
 ```ts title="src/app/users/controllers/download-avatar.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
@@ -603,7 +603,7 @@ Sometimes we want to send large files, in that case we need to stream the file.
 To stream a file, use `response.streamFile()` method.
 
 ```ts title="src/app/users/controllers/download-avatar.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
@@ -658,7 +658,7 @@ Well, for many reasons, for example:
 In any `src/general/events` directory, create `send-app-version-to-response.ts` file:
 
 ```ts title="src/general/events/send-app-version-to-response.ts"
-import { Response } from "@mongez/warlock";
+import { Response } from "@warlock.js/core";
 
 Response.on("sending", (response) => {
   response.body.appVersion = "1.0.0";
@@ -668,7 +668,7 @@ Response.on("sending", (response) => {
 If we want to perform something after the response is sent, use `on("sent")` event
 
 ```ts title="src/general/events/log-request.ts"
-import { storagePath, Response } from "@mongez/warlock";
+import { storagePath, Response } from "@warlock.js/core";
 import { putJsonFileAsync } from "@mongez/fs";
 
 Response.on("sent", (response) => {

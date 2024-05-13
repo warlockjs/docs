@@ -17,7 +17,7 @@ The `Auth` model has a `generateAccessToken` method that creates and store the a
 If you would like to generate an access token away from the Auth model, you can import `jwt` object from `Warlock`
 
 ```ts title="src/app/main.ts"
-import { jwt } from "@mongez/warlock";
+import { jwt } from "@warlock.js/core";
 
 async function main() {
   const token = await jwt.generate({
@@ -38,7 +38,7 @@ JWT is generating using [Fastify JWT](https://github.com/fastify/fastify-jwt) so
 To validate a JWT, you can use the `verify` method from `jwt` object.
 
 ```ts title="src/app/main.ts"
-import { jwt } from "@mongez/warlock";
+import { jwt } from "@warlock.js/core";
 
 async function main() {
   const token = await jwt.verify("token");

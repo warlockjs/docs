@@ -11,7 +11,7 @@ This section of documentation covers various functions that can be used for loca
 `getLocalized` is a function that receives an array of [Localized data](./introduction#Localized-data) and returns the value of the given locale code.
 
 ```ts title="src/app/main.ts"
-import { getLocalized } from "@mongez/warlock";
+import { getLocalized } from "@warlock.js/core";
 
 const name = [
   {
@@ -32,7 +32,7 @@ This could be handy function if you want to retrieve the value of a localized da
 If the second argument is not passed and the function is called within a [Request Context](./../http/request-context) then it will return the value of the current locale code.
 
 ```ts title="src/app/posts/controllers/get-post.ts"
-import { getLocalized, Request, Response } from "@mongez/warlock";
+import { getLocalized, Request, Response } from "@warlock.js/core";
 import { Post } from "app/posts/models/post";
 
 export default async function getPost(request: Request, response: Response) {

@@ -12,7 +12,7 @@ Let's go to our `src/config/http.ts` file and define the http configurations.
 
 ```ts title="src/config/http.ts"
 import { env } from "@mongez/dotenv";
-import { HttpConfigurations } from "@mongez/warlock";
+import { HttpConfigurations } from "@warlock.js/core";
 
 const httpConfigurations: HttpConfigurations = {
   port: env("PORT", 3000),

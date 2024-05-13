@@ -15,7 +15,7 @@ To get the uploaded file using the file path, use `/uploads/*` endpoint with `GE
 ### Example
 
 ```ts {3} title="src/app/uploads/routes.ts"
-import { router, getUploadedFile } from "@mongez/warlock";
+import { router, getUploadedFile } from "@warlock.js/core";
 
 router.get("/uploads/*", getUploadedFile);
 ```

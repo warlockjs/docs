@@ -17,7 +17,7 @@ Creating routes is super easy, it has mostly the same signature as the `express`
 Let's create a simple route file and see how it works.
 
 ```ts title="src/app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import { getUsers } from "./controllers/get-users";
 
 router.get("/users", getUsers);
@@ -28,7 +28,7 @@ We defined a route that will handle `GET` requests to `/users` path, and will be
 Now let's create the controller:
 
 ```ts title="src/app/users/controllers/get-users.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { User } from "./../models/user";
 
 export async function getUsers(request: Request, response: Response) {
@@ -44,7 +44,7 @@ The controller is a simple function that accepts the request and response object
 The `User.list()` method returns a list of users, and we return it as a response body.
 
 :::tip
-To get better understanding of database models, please check [Monpulse Documentation](./../../monpulse//models/introduction.mdx)
+To get better understanding of database models, please check [Cascade Documentation](./../../cascade//models/introduction.mdx)
 :::
 
 ## Route parameters
@@ -52,7 +52,7 @@ To get better understanding of database models, please check [Monpulse Documenta
 In the previous example we saw how to return list of users, but what if we want to return a specific user?
 
 ```ts {3,6} title="src/app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import { getUsers } from "./controllers/get-users";
 import { getUser } from "./controllers/get-user";
 
@@ -63,7 +63,7 @@ router.get("/users/:id", getUser);
 We added a new route to fetch a single user, let's create the controller:
 
 ```ts title="src/app/users/controllers/get-user.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { User } from "./../models/user";
 
 export async function getUser(request: Request, response: Response) {
@@ -81,7 +81,7 @@ In this example we used the `request.input()` method to get the route parameter 
 Sometimes we need to add a middleware to a specific route, for example to check if the user is authenticated or not.
 
 ```ts {3,6} title="src/app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import { getUsers } from "./controllers/get-users";
 import { getUser } from "./controllers/get-user";
 import { auth } from "./../middleware/auth";
@@ -97,7 +97,7 @@ router.get("/users/:id", getUser, {
 We added the `auth` middleware to both routes, now let's create the middleware:
 
 ```ts title="src/app/users/middleware/auth.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export async function auth(request: Request, response: Response) {
   const authorizationHeader = request.header("Authorization");
@@ -134,7 +134,7 @@ Sometimes we need to register multiple routes with the same handler, a good exam
 To do this, we can pass an array of paths to the `router` methods:
 
 ```ts {3,6} title="src/app/uploads/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import { upload } from "./controllers/upload";
 
 router.post(["/uploads", "/admin/uploads"], upload);
@@ -147,7 +147,7 @@ Sometimes we need to generate a URL for a specific route, for example to redirec
 To do this, we can pass a name to the route options:
 
 ```ts {3,6} title="src/app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import { getUsers } from "./controllers/get-users";
 
 router.get("/users", getUsers, {
@@ -160,7 +160,7 @@ By default if the route `name` property is not defined, it will be the route pat
 Now we can generate the URL for this route using the `route()` helper function:
 
 ```ts title="src/app/users/controllers/get-users.ts"
-import { Request, Response, route } from "@mongez/warlock";
+import { Request, Response, route } from "@warlock.js/core";
 
 export async function getUsers(request: Request, response: Response) {
   const usersList = await User.list();
@@ -176,7 +176,7 @@ The `route()` function accepts the route name as the first argument, and the rou
 An example for the second parameter is used with a single user route:
 
 ```ts title="src/app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import { getUser } from "./controllers/get-user";
 
 router.get("/users/:id", getUser, {
@@ -187,7 +187,7 @@ router.get("/users/:id", getUser, {
 Now we can generate the URL for this route using the `route()` helper function:
 
 ```ts title="src/app/users/controllers/get-user.ts"
-import { Request, Response, route } from "@mongez/warlock";
+import { Request, Response, route } from "@warlock.js/core";
 
 export async function getUser(request: Request, response: Response) {
   const user = await User.find(request.input("id"));
@@ -205,7 +205,7 @@ As our applications grow, we need to make a more control over it, and one of the
 For example, we can group all the routes that needs to be authorized before accessing them:
 
 ```ts title="src/app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import { getUsers } from "./controllers/get-users";
 import { getUser } from "./controllers/get-user";
 import { auth } from "./../middleware/auth";
@@ -233,7 +233,7 @@ Please note that if the routes registered inside the group have a middleware, it
 We can also add same prefix for list of groups, i.e we can add `/admin` prefix for all admin routes, we can make it more professional by creating a function called `adminRoutes` that takes the callback function as an argument:
 
 ```ts title="src/app/admin/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import { auth } from "./../middleware/auth";
 
 export function adminRoutes(callback) {
@@ -250,7 +250,7 @@ export function adminRoutes(callback) {
 Now we can use it in our routes:
 
 ```ts title="src/app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import { getUsers } from "./controllers/get-users";
 import { getUser } from "./controllers/get-user";
 import { adminRoutes } from "./../admin/routes";
@@ -266,7 +266,7 @@ adminRoutes(() => {
 A `router.prefix` method is a syntactic sugar for `router.group` method, it accepts the prefix as the first argument, and the callback function as the second argument:
 
 ```ts title="src/app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import { getUsers } from "./controllers/get-users";
 
 router.prefix("/admin", () => {
@@ -279,7 +279,7 @@ router.prefix("/admin", () => {
 To list all registered routes, you can use the `router.list()` method:
 
 ```ts title="src/app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 
 router.list();
 ```

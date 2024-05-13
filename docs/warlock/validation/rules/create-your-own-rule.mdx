@@ -9,7 +9,7 @@ To create a new rule, you need to create a class that extends the `Rule` class.
 Let's create a rule that validates phone number to start with `+2` as optional then `01` then `0|1|2|5` then 8 digits.
 
 ```ts title="src/app/general/validation/phone.ts"
-import { Rule } from "@mongez/warlock";
+import { Rule } from "@warlock.js/core";
 
 export class PhoneNumberRule extends Rule {
   /**
@@ -74,7 +74,7 @@ Now let's add it to our validation configurations:
 
 ```ts title="src/config/validation.ts"
 import { PhoneNumberRule } from "app/general/validation/phone";
-import type { ValidationConfigurations } from "@mongez/warlock";
+import type { ValidationConfigurations } from "@warlock.js/core";
 
 const validationConfigurations: ValidationConfigurations = {
   rules: {
@@ -90,7 +90,7 @@ const validationConfigurations: ValidationConfigurations = {
 To use it, add it to the validation rules in any handler, let's do it in the `create-account` handler:
 
 ```ts title="src/app/users/controllers/auth/create-account.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { User } from "app/users/models/user";
 
 export default async function createAccount(

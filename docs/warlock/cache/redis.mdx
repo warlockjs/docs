@@ -16,7 +16,7 @@ Go to the [Cache Configurations](./configurations) file, and add the following:
 
 ```ts title="src/config/cache.ts"
 import { env } from "@mongez/dotenv";
-import { CacheConfigurations, RedisCacheDriver } from "@mongez/warlock";
+import { CacheConfigurations, RedisCacheDriver } from "@warlock.js/core";
 
 const cacheConfigurations: CacheConfigurations = {
   drivers: {
@@ -55,7 +55,7 @@ Make sure Redis is installed on your local machine and on the server otherwise i
 To access the Redis client, use the `client` property on the cache manager or the cache driver.
 
 ```ts
-import { cache } from "@mongez/warlock";
+import { cache } from "@warlock.js/core";
 
 // assuming the default driver is redis
 const redisClient = cache.client;

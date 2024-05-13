@@ -34,7 +34,7 @@ Consider a custom validator as the final middleware interceptor before processin
 Let's consider using the login request as an example:
 
 ```ts title="src/app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import { login } from "./controllers/auth/login";
 
 router.post("/login", login);
@@ -43,7 +43,7 @@ router.post("/login", login);
 Now let's head to `src/app/users/controllers/auth/login.ts` and see what's inside:
 
 ```ts title="src/app/users/controllers/auth/login.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { User } from "app/users/models/user";
 
 export default async function login(request: Request, response: Response) {

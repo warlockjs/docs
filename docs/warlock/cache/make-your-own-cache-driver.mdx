@@ -11,7 +11,7 @@ Warlock ships with a few cache drivers out of the box, but you can easily make y
 Let's say we want to implement the [MemCached](https://memcached.org/) cache driver. We'll start by creating a new file called `memcached-cache-driver.ts` in your project's `src/cache` directory.
 
 ```ts
-import { CacheDriver } from "@mongez/warlock";
+import { CacheDriver } from "@warlock.js/core";
 import Memcached from "memcached";
 
 // first off let's define the options interface
@@ -97,7 +97,7 @@ The `parseKey` method is used to parse the key before it is used in the cache. T
 We will use [Parse Cache Key utility](./utils#parse-cache-key) to parse the key.
 
 ```ts
-import { CacheDriver, parseCacheKey } from "@mongez/warlock";
+import { CacheDriver, parseCacheKey } from "@warlock.js/core";
 import { GenericObject } from "@mongez/reinforcements";
 
 // ...

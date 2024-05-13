@@ -121,7 +121,7 @@ import {
   FilterByOptions,
   RepositoryManager,
   RepositoryOptions,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 import { User } from "../models/user";
 
 export class UsersRepository extends RepositoryManager<User> {
@@ -155,7 +155,7 @@ import {
   FilterByOptions,
   RepositoryManager,
   RepositoryOptions,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 import { User } from "../models/user";
 
 export class UsersRepository extends RepositoryManager<User> {
@@ -204,7 +204,7 @@ const { documents: users } = await usersRepository.list({
 });
 ```
 
-The output will remain the same, except that [paginationInfo](./../../monpulse/aggregate/fetching#pagination) object will not be returned.
+The output will remain the same, except that [paginationInfo](./../../cascade/aggregate/fetching#pagination) object will not be returned.
 
 ## Filter By
 
@@ -217,7 +217,7 @@ import {
   FilterByOptions,
   RepositoryManager,
   RepositoryOptions,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 import { User } from "../models/user";
 
 export class UsersRepository extends RepositoryManager<User> {
@@ -261,7 +261,7 @@ import {
   FilterByOptions,
   RepositoryManager,
   RepositoryOptions,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 import { User } from "../models/user";
 
 export class UsersRepository extends RepositoryManager<User> {
@@ -382,7 +382,7 @@ import {
   FilterByOptions,
   RepositoryManager,
   RepositoryOptions,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 import { User } from "../models/user";
 
 export class UsersRepository extends RepositoryManager<User> {
@@ -442,7 +442,7 @@ import {
   FilterByOptions,
   RepositoryManager,
   RepositoryOptions,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 import { Session } from "../models/session";
 
 export class SessionsRepository extends RepositoryManager<Session> {
@@ -469,7 +469,7 @@ export class SessionsRepository extends RepositoryManager<Session> {
 //...
 ```
 
-Here what we did is we added a custom function callback that receives the passed value which is in our case will be `male` that will be passed as the first argument, and the second argument will be the [Aggregate Query](./../../monpulse/aggregate/model-aggregate) so we can perform a query on it.
+Here what we did is we added a custom function callback that receives the passed value which is in our case will be `male` that will be passed as the first argument, and the second argument will be the [Aggregate Query](./../../cascade/aggregate/model-aggregate) so we can perform a query on it.
 
 :::tip
 The third argument to the callback is the entire object of the options passed to the list method.
@@ -477,7 +477,7 @@ The third argument to the callback is the entire object of the options passed to
 
 ### Perform option
 
-In some situations, we may need to `perform` a custom query on a particular `list` method, this would not need an additional `filter` to be added to, in this case, we can pass `perform` callback that receives the [Aggregate Query](./../../monpulse/aggregate/model-aggregate) and the options object, this can be passed directly to the `list options`:
+In some situations, we may need to `perform` a custom query on a particular `list` method, this would not need an additional `filter` to be added to, in this case, we can pass `perform` callback that receives the [Aggregate Query](./../../cascade/aggregate/model-aggregate) and the options object, this can be passed directly to the `list options`:
 
 ```ts {4,5,6} title="src/app/main.ts"
 import { sessionsRepository } from "app/sessions/repositories/sessions.repository";
@@ -570,7 +570,7 @@ import {
   FilterByOptions,
   RepositoryManager,
   RepositoryOptions,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 import { User } from "../models/user";
 
 export class UsersRepository extends RepositoryManager<User> {
@@ -655,7 +655,7 @@ import {
   FilterByOptions,
   RepositoryManager,
   RepositoryOptions,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 import { User } from "../models/user";
 
 export class UsersRepository extends RepositoryManager<User> {

@@ -1,0 +1,66 @@
+---
+sidebar_position: 5
+---
+
+# Default values
+
+When creating new model, you can specify default values for fields. These values will be used when creating new records if the field is not specified.
+
+```ts title="src/models/post.ts"
+import { Model } from '@warlock.js/cascade'
+
+export class Post extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "posts";
+
+  /**
+   * {@inheritDoc}
+   */
+  public defaultValue: Document = {
+    isActive: false,
+  };
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    title: "string",
+    content: "string",
+    isActive: "boolean",
+  };
+}
+```
+
+We can also use callbacks to set default values for each field:
+
+```ts title="src/models/post.ts"
+import { Model } from '@warlock.js/cascade'
+
+export class Post extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "posts";
+
+  /**
+   * {@inheritDoc}
+   */
+  public defaultValue: Document = {
+    isActive: false,
+    views: () => {
+      return Math.floor(Math.random() * 1000); // random number between 0 and 1000
+    },
+  };
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    title: "string",
+    content: "string",
+    isActive: "boolean",
+  };
+}
+```

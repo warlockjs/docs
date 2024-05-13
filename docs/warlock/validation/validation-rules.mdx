@@ -18,7 +18,7 @@ Each handler can have special property called `validation`, this property is an 
 Let's take an example of validating the login request:
 
 ```ts title="src/app/users/controllers/auth/login.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { User } from "app/users/models/user";
 
 export default async function login(request: Request, response: Response) {
@@ -55,7 +55,7 @@ import {
   RequiredRule,
   StringRule,
   ValidationConfigurations,
-} from "@mongez/warlock";
+} from "@warlock.js/core";
 
 const validationConfigurations: ValidationConfigurations = {
   rules: {
@@ -93,7 +93,7 @@ Another way to use the validation rules is by passing the rule object instead of
 For example, let's consider the following example:
 
 ```ts
-import { ExistsRule } from "@mongez/warlock";
+import { ExistsRule } from "@warlock.js/core";
 import { User } from "app/users/models/user";
 
 login.validation = {
@@ -136,7 +136,7 @@ To set the options using Rule object,pass an array of options to `setOptions` me
 For example, let's consider the following example:
 
 ```ts
-import { MinLengthRule } from "@mongez/warlock";
+import { MinLengthRule } from "@warlock.js/core";
 
 login.validation = {
   rules: {

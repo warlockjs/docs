@@ -25,7 +25,7 @@ This method accepts an object that will be used to fetch the user from the datab
 Consider the following example:
 
 ```ts {7,24} title="src/app/users/controllers/login.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { User } from "../models/user";
 
 export default async function login(request: Request, response: Response) {
@@ -78,7 +78,7 @@ If the user is found, we check if the user is active, if not, we return an error
 This will be handy in the `logout` request, so we can remove the access token from the database.
 
 ```ts {7} title="src/app/users/controllers/logout.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 import { User } from "../models/user";
 
 export default async function logout(

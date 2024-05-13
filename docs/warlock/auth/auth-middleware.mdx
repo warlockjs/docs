@@ -8,10 +8,10 @@ Auth middleware is used to verify the user identity, it's used to protect routes
 
 ## Usage
 
-Import `auth` middleware from `@mongez/warlock` and use it in the route definition.
+Import `auth` middleware from `@warlock.js/core` and use it in the route definition.
 
 ```ts title="src/app/users/routes.ts"
-import { router, authMiddleware } from "@mongez/warlock";
+import { router, authMiddleware } from "@warlock.js/core";
 import { listUsers } from "./controllers/list-users";
 
 router.get("/users", listUsers, {
@@ -30,7 +30,7 @@ Now what if we want to protect a route for a specific user type?
 For example, the `update profile` api requires an actual user not a guest user, in this case we can use the `authMiddleware` and pass to it the user type defined in [Auth configurations](./configurations).
 
 ```ts title="src/app/users/routes.ts"
-import { router, authMiddleware } from "@mongez/warlock";
+import { router, authMiddleware } from "@warlock.js/core";
 import { updateProfile } from "./controllers/update-profile";
 
 router.post("/users/profile", updateProfile, {
@@ -43,7 +43,7 @@ This will allow only the user with `userType` equals to **user** to access this 
 We can also use it for reverse guarded, for example, a logged in user can not make a login, create account or forget password request, so we can use the `authMiddleware` to guard these routes for guests only.
 
 ```ts title="src/app/users/routes.ts"
-import { router, authMiddleware } from "@mongez/warlock";
+import { router, authMiddleware } from "@warlock.js/core";
 import { login } from "./controllers/login";
 import { createAccount } from "./controllers/create-account";
 import { forgetPassword } from "./controllers/forget-password";

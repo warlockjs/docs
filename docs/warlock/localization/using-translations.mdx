@@ -15,7 +15,7 @@ To access the translations list, you can use the `request` object, which is avai
 To access the translations list, use the `t` method:
 
 ```ts {8} title="src/app/users/controllers/create-account.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export async function createAccount(request: Request, response: Response) {
   try {
@@ -50,7 +50,7 @@ groupedTranslation("users", {
 Another shorthand function to use current translation is by using `t` function, this function can be used anywhere in the application.
 
 ```ts title="src/app/users/controllers/create-account.ts"
-import { t } from "@mongez/warlock";
+import { t } from "@warlock.js/core";
 
 export async function createAccount(request: Request, response: Response) {
   try {

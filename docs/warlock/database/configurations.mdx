@@ -8,7 +8,7 @@ Make sure to add the database configurations in the `src/config/database.ts` fil
 
 ```ts title="src/config/database.ts"
 import { env } from "@mongez/dotenv";
-import { DatabaseConfigurations } from "@mongez/monpulse";
+import { DatabaseConfigurations } from "@warlock.js/cascade";
 
 const databaseConfigurations: DatabaseConfigurations = {
   host: env("DB_HOST", "localhost"),
@@ -25,4 +25,4 @@ export default databaseConfigurations;
 
 If the url is provided, then the other configurations will be ignored, otherwise, the url will be generated from the other configurations.
 
-For more information about database configurations, please read [MonPulse Configurations](./../../monpulse/getting-started/connecting-to-database).
+For more information about database configurations, please read [Cascade Configurations](./../../cascade/getting-started/connecting-to-database).

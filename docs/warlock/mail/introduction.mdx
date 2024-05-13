@@ -19,7 +19,7 @@ Now just head to the [Mail Configurations](./configurations) file, and set your 
 After we configured the mailer, we can now send emails using the `sendMail` function.
 
 ```ts
-import { sendMail } from "@mongez/warlock";
+import { sendMail } from "@warlock.js/core";
 
 sendMail({
   to: "your-email@exampl.com",
@@ -56,7 +56,7 @@ Luckily, Warlock uses a simple react component to render the email body, so you 
 To send a react mail, use `sendReactMail`, it takes everything that `sendMail` takes, except the html is replaced by `render` property
 
 ```tsx title="src/app/users/mail/verifyEmail.tsx"
-import { sendReactMail } from "@mongez/warlock";
+import { sendReactMail } from "@warlock.js/core";
 import EmailVerification from "./../components/EmailVerification";
 import { User } from "./../models/user";
 

@@ -13,7 +13,9 @@ function HomepageHeader() {
     <header className={clsx("hero hero--primary", styles.heroBanner)}>
       <div className="container">
         <h1 className="hero__title">{siteConfig.title}</h1>
-        <p className="hero__subtitle">{siteConfig.tagline}</p>
+        <p className="hero__subtitle">
+          Warlock Js is a fully featured, modern, and easy to use for Nodejs
+        </p>
       </div>
     </header>
   );

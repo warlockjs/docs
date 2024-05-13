@@ -23,7 +23,7 @@ First off, restful controllers heavily depends on [Repositories](./../repositori
 Now let's create our `restfulUsers` controller
 
 ```ts title="app/users/controllers/restful-users.ts"
-import { Restful } from '@mongez/warlock';
+import { Restful } from '@warlock.js/core';
 import { User } from "app/users/models/user":
 import userRepository from "app/users/repositories/users-repository";
 
@@ -41,7 +41,7 @@ export default restfulUsers;
 
 Let's break down this code:
 
-- We imported the `Restful` class from `@mongez/warlock` package.
+- We imported the `Restful` class from `@warlock.js/core` package.
 - We imported the `User` model from `app/users/models/user`, which will be used for typescript type checking.
 - We imported the `usersRepository` from `app/users/repositories/users-repository`, which will be used to operate on the database.
 - We extended the `Restful` class, and set the `repository` property to `usersRepository`.
@@ -68,7 +68,7 @@ Now let's see how to define our restful and its corresponding methods.
 Warlock's router system has a builtin `restfulResource` method that accepts the base path of the resource, and the controller instance.
 
 ```ts title="app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import restfulUsers from "app/users/controllers/restful-users";
 
 router.restfulResource("users", restfulUsers);
@@ -97,7 +97,7 @@ By default when calling `/users` the response will be returned with pagination (
 > The sent inputs from the request to the repository list methods will be used against [Request Heavy method](./request#get-heavy-inputs).
 
 - `records`: list of records that are fetched from the database.
-- [paginationInfo](./../../monpulse/aggregate/fetching#pagination): The pagination info that is returned from the repository.
+- [paginationInfo](./../../cascade/aggregate/fetching#pagination): The pagination info that is returned from the repository.
 
 Records that are sent are instance of the repository's model, so in our case users, it will be list of `User` models.
 
@@ -106,7 +106,7 @@ Records that are sent are instance of the repository's model, so in our case use
 To send another key instead of `records`, define `recordsListName` property in the controller.
 
 ```ts title="app/users/controllers/restful-users.ts"
-import { Restful } from '@mongez/warlock';
+import { Restful } from '@warlock.js/core';
 import { User } from "app/users/models/user":
 import userRepository from "app/users/repositories/users-repository";
 
@@ -135,7 +135,7 @@ To define a middleware to be executed before calling the `restful.list` method, 
 
 ```ts title="app/users/controllers/restful-users.ts"
 
-import {Request, Response, Restful } from '@mongez/warlock';
+import {Request, Response, Restful } from '@warlock.js/core';
 import { User } from "app/users/models/user":
 import userRepository from "app/users/repositories/users-repository";
 
@@ -239,7 +239,7 @@ So the validation here is a little different than normal function handler, but t
 
 ```ts title="app/users/controllers/restful-users.ts"
 //...
-import { RouteResource } from "@mongez/warlock";
+import { RouteResource } from "@warlock.js/core";
 
 class RestfulUsers<User> extends Restful {
   //...
@@ -266,7 +266,7 @@ We can use another rules like `UniqueRule` as follows:
 
 ```ts title="app/users/controllers/restful-users.ts"
 //...
-import { UniqueRule, RouteResource } from "@mongez/warlock";
+import { UniqueRule, RouteResource } from "@warlock.js/core";
 
 class RestfulUsers<User> extends Restful {
   //...
@@ -291,7 +291,7 @@ Of course we can define a custom validation method by passing to the `middleware
 
 ```ts title="app/users/controllers/restful-users.ts"
 //...
-import { RouteResource } from "@mongez/warlock";
+import { RouteResource } from "@warlock.js/core";
 
 class RestfulUsers<User> extends Restful {
   //...
@@ -412,7 +412,7 @@ We can also use the `UniqueRule` as well:
 
 ```ts title="app/users/controllers/restful-users.ts"
 //...
-import { UniqueRule, RouteResource } from "@mongez/warlock";
+import { UniqueRule, RouteResource } from "@warlock.js/core";
 
 class RestfulUsers<User> extends Restful {
   //...
@@ -598,7 +598,7 @@ In some situation we want to use the same restful object, but we need to use ano
 To do so we can use the `replace` object when defining the route resource to update the `list` method
 
 ```ts title="app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import restfulUsers from "app/users/controllers/restful-users";
 import ListCustomers from "app/users/controllers/list-customers";
 

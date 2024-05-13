@@ -15,7 +15,7 @@ There are multiple ways to define middleware, by adding it to a route, adding it
 Basically, we define a function that accepts the request and response objects, if the function returns a value, the request life cycle is interrupted and the response is sent back to the client thus the controller is never executed.
 
 ```ts title="src/app/users/middleware/validate-user.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export async function validateUser(request: Request, response: Response) {
   const user = await User.find(request.input("id"));
@@ -32,7 +32,7 @@ export async function validateUser(request: Request, response: Response) {
 Now we can use this middleware in our routes:
 
 ```ts {5,12} title="src/app/users/routes.ts"
-import { router } from "@mongez/warlock";
+import { router } from "@warlock.js/core";
 import { getUsers } from "./controllers/get-users";
 import { getUser } from "./controllers/get-user";
 import { auth } from "./../middleware/auth";
@@ -52,7 +52,7 @@ So what happens now is when the user requests the `/users/:id` route, the `valid
 And if the user exists, we can now access the user object from the request object:
 
 ```ts {2} title="src/app/users/controllers/get-user.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export async function getUser(request: Request, response: Response) {
   const user = request.user;
@@ -74,7 +74,7 @@ In some situations, we need to execute a middleware for all routes, for example 
 To do this, open `src/config/http.ts` file, you'll find there a `middleware` object, add your middleware to the `all` array:
 
 ```ts {2,7} title="src/config/http.ts"
-import { HttpConfigurations } from "@mongez/warlock";
+import { HttpConfigurations } from "@warlock.js/core";
 import { auth } from "app/users/middleware/auth";
 
 const httpConfigurations: HttpConfigurations = {
@@ -96,7 +96,7 @@ We can add a list of middleware to all routes except some routes, for example we
 To do this, use the `middleware.except` object:
 
 ```ts {2,7} title="src/config/http.ts"
-import { HttpConfigurations } from "@mongez/warlock";
+import { HttpConfigurations } from "@warlock.js/core";
 import { auth } from "app/users/middleware/auth";
 
 const httpConfigurations: HttpConfigurations = {
@@ -117,7 +117,7 @@ This will execute the `auth` middleware for all routes except the `/login` route
 We can also exclude named routes by using `namedRoutes` instead of `routes`:
 
 ```ts {2,7} title="src/config/http.ts"
-import { HttpConfigurations } from "@mongez/warlock";
+import { HttpConfigurations } from "@warlock.js/core";
 import { auth } from "app/users/middleware/auth";
 
 const httpConfigurations: HttpConfigurations = {

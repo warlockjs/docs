@@ -13,8 +13,8 @@ It works with strings and localized values as well.
 In your post model, add the following:
 
 ```ts title="src/app/posts/models/post.ts"
-import { Model, Casts } from "@mongez/monpulse";
-import { sluggable } from "@mongez/warlock";
+import { Model, Casts } from "@warlock.js/cascade";
+import { sluggable } from "@warlock.js/core";
 
 export class Post extends Model {
   /**

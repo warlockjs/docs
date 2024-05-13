@@ -1,52 +1,65 @@
-import React from 'react';
-import clsx from 'clsx';
-import styles from './styles.module.css';
+import React from "react";
+import clsx from "clsx";
+import styles from "./styles.module.css";
 
 type FeatureItem = {
   title: string;
-  Svg: React.ComponentType<React.ComponentProps<'svg'>>;
   description: JSX.Element;
 };
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Easy to Use',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
+    title: "Suitable for rapid development",
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        Build apps quickly with Warlock Js, it focuses on reducing development
+        time by providing a lot of features out of the box.
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    title: "Focus on What Matters",
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Warlock Js does the heavy lifting for you, so you can focus on your app.
       </>
     ),
   },
   {
-    title: 'Powered by React',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
+    title: "Powered by Typescript",
+    description: (
+      <>Leverage the power of Typescript to build your app with confidence.</>
+    ),
+  },
+  {
+    title: "Automation",
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        Warlock Js focuses on automatically loading routes, events,
+        translations, main files, command lines, and more out of the box.
       </>
+    ),
+  },
+  {
+    title: "Postman Generation",
+    description: (
+      <>
+        Warlock Js can generate postman collections for your routes
+        automatically.
+      </>
+    ),
+  },
+  {
+    title: "MongoDB Integration",
+    description: (
+      <>Warlock Js provides a built-in MongoDB integration for your app.</>
     ),
   },
 ];
 
-function Feature({title, Svg, description}: FeatureItem) {
+function Feature({ title, description }: FeatureItem) {
   return (
-    <div className={clsx('col col--4')}>
-      <div className="text--center">
-        <Svg className={styles.featureSvg} role="img" />
-      </div>
+    <div className={clsx("col col--4")}>
       <div className="text--center padding-horiz--md">
         <h3>{title}</h3>
         <p>{description}</p>

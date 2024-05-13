@@ -1,0 +1,151 @@
+---
+sidebar_position: 3
+title: Model Events
+---
+
+## Introduction
+
+Model events are crucial in any application or complex package as they help manage the flow of your application and make your code more readable and maintainable.
+
+## Accessing Model Events
+
+To access the Model events manager, call the `events()` method on the Model class `(not the instance)`.
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+User.events().onSaving((user) => {
+  // do something
+});
+```
+
+## Types of Events
+
+There are **8** types of events that could be triggered for a model:
+
+1. `onCreating(model: Model)`: Called before creating a new document.
+2. `onCreated(model: Model)`: Called after creating a new document.
+3. `onUpdating(model: Model, oldModel: Model)`: Called before updating a document.
+4. `onUpdated(model: Model, oldModel: Model)`: Called after updating a document.
+5. `onSaving(model: Model, oldModel?: Model)`: Called before saving a document, this event is triggered before creating or updating a document.
+6. `onSaved(model: Model, oldModel?: Model)`: Called after saving a document, this event is triggered after creating or updating a document.
+7. `onDeleting(model: Model)`: Called before deleting a document.
+8. `onDeleted(model: Model)`: Called after deleting a document.
+
+These **8** events are triggered in three scopes.
+
+All scopes has the same method name.
+
+## Scopes of Events
+
+There are three scopes of events in Cascade **(Ordered by the order of triggering)**
+
+1. **Self Events**: These events are callbacks that being called inside the model itself.
+2. **Model Events**: These events are triggered for a specific model.
+3. **Global Events**: These events are triggered for all models.
+
+## Self Events
+
+The self events are `methods` inside the model itself that can be called, in real world apps, they are not that much of usage, but they could be handy in some situations.
+
+Here are the available self events:
+
+1. `onCreating`: Called before creating a new document.
+2. `onCreated`: Called after creating a new document.
+3. `onUpdating`: Called before updating a document.
+4. `onUpdated`: Called after updating a document.
+5. `onSaving`: Called before saving a document, this event is triggered before creating or updating a document.
+6. `onSaved`: Called after saving a document, this event is triggered after creating or updating a document.
+7. `onDeleting`: Called before deleting a document.
+8. `onDeleted`: Called after deleting a document.
+
+These events are the first events triggered before the other scopes.
+
+An example of usage
+
+```ts title="src/models/user.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class User extends Model {
+  // ...
+
+  /**
+   * {@inheritdoc}
+   */
+  protected onCreating() {
+    // do something
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected onCreated() {
+    // do something
+  }
+}
+```
+
+:::info
+Please note that all of these methods should be `protected` methods.
+:::
+
+## Model Events
+
+Model events are triggered whenever a model is triggering the event, their order of the trigger are the second ones to be triggered.
+
+This second type is mainly the most used one, as it is the most common one to be used in real world apps.
+
+An example of usage
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+User.events()
+  .onCreating((user) => {
+    // do something
+  })
+  .onCreated((user) => {
+    // do something
+  });
+```
+
+All events methods are chainable, so you can chain as many events as you want.
+
+## Global Events
+
+Global events are triggered whenever a model is triggering the event, their order of the trigger are the last ones to be triggered.
+
+This also could be a good one as well for real world apps.
+
+An example of usage
+
+```ts title="src/app.ts"
+import { Model } from "@warlock.js/cascade";
+
+Model.events()
+  .onCreating((model) => {
+    // do something
+  })
+  .onCreated((model) => {
+    // do something
+  });
+```
+
+All events methods are chainable, so you can chain as many events as you want.
+
+## The Events Manager
+
+The second and third scopes have a `EventManager`, each `Model` or even the `Model` class itself has its own `EventManager` and they are all singletons, so you can call them multiple times with no worries.
+
+## Event Payload
+
+Let's take a quick look about what data are passed into the event callback.
+
+1. `onCreating`: this event receives the model instance.
+2. `onCreated`: this event receives the model instance.
+3. `onUpdating`: this event receives the model instance and a clone of model instance with `old data`.
+4. `onUpdated`: this event receives the model instance and a clone of model instance with `old data`.
+5. `onSaving`: this event receives the model instance and, optionally, a clone of model instance with `old data`, if the second parameter is passed, it means that the model is being updated, otherwise it is being created.
+6. `onSaved`: this event receives the model instance and, optionally, a clone of model instance with `old data`, if the second parameter is passed, it means that the model is being updated, otherwise it is being created.
+7. `onDeleting`: this event receives the model instance.
+8. `onDeleted`: this event receives the model instance.

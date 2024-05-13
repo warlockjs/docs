@@ -15,7 +15,7 @@ So when you make a request, Warlock will create a `request` object that contains
 Let's see a simple example
 
 ```ts title="src/app/general/routes.ts"
-import { router, Request, Response } from "@mongez/warlock";
+import { router, Request, Response } from "@warlock.js/core";
 
 router.get("/", (request: Request, response: Response) => {
   return response.success({

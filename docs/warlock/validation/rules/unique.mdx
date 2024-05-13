@@ -16,7 +16,7 @@ For the time being, this rule does not support custom string rule, so the rule c
 
 ```ts title="src/app/users/controllers/create-account.ts"
 // ...
-import { UniqueRule } from "@mongez/warlock";
+import { UniqueRule } from "@warlock.js/core";
 import { User } from "../models/user";
 
 createAccount.validation = {
@@ -34,7 +34,7 @@ You may also pass the collection name instead of the model class:
 
 ```ts title="src/app/users/controllers/create-account.ts"
 // ...
-import { UniqueRule } from "@mongez/warlock";
+import { UniqueRule } from "@warlock.js/core";
 
 createAccount.validation = {
   rules: {
@@ -53,7 +53,7 @@ Ensure that a given value unique in a collection, while also allowing the exclus
 
 ```ts title="src/app/users/controllers/create-account.ts"
 // ...
-import { UniqueRule } from "@mongez/warlock";
+import { UniqueRule } from "@warlock.js/core";
 
 createAccount.validation = {
   rules: {
@@ -72,7 +72,7 @@ You may also validate the input to match a unique value, except the current user
 
 ```ts title="src/app/users/controllers/update-profile.ts"
 // ...
-import { UniqueRule } from "@mongez/warlock";
+import { UniqueRule } from "@warlock.js/core";
 
 updateProfile.validation = {
   rules: {
@@ -93,7 +93,7 @@ You may also perform a custom query to validate the input value using `query` me
 
 ```ts title="src/app/users/controllers/create-account.ts"
 // ...
-import { UniqueRule } from "@mongez/warlock";
+import { UniqueRule } from "@warlock.js/core";
 
 createAccount.validation = {
   rules: {

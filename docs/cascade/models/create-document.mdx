@@ -1,0 +1,78 @@
+---
+sidebar_position: 2
+---
+
+# Create New Document
+
+In the previous section, we've seen how to create a document by creating a new instance of the model then calling the `save` method, this is a way, let's recap it quickly.
+
+## Creating a model
+
+To create a model, you need to extend the `Model` class and define the `collection` property.
+
+```ts title="src/models/user.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class User extends Model {
+    /**
+    * The collection name
+    */
+    public static collection = "users";
+}
+```
+
+## Creating a model instance
+
+When creating a new model instance, you optionally pass an object of the data that will be saved (**created**).
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+const user = new User({
+    name: "Hasan Zohdy",
+    email: "hassanzohdy@gmail.com",
+    isActive: true,
+});
+```
+
+This only creates an instance of the model, but the data is not saved yet, now let's see how to save the data.
+
+## Saving a model instance
+
+To save a model instance, you need to call the `save` method.
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+async function main() {
+    const user = new User({
+        name: "Hasan Zohdy",
+        email: "hassanzohdy@gmail.com",
+        isActive: true,
+    });
+
+    await user.save();
+
+    console.log(user.data); // outputs all data
+}
+```
+
+## Using the `create` method
+
+A more preferred way to create a new model instance and save it is to use the static `create` method.
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+async function main() {
+    const user = await User.create({
+        name: "Hasan Zohdy",
+        email: "hassanzohdy@gmail.com",
+        isActive: true,
+    });
+
+    console.log(user.data); // outputs all data
+}
+```
+
+This is more easier and cleaner, and it's the **recommended way** to create a new model instance and save it.

@@ -11,7 +11,7 @@ This section covers the utilities provided for cache drivers.
 The `parseCacheKey` function parses a cache key either it is a string or an object then sanitizes it from any invalid characters and return a `dot.notation` syntax.
 
 ```ts title="src/app/main.ts"
-import { parseCacheKey } from "@mongez/warlock";
+import { parseCacheKey } from "@warlock.js/core";
 
 console.log(parseCacheKey("users:1")); // users.1
 ```
@@ -19,7 +19,7 @@ console.log(parseCacheKey("users:1")); // users.1
 Also if it is an object, it will flat map it like this:
 
 ```ts title="src/app/main.ts"
-import { parseCacheKey } from "@mongez/warlock";
+import { parseCacheKey } from "@warlock.js/core";
 
 const filter = {
     limit: 3,

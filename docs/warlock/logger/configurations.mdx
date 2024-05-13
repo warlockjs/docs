@@ -8,7 +8,7 @@ To set logging configurations, modify `src/config/log.ts` file.
 
 ```ts title="src/config/log.ts"
 import { ConsoleLog } from "@mongez/logger";
-import { LogConfigurations } from "@mongez/warlock";
+import { LogConfigurations } from "@warlock.js/core";
 
 const consoleLog = new ConsoleLog();
 
@@ -34,7 +34,7 @@ If we want to set different channels for different environments, then add the en
 
 ```ts title="src/config/log.ts"
 import { FileLog, ConsoleLog } from "@mongez/logger";
-import { LogConfigurations } from "@mongez/warlock";
+import { LogConfigurations } from "@warlock.js/core";
 
 const consoleLog = new ConsoleLog();
 const fileLog = new FileLog();

@@ -12,7 +12,7 @@ In the `src/config` directory, make sure to create `cache.ts` file if not create
 
 ```ts title="src/config/cache.ts"
 import { env } from "@mongez/dotenv";
-import { CacheConfigurations, RedisCacheDriver } from "@mongez/warlock";
+import { CacheConfigurations, RedisCacheDriver } from "@warlock.js/core";
 
 const cacheConfigurations: CacheConfigurations = {
   drivers: {
@@ -49,7 +49,7 @@ For example, we can set the default cache driver to `redis` which is declared un
 
 ```ts title="src/config/cache.ts"
 import { env } from "@mongez/dotenv";
-import { CacheConfigurations, RedisCacheDriver } from "@mongez/warlock";
+import { CacheConfigurations, RedisCacheDriver } from "@warlock.js/core";
 
 const cacheConfigurations: CacheConfigurations = {
   drivers: {

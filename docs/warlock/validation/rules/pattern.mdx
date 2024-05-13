@@ -14,7 +14,7 @@ The pattern rule can not be used as a string, it must be declared as a rule clas
 
 ```ts title="src/app/users/controllers/create-account.ts"
 // ...
-import { PatternRule } from "@mongez/warlock";
+import { PatternRule } from "@warlock.js/core";
 
 const usernamePattern = /^[a-z0-9_-]{3,16}$/;
 
@@ -37,7 +37,7 @@ To override the pattern, pass the second argument as the translation key:
 
 ```ts title="src/app/users/controllers/create-account.ts"
 // ...
-import { PatternRule } from "@mongez/warlock";
+import { PatternRule } from "@warlock.js/core";
 
 const usernamePattern = /^[a-z0-9_-]{3,16}$/;
 

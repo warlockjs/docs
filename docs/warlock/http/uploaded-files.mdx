@@ -15,7 +15,7 @@ Uploaded files are used in `multipart/form-data` requests, and Warlock handles t
 To access a an uploaded file, use `request.file()` method, which returns a `File` object.
 
 ```ts title="src/app/users/controllers/upload-avatar.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export async function uploadAvatar(request: Request, response: Response) {
   const avatar = request.file("avatar");
@@ -35,7 +35,7 @@ Now we got the uploaded file, let's see what we can do with it.
 To get the file name, use `name` property.
 
 ```ts title="src/app/users/controllers/upload-avatar.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export async function uploadAvatar(request: Request, response: Response) {
   const avatar = request.file("avatar");
@@ -136,7 +136,7 @@ const buffer = await avatar.buffer();
 It is pretty much the same as dealing with a single file, except that the return type is an array of `UploadedFile` objects.
 
 ```ts title="src/app/users/controllers/upload-avatar.ts"
-import { Request, Response } from "@mongez/warlock";
+import { Request, Response } from "@warlock.js/core";
 
 export async function uploadAvatar(request: Request, response: Response) {
   const avatars = request.files("avatars");

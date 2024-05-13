@@ -10,10 +10,10 @@ The `:hash` is the file hash returned from the [Upload model](./upload-model).
 
 ## Deleting Files from the Database
 
-To delete the file from the database, use the `deleteFile` function from `@mongez/warlock`:
+To delete the file from the database, use the `deleteFile` function from `@warlock.js/core`:
 
 ```ts {10} title="src/app/uploads/routes.ts"
-import { router, deleteFile } from "@mongez/warlock";
+import { router, deleteFile } from "@warlock.js/core";
 import { adminPath, guarded } from "app/utils/router";
 
 guarded(() => {
