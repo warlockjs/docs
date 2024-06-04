@@ -3,12 +3,14 @@
 
 const lightCodeTheme = require("prism-react-renderer/themes/oceanicNext");
 const darkCodeTheme = require("prism-react-renderer/themes/dracula");
+import tailwindPlugin from "./plugins/tailwind-plugin.cjs";
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: "Warlock Js",
-  tagline: "Warlock Js ecosystem documentation",
-  favicon: "img/logo.svg",
+  title: "Warlock.js",
+  tagline: "Warlock.js ecosystem documentation",
+  favicon: "img/favicon.ico",
+  plugins: [tailwindPlugin],
 
   // Set the production url of your site here
   url: "https://warlock.js.org",
@@ -19,7 +21,7 @@ const config = {
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: "mentoor.io", // Usually your GitHub org/user name.
-  projectName: "Warlock Js", // Usually your repo name.
+  projectName: "Warlock.js", // Usually your repo name.
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
 
@@ -61,7 +63,7 @@ const config = {
       // Replace with your project's social card
       image: "https://mentoor.io/logo.svg",
       navbar: {
-        title: "Warlock Js EcoSystem",
+        title: "Warlock.js EcoSystem",
         logo: {
           alt: "mentoor.io",
           src: "https://mentoor.io/logo.svg",

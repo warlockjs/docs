@@ -9,3 +9,16 @@
   height: 200px;
   width: 200px;
 }
+
+.featuresWrapper {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 2rem;
+}
+
+.featureCard {
+  height: 150px;
+  padding: 1rem;
+}

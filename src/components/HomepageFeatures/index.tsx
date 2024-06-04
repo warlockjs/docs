@@ -11,17 +11,14 @@ const FeatureList: FeatureItem[] = [
   {
     title: "Suitable for rapid development",
     description: (
-      <>
-        Build apps quickly with Warlock Js, it focuses on reducing development
-        time by providing a lot of features out of the box.
-      </>
+      <>Build apps fast with Warlock.js, featuring many built-in tools.</>
     ),
   },
   {
     title: "Focus on What Matters",
     description: (
       <>
-        Warlock Js does the heavy lifting for you, so you can focus on your app.
+        Warlock.js does the heavy lifting for you, so you can focus on your app.
       </>
     ),
   },
@@ -35,8 +32,8 @@ const FeatureList: FeatureItem[] = [
     title: "Automation",
     description: (
       <>
-        Warlock Js focuses on automatically loading routes, events,
-        translations, main files, command lines, and more out of the box.
+        Warlock.js automatically loads routes, events, translations, main files,
+        command lines, and more.
       </>
     ),
   },
@@ -44,7 +41,7 @@ const FeatureList: FeatureItem[] = [
     title: "Postman Generation",
     description: (
       <>
-        Warlock Js can generate postman collections for your routes
+        Warlock.js can generate postman collections for your routes
         automatically.
       </>
     ),
@@ -52,16 +49,16 @@ const FeatureList: FeatureItem[] = [
   {
     title: "MongoDB Integration",
     description: (
-      <>Warlock Js provides a built-in MongoDB integration for your app.</>
+      <>Warlock.js provides a built-in MongoDB integration for your app.</>
     ),
   },
 ];
 
 function Feature({ title, description }: FeatureItem) {
   return (
-    <div className={clsx("col col--4")}>
+    <div className={clsx("col col--4", styles.featureCard)}>
       <div className="text--center padding-horiz--md">
-        <h3>{title}</h3>
+        <h3 className="text-red-500">{title}</h3>
         <p>{description}</p>
       </div>
     </div>
@@ -72,7 +69,7 @@ export default function HomepageFeatures(): JSX.Element {
   return (
     <section className={styles.features}>
       <div className="container">
-        <div className="row">
+        <div className={styles.featuresWrapper}>
           {FeatureList.map((props, idx) => (
             <Feature key={idx} {...props} />
           ))}
