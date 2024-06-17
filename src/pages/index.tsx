@@ -6,8 +6,20 @@ import Video from "../components/Video";
 import AboutSectionOne from "../components/About/AboutSectionOne";
 import AboutSectionTwo from "../components/About/AboutSectionTwo";
 import ScrollUp from "../components/Common/ScrollUp";
+import { useEffect } from "react";
+
+function setDarkMode() {
+  if (typeof window !== "undefined") {
+    document.documentElement.classList.add("dark");
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
+}
 
 const Home = () => {
+  useEffect(() => {
+    setDarkMode();
+  }, []);
+
   return (
     <main className="relative">
       <ScrollUp />
