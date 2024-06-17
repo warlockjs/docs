@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import menuData from "./menuData";
+import mainLogo from "../../../static/images/warlock.png";
 
 const Header = () => {
   // Navbar toggle
@@ -47,10 +48,11 @@ const Header = () => {
             <div className="w-60 max-w-full px-4 xl:mr-12">
               <a
                 href="/"
-                className={`header-logo block w-full text-2xl font-bold text-black dark:text-white ${
+                className={`header-logo flex items-center gap-2 w-full text-2xl font-semibold text-black dark:text-white ${
                   sticky ? "py-5 lg:py-2" : "py-8"
                 } `}
               >
+                <img src={mainLogo} alt="Warlock.js Logo" className="size-10" />
                 Warlock.js
               </a>
             </div>
@@ -80,13 +82,13 @@ const Header = () => {
                 </button>
                 <nav
                   id="navbarCollapse"
-                  className={`navbar absolute right-0 z-30 w-[250px] rounded border-[.5px] border-body-color/50 bg-white px-6 duration-300 dark:border-body-color/20 dark:bg-dark lg:visible lg:static lg:w-auto lg:border-none lg:!bg-transparent lg:p-0 lg:opacity-100 ${
+                  className={`navbar absolute right-0 z-30 w-[250px] rounded border-[.5px] border-body-color/50 bg-white px-6 duration-300 dark:border-body-color/20 dark:bg-dark lg:visible lg:static lg:w-auto lg:border-none lg:!bg-transparent lg:p-0 lg:opacity-100  ${
                     navbarOpen
                       ? "visibility top-full opacity-100 h-[100px]"
-                      : "invisible top-[120%] opacity-0"
+                      : "invisible top-[120%] opacity-0 h-auto"
                   }`}
                 >
-                  <ul className="block lg:flex lg:space-x-6 h-auto">
+                  <ul className="block lg:flex lg:gap-5 p-0 m-0">
                     {menuData.map((menuItem, index) => (
                       <li key={index} className="group relative">
                         <a
@@ -104,7 +106,7 @@ const Header = () => {
                 <a
                   href="https://github.com/hassanzohdy"
                   target="_blank"
-                  className="ease-in-up hidden rounded-sm bg-primary px-4 py-3 text-base font-medium text-white shadow-btn transition duration-300 hover:bg-opacity-70 hover:text-white hover:shadow-btn-hover md:block md:px-9 lg:px-6 xl:px-9"
+                  className="ease-in-up hidden rounded-sm bg-black p-3 text-base font-medium text-white shadow-btn transition duration-300 hover:bg-black/80 hover:text-white hover:shadow-btn-hover md:block md:px-9 lg:px-6 xl:px-9"
                 >
                   Github
                 </a>
