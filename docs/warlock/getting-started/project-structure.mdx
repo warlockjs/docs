@@ -21,7 +21,6 @@ Once the project is done, you'll find two main directories `src` and `storage` w
 │   │   ├── uploads
 │   │   │   ├── routes.ts
 │   │   ├── users
-│   │   │   ├── components
 │   │   │   ├── controllers
 │   │   │   │   ├── auth
 │   │   │   │   │   ├── social
@@ -222,42 +221,42 @@ The `src/main.ts` is called after bootstraping the application, you can use it t
 
 When the http server and database connection is warming up (But not yet connected) the `src/app/main.ts` file is called.
 
-## Module main file
+## main file
 
 This is the main file that will be called in each module, if the file exists, it will be called after calling `src/app/main.ts` file.
 
-## Module localization file
+## localization file
 
 If the application is an international application, then each module should have a localization file, the file should be located inside `module/utils/locales.ts`
 
-## Module routes file
+## routes file
 
 The file is responsible for defining the module routes either grouped by middleware, or using restful resources or just basic routes.
 
-## Module Events
+## Events directory
 
 The events directory mainly handles all events that needed to be called when certain events are triggered, it's very essential concept you should use in any successful and scalable application.
 
-## Module Controllers
+## Controllers directory
 
 The controllers directory contains all the controllers for the module, it's very important to keep the controllers as simple as possible, and to keep the business logic away from the controllers, using functions as request handlers/controllers is a good practice most of the time, however, mixing it with classes is also a good practice depending on the use case.
 
-## Module Models
+## Models directory
 
 Here we keep our models for the module, each model should be in a separate directory, and each model should have a `setup.ts` file that contains the model migrations, and `index.ts` file that exports the model.
 
-## Module Output
+## Output directory
 
 Outputs are classes that are mainly linked with `Models` to decide which data should be return in the response when the model is returned.
 
-## Module Repositories
+## Repositories directory
 
 A repository is an additional layer over the model to perform certain database operations and other stuff, also it can perform some good data caching as well and filtering.
 
-## Module Utils
+## Utils directory
 
 Any helper functions, classes should be listed here, for example, if you have a function that is used to generate a random string, you can put it here.
 
-## Module flags
+## flags file
 
 Another good practice is to have the static data in a `utils/flags.ts` file, this file should contain all the static data that is used in the module, for example, if you're in the `users` module, you can have a `utils/flags.ts` file that contains all the user roles, and other static data such as `user, admin, moderator` and so on.

@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import SectionTitle from "../Common/SectionTitle";
-import ModalVideo from "react-modal-video";
-
 import videoThumb from "../../../static/images/video/warlock-thumbnail.png";
 
 const Video = () => {
@@ -13,8 +11,8 @@ const Video = () => {
     <section className="relative z-10 py-16 md:py-20 lg:py-28">
       <div className="container">
         <SectionTitle
-          title="Warlock.js Introduction"
-          paragraph="Warlock.js is a robust Node.js framework that helps you to build APIs and web applications easily, it's built on top of Fastify and MongoDB."
+          title="Easy to learn, easy to use."
+          paragraph="Warlock.js is a robust Node.js framework that helps you to build APIs and web applications easily, it's built on top of Fastify and TypeScript Support first class."
           center
           mb="80px"
         />

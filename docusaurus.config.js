@@ -60,6 +60,11 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
+      colorMode: {
+        defaultMode: "dark",
+        disableSwitch: true,
+        respectPrefersColorScheme: false,
+      },
       // Replace with your project's social card
       image: "https://mentoor.io/logo.svg",
       navbar: {
