@@ -34,6 +34,16 @@
   --ifm-h2-font-size: 1.8rem;
 }
 
+.markdown {
+  font-size: 15px;
+}
+
+.markdown * {
+  --ifm-h1-font-size: 2.2rem !important;
+  --ifm-h2-font-size: 1.7rem !important;
+  --ifm-h3-font-size: 1.5rem !important;
+}
+
 .markdown a {
   font-weight: bold;
 }
@@ -47,7 +57,7 @@ code {
     font-family: "Inter", sans-serif;
   }
   ul {
-    list-style-type: none;
+    /* list-style-type: none; */
   }
   a {
     text-decoration: none;
