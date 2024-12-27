@@ -2,9 +2,9 @@
 sidebar_position: 2
 ---
 
-# Database Configurations
+# ⚙️ Database Configurations
 
-Make sure to add the database configurations in the `src/config/database.ts` file.
+Ensure that you add the database configurations in the `src/config/database.ts` file.
 
 ```ts title="src/config/database.ts"
 import { env } from "@mongez/dotenv";
@@ -18,11 +18,27 @@ const databaseConfigurations: DatabaseConfigurations = {
   database: env("DB_NAME"),
   dbAuth: env("DB_AUTH"),
   url: env("DB_URL"),
+  model: {
+    autoIncrementBy: 1,
+    initialId: 1,
+  },
 };
 
 export default databaseConfigurations;
 ```
 
-If the url is provided, then the other configurations will be ignored, otherwise, the url will be generated from the other configurations.
+### 🔍 Configuration Guide
 
-For more information about database configurations, please read [Cascade Configurations](./../../cascade/getting-started/connecting-to-database).
+- **`host`**: Specifies the database server's host address. Defaults to `localhost` if not provided.
+- **`port`**: Defines the port on which the database server is running. Defaults to `27017` for MongoDB.
+- **`username`**: The username used for authenticating with the database.
+- **`password`**: The password associated with the database username.
+- **`database`**: The name of the database to connect to.
+- **`dbAuth`**: The authentication database, used for user authentication.
+- **`url`**: A complete connection URL. If provided, it overrides other configurations.
+- **`model.autoIncrementBy`**: Sets the increment step for auto-increment fields.
+- **`model.initialId`**: Defines the starting value for auto-increment fields.
+
+If the `url` is provided, other configurations will be ignored; otherwise, the URL will be generated from the other configurations.
+
+For more detailed information about database configurations, please refer to [Cascade Configurations](./../../cascade/getting-started/connecting-to-database).

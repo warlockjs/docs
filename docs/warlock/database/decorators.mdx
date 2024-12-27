@@ -2,13 +2,13 @@
 sidebar_position: 3
 ---
 
-# Database Decorators
+# 🏷️ Database Decorators
 
-Decorators are a way to add metadata to a class, property, or method declaration, and make the class, property, or method declaration more expressive.
+Decorators are a way to add metadata to a class, property, or method declaration, making them more expressive and functional.
 
-## Sluggable
+## 🌀 Sluggable
 
-The `Sluggable` decorator is used to generate a slug from a string property, it uses under the hood [sluggable](./../utils/sluggable) utility function.
+The `Sluggable` decorator is used to generate a slug from a string property. It utilizes the [sluggable](./../utils/sluggable) utility function under the hood.
 
 ### Example
 
@@ -32,7 +32,7 @@ export default class Post extends Model {
 }
 ```
 
-This will create `slug` field whenever the post is saved (created or updated), the slug will be generated from the `title` field.
+This will create a `slug` field whenever the post is saved (created or updated). The slug will be generated from the `title` field.
 
 You can generate the slug from another column by passing the column name to the `Sluggable` decorator.
 
