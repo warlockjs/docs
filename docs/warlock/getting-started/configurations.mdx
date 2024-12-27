@@ -2,81 +2,79 @@
 sidebar_position: 4
 ---
 
-# Configurations
+# ⚙️ Configurations
 
-Configurations are crucial for any application, and Warlock provides a simple way to manage your application configurations.
+Configurations are crucial for any application, and Warlock provides a straightforward way to manage them.
 
-## Config directory
+## 📂 Config Directory
 
-All configurations are located inside `src/config` directory, they are automatically loaded when the application starts.
+All configurations are located inside the `src/config` directory and are automatically loaded when the application starts.
 
-## Environment variables
+## 🌐 Environment Variables
 
-Before we proceed, there is an important note to be taken into consideration, which is the environment variables.
+Before proceeding, it's important to consider environment variables.
 
-[Environment Variables](./environment) are important to any application to distinguish between different environments, like development, staging and production.
+[Environment Variables](./environment) are essential for distinguishing between different environments, such as development, staging, and production.
 
-In that sense, when we define the app configurations, make sure to not include the information directly, use environment variables instead.
+When defining app configurations, ensure not to include sensitive information directly; use environment variables instead.
 
-## Configurations Types
+## 🛠️ Configuration Types
 
-Application configurations are the general application configurations, it contains the following types:
+Application configurations encompass general settings, including:
 
-1. [app](#app-configurations): General application configurations, like the application name, the application URL ...etc.
-2. [Auth configurations](./../auth/configurations): Authentication configurations
-3. [Cache configurations](./../cache/configurations): Cache configurations
-4. [Database configurations](./../database/configurations): Database configurations
-5. [Http + cors configurations](./../http/configurations): CORS configurations
-6. [Log configurations](./../logger/configurations): Logger configurations
-7. [Validation configurations](./../validation/configurations): Validation configurations
-8. [uploads](./../upload/configurations): Uploads configurations
+1. [App Configurations](#app-configurations): General settings like application name, URL, etc.
+2. [Auth Configurations](./../auth/configurations): Authentication settings.
+3. [Cache Configurations](./../cache/configurations): Cache settings.
+4. [Database Configurations](./../database/configurations): Database settings.
+5. [HTTP + CORS Configurations](./../http/configurations): CORS settings.
+6. [Log Configurations](./../logger/configurations): Logger settings.
+7. [Validation Configurations](./../validation/configurations): Validation settings.
+8. [Uploads Configurations](./../upload/configurations): Upload settings.
 
-## Configuration Files
+## 📄 Configuration Files
 
-Because the configurations here are automatically loaded, each config file name is a special name that is used to load the configurations.
+Since configurations are automatically loaded, each config file name is special and used to load the settings.
 
 Here is the list of all available files that can be loaded:
 
-- `app.ts`: This file is used to define the [App Configurations](#app-configurations).
-- `auth.ts`: This file is used to define the [Auth Configurations](./../auth/configurations).
-- `cache.ts`: This file is used to define the [Cache Configurations](./../cache/configurations).
-- `database.ts`: This file is used to define the [Database Configurations](./../database/configurations).
-- `http.ts`: This file is used to define the [Http Configurations](./../http/configurations).
-- `log.ts`: This file is used to define the [Log Configurations](./../logger/configurations).
-- `mail.ts`: This file is used to define the [Mail Configurations](./../mail/configurations).
-- `validation.ts`: This file is used to define the [Validation Configurations](./../validation/configurations).
-- `uploads.ts`: This file is used to define the [Uploads Configurations](./../upload/configurations).
+- `app.ts`: Defines the [App Configurations](#app-configurations).
+- `auth.ts`: Defines the [Auth Configurations](./../auth/configurations).
+- `cache.ts`: Defines the [Cache Configurations](./../cache/configurations).
+- `database.ts`: Defines the [Database Configurations](./../database/configurations).
+- `http.ts`: Defines the [HTTP Configurations](./../http/configurations).
+- `log.ts`: Defines the [Log Configurations](./../logger/configurations).
+- `mail.ts`: Defines the [Mail Configurations](./../mail/configurations).
+- `validation.ts`: Defines the [Validation Configurations](./../validation/configurations).
+- `uploads.ts`: Defines the [Uploads Configurations](./../upload/configurations).
 
 :::note
-All configuration files must export a default object that contains the configurations.
+All configuration files must export a default object containing the configurations.
 :::
 
 :::danger
-Please note that each file in the config directory must be named as the way it was defined in the [Configurations Types](#configurations-types) section.
+Each file in the config directory must be named as defined in the [Configuration Types](#configurations-types) section.
 :::
 
-## App configurations
+## 📝 App Configurations
 
-The app configurations contains simple data, like the application name, the application URL, debug mode ...etc.
+App configurations contain simple data, such as the application name, URL, debug mode, etc.
 
-- `baseUrl`: The application base URL, it's used to generate the full URL for the application, you can not miss it, it is required.
-- `timezone`: The application timezone, it's used to set the timezone for the application, defaults to `UTC`.
-- `localeCode`: Default locale code
+- `baseUrl`: The application's base URL, used to generate full URLs. This is required.
+- `timezone`: The application's timezone, defaulting to `UTC`.
+- `localeCode`: Default locale code.
 
-### Base Url
+### 🌐 Base URL
 
-Base Url is used to generate [Urls](./../utils/urls) to make sure it generates a proper URL for each generated url.
+The Base URL is used to generate [URLs](./../utils/urls) to ensure proper URL generation for each request.
 
-### Timezone
+### 🕒 Timezone
 
-Timezone is used to set the default timezone for the application, it's used to make sure that all dates are generated with the correct timezone.
+The timezone sets the default timezone for the application, ensuring all dates are generated with the correct timezone.
 
 :::tip
-Cascade depends on this timezone to generate the correct date for each user, so make sure to set it correctly.
+Cascade relies on this timezone to generate the correct date for each user, so set it correctly.
 :::
 
-### localeCode
+### 🌍 Locale Code
 
-Locale code is used when the app is a multilingual (has more than one language) application, so make sure to provide the default locale code for the application.
-
-This will be used as a default fallback when api is requested with invalid locale code or with no locale code at at all.
+The locale code is used for multilingual applications, providing a default fallback when an API request has an invalid or missing locale code.

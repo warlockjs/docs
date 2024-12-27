@@ -2,15 +2,15 @@
 sidebar_position: 5
 ---
 
-# Environment Variables
+# 🌍 Environment Variables
 
-`Warlock` is powered by [Mongez Dotenv](https://github.com/hassanzohdy/mongez-dotenv) which is shipped with powerful features, let's see how it works.
+`Warlock` is powered by [Mongez Dotenv](https://github.com/hassanzohdy/mongez-dotenv), which comes with powerful features. Let's explore how it works.
 
-## Variables
+## 🔧 Variables
 
-The project is shipped with a `.env` file, this file contains predefined variables will be used along with [project configurations](./configurations).
+The project includes a `.env` file containing predefined variables used alongside [project configurations](./configurations).
 
-Let's have a look at the default .env file contents:
+Here's a look at the default `.env` file contents:
 
 ```bash
 # App Configurations
@@ -44,40 +44,40 @@ MAIL_FROM_ADDRESS=
 
 Let's go through each variable and see what it does.
 
-- `APP_NAME`: This variable is used to set the application name, it will be used in the mailer and other places.
-- `TIMEZONE`: This variable is used to set the timezone for the application, it will be used in the mailer and other places.
-- `PORT`: This variable is used to set the port for the http server.
-- `HOST`: This variable is used to set the host for the http server.
-- `BASE_URL`: This variable is used to set the base url for the application, it will be used with [url functions](./../utils//urls.mdx).
-- `DB_AUTH`: This variable is used to set the authentication database for the database connection.
-- `DB_PORT`: This variable is used to set the port for the database connection.
-- `DB_HOST`: This variable is used to set the host for the database connection.
-- `DB_NAME`: This variable is used to set the database name for the database connection.
-- `DB_USERNAME`: This variable is used to set the username for the database connection.
-- `DB_PASSWORD`: This variable is used to set the password for the database connection.
-- `MAIL_HOST`: This variable is used to set the mail host for the mailer.
-- `MAIL_PORT`: This variable is used to set the mail port for the mailer.
-- `MAIL_ENCRYPTION`: This variable is used to set the mail encryption for the mailer.
-- `MAIL_SECURE`: This variable is used to set the mail secure for the mailer.
-- `MAIL_USERNAME`: This variable is used to set the mail username for the mailer.
-- `MAIL_PASSWORD`: This variable is used to set the mail password for the mailer.
-- `MAIL_FROM_NAME`: This variable is used to set the mail from name for the mailer.
-- `MAIL_FROM_ADDRESS`: This variable is used to set the mail from address for the mailer.
+- `APP_NAME`: Sets the application name, used in the mailer and other places.
+- `TIMEZONE`: Sets the timezone for the application, used in the mailer and other places.
+- `PORT`: Sets the port for the HTTP server.
+- `HOST`: Sets the host for the HTTP server.
+- `BASE_URL`: Sets the base URL for the application, used with [URL functions](./../utils//urls.mdx).
+- `DB_AUTH`: Sets the authentication database for the database connection.
+- `DB_PORT`: Sets the port for the database connection.
+- `DB_HOST`: Sets the host for the database connection.
+- `DB_NAME`: Sets the database name for the database connection.
+- `DB_USERNAME`: Sets the username for the database connection.
+- `DB_PASSWORD`: Sets the password for the database connection.
+- `MAIL_HOST`: Sets the mail host for the mailer.
+- `MAIL_PORT`: Sets the mail port for the mailer.
+- `MAIL_ENCRYPTION`: Sets the mail encryption for the mailer.
+- `MAIL_SECURE`: Sets the mail secure for the mailer.
+- `MAIL_USERNAME`: Sets the mail username for the mailer.
+- `MAIL_PASSWORD`: Sets the mail password for the mailer.
+- `MAIL_FROM_NAME`: Sets the mail from name for the mailer.
+- `MAIL_FROM_ADDRESS`: Sets the mail from address for the mailer.
 
-## Environment Files
+## 📂 Environment Files
 
-As mentioned above, the project is crafted with a `.env` file, this is the default environment file that will be loaded when running the project, however, things can get more complicated when you want to run the project in different environments, for example you may want to run the project in `development` environment, and `production` environment.
+The project is crafted with a `.env` file, the default environment file loaded when running the project. However, things can get more complex when running the project in different environments, such as `development` and `production`.
 
-In this case, create two files `.env` and `.env.production`.
+In this case, create two files: `.env` and `.env.production`.
 
-The `.env` file will be loaded when running the project in `development` environment, and the `.env.production` file will be loaded when running the project in `production` environment.
+The `.env` file is loaded when running the project in the `development` environment, and the `.env.production` file is loaded when running the project in the `production` environment.
 
 :::tip
-You can use `.env.development` and `.env.production` to distinguish between the environments, but it's recommended to use `.env` and `.env.production` to avoid any confusion.
+You can use `.env.development` and `.env.production` to distinguish between environments, but it's recommended to use `.env` and `.env.production` to avoid confusion.
 :::
 
-## Shared Environment File
+## 🔗 Shared Environment File
 
-In some cases, there are some variables that are shared between all environments, for example the `APP_NAME` variable, you may want to set it once and use it in all environments.
+In some cases, variables are shared between all environments, such as the `APP_NAME` variable. You may want to set it once and use it in all environments.
 
-To reduce duplicates between the environment variables in development and in production, create a `.env.shared` file then add all shared variables to it, then add the following line to the `.env` and `.env.production` files, the file will be loaded automatically.
+To reduce duplicates between environment variables in development and production, create a `.env.shared` file, add all shared variables to it, and then add the following line to the `.env` and `.env.production` files. The file will be loaded automatically.

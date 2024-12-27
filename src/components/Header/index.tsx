@@ -104,7 +104,7 @@ const Header = () => {
               </div>
               <div className="flex items-center justify-end gap-3 pr-16 lg:pr-0">
                 <a
-                  href="https://github.com/hassanzohdy"
+                  href="https://github.com/warlockjs"
                   target="_blank"
                   className="ease-in-up hidden rounded-sm bg-black p-3 text-base font-medium text-white shadow-btn transition duration-300 hover:bg-black/80 hover:text-white hover:shadow-btn-hover md:block md:px-9 lg:px-6 xl:px-9"
                 >
