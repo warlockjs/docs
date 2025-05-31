@@ -220,3 +220,51 @@ await cache.removeNamespace("users");
 ```
 
 This will clear out all the values that are stored under the `users` namespace.
+
+## Set Default Driver at Runtime
+You can switch the default driver at runtime using `use`:
+```ts
+import { cache } from "@warlock.js/core";
+await cache.use("memory");
+```
+
+## Get a Specific Driver (without switching)
+```ts
+import { cache } from "@warlock.js/core";
+const fileDriver = await cache.driver("file");
+```
+
+## Using Multiple Drivers
+You can use different drivers for different use-cases:
+```ts
+import { cache } from "@warlock.js/core";
+const redis = await cache.driver("redis");
+const memory = await cache.driver("memory");
+await redis.set("user:1", { name: "Alice" });
+await memory.set("temp", 123);
+```
+
+## Real-World Example: Caching API Responses
+```ts
+import { cache } from "@warlock.js/core";
+
+async function getUser(id) {
+  const cached = await cache.get(`user:${id}`);
+  if (cached) return cached;
+  const user = await fetchUserFromDb(id);
+  await cache.set(`user:${id}`, user, 3600);
+  return user;
+}
+```
+
+## Troubleshooting
+- **Driver not found?** Make sure it's listed in your config's `drivers` property.
+- **Cache not working?** Check your driver options and environment variables.
+- **Switching drivers has no effect?** Use `await cache.use("driverName")` and ensure the driver is properly configured.
+
+## Namespaces & Prefixes
+- Use namespaces (e.g., `users.1`) to group related cache keys.
+- Use `globalPrefix` to avoid key collisions between apps.
+
+## More
+See [Cache Driver Interface](./cache-driver-interface) for all available methods.

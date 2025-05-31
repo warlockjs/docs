@@ -4,17 +4,41 @@ sidebar_position: 1
 
 # Introduction
 
-Cache is a very important part of any application. It is used to store data that is frequently accessed by the application. This data is stored in memory and is retrieved from the cache instead of the database. This improves the performance of the application.
+Cache is a crucial part of any high-performance application. It stores frequently accessed data, reducing database or API calls and improving response times.
+
+## Why Use Cache?
+- **Speed**: Serve data instantly from memory or fast storage.
+- **Scalability**: Reduce load on databases and external services.
+- **Cost**: Lower infrastructure costs by reducing repeated expensive operations.
 
 ## Cache Manager
+Warlock provides a unified, developer-friendly API to interact with cache. The [`CacheManager`](./cache-manager) lets you use any cache driver with a consistent set of methods.
 
-Warlock provides a high level with single API to interact with the cache. The [CacheManager](./cache-manager) object, it wraps any [cache driver](#cache-drivers) and provides a set of methods that you can use to interact with the cache.
+## Available Cache Drivers
+Warlock ships with several drivers out of the box:
 
-## Cache Drivers
+1. [Redis Cache Driver](./redis) — Best for distributed, production-grade caching.
+2. [File Cache Driver](./file) — Simple, persistent, file-based cache.
+3. [Memory Cache Driver](./memory) — Fast, in-memory cache (resets on restart).
+4. [Memory Extended Cache Driver](./memory-extended) — Like memory, but resets TTL on every access (sliding expiration).
+5. [LRU Memory Cache Driver](./lru-memory) — In-memory cache with Least Recently Used eviction.
+6. [Null Cache Driver](./null) — Disables caching (useful for testing).
 
-Warlock is shipped with the following drivers for caching process:
+## Quick Guide: Which Driver Should I Use?
+| Use Case | Recommended Driver |
+|----------|-------------------|
+| Production, multi-server, distributed | Redis |
+| Local development, simple persistence | File |
+| Fastest, ephemeral, single-process | Memory |
+| Need sliding expiration | Memory Extended |
+| Limited memory, want LRU eviction | LRU Memory |
+| Testing, disable cache | Null |
 
-1. [Redis Cache Driver](./redis)
-2. [File Cache Driver](./file)
-3. [Memory Cache Driver](./memory)
-4. [Null Cache Driver](./null)
+## Advanced Features
+- **Namespaces** for grouping cache keys
+- **Global Prefixes** to avoid key collisions
+- **Custom Drivers**: [Create your own](./make-your-own-cache-driver)
+- **Driver Switching**: Change drivers at runtime
+- **Multi-driver strategies** (coming soon)
+
+Ready to get started? Check out [Cache Configurations](./configurations) or jump to a driver above!

@@ -4,57 +4,47 @@ sidebar_position: 4
 
 # Cache Driver Interface
 
-The following schema represents the interface of any cache driver implementation.
+Any custom cache driver must implement this interface. All built-in drivers follow this contract.
 
-If you are going to [create a custom cache driver](./make-your-own-cache-driver) make sure to implement this interface.
+## Required Methods
+
+| Method                       | Description                            |
+| ---------------------------- | -------------------------------------- |
+| `options`                    | Driver options object                  |
+| `name`                       | Driver name (string)                   |
+| `removeNamespace(namespace)` | Remove all cached items by namespace   |
+| `setOptions(options)`        | Set the driver options                 |
+| `parseKey(key)`              | Parse the cache key (string or object) |
+| `set(key, value, ttl?)`      | Set a value in the cache               |
+| `get(key)`                   | Get a value from the cache             |
+| `remove(key)`                | Remove a value from the cache          |
+| `flush()`                    | Flush the entire cache                 |
+| `connect()`                  | Connect to the cache backend           |
+| `client`                     | (optional) Underlying client instance  |
+| `disconnect()`               | (optional) Disconnect from backend     |
+
+## Example
 
 ```ts
 export interface CacheDriver<ClientType, Options> {
-  /**
-   * The cache driver options
-   */
   options: Options;
-  /**
-   *  Remove all cached items by namespace
-   */
+  name: string;
   removeNamespace(namespace: string): Promise<any>;
-  /**
-   * Set the cache driver options
-   */
   setOptions(options: Options): any;
-  /**
-   * Parse the key to be used in the cache
-   */
-  parseKey(key: string | GenericObject): string;
-  /**
-   * Set a value in the cache
-   *
-   * @param key The cache key, could be an object or string
-   * @param value The value to be stored in the cache
-   * @param ttl The time to live in seconds
-   */
+  parseKey(key: string | GenericObject): Promise<string>;
   set(key: string | GenericObject, value: any, ttl?: number): Promise<any>;
-  /**
-   * Get a value from the cache
-   */
-  get(key: string | GenericObject): Promise<any>;
-  /**
-   * Remove a value from the cache
-   */
+  get(key: string | GenericObject): Promise<any | null>;
   remove(key: string | GenericObject): Promise<void>;
-  /**
-   * Flush the entire cache
-   */
   flush(): Promise<void>;
-  /**
-   * Connect to the cache driver
-   */
   connect(): Promise<any>;
-  /**
-   * The cache client
-   */
   client?: ClientType;
+  disconnect?(): Promise<void>;
 }
 ```
 
-The client type here represents a high level access for the cache client, for example the [Redis Cache Driver](./redis)'s client is [Redis Client](https://www.npmjs.com/package/redis).
+## Extension Points
+
+- Extend [BaseCacheDriver](./base-cache-driver) for common logic
+- Use [parseCacheKey](./utils#parse-cache-key) for key normalization
+
+See [Make Your Own Cache Driver](./make-your-own-cache-driver) for a full example.

@@ -4,30 +4,34 @@ sidebar_position: 7
 
 # Memory Cache Driver
 
-The memory cache driver stores data in memory, it will be persisted until the application is restarted.
+The memory cache driver stores data in memory. All cached data is lost when the application restarts.
 
-## Driver name
+## When to Use
+- Local development
+- Caching data for the duration of a process
+- Fastest possible cache (no disk or network I/O)
 
-The default name for the driver is `memory`.
+## Best For
+- Temporary data
+- Caching API responses, user sessions, or computed values
+
+## Limitations
+- Data is lost on restart
+- Not shared between processes or servers
+- No eviction policy (see [LRU Memory Cache Driver](./lru-memory) for that)
+
+## Alternatives
+- [Memory Extended Cache Driver](./memory-extended): Sliding expiration (TTL resets on access)
+- [LRU Memory Cache Driver](./lru-memory): Evicts least recently used items when full
 
 ## Options
+- `globalPrefix`: Prefix for all keys (string or function)
+- `ttl`: Time to live in seconds (default: Infinity)
 
-The memory cache driver has the following options:
-
-- `globalPrefix`: A prefix that will be added to all keys. This is useful when you want to use the same cache driver for multiple applications, it could be a `string` or a callback that returns a `string`, if not provided then there will no be prefix for the keys.
-- `ttl`: Time to live in seconds, the default value is `Infinity`.
-
-## Usage
-
-To use the memory cache driver, you need to define it in the drivers list in the cache configurations file:
-
+## Example Usage
 ```ts title="src/config/cache.ts"
 import { env } from "@mongez/dotenv";
-import {
-  CacheConfigurations,
-  MemoryCacheDriver,
-  requestContext,
-} from "@warlock.js/core";
+import { CacheConfigurations, MemoryCacheDriver } from "@warlock.js/core";
 
 const cacheConfigurations: CacheConfigurations = {
   drivers: {
@@ -36,8 +40,8 @@ const cacheConfigurations: CacheConfigurations = {
   default: env("CACHE_DRIVER", "memory"),
   options: {
     memory: {
-      globalPrefix: "online-store",
-      ttl: 60 * 60 * 24, // 24 hours
+      globalPrefix: "dev-app",
+      ttl: 60 * 60, // 1 hour
     },
   },
 };
@@ -45,11 +49,17 @@ const cacheConfigurations: CacheConfigurations = {
 export default cacheConfigurations;
 ```
 
-This will allow the cache manager to pick it if there is no `CACHE_DRIVER` environment variable defined.
+## Storing and Retrieving Data
+```ts
+import { cache } from "@warlock.js/core";
 
-We set the global prefix to `online-store`, this will be added to all keys. This is useful when you want to use the same cache driver for multiple applications, it could be a `string` or a callback that returns a `string`, if not provided then there will no be prefix for the keys.
+await cache.set("user:1", { name: "Alice" }, 3600);
+const user = await cache.get("user:1");
+```
 
-All cache keys will remain for 24 hours, after that they will be removed.
+## Troubleshooting
+- **Data disappears after restart**: This is expected. Use [File](./file) or [Redis](./redis) drivers for persistence.
+- **Cache not shared between processes**: Use [Redis](./redis) for distributed cache.
 
 :::note
 Please note that the Memory Cache Drier implements all methods in [Cache Driver Interface](./cache-driver-interface) so you can use it directly as a cache driver.

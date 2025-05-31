@@ -1,0 +1,54 @@
+---
+sidebar_position: 9
+---
+
+# LRU Memory Cache Driver
+
+The LRU (Least Recently Used) Memory Cache Driver is an in-memory cache that automatically evicts the least recently used items when it reaches its capacity.
+
+## When to Use
+- You want fast, in-memory caching with automatic eviction
+- You have limited memory and want to avoid unbounded growth
+
+## Best For
+- Caching computed values, API responses, or temporary data
+- Scenarios where memory usage must be controlled
+
+## Limitations
+- Data is lost on restart
+- Not shared between processes or servers
+- No persistence
+- No namespaces support
+
+## Options
+- `capacity`: Maximum number of items in the cache (default: 1000)
+
+## Example Usage
+```ts title="src/config/cache.ts"
+import { LRUMemoryCacheDriver } from "@warlock.js/core";
+
+const cacheConfigurations = {
+  drivers: {
+    lru: LRUMemoryCacheDriver,
+  },
+  default: "lru",
+  options: {
+    lru: {
+      capacity: 500,
+    },
+  },
+};
+```
+
+## Storing and Retrieving Data
+```ts
+import { cache } from "@warlock.js/core";
+
+await cache.set("temp:1", 123);
+const value = await cache.get("temp:1");
+```
+
+## Troubleshooting
+- **Data disappears after restart**: This is expected. Use [File](./file) or [Redis](./redis) for persistence.
+- **Cache not shared between processes**: Use [Redis](./redis) for distributed cache.
+- **No namespaces?** LRU driver does not support namespaces. 

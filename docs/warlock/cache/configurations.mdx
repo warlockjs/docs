@@ -4,12 +4,10 @@ sidebar_position: 2
 
 # Cache Configurations
 
-Cache configurations are used to define the cache drivers, and the default driver and each driver's options.
+Cache configurations define which drivers are available, the default driver, and options for each driver.
 
-## Usage
-
-In the `src/config` directory, make sure to create `cache.ts` file if not created already.
-
+## Basic Usage
+Create `src/config/cache.ts`:
 ```ts title="src/config/cache.ts"
 import { env } from "@mongez/dotenv";
 import { CacheConfigurations, RedisCacheDriver } from "@warlock.js/core";
@@ -31,61 +29,45 @@ const cacheConfigurations: CacheConfigurations = {
 export default cacheConfigurations;
 ```
 
-## Configurations
-
-The cache configurations object has the following properties:
-
-- `default`: This is the default driver that will be used if no driver is specified.
-- `drivers`: This is an object that holds the cache drivers, the key is the driver name, and the value is the driver class.
-- `options`: This is an object that holds the options for each driver, the key is the driver name, and the value is the driver options.
-
-## Default Driver
-
-The `default` property is used to define the default driver that will be called on application boot.
-
-It should be a driver name that is named under the `drivers` property.
-
-For example, we can set the default cache driver to `redis` which is declared under the `drivers` property.
-
+## Advanced: Multiple Drivers
+You can define several drivers and switch between them at runtime:
 ```ts title="src/config/cache.ts"
-import { env } from "@mongez/dotenv";
-import { CacheConfigurations, RedisCacheDriver } from "@warlock.js/core";
+import { FileCacheDriver, RedisCacheDriver, MemoryCacheDriver } from "@warlock.js/core";
 
-const cacheConfigurations: CacheConfigurations = {
+const cacheConfigurations = {
   drivers: {
     redis: RedisCacheDriver,
+    file: FileCacheDriver,
+    memory: MemoryCacheDriver,
   },
-  default: env("CACHE_DRIVER", "redis"),
+  default: "redis",
   options: {
-    redis: {
-      host: env("REDIS_HOST"),
-      port: env("REDIS_PORT"),
-      password: env("REDIS_PASSWORD"),
-    },
+    redis: { host: "localhost" },
+    file: { directory: "./tmp/cache" },
+    memory: { ttl: 3600 },
   },
 };
-
-export default cacheConfigurations;
 ```
 
-:::info
-If no default driver is defined, then the cache manager will use the [NullCacheDriver](./null) instead.
-:::
+## Using a Custom Driver
+You can add your own driver:
+```ts
+import { MyCustomCacheDriver } from "./my-custom-driver";
 
-## Drivers
+const cacheConfigurations = {
+  drivers: {
+    custom: MyCustomCacheDriver,
+  },
+  default: "custom",
+  options: {
+    custom: { /* ... */ },
+  },
+};
+```
 
-This is where we define all drivers that might be used in the application, usually, we define only the default driver, but based on the application needs, we might need to define more than one driver.
+## Troubleshooting
+- **Driver not found?** Make sure it's listed in `drivers`.
+- **Wrong driver used?** Check the `default` property and your environment variables.
+- **Options not applied?** Ensure the `options` object matches your driver names.
 
-the `driver` property is an object that holds the cache drivers, the key is the driver name, and the value is the driver class.
-
-:::note
-Please note we define the driver class, not an instance of the driver as it is lazy instantiated by the cache manager.
-:::
-
-:::info
-Please check [All Available Drivers](./introduction#cache-drivers) to know more about the available drivers.
-:::
-
-## Options
-
-In the `options` property, we define the options for each driver, the key is the driver name, and the value is the driver options that will be used when the cache driver is loaded.
+See [Cache Manager](./cache-manager) for runtime switching and more advanced usage.

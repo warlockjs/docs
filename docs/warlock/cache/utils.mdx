@@ -8,26 +8,31 @@ This section covers the utilities provided for cache drivers.
 
 ## Parse Cache Key
 
-The `parseCacheKey` function parses a cache key either it is a string or an object then sanitizes it from any invalid characters and return a `dot.notation` syntax.
+The `parseCacheKey` function parses a cache key (string or object), sanitizes it, and returns a dot.notation string. This helps avoid key collisions and makes cache keys predictable.
 
+### When to Use
+- When using objects as cache keys (e.g., for query filters)
+- When you want consistent, readable cache keys
+
+### Examples
 ```ts title="src/app/main.ts"
 import { parseCacheKey } from "@warlock.js/core";
 
 console.log(parseCacheKey("users:1")); // users.1
-```
-
-Also if it is an object, it will flat map it like this:
-
-```ts title="src/app/main.ts"
-import { parseCacheKey } from "@warlock.js/core";
 
 const filter = {
-    limit: 3,
-    page: 1,
-    search: 'John',
+  limit: 3,
+  page: 1,
+  search: "John",
 };
-
 console.log(parseCacheKey(filter)); // limit.3.page.1.search.John
+
+const nested = {
+  user: { id: 5 },
+  tags: ["a", "b"],
+};
+console.log(parseCacheKey(nested)); // user.id.5.tags.a.b
 ```
 
-This will be extremely useful when caching the database queries that are called based on current request filters which is implemented in [Repository Cache](./../repositories/caching)
+### Tip
+Use this utility for cache keys in repositories, API responses, or any place where the key might be an object.

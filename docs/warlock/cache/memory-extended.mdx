@@ -1,0 +1,60 @@
+---
+sidebar_position: 8
+---
+
+# Memory Extended Cache Driver
+
+The Memory Extended Cache Driver is similar to the [Memory Cache Driver](./memory), but with **sliding expiration**: every time you access a key, its TTL is reset.
+
+## When to Use
+
+- You want cache entries to stay alive as long as they're being used
+- Session-like or frequently accessed data
+
+## Best For
+
+- User sessions
+- Frequently accessed, but not permanent, data
+
+## Limitations
+
+- Data is lost on restart
+- Not shared between processes or servers
+- No eviction policy (see [LRU Memory Cache Driver](./lru-memory))
+
+## Options
+
+- `globalPrefix`: Prefix for all keys (string or function)
+- `ttl`: Time to live in seconds (default: Infinity)
+
+## Example Usage
+
+```ts title="src/config/cache.ts"
+import { MemoryExtendedCacheDriver } from "@warlock.js/core";
+
+const cacheConfigurations = {
+  drivers: {
+    memoryExtended: MemoryExtendedCacheDriver,
+  },
+  default: "memoryExtended",
+  options: {
+    memoryExtended: {
+      ttl: 600, // 10 minutes
+    },
+  },
+};
+```
+
+## Storing and Retrieving Data
+
+```ts
+import { cache } from "@warlock.js/core";
+
+await cache.set("session:abc", { userId: 1 }, 600);
+const session = await cache.get("session:abc"); // TTL resets to 10 minutes
+```
+
+## Troubleshooting
+
+- **Data disappears after restart**: This is expected. Use [File](./file) or [Redis](./redis) for persistence.
+- **Cache not shared between processes**: Use [Redis](./redis) for distributed cache.

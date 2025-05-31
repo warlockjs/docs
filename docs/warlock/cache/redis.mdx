@@ -4,7 +4,25 @@ sidebar_position: 6
 
 # Redis Cache Driver
 
-[Redis](https://redis.io/) is an open source (BSD licensed), in-memory data structure store, used as a database, cache, and message broker.
+[Redis](https://redis.io/) is a high-performance, in-memory data store. It is ideal for distributed, production-grade caching.
+
+## When to Use
+- Production environments
+- Multi-server or distributed systems
+- Need for persistence, high availability, or large cache sizes
+
+## Best For
+- Caching API/database responses
+- Session storage
+- Shared cache between multiple app instances
+
+## Limitations
+- Requires Redis server setup
+- Slightly more operational overhead than memory/file
+
+## Alternatives
+- [File Cache Driver](./file): Simpler, persistent, but not distributed
+- [Memory Cache Driver](./memory): Fastest, but not shared or persistent
 
 ## Setup
 
@@ -25,10 +43,12 @@ const cacheConfigurations: CacheConfigurations = {
   default: env("CACHE_DRIVER", "redis"),
   options: {
     redis: {
-      host: env("REDIS_HOST"),
-      port: env("REDIS_PORT"),
+      host: env("REDIS_HOST", "localhost"),
+      port: env("REDIS_PORT", 6379),
       username: env("REDIS_USERNAME"),
       password: env("REDIS_PASSWORD"),
+      globalPrefix: "prod-app",
+      ttl: 60 * 60 * 24, // 24 hours
     },
   },
 };
@@ -49,17 +69,27 @@ Make sure Redis is installed on your local machine and on the server otherwise i
 - `password`: Redis password, the default value is `null`.
 - `globalPrefix`: A prefix that will be added to all keys. This is useful when you want to use the same cache driver for multiple applications, it could be a `string` or a callback that returns a `string`, if not provided then there will no be prefix for the keys.
 - `clientOptions`: Any additional options that will be passed to the [Redis Configurations](https://github.com/redis/node-redis/blob/a8b81bdd01329252466eb1dd608b2a92b960c3ae/docs/client-configuration.md).
+- `ttl`: Time to live in seconds (default: Infinity)
 
-## Accessing the Redis Client
+## Example Usage
 
-To access the Redis client, use the `client` property on the cache manager or the cache driver.
-
+## Storing and Retrieving Data
 ```ts
 import { cache } from "@warlock.js/core";
 
-// assuming the default driver is redis
+await cache.set("user:2", { name: "Bob" }, 3600);
+const user = await cache.get("user:2");
+```
+
+## Accessing the Redis Client
+```ts
+import { cache } from "@warlock.js/core";
 const redisClient = cache.client;
 ```
+
+## Troubleshooting
+- **Connection errors?** Check your Redis server is running and credentials are correct.
+- **Data not shared between servers?** Make sure all instances use the same Redis server.
 
 :::note
 Please note that the Redis Cache Drier implements all methods in [Cache Driver Interface](./cache-driver-interface) so you can use it directly as a cache driver.
