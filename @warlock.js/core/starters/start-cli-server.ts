@@ -2,6 +2,7 @@
 import { ensureDirectoryAsync } from "@mongez/fs";
 import { spawn } from "child_process";
 import esbuild from "esbuild";
+import { type CommandActionData } from "../console";
 import { srcPath, storagePath, warlockPath } from "../utils";
 import { nativeNodeModulesPlugin } from "./../esbuild";
 import { startHttpApp } from "./start-http-server";
@@ -15,7 +16,17 @@ export async function startCliServer() {
 
   // make a special check for the development command
   if (command === "dev") {
-    return startHttpApp();
+    // check if the command receives --fresh
+    const data = {
+      options: {
+        fresh: false,
+      },
+    };
+    if (process.argv.includes("--fresh")) {
+      data.options.fresh = true;
+    }
+
+    return startHttpApp(data as unknown as CommandActionData);
   }
 
   const outputCliPath = warlockPath("cli.js");

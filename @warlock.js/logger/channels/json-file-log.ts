@@ -6,7 +6,7 @@ import {
 } from "@mongez/fs";
 import dayjs from "dayjs";
 import path from "path";
-import type { LogContract, LogLevel, LogMessage } from "../types";
+import type { LogContract, LogMessage, LoggingData } from "../types";
 import { FileLog } from "./file-log";
 
 export class JSONFileLog extends FileLog implements LogContract {
@@ -34,24 +34,21 @@ export class JSONFileLog extends FileLog implements LogContract {
   /**
    * {@inheritdoc}
    */
-  public async log(
-    module: string,
-    action: string,
-    message: any,
-    level: LogLevel,
-  ) {
-    if (!this.shouldBeLogged({ module, action, level, message })) return;
+  public async log(data: LoggingData) {
+    let stack: string[] | undefined;
+
+    if (data.message instanceof Error) {
+      stack = data.message.stack?.split("\n");
+      data.message = data.message.message;
+    }
+
+    const { module, action, message, type: level } = data;
+
+    if (!this.shouldBeLogged(data)) return;
 
     const { date: dateFormat, time } = this.getDateAndTimeFormat();
 
     const date = dayjs().format(dateFormat + " " + time);
-
-    let stack: string[] | undefined;
-
-    if (message instanceof Error) {
-      stack = message.stack?.split("\n");
-      message = message.message;
-    }
 
     this.messages.push({
       content: message,

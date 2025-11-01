@@ -40,19 +40,17 @@ export type Schema<ModelSchema = Document> = ModelSchema & {
   updatedAt?: Date;
 };
 
-type ModelSchema = Schema;
-
 export class Model
   // <
   //   ModelDocument extends Document = any,
-  //   ModelSchema extends Schema<ModelDocument> = any,
+  //   Schema extends Schema<ModelDocument> = any,
   // >
   extends CrudModel
 {
   /**
    * Model Initial Document data
    */
-  public initialData: Partial<ModelSchema> = {};
+  public initialData: Partial<Schema> = {};
 
   /**
    * Model relationships defined using the joinable API.
@@ -81,13 +79,13 @@ export class Model
   /**
    * Model Document data
    */
-  public data!: ModelSchema;
+  public data!: Schema;
 
   /**
    * Define Default value data that will be merged with the models' data
    * on the create process
    */
-  public defaultValue: Partial<ModelSchema> = {};
+  public defaultValue: Partial<Schema> = {};
 
   /**
    * A flag to determine if the model is being restored
@@ -124,7 +122,7 @@ export class Model
   /**
    * Embedded columns
    */
-  public embedded: (keyof ModelSchema)[] = [];
+  public embedded: (keyof Schema)[] = [];
 
   /**
    * Embed all columns except the given columns
@@ -184,7 +182,7 @@ export class Model
   /**
    * Original data
    */
-  public originalData: ModelSchema = {} as ModelSchema;
+  public originalData: Schema = {} as Schema;
 
   /**
    * List of dirty columns
@@ -200,13 +198,13 @@ export class Model
   /**
    * Constructor
    */
-  public constructor(originalData: Partial<ModelSchema> = {}) {
+  public constructor(originalData: Partial<Schema> = {}) {
     super();
 
     if (originalData instanceof Model) {
-      this.originalData = clone(originalData.data) as ModelSchema;
+      this.originalData = clone(originalData.data) as Schema;
     } else {
-      this.originalData = clone(originalData) as ModelSchema;
+      this.originalData = clone(originalData) as Schema;
     }
 
     if (typeof originalData?._id === "string") {
@@ -266,10 +264,10 @@ export class Model
   }
 
   /**
-   * Check if current user is active
+   * Check if current model is active
    */
   public get isActive() {
-    return Boolean(this.get(this.isActiveColumn));
+    return this.bool(this.isActiveColumn);
   }
 
   /**
@@ -289,9 +287,9 @@ export class Model
   /**
    * Set a column in the model data
    */
-  public set(column: keyof ModelSchema, value: any) {
+  public set(column: keyof Schema, value: any) {
     const currentValue = this.get(column);
-    this.data = set(this.data, column as string, value) as ModelSchema;
+    this.data = set(this.data, column as string, value) as Schema;
 
     if (currentValue !== value) {
       set(this.dirtyColumns, column as string, {
@@ -306,21 +304,21 @@ export class Model
   /**
    * Increment the given column by the given value
    */
-  public increment(column: keyof ModelSchema, value = 1) {
+  public increment(column: keyof Schema, value = 1) {
     return this.set(column, this.get(column, 0) + value);
   }
 
   /**
    * Decrement the given column by the given value
    */
-  public decrement(column: keyof ModelSchema, value = 1) {
+  public decrement(column: keyof Schema, value = 1) {
     return this.set(column, this.get(column, 0) - value);
   }
 
   /**
    * Get initial value of the given column
    */
-  public getInitial(column: keyof ModelSchema, defaultValue?: any) {
+  public getInitial(column: keyof Schema, defaultValue?: any) {
     return get(this.initialData, column as string, defaultValue);
   }
 
@@ -328,7 +326,7 @@ export class Model
    * Get value of the given column
    */
   public get<ValueType = any>(
-    column: keyof ModelSchema,
+    column: keyof Schema,
     defaultValue?: any,
   ): ValueType {
     return get(this.data, column as string, defaultValue);
@@ -337,56 +335,56 @@ export class Model
   /**
    * Return the value of the given column as a string
    */
-  public string(column: keyof ModelSchema, defaultValue?: any) {
+  public string(column: keyof Schema, defaultValue?: any) {
     return String(this.get(column, defaultValue));
   }
 
   /**
    * Return the value of the given column as an integer
    */
-  public int(column: keyof ModelSchema, defaultValue?: any) {
+  public int(column: keyof Schema, defaultValue?: any) {
     return parseInt(this.get(column, defaultValue));
   }
 
   /**
    * Return the value of the given column as a float
    */
-  public float(column: keyof ModelSchema, defaultValue?: any) {
+  public float(column: keyof Schema, defaultValue?: any) {
     return parseFloat(this.get(column, defaultValue));
   }
 
   /**
    * Return the value of the given column as a number
    */
-  public number(column: keyof ModelSchema, defaultValue?: any) {
+  public number(column: keyof Schema, defaultValue?: any) {
     return Number(this.get(column, defaultValue));
   }
 
   /**
    * Return the value of the given column as a boolean
    */
-  public bool(column: keyof ModelSchema, defaultValue?: any) {
+  public bool(column: keyof Schema, defaultValue?: any) {
     return Boolean(this.get(column, defaultValue));
   }
 
   /**
    * Determine whether the given column exists in the document
    */
-  public has(column: keyof ModelSchema) {
+  public has(column: keyof Schema) {
     return get(this.data, column as string) !== undefined;
   }
 
   /**
    * Get all columns except the given ones
    */
-  public except(columns: (keyof ModelSchema)[]): Document {
+  public except(columns: (keyof Schema)[]): Document {
     return except(this.data, columns as string[]);
   }
 
   /**
    * Get only the given columns
    */
-  public only(columns: (keyof ModelSchema)[]): Document {
+  public only<T extends Document = Document>(columns: (keyof Schema)[]): T {
     return only(this.data, columns as string[]);
   }
 
@@ -400,7 +398,7 @@ export class Model
   /**
    * Unset or remove the given columns from the data
    */
-  public unset(...columns: (keyof ModelSchema)[]) {
+  public unset(...columns: (keyof Schema)[]) {
     const currentValues = this.only(columns);
     this.data = except(this.data, columns as string[]);
 
@@ -417,7 +415,7 @@ export class Model
   /**
    * Get the value of the given column and remove it from the data
    */
-  public pluck(column: keyof ModelSchema) {
+  public pluck(column: keyof Schema) {
     const value = this.get(column);
     this.unset(column);
     return value;
@@ -426,7 +424,7 @@ export class Model
   /**
    * Replace the entire document data with the given new data
    */
-  public replaceWith(data: ModelSchema) {
+  public replaceWith(data: Schema) {
     if (!data.id && this.data.id) {
       data.id = this.data.id;
     }
@@ -475,7 +473,7 @@ export class Model
    * If the given column does not exists, it will be created
    * If the given value exists but not an array it will be ignored
    */
-  public push(column: keyof ModelSchema, ...values: any[]) {
+  public push(column: keyof Schema, ...values: any[]) {
     const currentValue = this.get(column);
 
     if (Array.isArray(currentValue)) {
@@ -490,7 +488,7 @@ export class Model
   /**
    * Push the given values to the given column only if not exists
    */
-  public pushOnce(column: keyof ModelSchema, ...values: any[]) {
+  public pushOnce(column: keyof Schema, ...values: any[]) {
     const currentValue = this.get(column);
 
     if (Array.isArray(currentValue)) {
@@ -508,7 +506,7 @@ export class Model
    * If the given column does not exists, it will be created
    * If the given value exists but not an array it will be ignored
    */
-  public unshift(column: keyof ModelSchema, ...values: any[]) {
+  public unshift(column: keyof Schema, ...values: any[]) {
     const currentValue = this.get(column);
 
     if (Array.isArray(currentValue)) {
@@ -523,7 +521,7 @@ export class Model
   /**
    * Add the given values to the beginning of the given column only if not exists
    */
-  public unshiftOnce(column: keyof ModelSchema, ...values: any[]) {
+  public unshiftOnce(column: keyof Schema, ...values: any[]) {
     const currentValue = this.get(column);
 
     if (Array.isArray(currentValue)) {
@@ -595,7 +593,7 @@ export class Model
    * Perform saving operation either by updating or creating a new record in database
    */
   public async save(
-    mergedData?: Omit<ModelSchema, "id" | "_id">,
+    mergedData?: Omit<Schema, "id" | "_id">,
     {
       triggerEvents = true,
       cast = true,
@@ -674,7 +672,7 @@ export class Model
             this.data = (await this.getQuery().create(
               this.getCollection(),
               this.data,
-            )) as ModelSchema;
+            )) as Schema;
 
             if (triggerEvents) {
               this.triggerCreatedEvents();
@@ -770,7 +768,7 @@ export class Model
    * Perform saving but without any events triggers
    */
   public async silentSaving(
-    mergedData?: Omit<ModelSchema, "id" | "_id">,
+    mergedData?: Omit<Schema, "id" | "_id">,
     options?: { cast?: boolean },
   ) {
     return await this.save(mergedData, {
@@ -782,7 +780,7 @@ export class Model
   /**
    * Determine whether the model should be updated or not
    */
-  protected shouldUpdate(originalData: ModelSchema, data: ModelSchema) {
+  protected shouldUpdate(originalData: Schema, data: Schema) {
     return areEqual(originalData, data) === false;
   }
 

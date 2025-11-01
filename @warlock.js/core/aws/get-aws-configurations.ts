@@ -1,5 +1,5 @@
 import type { AWSConnectionOptions } from ".";
-import { config } from "../config";
+import { config } from "../config/utils";
 
 export async function getAWSConfigurations(): Promise<
   AWSConnectionOptions | undefined

@@ -46,6 +46,18 @@ export type ResponseEvent =
    */
   | "sending"
   /**
+   * Triggered before sending json response
+   */
+  | "sendingJson"
+  /**
+   * Triggered after sending success json response
+   */
+  | "sendingSuccessJson"
+  /**
+   * Triggered after sending bad request json response
+   */
+  | "sendingBadRequestJson"
+  /**
    * Triggered after sending the response regardless of the response status code
    */
   | "sent"

@@ -4,21 +4,5 @@
   "link": {
     "type": "generated-index",
     "description": "Cache System In Warlock"
-  },
-  "items": [
-    "introduction",
-    "configurations",
-    "cache-manager",
-    "cache-driver-interface",
-    "base-cache-driver",
-    "redis",
-    "memory",
-    "memory-extended",
-    "lru-memory",
-    "file",
-    "database",
-    "null",
-    "make-your-own-cache-driver",
-    "utils"
-  ]
+  }
 }

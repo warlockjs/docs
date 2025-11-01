@@ -18,16 +18,18 @@ Warlock provides a unified, developer-friendly API to interact with cache. The [
 Warlock ships with several drivers out of the box:
 
 1. [Redis Cache Driver](./redis) — Best for distributed, production-grade caching.
-2. [File Cache Driver](./file) — Simple, persistent, file-based cache.
-3. [Memory Cache Driver](./memory) — Fast, in-memory cache (resets on restart).
-4. [Memory Extended Cache Driver](./memory-extended) — Like memory, but resets TTL on every access (sliding expiration).
-5. [LRU Memory Cache Driver](./lru-memory) — In-memory cache with Least Recently Used eviction.
-6. [Null Cache Driver](./null) — Disables caching (useful for testing).
+2. [Database Cache Driver](./database) — Store cache in your database for persistence and querying.
+3. [File Cache Driver](./file) — Simple, persistent, file-based cache.
+4. [Memory Cache Driver](./memory) — Fast, in-memory cache (resets on restart).
+5. [Memory Extended Cache Driver](./memory-extended) — Like memory, but resets TTL on every access (sliding expiration).
+6. [LRU Memory Cache Driver](./lru-memory) — In-memory cache with Least Recently Used eviction.
+7. [Null Cache Driver](./null) — Disables caching (useful for testing).
 
 ## Quick Guide: Which Driver Should I Use?
 | Use Case | Recommended Driver |
 |----------|-------------------|
 | Production, multi-server, distributed | Redis |
+| Need database persistence with querying | Database |
 | Local development, simple persistence | File |
 | Fastest, ephemeral, single-process | Memory |
 | Need sliding expiration | Memory Extended |
@@ -40,5 +42,7 @@ Warlock ships with several drivers out of the box:
 - **Custom Drivers**: [Create your own](./make-your-own-cache-driver)
 - **Driver Switching**: Change drivers at runtime
 - **Multi-driver strategies** (coming soon)
+- **Built-in Logging**: All cache operations are automatically logged
+- **TTL Management**: Automatic expiration handling
 
 Ready to get started? Check out [Cache Configurations](./configurations) or jump to a driver above!

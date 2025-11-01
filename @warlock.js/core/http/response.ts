@@ -5,6 +5,7 @@ import { fileExistsAsync } from "@mongez/fs";
 import { isIterable, isPlainObject, isScalar } from "@mongez/supportive-is";
 import type { LogLevel } from "@warlock.js/logger";
 import { log } from "@warlock.js/logger";
+import type { ValidationResult } from "@warlock.js/seal";
 import type { FastifyReply } from "fastify";
 import fs from "fs";
 import path from "path";
@@ -12,8 +13,8 @@ import type React from "react";
 import { type ReactNode } from "react";
 import send from "send";
 import type { Route } from "../router";
-import type { ValidationResult, Validator } from "../validator";
-import { render } from "./../react";
+import { renderReact } from "./../react";
+import type { Validator } from "./../validator";
 import type { Request } from "./request";
 import type { ResponseEvent } from "./types";
 
@@ -53,7 +54,7 @@ export class Response {
   /**
    * Current status code
    */
-  protected currentStatusCode?: number;
+  protected currentStatusCode = 200;
 
   /**
    * Current response body
@@ -171,9 +172,7 @@ export class Response {
    * Check if response status is ok
    */
   public get isOk() {
-    return (
-      this.baseResponse.statusCode >= 200 && this.baseResponse.statusCode < 300
-    );
+    return this.currentStatusCode >= 200 && this.currentStatusCode < 300;
   }
 
   /**
@@ -258,12 +257,20 @@ export class Response {
   public log(message: string, level: LogLevel = "info") {
     if (!config.get("http.log")) return;
 
-    log(
-      "response",
-      this.route.method + " " + this.route.path.replace("/*", ""),
+    log({
+      module: "response",
+      action:
+        this.route.method +
+        " " +
+        this.route.path.replace("/*", "") +
+        `:${this.request.id}`,
       message,
-      level,
-    );
+      type: level,
+      context: {
+        request: this.request,
+        response: this,
+      },
+    });
   }
 
   /**
@@ -293,10 +300,24 @@ export class Response {
 
     this.log("Sending response");
     // trigger the sending event
+    if (typeof this.currentBody === "object") {
+      this.setContentType("application/json");
+    }
+
     await Response.trigger("sending", this);
 
     for (const callback of this.events.get("sending") || []) {
       await callback(this);
+    }
+
+    for (const callback of this.events.get("sendingJson") || []) {
+      await callback(this);
+    }
+
+    if (this.isOk) {
+      for (const callback of this.events.get("sendingSuccessJson") || []) {
+        await callback(this);
+      }
     }
 
     // parse the body and make sure it is transformed to sync data instead of async data
@@ -383,7 +404,7 @@ export class Response {
     element: React.ReactElement | React.ComponentType,
     status = 200,
   ) {
-    return this.setStatusCode(status).html(render(element));
+    return this.setStatusCode(status).html(renderReact(element));
   }
 
   /**
@@ -431,7 +452,7 @@ export class Response {
         this.baseResponse.raw.end();
       },
       render: (element: ReactNode) => {
-        const html = render(element);
+        const html = renderReact(element);
         this.baseResponse.raw.write(html);
       },
     };
@@ -685,7 +706,11 @@ export class Response {
 
     const responseStatus = config.get("validation.responseStatus", 400);
 
-    log.error("request", "validation", "Validation failed");
+    log.error(
+      "request",
+      "validation",
+      `${this.request.id} - Validation failed`,
+    );
 
     return this.send(
       {
@@ -704,7 +729,11 @@ export class Response {
     const inputError = config.get("validation.keys.inputError", "error");
     const responseStatus = config.get("validation.responseStatus", 400);
 
-    log.error("request", "validation", "Validation failed");
+    log.error(
+      "request",
+      "validation",
+      `${this.request.id} - Validation failed`,
+    );
 
     return this.send(
       {

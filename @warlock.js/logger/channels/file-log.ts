@@ -7,6 +7,7 @@ import { LogChannel } from "../log-channel";
 import type {
   BasicLogConfigurations,
   LogContract,
+  LoggingData,
   LogLevel,
   LogMessage,
 } from "../types";
@@ -253,13 +254,10 @@ export class FileLog extends LogChannel<FileLogConfig> implements LogContract {
   /**
    * {@inheritdoc}
    */
-  public async log(
-    module: string,
-    action: string,
-    message: any,
-    level: LogLevel,
-  ) {
-    if (!this.shouldBeLogged({ module, action, level, message })) return;
+  public async log(data: LoggingData) {
+    const { module, action, message, type: level } = data;
+
+    if (!this.shouldBeLogged(data)) return;
 
     const { date: dateFormat, time } = this.getDateAndTimeFormat();
 

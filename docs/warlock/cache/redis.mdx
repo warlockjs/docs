@@ -60,16 +60,72 @@ export default cacheConfigurations;
 Make sure Redis is installed on your local machine and on the server otherwise it will throw an error.
 :::
 
-## Options
+## Options {#options}
 
-- `host`: Redis host, the default value is `localhost`.
-- `port`: Redis port, the default value is `6379`.
-- `url`: If you're using a remote Redis server, you can pass the URL directly, this will override the `host` and `port` options.
-- `username`: Redis username, the default value is `null`.
-- `password`: Redis password, the default value is `null`.
-- `globalPrefix`: A prefix that will be added to all keys. This is useful when you want to use the same cache driver for multiple applications, it could be a `string` or a callback that returns a `string`, if not provided then there will no be prefix for the keys.
-- `clientOptions`: Any additional options that will be passed to the [Redis Configurations](https://github.com/redis/node-redis/blob/a8b81bdd01329252466eb1dd608b2a92b960c3ae/docs/client-configuration.md).
-- `ttl`: Time to live in seconds (default: Infinity)
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `host` | string | `"localhost"` | Redis server host |
+| `port` | number | `6379` | Redis server port |
+| `username` | string | `undefined` | Redis username for authentication |
+| `password` | string | `undefined` | Redis password for authentication |
+| `url` | string | `undefined` | Redis connection URL (overrides host/port) |
+| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys |
+| `ttl` | number | `Infinity` | Default TTL in seconds |
+| `clientOptions` | object | `{}` | Additional Redis client options |
+
+### Connection Options
+
+```ts
+{
+  host: "localhost",           // Redis host
+  port: 6379,                  // Redis port
+  username: "default",         // Redis username
+  password: "your-password",   // Redis password
+  url: "redis://user:pass@host:port", // Alternative: use URL
+}
+```
+
+### Global Prefix
+
+```ts
+{
+  globalPrefix: "myapp",       // Static prefix
+  // OR
+  globalPrefix: () => `app-${Date.now()}`, // Dynamic prefix
+}
+```
+
+### TTL Configuration
+
+```ts
+{
+  ttl: 3600,                   // 1 hour default TTL
+  // OR
+  ttl: 60 * 60 * 24,          // 24 hours
+  // OR
+  ttl: Infinity,               // Never expire (default)
+}
+```
+
+### Advanced Client Options
+
+```ts
+{
+  clientOptions: {
+    retry_strategy: (options) => {
+      if (options.total_retry_time > 1000 * 60 * 60) {
+        return new Error('Retry time exhausted');
+      }
+      if (options.attempt > 10) {
+        return undefined;
+      }
+      return Math.min(options.attempt * 100, 3000);
+    },
+    max_attempts: 3,
+    connect_timeout: 10000,
+  }
+}
+```
 
 ## Example Usage
 

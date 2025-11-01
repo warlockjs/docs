@@ -3,6 +3,7 @@ import { colors } from "@mongez/copper";
 import events from "@mongez/events";
 import { trans, transFrom } from "@mongez/localization";
 import {
+  Random,
   except,
   get,
   only,
@@ -96,6 +97,11 @@ export class Request<User = any> {
    * Validated data
    */
   protected validatedData?: GenericObject;
+
+  /**
+   * Request id
+   */
+  public id = Random.string(32);
 
   /**
    * Set request handler
@@ -457,12 +463,19 @@ export class Request<User = any> {
   public log(message: any, level: LogLevel = "info") {
     if (!config.get("http.log")) return;
 
-    log(
-      "request",
-      this.route.method + " " + this.route.path.replace("/*", ""),
+    log({
+      module: "request",
+      action:
+        this.route.method +
+        " " +
+        this.route.path.replace("/*", "") +
+        `:${this.id}`,
       message,
-      level,
-    );
+      type: level,
+      context: {
+        request: this,
+      },
+    });
   }
 
   /**
@@ -545,6 +558,13 @@ export class Request<User = any> {
   }
 
   /**
+   * Get inputs that has been validated except the given inputs
+   */
+  public validatedExcept(...inputs: string[]) {
+    return except(this.validated(), inputs);
+  }
+
+  /**
    * Set validated data
    */
   public setValidatedData(data: GenericObject) {
@@ -586,7 +606,10 @@ export class Request<User = any> {
     for (const middleware of middlewares) {
       this.log("Executing middleware " + colors.yellowBright(middleware.name));
       const output = await middleware(this, this.response);
-      this.log("Executed middleware " + colors.yellowBright(middleware.name));
+      this.log(
+        "Executed middleware " + colors.yellowBright(middleware.name),
+        "success",
+      );
 
       if (output !== undefined) {
         this.log(
@@ -597,13 +620,13 @@ export class Request<User = any> {
 
         this.trigger("executedMiddleware");
 
-        this.log("Request middlewares executed");
+        this.log("Request middlewares executed", "success");
 
         return output;
       }
     }
 
-    this.log("Request middlewares executed");
+    this.log("Request middlewares executed", "success");
 
     // trigger the executedMiddleware event
     this.trigger("executedMiddleware", middlewares, this.route);
@@ -732,6 +755,15 @@ export class Request<User = any> {
   }
 
   /**
+   * Set request body value
+   */
+  public setBody(key: string, value: any) {
+    set(this.payload.body, key, value);
+
+    return this;
+  }
+
+  /**
    * Get body inputs except files
    */
   public get bodyInputs() {
@@ -775,10 +807,28 @@ export class Request<User = any> {
   }
 
   /**
+   * Set request params value
+   */
+  public setParam(key: string, value: any) {
+    set(this.payload.params, key, value);
+
+    return this;
+  }
+
+  /**
    * Get request query
    */
   public get query() {
     return this.payload.query;
+  }
+
+  /**
+   * Set request query value
+   */
+  public setQuery(key: string, value: any) {
+    set(this.payload.query, key, value);
+
+    return this;
   }
 
   /**

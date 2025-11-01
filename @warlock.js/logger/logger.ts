@@ -1,6 +1,6 @@
 import { Random } from "@mongez/reinforcements";
 import type { LogChannel } from "./log-channel";
-import type { LogLevel } from "./types";
+import type { Log, LoggingData, LogLevel, OmittedLoggingData } from "./types";
 import { clearMessage } from "./utils/clear-message";
 
 export class Logger {
@@ -39,58 +39,110 @@ export class Logger {
   }
 
   /**
+   * Normalize log data to a single object
+   */
+  private normalizeLogData(
+    dataOrModule: LoggingData | OmittedLoggingData | string,
+    action?: string,
+    message: any = "",
+    level?: LogLevel,
+  ): LoggingData {
+    if (typeof dataOrModule === "object") {
+      // If level is provided, override type
+      return {
+        type: (level || (dataOrModule as any).type || "info") as LogLevel,
+        module: dataOrModule.module,
+        action: dataOrModule.action,
+        message: dataOrModule.message,
+        ...(dataOrModule.context ? { context: dataOrModule.context } : {}),
+      };
+    }
+    return {
+      type: (level || "info") as LogLevel,
+      module: dataOrModule,
+      action: action as string,
+      message,
+    };
+  }
+
+  /**
    * Make log
    */
-  public async log(
-    module: string,
-    action: string,
-    message: any,
-    level: LogLevel = "info",
-  ) {
+  public async log(data: LoggingData) {
     for (const channel of this.channels) {
       if (channel.terminal === false) {
-        message = clearMessage(message);
+        data.message = clearMessage(data.message);
       }
 
-      channel.log(module, action, message, level);
+      channel.log(data);
     }
-
     return this;
   }
 
   /**
    * Make debug log
    */
-  public debug(module: string, action: string, message: any = "") {
-    return this.log(module, action, message, "debug");
+  public debug(
+    dataOrModule: LoggingData | string,
+    action?: string,
+    message: any = "",
+  ) {
+    const data = this.normalizeLogData(dataOrModule, action, message, "debug");
+    return this.log(data);
   }
 
   /**
    * Make info log
    */
-  public info(module: string, action: string, message: any = "") {
-    return this.log(module, action, message, "info");
+  public info(
+    dataOrModule: OmittedLoggingData | string,
+    action?: string,
+    message: any = "",
+  ) {
+    const data = this.normalizeLogData(dataOrModule, action, message, "info");
+    return this.log(data);
   }
 
   /**
    * Make warn log
    */
-  public warn(module: string, action: string, message: any = "") {
-    return this.log(module, action, message, "warn");
+  public warn(
+    dataOrModule: LoggingData | string,
+    action?: string,
+    message: any = "",
+  ) {
+    const data = this.normalizeLogData(dataOrModule, action, message, "warn");
+    return this.log(data);
   }
 
   /**
    * Make error log
    */
-  public error(module: string, action: string, message: any = "") {
-    return this.log(module, action, message, "error");
+  public error(
+    dataOrModule: LoggingData | string,
+    action?: string,
+    message: any = "",
+  ) {
+    const data = this.normalizeLogData(dataOrModule, action, message, "error");
+    return this.log(data);
   }
 
   /**
    * Make success log
    */
-  public success(module: string, action: string, message: any = "") {
-    return this.log(module, action, message, "success");
+  public success(
+    dataOrModule: LoggingData | string,
+    action?: string,
+    message: any = "",
+  ) {
+    const data = this.normalizeLogData(
+      dataOrModule,
+      action,
+      message,
+      "success",
+    );
+
+    return this.log(data);
   }
 
   /**
@@ -103,49 +155,14 @@ export class Logger {
 
 export const logger = new Logger();
 
-export interface Log {
-  (
-    module: string,
-    action: string,
-    message: any,
-    level: LogLevel,
-  ): Promise<Logger>;
-  /**
-   * Make info log
-   */
-  info(module: string, action: string, message: any): Promise<Logger>;
-  /**
-   * Make debug log
-   */
-  debug(module: string, action: string, message: any): Promise<Logger>;
-  warn(module: string, action: string, message: any): Promise<Logger>;
-  /**
-   * Make error log
-   */
-  error(module: string, action: string, message: any): Promise<Logger>;
-  /**
-   * Make success log
-   */
-  success(module: string, action: string, message: any): Promise<Logger>;
-  /**
-   * Get channel by name
-   */
-  channel(name: string): LogChannel | undefined;
-}
-
-export const log: Log = (
-  module: string,
-  action: string,
-  message: any,
-  level: LogLevel,
-) => {
-  return logger.log(module, action, message, level);
+export const log: Log = (data: LoggingData) => {
+  return logger.log(data);
 };
 
-log.info = logger.info.bind(logger);
-log.debug = logger.debug.bind(logger);
-log.warn = logger.warn.bind(logger);
-log.error = logger.error.bind(logger);
-log.success = logger.success.bind(logger);
+log.info = logger.info.bind(logger) as Log["info"];
+log.debug = logger.debug.bind(logger) as Log["debug"];
+log.warn = logger.warn.bind(logger) as Log["warn"];
+log.error = logger.error.bind(logger) as Log["error"];
+log.success = logger.success.bind(logger) as Log["success"];
 
 log.channel = logger.channel.bind(logger);

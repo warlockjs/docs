@@ -8,43 +8,157 @@ Any custom cache driver must implement this interface. All built-in drivers foll
 
 ## Required Methods
 
-| Method                       | Description                            |
-| ---------------------------- | -------------------------------------- |
-| `options`                    | Driver options object                  |
-| `name`                       | Driver name (string)                   |
-| `removeNamespace(namespace)` | Remove all cached items by namespace   |
-| `setOptions(options)`        | Set the driver options                 |
-| `parseKey(key)`              | Parse the cache key (string or object) |
-| `set(key, value, ttl?)`      | Set a value in the cache               |
-| `get(key)`                   | Get a value from the cache             |
-| `remove(key)`                | Remove a value from the cache          |
-| `flush()`                    | Flush the entire cache                 |
-| `connect()`                  | Connect to the cache backend           |
-| `client`                     | (optional) Underlying client instance  |
-| `disconnect()`               | (optional) Disconnect from backend     |
+| Method                       | Description                            | Return Type |
+| ---------------------------- | -------------------------------------- | ----------- |
+| `options`                    | Driver options object                  | `Options` |
+| `name`                       | Driver name (string)                   | `string` |
+| `removeNamespace(namespace)` | Remove all cached items by namespace   | `Promise<any>` |
+| `setOptions(options)`        | Set the driver options                 | `any` |
+| `parseKey(key)`              | Parse the cache key (string or object) | `Promise<string>` |
+| `set(key, value, ttl?)`      | Set a value in the cache               | `Promise<any>` |
+| `get(key)`                   | Get a value from the cache             | `Promise<any \| null>` |
+| `remove(key)`                | Remove a value from the cache          | `Promise<void>` |
+| `flush()`                    | Flush the entire cache                 | `Promise<void>` |
+| `connect()`                  | Connect to the cache backend           | `Promise<any>` |
+| `client`                     | (optional) Underlying client instance  | `ClientType \| undefined` |
+| `disconnect()`               | (optional) Disconnect from backend     | `Promise<void>` |
 
-## Example
+## Interface Definition
 
 ```ts
 export interface CacheDriver<ClientType, Options> {
+  /**
+   * The cache driver options
+   */
   options: Options;
+  
+  /**
+   * Cache driver name
+   */
   name: string;
+  
+  /**
+   * Remove all cached items by namespace
+   */
   removeNamespace(namespace: string): Promise<any>;
+  
+  /**
+   * Set the cache driver options
+   */
   setOptions(options: Options): any;
+  
+  /**
+   * Parse the key to be used in the cache
+   */
   parseKey(key: string | GenericObject): Promise<string>;
+  
+  /**
+   * Set a value in the cache
+   * @param key The cache key, could be an object or string
+   * @param value The value to be stored in the cache
+   * @param ttl The time to live in seconds
+   */
   set(key: string | GenericObject, value: any, ttl?: number): Promise<any>;
+  
+  /**
+   * Get a value from the cache
+   */
   get(key: string | GenericObject): Promise<any | null>;
+  
+  /**
+   * Remove a value from the cache
+   */
   remove(key: string | GenericObject): Promise<void>;
+  
+  /**
+   * Flush the entire cache
+   */
   flush(): Promise<void>;
+  
+  /**
+   * Connect to the cache driver
+   */
   connect(): Promise<any>;
+  
+  /**
+   * The cache client
+   */
   client?: ClientType;
-  disconnect?(): Promise<void>;
+  
+  /**
+   * Disconnect the cache driver
+   */
+  disconnect(): Promise<void>;
 }
 ```
+
+## Key Features
+
+### Key Parsing
+All drivers automatically parse keys using the `parseKey` method:
+- String keys are sanitized (removes `{}"` characters, replaces `:` and `,` with `.`)
+- Object keys are JSON stringified and then sanitized
+- Global prefix is automatically applied if configured
+
+### TTL Handling
+- TTL is specified in seconds
+- Drivers automatically handle expiration
+- If no TTL is provided, uses the driver's default TTL
+- If no default TTL is set, cache entries never expire
+
+### Namespace Support
+- Namespaces allow grouping related cache entries
+- Use `removeNamespace()` to clear all entries in a namespace
+- Namespaces are the first part of the key before the first dot
+
+### Built-in Logging
+All drivers automatically log operations:
+- Success operations (cached, fetched, removed, etc.)
+- Error operations (notFound, expired, error)
+- Connection operations (connecting, connected, disconnecting, disconnected)
 
 ## Extension Points
 
 - Extend [BaseCacheDriver](./base-cache-driver) for common logic
 - Use [parseCacheKey](./utils#parse-cache-key) for key normalization
+- Implement custom logging by overriding the `log()` method
 
-See [Make Your Own Cache Driver](./make-your-own-cache-driver) for a full example.
+## Example Implementation
+
+```ts
+import { BaseCacheDriver } from "@warlock.js/cache";
+import type { CacheDriver } from "@warlock.js/cache";
+
+interface MyCacheOptions {
+  globalPrefix?: string;
+  ttl?: number;
+}
+
+export class MyCacheDriver extends BaseCacheDriver<any, MyCacheOptions> 
+  implements CacheDriver<any, MyCacheOptions> {
+  
+  public name = "myCache";
+  
+  public async removeNamespace(namespace: string) {
+    // Implementation for removing namespace
+  }
+  
+  public async set(key: string | GenericObject, value: any, ttl?: number) {
+    // Implementation for setting value
+  }
+  
+  public async get(key: string | GenericObject) {
+    // Implementation for getting value
+  }
+  
+  public async remove(key: string | GenericObject) {
+    // Implementation for removing value
+  }
+  
+  public async flush() {
+    // Implementation for flushing cache
+  }
+}
+```
+
+See [Make Your Own Cache Driver](./make-your-own-cache-driver) for a complete example.

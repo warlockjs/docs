@@ -2,54 +2,70 @@
 sidebar_position: 4
 ---
 
-# Casting Custom Fields
+# 🧙‍♂️ Casting Custom Fields
 
-Casting custom fields are another common use case for custom fields. For example, we need to generate a `slug` field from the `title` field. We can use the `cast` method to cast the `title` field to a `slug` field, because we don't need to add slug field when creating a new post from outside the model.
+Need something special? Cascade lets you define your own custom casts for any field! Perfect for special data types, encryption, or anything unique to your app. 🛠️
 
-```ts title="src/models/post.ts"
+## 🏗️ How to Make a Custom Cast
+
+Just use a function in your `casts` property:
+
+```ts title="src/models/user.ts"
 import { Model, Casts } from "@warlock.js/cascade";
-import { sluggable } from "./../utils/casts/sluggable";
 
-export class Post extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "posts";
-
-  /**
-   * {@inheritDoc}
-   */
+export class User extends Model {
+  public static collection = "users";
   protected casts: Casts = {
-    title: "string",
-    content: "string",    
-  };
-
-  /**
-   * {@inheritDoc}
-   */
-   protected customCasts: CustomCasts = {
-    slug: sluggable("title"),
-  };
-```
-
-The `sluggable` cast is a custom cast that we created to generate a slug from the title. We can use it as follows:
-
-```ts title="src/utils/casts/sluggable.ts"
-import { Model } from "@warlock.js/cascade";
-import slug from "@mongez/slug";
-
-/**
- * Used for model castings
- */
-export function sluggable(field: string) {
-  return (model: Model) => {
-    let value = model.get(field);
-
-    if (!value) return "";
-
-    return slug(String(value));
+    // Custom cast for uppercase names
+    name: (value) => (typeof value === "string" ? value.toUpperCase() : value),
   };
 }
 ```
 
-Unlike `casts`, `customCasts` receives directly the model instance in the first argument this is we don't need to pass the field name to the cast function.
+## ♻️ Reusable Casts
+
+Make your custom cast reusable:
+
+```ts title="src/casts/uppercase.ts"
+export function uppercase(value) {
+  return typeof value === "string" ? value.toUpperCase() : value;
+}
+```
+
+```ts title="src/models/user.ts"
+import { uppercase } from "../casts/uppercase";
+
+protected casts: Casts = {
+  name: uppercase,
+};
+```
+
+## 🧙‍♂️ Pro Tip: Use for Encryption!
+
+Custom casts are perfect for encrypting/decrypting fields on the fly.
+
+```ts title="src/casts/encrypt.ts"
+import { encrypt, decrypt } from "../utils/crypto";
+
+export function encrypted(value, direction) {
+  return direction === "get" ? decrypt(value) : encrypt(value);
+}
+```
+
+## ⚠️ Gotchas
+
+- Your cast function receives the value (and sometimes direction: "get" or "set").
+- Always handle `undefined` and `null` values gracefully.
+
+:::info
+Custom casts make your models super flexible. Use them for anything the built-in casts can't handle!
+:::
+
+---
+
+## 🌟 What's Next?
+- [📝 Default Values](./default-values)
+- [🧩 Embedded Documents](./embedded-documents)
+- [💾 Saving Models](./saving-models)
+- [🗑️ Destroying Models](./destroying-models)
+- [🔍 Fetching Documents](./fetching-documents)

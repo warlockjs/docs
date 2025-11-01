@@ -1,8 +1,11 @@
 import type { GenericObject } from "@mongez/reinforcements";
+import type { Model } from "@warlock.js/cascade";
 import type { RedisClientOptions } from "redis";
 import type {
   BaseCacheDriver,
+  DatabaseCacheDriver,
   FileCacheDriver,
+  LRUMemoryCacheDriver,
   MemoryCacheDriver,
   MemoryExtendedCacheDriver,
   NullCacheDriver,
@@ -31,6 +34,23 @@ export type CacheOperationType =
 export type MemoryCacheOptions = {
   /**
    * The global prefix for the cache key
+   */
+  globalPrefix?: string | (() => string);
+  /**
+   * The default TTL for the cache in seconds
+   *
+   * @default Infinity
+   */
+  ttl?: number;
+};
+
+export type DatabaseCacheOptions = {
+  /**
+   * Database model class
+   */
+  model: typeof Model;
+  /**
+   * Global prefix for the cache key
    */
   globalPrefix?: string | (() => string);
   /**
@@ -198,7 +218,8 @@ type DefaultDrivers =
   | "memory"
   | "memoryExtended"
   | "null"
-  | "lru";
+  | "lru"
+  | "database";
 
 type MergeWithDefaultDrivers<T> = T extends undefined
   ? DefaultDrivers
@@ -221,6 +242,8 @@ export type CacheConfigurations<
     null?: typeof NullCacheDriver;
     memory?: typeof MemoryCacheDriver;
     memoryExtended?: typeof MemoryExtendedCacheDriver;
+    lru?: typeof LRUMemoryCacheDriver;
+    database?: typeof DatabaseCacheDriver;
   } & {
     [key in Extract<T, string>]?: typeof BaseCacheDriver<any, any> | undefined;
   };
@@ -233,6 +256,8 @@ export type CacheConfigurations<
     memory?: MemoryCacheOptions;
     memoryExtended?: MemoryExtendedCacheOptions;
     null?: NullCacheDriverOptions;
+    lru?: LRUMemoryCacheOptions;
+    database?: DatabaseCacheOptions;
   } & {
     [key in Extract<T, string>]?: GenericObject;
   };

@@ -13,9 +13,6 @@ const MAX_DIMENSIONS = {
   height: 4096,
 };
 
-// Maximum file size in bytes (10MB)
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-
 // Cache time in seconds (default is 1 year)
 const DEFAULT_CACHE_TIME = 31536000;
 

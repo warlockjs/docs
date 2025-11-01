@@ -43,7 +43,7 @@ export class RedisCacheDriver
 
     this.log("caching", key);
 
-    ttl = this.getTtl(ttl);
+    ttl = this.getExpiresAt(ttl);
 
     const data = this.prepareDataForStorage(value, ttl);
 

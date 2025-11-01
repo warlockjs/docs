@@ -18,7 +18,16 @@ export async function compressUploadingFile(file: Upload) {
     const fileName = file.get("name");
 
     // convert the image to webp
-    log("upload", "compressing", "Compressing " + fileName + "...", "info");
+    log({
+      module: "upload",
+      action: "compressing",
+      message: "Compressing " + fileName + "...",
+      type: "info",
+      context: {
+        fileName,
+        fullFilePath,
+      },
+    });
 
     const image = new Image(fullFilePath);
 
@@ -33,14 +42,30 @@ export async function compressUploadingFile(file: Upload) {
     file.set("extension", "webp");
     file.set("size", fileSize(newPath));
 
-    log("upload", "compressed", "Compressed " + fileName + "...", "success");
+    log({
+      module: "upload",
+      action: "compressed",
+      message: "Compressed " + fileName + "...",
+      type: "success",
+      context: {
+        fileName,
+        fullFilePath,
+      },
+    });
 
     // now remove the original file
     removePath(fullFilePath);
   } catch (error: any) {
     // do nothing
     console.log("Compressing Error", error.message);
-    log.error("upload", "compressing", error.message);
+    log.error({
+      module: "upload",
+      action: "compressing",
+      message: error.message,
+      context: {
+        error,
+      },
+    });
   }
 }
 

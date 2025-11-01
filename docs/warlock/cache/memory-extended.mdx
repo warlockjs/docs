@@ -22,12 +22,7 @@ The Memory Extended Cache Driver is similar to the [Memory Cache Driver](./memor
 - Not shared between processes or servers
 - No eviction policy (see [LRU Memory Cache Driver](./lru-memory))
 
-## Options
-
-- `globalPrefix`: Prefix for all keys (string or function)
-- `ttl`: Time to live in seconds (default: Infinity)
-
-## Example Usage
+## Configuration
 
 ```ts title="src/config/cache.ts"
 import { MemoryExtendedCacheDriver } from "@warlock.js/core";
@@ -39,11 +34,43 @@ const cacheConfigurations = {
   default: "memoryExtended",
   options: {
     memoryExtended: {
+      globalPrefix: "sessions",
       ttl: 600, // 10 minutes
     },
   },
 };
 ```
+
+## Options {#options}
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys |
+| `ttl` | number | `Infinity` | Default TTL in seconds |
+
+### Global Prefix
+
+```ts
+{
+  globalPrefix: "sessions",    // Static prefix
+  // OR
+  globalPrefix: () => `app-${environment()}`, // Dynamic prefix
+}
+```
+
+### TTL Configuration
+
+```ts
+{
+  ttl: 600,                    // 10 minutes
+  // OR
+  ttl: 3600,                   // 1 hour
+  // OR
+  ttl: Infinity,               // Never expire (default)
+}
+```
+
+## Example Usage
 
 ## Storing and Retrieving Data
 
@@ -54,7 +81,39 @@ await cache.set("session:abc", { userId: 1 }, 600);
 const session = await cache.get("session:abc"); // TTL resets to 10 minutes
 ```
 
+## Sliding Expiration Explained
+
+Unlike the regular Memory Cache Driver, the Memory Extended Driver implements **sliding expiration**:
+
+1. **Initial Set**: When you set a value with TTL, it's stored with an expiration time
+2. **Access Resets TTL**: Every time you access the value, the TTL is reset to the original duration
+3. **Continuous Access**: As long as the value is accessed within the TTL window, it never expires
+4. **Inactivity Expiration**: Only when the value is not accessed for the full TTL duration does it expire
+
+### Example Timeline
+
+```ts
+// TTL: 10 minutes (600 seconds)
+await cache.set("session:123", data, 600);
+
+// After 5 minutes
+await cache.get("session:123"); // TTL resets to 10 minutes
+
+// After another 8 minutes (13 minutes total)
+await cache.get("session:123"); // TTL resets to 10 minutes again
+
+// If not accessed for 10 minutes, it expires
+```
+
+## Use Cases
+
+- **User Sessions**: Keep sessions alive as long as users are active
+- **API Rate Limiting**: Reset counters on each request
+- **Frequently Accessed Data**: Keep hot data in cache longer
+- **Temporary State**: Maintain state that should persist during activity
+
 ## Troubleshooting
 
 - **Data disappears after restart**: This is expected. Use [File](./file) or [Redis](./redis) for persistence.
 - **Cache not shared between processes**: Use [Redis](./redis) for distributed cache.
+- **Items expiring too quickly**: Increase the `ttl` value or access them more frequently.

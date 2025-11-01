@@ -2,163 +2,88 @@
 sidebar_position: 9
 ---
 
-# Destroying Models
+# 🗑️ Destroying Models
 
-There are two ways to destroy a model, one when we have an instance of the model and the other when we don't.
+Sometimes, you need to say goodbye to your data. Cascade makes deleting (and restoring!) models safe, easy, and powerful. 💥
 
-## Delete documents
+## 🧹 Deleting a Model
 
-If we don't care of having an instance of the model, we can use the `delete` method to delete documents from the database.
+Just call `destroy()` on a model instance:
 
-```ts
-await User.delete({ name: "John" });
-```
-
-This will delete all the documents that match the query and return the number of documents deleted.
-
-If we want to delete a document using `id` or `_id`, simply pass the value directly to the `delete` method.
-
-```ts
-await User.delete(1);
-```
-
-> Please note that `_id` must be a string or an instance of `ObjectId` class.
-
-## Destroy model
-
-If we already have an instance of the model we can use `destroy` method.
-
-```ts
-import { User } from "./models/User";
-
-const user = await User.find(1);
-
-await user.destroy();
-```
-
-This will delete the document from the database but you still can work with the instance of the model.
-
-:::tip
-If you tried to save the model after destroying it, it will throw an error.
-:::
-
-## Recycle bin
-
-When using the `destroy` model, by default the model is actually deleted but before that a copy of the model document is taken and moved to the trash collection. This is done to prevent accidental deletion of documents.
-
-The trash collection name is the model's collection name suffixed with `Trash`. For example, if the model's collection name is `users`, the trash collection name will be `usersTrash`.
-
-## Restoring documents
-
-If documents are deleted using Recycle bin `destroy` method, you can restore them using the `restore` method.
-
-```ts
-await User.restore(1);
-```
-
-This will restore the document with the given id and return the restored document.
-
-## Restoring multiple documents
-
-If you want to restore all the documents in the trash collection, you can use the `restoreAll` method.
-
-```ts
-const restoredUsers = await User.restoreAll();
-```
-
-If you want to restore specific documents, you can pass a query to the `restoreAll` method.
-
-```ts
-const restoredUsers = await User.restoreAll({ name: "John" });
-```
-
-## Model Delete Strategies
-
-We saw earlier the `moveToTrash` strategy which is the default strategy. There are two other strategies that you can use.
-
-You can override the model's default delete strategy by setting the `deleteStrategy` property on the model.
-
-```ts
-import { Model, ModelDeleteStrategy } from "@warlock.js/cascade";
-
-export class User extends Model {
-  /**
-   * The collection name
-   */
-  public static collection = "users";
-
-  /**
-   * The delete strategy
-   * Delete the documents forever.
-   */
-  public static deleteStrategy = ModelDeleteStrategy.hardDelete;
+```ts title="src/app.ts"
+const category = await Category.find(1);
+if (category) {
+  await category.destroy();
 }
 ```
 
-### hardDelete strategy
+Or use the static `destroy` method:
 
-This strategy will delete the document without moving it to the trash collection, so it's gone forever.
+```ts title="src/app.ts"
+await Category.destroy(1); // By ID
+await Category.destroy({ name: "Sports" }); // By filter
+```
 
-```ts
-import { Model, ModelDeleteStrategy } from "@warlock.js/cascade";
+## 🦺 Soft Deletes (The Safety Net!)
 
-export class User extends Model {
-  /**
-   * The collection name
-   */
-  public static collection = "users";
+By default, Cascade uses **soft deletes**—your data isn't really gone, just marked as deleted! (Unless you say otherwise.)
 
-  /**
-   * The delete strategy
-   * Delete the documents forever.
-   */
-  public static deleteStrategy = ModelDeleteStrategy.hardDelete;
+```ts title="src/models/category.ts"
+export class Category extends Model {
+  public static collection = "categories";
+  public softDelete = true; // This is the default!
 }
 ```
 
-Now whenever you call the `destroy` method, the document will be deleted forever.
+When you destroy a model, it sets the `deletedAt` field instead of removing the document. You can still query, restore, or force-delete it later!
 
-```ts
-await User.find(1).destroy();
-```
+## ♻️ Restoring Soft-Deleted Models
 
-### softDelete strategy
+Bring your data back from the grave:
 
-This strategy will add a `deletedAt` field to the document and set it to the current date and time. This field will be used to determine if the document is deleted or not.
-
-```ts
-import { Model, ModelDeleteStrategy } from "@warlock.js/cascade";
-
-export class User extends Model {
-  /**
-   * The collection name
-   */
-  public static collection = "users";
-
-  /**
-   * The delete strategy
-   * Delete the documents forever.
-   */
-  public static deleteStrategy = ModelDeleteStrategy.softDelete;
+```ts title="src/app.ts"
+const category = await Category.find(1, { withTrashed: true });
+if (category && category.isTrashed()) {
+  await category.restore();
 }
 ```
 
-Now whenever you call the `destroy` method, the document will be soft deleted.
+Or restore many at once:
 
-:::tip
-You can use the `restore` and `restoreAll` methods to restore the documents, this will remove the `deletedAt` field from the documents.
-:::
-
-Now whenever you use any [listing method](./fetching-documents) the soft deleted documents will be excluded from the results.
-
-:::info
-If you want to include the deleted documents in your results, pass `withDeleted` option to the listing filters with `true` value.
-:::
-
-```ts
-// fetch all users including the deleted ones
-await User.list({ withDeleted: true });
-
-// fetch all users excluding the deleted ones
-await User.list();
+```ts title="src/app.ts"
+await Category.restore({ isActive: false });
 ```
+
+## 💣 Force Delete (No Going Back!)
+
+Want to really, truly, permanently delete? Use `forceDelete`:
+
+```ts title="src/app.ts"
+await category.forceDelete(); // Instance method
+await Category.forceDelete(1); // Static method
+```
+
+:::danger
+Force delete is permanent! Use with care. (There's no undo.)
+:::
+
+## ⚡ Model Events: Deletion Hooks
+
+Cascade's event system lets you hook into deletion actions:
+
+```ts title="src/app/main.ts"
+Category.events()
+  .onDeleting((category) => console.log("Deleting!"))
+  .onDeleted((category) => console.log("Deleted!"));
+```
+
+Use these for logging, cleanup, or syncing related data.
+
+## 🧙‍♂️ Pro Tip
+Soft deletes are great for audit trails and accidental-deletion recovery. But if you need to save space or comply with regulations, use force delete!
+
+---
+
+## 🌟 What's Next?
+- [🔍 Fetching Documents](./fetching-documents)
+- [🔗 Relationships](../relationships/introduction)

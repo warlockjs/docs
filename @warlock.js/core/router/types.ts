@@ -1,8 +1,8 @@
 import type { GenericObject } from "@mongez/reinforcements";
+import type { ObjectValidator } from "@warlock.js/seal";
 import type { RouteShorthandOptions } from "fastify";
 import type { Request, Response, ReturnedResponse } from "../http";
 import type { Rule, Validation, ValidationSchema } from "../validator";
-import type { ObjectValidator } from "../validator/v";
 import type {
   PostmanExample,
   PostmanRequestEvent,

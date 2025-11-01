@@ -1,8 +1,8 @@
 import config from "@mongez/config";
 import { log } from "@warlock.js/logger";
+import { v } from "@warlock.js/seal";
 import type { Request, Response } from "../http";
 import type { Route } from "../router";
-import { v } from "./v";
 import { Validator } from "./validator";
 
 /**
@@ -31,16 +31,23 @@ export async function validateAll(
   }
 
   if (validation.schema) {
+    log.info("validation", "schema", "Validating request schema");
     try {
-      const result = await v.validate(validation.schema, request.all());
+      const result = await v.validate(
+        validation.schema,
+        request.allExceptParams(),
+      );
 
       if (result.data && result.isValid) {
         request.setValidatedData(result.data);
       }
 
       if (!result.isValid) {
+        log.error("validation", "schema", "Schema Validation failed");
         return response.failedSchema(result);
       }
+
+      log.success("validation", "schema", "Schema Validation passed");
     } catch (error) {
       log.error("app.validation", "error", error);
       throw error;

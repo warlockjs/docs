@@ -34,5 +34,83 @@ const nested = {
 console.log(parseCacheKey(nested)); // user.id.5.tags.a.b
 ```
 
+### With Global Prefix
+```ts
+import { parseCacheKey } from "@warlock.js/core";
+
+const options = { globalPrefix: "myapp" };
+console.log(parseCacheKey("user:1", options)); // myapp.user.1
+```
+
 ### Tip
 Use this utility for cache keys in repositories, API responses, or any place where the key might be an object.
+
+## Expiration Constants
+
+The `EXPIRES_AFTER` enum provides common TTL values for easy use:
+
+```ts
+import { EXPIRES_AFTER } from "@warlock.js/core";
+
+// Common expiration times
+await cache.set("temp", data, EXPIRES_AFTER.HALF_HOUR);    // 30 minutes
+await cache.set("session", data, EXPIRES_AFTER.ONE_HOUR);  // 1 hour
+await cache.set("daily", data, EXPIRES_AFTER.ONE_DAY);     // 24 hours
+await cache.set("weekly", data, EXPIRES_AFTER.ONE_WEEK);   // 7 days
+await cache.set("monthly", data, EXPIRES_AFTER.ONE_MONTH); // 30 days
+```
+
+### Available Constants
+
+| Constant | Value (seconds) | Description |
+|----------|----------------|-------------|
+| `HALF_HOUR` | 1800 | 30 minutes |
+| `ONE_HOUR` | 3600 | 1 hour |
+| `HALF_DAY` | 43200 | 12 hours |
+| `ONE_DAY` | 86400 | 24 hours |
+| `ONE_WEEK` | 604800 | 7 days |
+| `HALF_MONTH` | 1296000 | 15 days |
+| `ONE_MONTH` | 2592000 | 30 days |
+| `TWO_MONTHS` | 5184000 | 60 days |
+| `SIX_MONTHS` | 15768000 | 180 days |
+| `ONE_YEAR` | 31536000 | 365 days |
+
+### Real-World Example
+
+```ts
+import { cache } from "@warlock.js/core";
+import { EXPIRES_AFTER } from "@warlock.js/core";
+
+class UserService {
+  async getUser(id: number) {
+    const cacheKey = `user:${id}`;
+    
+    // Try to get from cache first
+    let user = await cache.get(cacheKey);
+    
+    if (!user) {
+      // Fetch from database
+      user = await this.fetchFromDatabase(id);
+      
+      // Cache for 1 hour
+      await cache.set(cacheKey, user, EXPIRES_AFTER.ONE_HOUR);
+    }
+    
+    return user;
+  }
+  
+  async getUserList(filters: any) {
+    const cacheKey = filters; // Object will be parsed automatically
+    
+    let users = await cache.get(cacheKey);
+    
+    if (!users) {
+      users = await this.fetchUsersFromDatabase(filters);
+      
+      // Cache for 30 minutes
+      await cache.set(cacheKey, users, EXPIRES_AFTER.HALF_HOUR);
+    }
+    
+    return users;
+  }
+}

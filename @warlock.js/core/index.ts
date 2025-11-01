@@ -1,3 +1,6 @@
+// Initialize Seal with Warlock configuration (localization, etc.)
+import "./v/init";
+
 export * from "./application";
 export * from "./aws";
 export * from "./bootstrap";
@@ -23,4 +26,5 @@ export * from "./router";
 export * from "./store";
 export * from "./tests";
 export * from "./utils";
+export * from "./v";
 export * from "./validator";

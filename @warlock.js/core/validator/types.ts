@@ -1,3 +1,4 @@
+import type { AttributeTranslation, RuleTranslation } from "@warlock.js/seal";
 import type { Rule } from "./rules/rule";
 import type { ValidationSchema } from "./validation-schema";
 
@@ -69,8 +70,35 @@ export type ValidationConfigurations = {
   };
   /**
    * Rules list that will be used in the validation process
+   *
+   * @deprecated use schema instead
    */
   rules?: Record<string, new (...args: any[]) => Rule>;
+  /**
+   * Validation schema configurations
+   */
+  schema?: {
+    /**
+     * Translate rule function
+     */
+    translateRule?: (ruleTranslation: RuleTranslation) => string;
+    /**
+     * Translate attribute function
+     */
+    translateAttribute?: (attributeTranslation: AttributeTranslation) => string;
+    /**
+     * Translate group prefix, will be used when no translate rule nor translate attribute functions provided
+     *
+     * @default validation
+     */
+    translationGroup?: string;
+    /**
+     * First error only
+     *
+     * @default true
+     */
+    firstErrorOnly?: boolean;
+  };
 };
 
 export type RuleType = string | Rule;

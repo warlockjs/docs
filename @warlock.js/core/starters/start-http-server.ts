@@ -1,98 +1,147 @@
-import { typecheckPlugin } from "@jgoz/esbuild-plugin-typecheck";
-import { debounce } from "@mongez/reinforcements";
+import { colors } from "@mongez/copper";
+import { getFileAsync, putFileAsync, removeDirectoryAsync } from "@mongez/fs";
+import { debounce, type GenericObject } from "@mongez/reinforcements";
 import chokidar from "chokidar";
-import esbuild from "esbuild";
+import dayjs from "dayjs";
+import { transform } from "esbuild";
+import fs from "fs/promises";
 import path from "path";
+import ts from "typescript";
 import { buildHttpApp, moduleBuilders } from "../builder/build-http-app";
+import {
+  checkSingleFile,
+  configure as configureCodeQuality,
+  scanProject,
+} from "../code-quality";
+import type { CommandActionData } from "../console";
 import { command } from "../console/command-builder";
 import { rootPath, srcPath, warlockPath } from "../utils";
-import {
-  injectImportPathPlugin,
-  nativeNodeModulesPlugin,
-  startHttpServerDev,
-  startServerPlugin,
-} from "./../esbuild";
+import { restartServer } from "./http-server-starter";
+import { httpLog } from "./serve-log";
 
-export async function startHttpApp() {
-  const httpPath = await buildHttpApp();
+// Configure code quality checker (you can change these settings)
+configureCodeQuality({
+  displayStrategy: "sequential", // Options: "sequential", "combined", "typescript-only", "eslint-only", "silent"
+  showSuccessMessages: true,
+  showWarnings: true,
+  showErrors: true,
+  showCodeSnippets: true,
+  contextLines: 2,
+  enableInitialScan: true, // Run full scan on startup
+});
 
-  const builder = await esbuild.context({
-    platform: "node",
-    entryPoints: [httpPath],
-    bundle: true,
-    minify: false,
-    packages: "external",
-    sourcemap: "linked",
-    sourceRoot: srcPath(),
+let tsconfigRaw: GenericObject = {};
+
+async function loadTsconfig() {
+  const configText = await fs.readFile(
+    process.cwd() + "/tsconfig.json",
+    "utf8",
+  );
+
+  const { config } = ts.parseConfigFileTextToJson(
+    process.cwd() + "/tsconfig.json",
+    configText,
+  );
+
+  tsconfigRaw = config;
+}
+
+export async function transformSingleFileAndCacheIt(filePath: string) {
+  const relativePath = path
+    .relative(process.cwd(), filePath)
+    .replace(/\\/g, "/");
+  const cacheFileName = relativePath.replace(/^\./, "").replace(/\//g, "-");
+  const cacheFilePath = path.resolve(
+    process.cwd(),
+    ".warlock/.cache",
+    cacheFileName,
+  );
+
+  const content = await getFileAsync(filePath);
+
+  // Check code quality (TypeScript + ESLint, async, non-blocking)
+  checkSingleFile(filePath);
+
+  const { code } = await transform(content, {
+    loader: filePath.endsWith(".tsx") ? "tsx" : "ts",
     format: "esm",
-    target: ["esnext"],
-    outdir: path.resolve(warlockPath()),
-    // Enable code splitting
-    splitting: true,
-    // Output chunks to a separate directory with meaningful names
-    chunkNames: "chunks/[name]",
-    // Ensure each entry point generates its own chunk
-    outbase: warlockPath(),
-    // Tree shaking for smaller bundles
-    treeShaking: true,
-    // Generate metafile for analysis
-    metafile: true,
-    // Deduplicate modules
-    mainFields: ["module", "main"],
-    conditions: ["import", "module"],
-    // Preserve imports structure
-    preserveSymlinks: true,
-    plugins: [
-      injectImportPathPlugin(),
-      nativeNodeModulesPlugin,
-      startServerPlugin,
-      typecheckPlugin({
-        watch: true,
-      }),
-    ],
+    sourcemap: false,
+    tsconfigRaw,
   });
 
-  // Set up chokidar to watch additional files (e.g., .env)
+  // if code length is zero, it means this was just an empty file or a types only file
+  let finalCode = code;
+  if (code.length === 0) {
+    finalCode = "/*_EMPTY_FILE_*/";
+  }
+
+  // Write to individual cache file
+  await putFileAsync(cacheFilePath, finalCode, "utf8");
+}
+
+const log = httpLog;
+
+export async function startHttpApp(data: CommandActionData) {
+  if (data?.options?.fresh) {
+    await removeDirectoryAsync(warlockPath());
+  }
+
+  log.info("http", "server", "Starting development server...");
+  await buildHttpApp();
+
+  await restartServer();
+
+  loadTsconfig();
+
+  // Run initial code quality scan (async, background)
+  scanProject(srcPath());
+
   const watcher = chokidar.watch(
-    [
-      rootPath(".env"),
-      rootPath(".env.shared"),
-      srcPath(),
-      // Add other files or patterns as needed
-    ],
+    [`${srcPath()}/**/*.{ts,tsx}`, rootPath(".env")],
     {
-      persistent: true,
-      ignoreInitial: false,
-      ignored: ["node_modules/**", "dist/**"], // Ignore irrelevant paths
+      ignoreInitial: true,
+      ignored: ["node_modules/**", "dist/**"],
     },
   );
 
-  const restartServer = debounce(async () => {
-    await builder.rebuild();
-    startHttpServerDev();
-  }, 500);
-
-  const rebuild = async (
-    mode: "add" | "change" | "unlink" | "unlinkDir",
-    filePath: string,
-  ) => {
-    if (["add", "unlink"].includes(mode)) {
-      // check if it is a routes.ts file
-      if (filePath.includes("routes.ts")) {
-        await moduleBuilders.routes();
-      } else if (filePath.endsWith("main.ts")) {
-        await moduleBuilders.main();
+  const rebuild = debounce(async (event, filePath) => {
+    console.log(
+      colors.yellowBright(
+        `${dayjs().format("YYYY-MM-DD HH:mm:ss")} Restarting development server...`,
+      ),
+    );
+    if (["add", "unlink"].includes(event)) {
+      // Rebuild manifest when files are added or removed
+      moduleBuilders.mainfest();
+      if (filePath.includes("routes.ts")) await moduleBuilders.routes();
+      if (filePath.endsWith("main.ts")) await moduleBuilders.main();
+      // Regenerate config types when config files change
+      if (
+        filePath.includes("src/config/") ||
+        filePath.includes("src\\config\\")
+      ) {
+        moduleBuilders.configTypes();
       }
     }
-    restartServer();
-  };
 
-  watcher.on("add", filePath => rebuild("add", filePath));
-  watcher.on("change", filePath => rebuild("change", filePath));
-  watcher.on("unlink", filePath => rebuild("unlink", filePath));
-  watcher.on("unlinkDir", filePath => rebuild("unlinkDir", filePath));
+    if (["add", "change"].includes(event)) {
+      // recache the file
+      await transformSingleFileAndCacheIt(filePath);
+    }
+
+    await restartServer();
+  }, 50);
+
+  watcher
+    .on("add", filePath => rebuild("add", filePath))
+    .on("change", filePath => rebuild("change", filePath))
+    .on("unlink", filePath => rebuild("unlink", filePath))
+    .on("unlinkDir", filePath => rebuild("unlinkDir", filePath));
 }
 
 export function registerHttpDevelopmentServerCommand() {
-  return command("dev").action(startHttpApp).preload("watch");
+  return command("dev")
+    .action(startHttpApp)
+    .preload("watch")
+    .option("--fresh -f", "Clear the previous cache and run it again.");
 }

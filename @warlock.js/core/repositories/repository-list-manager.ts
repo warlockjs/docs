@@ -331,7 +331,7 @@ export abstract class RepositoryListManager<
   ): Promise<T | undefined> {
     const { request } = useRequestStore() || {};
 
-    const localeCode = request.locale ? `locale.${request.locale}.` : "";
+    const localeCode = request?.locale ? `locale.${request.locale}.` : "";
 
     const cacheKey = this.cacheKey(
       `data.${localeCode}${column}.${value}`,

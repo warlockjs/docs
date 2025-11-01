@@ -138,7 +138,7 @@ export abstract class BaseCacheDriver<ClientType, Options extends GenericObject>
   /**
    * Get time to live value in milliseconds
    */
-  public getTtl(ttl: number = this.ttl) {
+  public getExpiresAt(ttl: number = this.ttl) {
     if (ttl) {
       return new Date().getTime() + ttl * 1000;
     }
@@ -154,7 +154,7 @@ export abstract class BaseCacheDriver<ClientType, Options extends GenericObject>
 
     if (ttl) {
       preparedData.ttl = ttl;
-      preparedData.expiresAt = this.getTtl(ttl);
+      preparedData.expiresAt = this.getExpiresAt(ttl);
     }
 
     return preparedData;

@@ -4,6 +4,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Enhanced Alert Styling - More Noticeable Changes */
+[data-theme="dark"] .alert--success {
+  --ifm-alert-background-color: #1e293b !important;
+  --ifm-alert-border-color: #0ea5e9 !important;
+  --ifm-alert-foreground-color: #7dd3fc !important;
+}
+
+[data-theme="light"] .alert--success {
+  --ifm-alert-background-color: #f0f9ff !important;
+  --ifm-alert-border-color: #0ea5e9 !important;
+  --ifm-alert-foreground-color: #0c4a6e !important;
+  --ifm-alert-border-radius: 8px !important;
+  --ifm-alert-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
 :root {
   /* --ifm-color-primary: #2e8555;
   --ifm-color-primary-dark: #29784c;
@@ -93,6 +108,32 @@ code {
   }
 }
 
+/* Method grid styles - using explicit CSS to ensure it works */
+.methods-grid {
+  display: grid !important;
+  grid-template-columns: repeat(1, 1fr) !important;
+  gap: 0.5rem !important;
+  margin-bottom: 2rem !important;
+}
+
+@media (min-width: 768px) {
+  .methods-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .methods-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
+
+@media (min-width: 1280px) {
+  .methods-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
+
 /* .alert { */
 /* --ifm-code-background: #666;
   --ifm-alert-background-color-highlight: #666; */
@@ -116,6 +157,7 @@ code {
   --ifm-color-primary-lighter: #beb52a;
   --ifm-color-primary-lightest: #beb52a;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-hr-background-color: #555 !important;
 }
 
 [data-theme="dark"] .markdown a {

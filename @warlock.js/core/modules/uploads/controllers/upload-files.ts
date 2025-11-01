@@ -1,9 +1,9 @@
 import { fileSize } from "@mongez/fs";
 import { Random, ltrim } from "@mongez/reinforcements";
+import { v } from "@warlock.js/seal";
 import type { Request, Response, UploadedFile } from "../../../http";
 import type { RequestHandler } from "../../../router";
 import { uploadsPath } from "../../../utils";
-import { v } from "../../../validator";
 import { Upload } from "../models/upload";
 import { uploadFromUrl } from "../utils";
 import { getUploadsDirectory } from "../utils/get-uploads-directory";

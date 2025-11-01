@@ -84,6 +84,12 @@ const config: Config = {
           label: "Cascade",
         },
         {
+          type: "doc",
+          docId: "seal/getting-started/introduction",
+          position: "left",
+          label: "Seal",
+        },
+        {
           href: "https://github.com/hassanzohdy",
           label: "GitHub",
           position: "right",

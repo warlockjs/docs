@@ -31,12 +31,31 @@ export async function getUploadedFileUsingHash(
   request: Request,
   response: Response,
 ) {
-  log("Bench", "loading", "upload", "info");
   const hash = request.input("hash");
+
+  log({
+    module: "Bench",
+    action: "loading",
+    message: "upload",
+    type: "info",
+    context: {
+      hash,
+    },
+  });
 
   const upload = await Upload.findBy("hash", hash);
 
-  log("Bench", "loaded", "upload", "success");
+  log({
+    module: "Bench",
+    action: "loaded",
+    message: "upload",
+    type: "success",
+    context: {
+      hash,
+      upload,
+    },
+  });
+
   if (!upload) {
     return response.notFound({
       error: "File not found",

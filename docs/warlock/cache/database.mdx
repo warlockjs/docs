@@ -4,11 +4,169 @@ sidebar_position: 9
 
 # Database Cache Driver
 
-> **Note:** The Database Cache Driver is not yet implemented in Warlock.
+The Database Cache Driver stores cache data in your database, providing persistence and the ability to query cache data using your existing database infrastructure.
 
-## Alternatives
-- For persistent, distributed cache: use [Redis Cache Driver](./redis)
-- For simple persistence: use [File Cache Driver](./file)
-- For in-memory cache: use [Memory Cache Driver](./memory)
+## Features
+- **Persistence**: Cache survives application restarts
+- **Queryable**: Use database queries to inspect cache data
+- **TTL Support**: Automatic expiration handling
+- **Namespace Support**: Group related cache entries
+- **Global Prefix**: Avoid key collisions
 
-Stay tuned for updates!
+## Configuration
+
+```ts title="src/config/cache.ts"
+import { CacheConfigurations } from "@warlock.js/core";
+import { CacheModel } from "./models/CacheModel"; // Your cache model
+
+const cacheConfigurations: CacheConfigurations = {
+  default: "database",
+  drivers: {
+    database: DatabaseCacheDriver,
+  },
+  options: {
+    database: {
+      model: CacheModel,
+      globalPrefix: "myapp",
+      ttl: 3600, // 1 hour default
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+## Cache Model
+
+You need to create a model for storing cache data. Here's an example:
+
+```ts title="src/models/CacheModel.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class CacheModel extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "cache";
+
+  /**
+   * Schema definition
+   */
+  public static schema = {
+    key: String,
+    namespace: String,
+    data: Mixed,
+    ttl: Number,
+    expiresAt: Date,
+  };
+}
+```
+
+## Options {#options}
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `model` | Model Class | **Required** | The model class for storing cache data |
+| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys |
+| `ttl` | number | `Infinity` | Default TTL in seconds |
+
+### Model Configuration
+
+```ts
+{
+  model: CacheModel,           // Required: Your cache model class
+}
+```
+
+### Global Prefix
+
+```ts
+{
+  globalPrefix: "myapp",       // Static prefix
+  // OR
+  globalPrefix: () => `app-${environment()}`, // Dynamic prefix
+}
+```
+
+### TTL Configuration
+
+```ts
+{
+  ttl: 3600,                   // 1 hour default TTL
+  // OR
+  ttl: 60 * 60 * 24,          // 24 hours
+  // OR
+  ttl: Infinity,               // Never expire (default)
+}
+```
+
+## Usage
+
+```ts
+import { cache } from "@warlock.js/core";
+
+// Set a value
+await cache.set("user:1", { name: "John", email: "john@example.com" }, 3600);
+
+// Get a value
+const user = await cache.get("user:1");
+
+// Remove a value
+await cache.remove("user:1");
+
+// Clear namespace
+await cache.removeNamespace("user");
+
+// Flush all cache
+await cache.flush();
+```
+
+## Database Schema
+
+The cache driver expects your cache model to have these fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `key` | String | The cache key |
+| `namespace` | String | The namespace (first part of the key) |
+| `data` | Mixed | The cached data |
+| `ttl` | Number | Time to live in seconds |
+| `expiresAt` | Date | When the cache expires |
+
+## Advantages
+
+- **Persistence**: Cache survives application restarts
+- **Queryable**: Use database queries to inspect cache data
+- **Consistent**: Uses your existing database infrastructure
+- **Backup**: Cache data is backed up with your database
+- **Monitoring**: Easy to monitor cache usage through database queries
+
+## Disadvantages
+
+- **Slower**: Database operations are slower than in-memory or Redis
+- **Resource Usage**: Uses database connections and storage
+- **Complexity**: Requires setting up a cache model
+
+## When to Use
+
+- When you need persistence but don't want to set up Redis
+- When you want to query cache data
+- When you want cache data backed up with your database
+- For development environments where simplicity is preferred
+
+## Example: Querying Cache Data
+
+```ts
+import { CacheModel } from "./models/CacheModel";
+
+// Get all expired cache entries
+const expired = await CacheModel.where("expiresAt", "<", new Date()).get();
+
+// Get cache entries by namespace
+const userCache = await CacheModel.where("namespace", "user").get();
+
+// Get cache statistics
+const stats = await CacheModel.aggregate([
+  { $group: { _id: "$namespace", count: { $sum: 1 } } }
+]);
+``` 

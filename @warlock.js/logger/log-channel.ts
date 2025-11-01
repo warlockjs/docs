@@ -1,4 +1,4 @@
-import type { BasicLogConfigurations, LogContract, LogLevel } from "./types";
+import type { BasicLogConfigurations, LogContract, LoggingData } from "./types";
 
 export abstract class LogChannel<
   Options extends BasicLogConfigurations = BasicLogConfigurations,
@@ -80,26 +80,17 @@ export abstract class LogChannel<
   /**
    * Determine if the message should be logged
    */
-  protected shouldBeLogged({
-    module,
-    action,
-    level,
-    message,
-  }: {
-    module: string;
-    action: string;
-    level: LogLevel;
-    message: any;
-  }): boolean {
+  protected shouldBeLogged(data: LoggingData): boolean {
     // check for debug mode
     const allowedLevels = this.config("levels");
 
-    if (allowedLevels?.length && !allowedLevels.includes(level)) return false;
+    if (allowedLevels?.length && !allowedLevels.includes(data.type))
+      return false;
 
     const filter = this.config("filter");
 
     if (filter) {
-      return filter({ level, module, action, message });
+      return filter(data);
     }
 
     return true;
@@ -108,12 +99,7 @@ export abstract class LogChannel<
   /**
    * Log the given message
    */
-  public abstract log(
-    module: string,
-    action: string,
-    message: any,
-    level: LogLevel,
-  ): void | Promise<void>;
+  public abstract log(data: LoggingData): void | Promise<void>;
 
   /**
    * Get date and time formats

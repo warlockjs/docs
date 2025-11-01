@@ -7,6 +7,9 @@
 # Generated files
 .docusaurus
 .cache-loader
+/@warlock.js
+seal
+cache
 
 # Misc
 .DS_Store

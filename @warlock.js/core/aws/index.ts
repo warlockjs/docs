@@ -125,22 +125,22 @@ export async function uploadToAWS({
     ContentType: mimeType,
   });
 
-  log(
-    "aws",
-    "uploading",
-    "Uploading " + finalFleName + " to " + bucketName + "...",
-    "info",
-  );
+  log({
+    module: "aws",
+    action: "uploading",
+    message: "Uploading " + finalFleName + " to " + bucketName + "...",
+    type: "info",
+  });
 
   try {
     await client.send(command);
 
-    log(
-      "aws",
-      "uploaded",
-      "Uploaded " + finalFleName + " to " + bucketName + "...",
-      "success",
-    );
+    log({
+      module: "aws",
+      action: "uploaded",
+      message: "Uploaded " + finalFleName + " to " + bucketName + "...",
+      type: "success",
+    });
 
     // now we have the URL of the uploaded file
     // let's return it
@@ -161,12 +161,12 @@ export async function uploadToAWS({
     };
   } catch (err) {
     console.log("Error", err);
-    log(
-      "aws",
-      "error",
-      "Error uploading " + finalFleName + " to " + bucketName + "...",
-      "error",
-    );
+    log({
+      module: "aws",
+      action: "error",
+      message: "Error uploading " + finalFleName + " to " + bucketName + "...",
+      type: "error",
+    });
   }
 }
 
@@ -184,25 +184,30 @@ export async function deleteFromAWS({
     Key: fileName,
   });
 
-  log(
-    "aws",
-    "deleting",
-    "Deleting " + fileName + " from " + bucketName + "...",
-    "info",
-  );
+  log({
+    module: "aws",
+    action: "deleting",
+    message: "Deleting " + fileName + " from " + bucketName + "...",
+    type: "info",
+  });
 
   try {
     await client.send(command);
 
-    log(
-      "aws",
-      "deleted",
-      "Deleted " + fileName + " from " + bucketName + "...",
-      "success",
-    );
+    log({
+      module: "aws",
+      action: "deleted",
+      message: "Deleted " + fileName + " from " + bucketName + "...",
+      type: "success",
+    });
   } catch (err) {
     console.log("Error", err);
-    log("aws", "deleting", err, "error");
+    log({
+      module: "aws",
+      action: "error",
+      message: "Error deleting " + fileName + " from " + bucketName + "...",
+      type: "error",
+    });
   }
 }
 
@@ -220,27 +225,32 @@ export async function downloadFromAWS({
     Key: fileName,
   });
 
-  log(
-    "aws",
-    "downloading",
-    "Downloading " + fileName + " from " + bucketName + "...",
-    "info",
-  );
+  log({
+    module: "aws",
+    action: "downloading",
+    message: "Downloading " + fileName + " from " + bucketName + "...",
+    type: "info",
+  });
 
   try {
     const content = await client.send(command);
 
-    log(
-      "aws",
-      "downloaded",
-      "Downloaded " + fileName + " from " + bucketName + "...",
-      "success",
-    );
+    log({
+      module: "aws",
+      action: "downloaded",
+      message: "Downloaded " + fileName + " from " + bucketName + "...",
+      type: "success",
+    });
 
     return content.Body?.transformToByteArray();
   } catch (err) {
     console.log("Error", err);
-    log("aws", "downloading", err, "error");
+    log({
+      module: "aws",
+      action: "error",
+      message: "Error downloading " + fileName + " from " + bucketName + "...",
+      type: "error",
+    });
   }
 }
 
@@ -263,26 +273,31 @@ export async function streamFromAWS({
     Range: `bytes=${start}-${end}`,
   });
 
-  log(
-    "aws",
-    "streaming",
-    "Streaming " + fileName + " from " + bucketName + "...",
-    "info",
-  );
+  log({
+    module: "aws",
+    action: "streaming",
+    message: "Streaming " + fileName + " from " + bucketName + "...",
+    type: "info",
+  });
 
   try {
     const content = await client.send(command);
 
-    log(
-      "aws",
-      "streamed",
-      "Streamed " + fileName + " from " + bucketName + "...",
-      "success",
-    );
+    log({
+      module: "aws",
+      action: "streamed",
+      message: "Streamed " + fileName + " from " + bucketName + "...",
+      type: "success",
+    });
 
     return content.Body?.transformToByteArray();
   } catch (err) {
     console.log("Error", err);
-    log("aws", "streaming", err, "error");
+    log({
+      module: "aws",
+      action: "error",
+      message: "Error streaming " + fileName + " from " + bucketName + "...",
+      type: "error",
+    });
   }
 }

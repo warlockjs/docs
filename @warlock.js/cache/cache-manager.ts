@@ -120,7 +120,7 @@ export class CacheManager implements CacheDriver<any, any> {
    * {@inheritdoc}
    */
   public setOptions(options: GenericObject) {
-    return this.currentDriver?.setOptions(options);
+    return this.currentDriver?.setOptions(options || {});
   }
 
   /**
@@ -161,7 +161,9 @@ export class CacheManager implements CacheDriver<any, any> {
 
     const driverInstance = new Driver();
 
-    driverInstance.setOptions((this.configurations.options as any)[driver]);
+    driverInstance.setOptions(
+      (this.configurations.options as any)[driver] || {},
+    );
 
     await driverInstance.connect();
 

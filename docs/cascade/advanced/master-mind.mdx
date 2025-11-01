@@ -1,8 +1,65 @@
 ---
-sidebar_position: 12
+sidebar_position: 3
 ---
 
-# Master Mind
+# 🧠 MasterMind: Auto-Increment ID Manager
+
+The `MasterMind` class is Cascade's behind-the-scenes wizard for managing auto-incrementing numeric IDs! It keeps track of the last used ID for each collection, ensuring your auto-increment IDs are always unique and collision-free. 🪄
+
+## 🚦 What Does MasterMind Do?
+- Stores the last used numeric ID for each collection in a special `MasterMind` collection.
+- Generates the next unique ID for new documents (auto-increment).
+- Lets you get, set, or update the last ID for any collection.
+- Handles renaming collections and syncing IDs.
+
+## 🏗️ How to Use MasterMind
+
+### Get the Last Used ID
+```ts title="src/app.ts"
+import { masterMind } from "@warlock.js/cascade";
+
+const lastId = await masterMind.getLastId("categories");
+console.log(lastId); // e.g., 42
+```
+
+### Set the Last Used ID
+```ts title="src/app.ts"
+await masterMind.setLastId("categories", 100);
+```
+
+### Generate the Next Auto-Increment ID
+```ts title="src/app.ts"
+const nextId = await masterMind.generateNextId("categories", 1, 1);
+console.log(nextId); // e.g., 43
+```
+- The second argument is the increment step (default: 1).
+- The third argument is the initial value if the collection is new (default: 1).
+
+### Rename a Collection in MasterMind
+```ts title="src/app.ts"
+await masterMind.renameCollection("oldName", "newName");
+```
+
+### Sync All Collections
+```ts title="src/app.ts"
+await masterMind.updateAllLastId();
+```
+
+## 🧙‍♂️ Pro Tip
+You rarely need to use `masterMind` directly—Cascade models handle auto-increment for you! But it's great for migrations, data repair, or advanced admin tools.
+
+## ⚠️ Best Practices
+- Use `generateNextId` for custom auto-increment logic.
+- Use `setLastId` if you manually insert data and need to update the counter.
+- Don't use MasterMind for multi-tenancy or tenant isolation—it's just for ID management!
+
+:::info
+MasterMind is the secret sauce behind Cascade's reliable, auto-incrementing numeric IDs. No more duplicate keys or manual tracking!
+:::
+
+---
+
+## 🌟 What's Next?
 
 ## Introduction
 

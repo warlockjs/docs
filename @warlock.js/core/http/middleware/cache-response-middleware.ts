@@ -89,8 +89,6 @@ export function cacheMiddleware(
       responseCacheOptions,
       request,
     );
-    console.log({ ttl, omit, cacheKey, driver });
-
     const cacheDriver = driver ? await cache.use(driver) : cache;
 
     const content = await cacheDriver.get(cacheKey);

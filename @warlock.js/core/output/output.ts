@@ -864,7 +864,7 @@ const _postOutput = output({
       image: _uploadOutput,
       name: "string",
     },
-    fullName: (resource: any, output: Record<string, any>) => {
+    fullName: (resource: any, _output: Record<string, any>) => {
       return `${resource.firstName} ${resource.lastName}`;
     },
   },
@@ -880,7 +880,7 @@ const _postOutput = output({
   after: async (
     resource: any,
     output: Record<string, any>,
-    helpers: OutputHelpers,
+    _helpers: OutputHelpers,
   ) => {
     output.title = "Hello World";
   },

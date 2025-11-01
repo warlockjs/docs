@@ -15,6 +15,11 @@ export async function createConfigLoader() {
   for (const fileName of files) {
     // get file name without extension
     const file = fileName.replace(".ts", "").replace(".tsx", "");
+
+    // Skip type definition files (they don't export runtime config)
+    if (file === "config-types" || file === "index") {
+      continue;
+    }
     if (file === "log") {
       addImport(
         `import logConfigurations from "src/config/log";`,

@@ -1,3 +1,6 @@
+import type { LogChannel } from "./log-channel";
+import type { Logger } from "./logger";
+
 export type LogLevel = "debug" | "info" | "warn" | "error" | "success";
 
 export type DebugMode = "daily" | "monthly" | "yearly" | "hourly";
@@ -19,12 +22,7 @@ export type BasicLogConfigurations = {
   /**
    * Advanced filter to determine if the message should be logged or not
    */
-  filter: (options: {
-    level: LogLevel;
-    module: string;
-    action: string;
-    message: any;
-  }) => boolean;
+  filter: (data: LoggingData) => boolean;
 };
 
 export type LogMessage = {
@@ -55,10 +53,48 @@ export interface LogContract {
   /**
    * Log the given message
    */
-  log(
-    module: string,
-    action: string,
-    message: any,
-    level: LogLevel,
-  ): void | Promise<void>;
+  log(data: LoggingData): void | Promise<void>;
+}
+
+export type LoggingData = {
+  type: "info" | "debug" | "warn" | "error" | "success";
+  module: string;
+  action: string;
+  message: any;
+  context?: Record<string, any>;
+};
+
+export type OmittedLoggingData = Omit<LoggingData, "type">;
+
+export interface Log {
+  (data: LoggingData): Promise<Logger>;
+  /**
+   * Make info log
+   */
+  info(data: OmittedLoggingData): Promise<Logger>;
+  info(module: string, action: string, message: any): Promise<Logger>;
+  /**
+   * Make debug log
+   */
+  debug(data: OmittedLoggingData): Promise<Logger>;
+  debug(module: string, action: string, message: any): Promise<Logger>;
+  /**
+   * Make warn log
+   */
+  warn(data: OmittedLoggingData): Promise<Logger>;
+  warn(module: string, action: string, message: any): Promise<Logger>;
+  /**
+   * Make error log
+   */
+  error(data: OmittedLoggingData): Promise<Logger>;
+  error(module: string, action: string, message: any): Promise<Logger>;
+  /**
+   * Make success log
+   */
+  success(data: OmittedLoggingData): Promise<Logger>;
+  success(module: string, action: string, message: any): Promise<Logger>;
+  /**
+   * Get channel by name
+   */
+  channel(name: string): LogChannel | undefined;
 }

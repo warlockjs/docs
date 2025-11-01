@@ -1,0 +1,88 @@
+---
+sidebar_position: 13
+---
+
+# 🎉 Model Events
+
+Cascade's event system lets you hook into every important moment in your model's lifecycle! Run custom code before or after creating, updating, saving, or deleting—perfect for logging, syncing, notifications, and more. 🪄
+
+## ✨ Why Use Model Events?
+- Add business logic without cluttering your models
+- Log changes for auditing
+- Sync related models
+- Send notifications after actions
+
+> **Note:** While you *can* technically stop an action in a before-event, we recommend handling validation explicitly in your application logic or with dedicated validation tools—not in model events. Events are best for side effects and automation, not for core validation.
+
+## 🚦 Full List of Events
+
+### Before (Sync, can cancel action)
+- `onCreating(model)`
+- `onSaving(model)`
+- `onUpdating(model, oldModel)`
+- `onDeleting(model)`
+
+### After (Async, cannot cancel)
+- `onCreated(model)`
+- `onSaved(model, oldModel)`
+- `onUpdated(model, oldModel)`
+- `onDeleted(model)`
+
+## 🏗️ How to Listen to Events
+Just use the `events()` method on your model class:
+
+```ts title="src/app.ts"
+User.events()
+  .onCreating((user) => console.log("Creating!"))
+  .onSaving((user) => console.log("Saving!"))
+  .onDeleting((user) => console.log("Deleting!"));
+```
+
+## ➕ Registering Multiple Listeners
+You can register as many listeners as you want for each event:
+
+```ts title="src/app.ts"
+User.events()
+  .onSaving((user) => console.log("First listener!"))
+  .onSaving((user) => console.log("Second listener!"));
+```
+
+## 🧑‍💻 Event Parameters
+- `model`: The current model instance
+- `oldModel`: The previous state (for update/save events)
+
+## 🛑 Cancelling Actions in Before Events
+Return `false` from a before-event listener to stop the action. This is best used for rare, advanced scenarios (like enforcing business rules), not for general validation:
+
+```ts title="src/app.ts"
+User.events().onSaving((user) => {
+  if (user.get("status") === "archived") {
+    return false; // Prevent saving if status is archived
+  }
+});
+```
+
+## 🌍 Real-World Use Cases
+- **Logging**: Track changes for auditing
+- **Syncing**: Update related models (e.g., recalculate counts)
+- **Notifications**: Send emails or push notifications after creation
+- **Enforcing business rules**: (rare) Prevent certain actions based on custom logic
+
+## 🧙‍♂️ Pro Tips
+- Use events for side effects and automation, not for core validation
+- Use after events for logging, syncing, and notifications
+- Chain listeners to keep code modular
+
+## 🛠️ Troubleshooting
+- If your event isn't firing, check that you're registering it on the correct model class
+- Remember: only before events can cancel actions
+- Use `console.log` or breakpoints to debug event flows
+
+:::info
+Events make your models super flexible and powerful. Use them to automate, sync, and react to changes in your data!
+:::
+
+---
+
+## 🌟 What's Next?
+- [🧰 Advanced Usage](../advanced/introduction) 

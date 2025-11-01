@@ -2,17 +2,17 @@
 sidebar_position: 1
 ---
 
-# Introduction
+# 🔍 Query Manager: Direct Database Power!
 
-Queries over MongoDB has many types, but in this section we will work with the most common ones.
+Sometimes you want to work with raw collections—no models, no frills, just pure MongoDB power. That's where Cascade's **Query manager** shines! 🚀
 
-## Query Manager
+## 🧰 What is the Query Manager?
+- A direct, flexible way to run queries on any collection
+- Perfect for scripts, migrations, admin tools, or when you don't need a full model
+- Gives you access to all the CRUD operations, filtering, aggregation, and more
 
-This is basically the underlying class for other higher levels such as Models and Aggregate framework, so let's see how this work in a nutshell.
-
-## Basic Usage
-
-By default Cascade is shipped with an instance of the query manager, you can import it directly from the package.
+## 🏗️ Basic Usage
+Import the `query` instance and go:
 
 ```ts title="src/app.ts"
 import { query } from "@warlock.js/cascade";
@@ -20,16 +20,18 @@ import { query } from "@warlock.js/cascade";
 const users = await query.list("users");
 ```
 
-This will return all users in the database, but you can pass a query object to filter the results.
+You can filter, sort, count, aggregate, and more—just pass the collection name and your options!
 
-```ts title="src/app.ts"
-import { query } from "@warlock.js/cascade";
+## 🤔 When to Use Query Manager vs Models?
+- **Use Models** for business logic, events, casting, and relationships
+- **Use Query Manager** for quick scripts, admin dashboards, migrations, or when you want full control
 
-const users = await query.list("users", {
-    name: "John",
-});
-```
+## 🧙‍♂️ Pro Tip
+You can mix and match! Use models for most of your app, and drop down to the Query manager for power-user tasks.
 
-In that sense we can conclude that any query you want to use receives the first argument as the collection name, and rest of arguments depends on the method arguments itself.
+---
 
-In the next sections, we will see each operation of the `CRUD` operations in details.
+## 🌟 What's Next?
+- [📋 Listing Documents](./listing-documents)
+- [💾 Saving Documents](./saving-documents)
+- [🗑️ Deleting Documents](./deleting-documents)

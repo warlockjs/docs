@@ -29,9 +29,9 @@ groupedTranslations("validation", {
     en: "The selected :input does not exist in our database records.",
     ar: ":input المحدد غير موجود في سجلات قاعدة البيانات الخاصة بنا.",
   },
-  confirmed: {
-    en: ":input must match :confirmationInput.",
-    ar: ":input يجب أن يتطابق مع :confirmationInput.",
+  matches: {
+    en: ":input must match :field.",
+    ar: ":input يجب أن يتطابق مع :field.",
   },
   min: {
     en: ":input must be at least :min.",
@@ -125,9 +125,9 @@ groupedTranslations("validation", {
     en: ":input must be number, string",
     ar: ":input يجب أن يكون رقم أو نص ",
   },
-  unknownKey: {
-    en: "unknown key :key",
-    ar: "مفتاح غير معروف :key",
+  unknownKeys: {
+    en: "The :input contains unknown keys: :unknownKeys",
+    ar: ":input يحتوي على حقول غير معروفة: :unknownKeys",
   },
   forbidden: {
     en: "The :input can not be present.",

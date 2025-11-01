@@ -2,77 +2,62 @@
 sidebar_position: 2
 ---
 
-# Create New Document
+# ✨ Creating Documents
 
-In the previous section, we've seen how to create a document by creating a new instance of the model then calling the `save` method, this is a way, let's recap it quickly.
+Creating new documents in Cascade is a breeze! Whether you like the classic OOP way or prefer a one-liner, Cascade has you covered. 🪄
 
-## Creating a model
+## 🏗️ The Classic Way: New + Save
 
-To create a model, you need to extend the `Model` class and define the `collection` property.
-
-```ts title="src/models/user.ts"
-import { Model } from "@warlock.js/cascade";
-
-export class User extends Model {
-    /**
-    * The collection name
-    */
-    public static collection = "users";
-}
-```
-
-## Creating a model instance
-
-When creating a new model instance, you optionally pass an object of the data that will be saved (**created**).
+1. **Create an instance:**
+2. **Call `save()` to persist it:**
 
 ```ts title="src/app.ts"
 import { User } from "./models/user";
 
 const user = new User({
-    name: "Hasan Zohdy",
-    email: "hassanzohdy@gmail.com",
-    isActive: true,
+  name: "Hasan Zohdy",
+  email: "hassanzohdy@gmail.com",
+  isActive: true,
 });
+
+await user.save();
 ```
 
-This only creates an instance of the model, but the data is not saved yet, now let's see how to save the data.
+This gives you full control—modify fields, run methods, and then save when you're ready.
 
-## Saving a model instance
+## 🚀 The Fast Lane: Static `create`
 
-To save a model instance, you need to call the `save` method.
+For most cases, you'll love the static `create` method. It creates and saves in one go:
 
 ```ts title="src/app.ts"
 import { User } from "./models/user";
 
-async function main() {
-    const user = new User({
-        name: "Hasan Zohdy",
-        email: "hassanzohdy@gmail.com",
-        isActive: true,
-    });
+const user = await User.create({
+  name: "Hasan Zohdy",
+  email: "hassanzohdy@gmail.com",
+  isActive: true,
+});
 
-    await user.save();
-
-    console.log(user.data); // outputs all data
-}
+console.log(user.data); // outputs all data
 ```
 
-## Using the `create` method
+:::tip
+**Recommended!** The static `create` method is the cleanest and most common way to add new documents.
+:::
 
-A more preferred way to create a new model instance and save it is to use the static `create` method.
+## 📝 What Happens Under the Hood?
+- Cascade auto-generates an `id` (number) and `_id` (ObjectId) for you.
+- Default values and type casting are applied automatically.
+- Any model events (like `onCreating`, `onCreated`) will run.
 
-```ts title="src/app.ts"
-import { User } from "./models/user";
+## 🧙‍♂️ Pro Tip: Use Model Methods
+You can add your own methods to models for custom logic before/after saving. Models are just classes—make them as smart as you want!
 
-async function main() {
-    const user = await User.create({
-        name: "Hasan Zohdy",
-        email: "hassanzohdy@gmail.com",
-        isActive: true,
-    });
+---
 
-    console.log(user.data); // outputs all data
-}
-```
-
-This is more easier and cleaner, and it's the **recommended way** to create a new model instance and save it.
+## 🌟 What's Next?
+- [🔮 Casting Data](./casting-data)
+- [🧩 Embedded Documents](./embedded-documents)
+- [💾 Saving Models](./saving-models)
+- [🗑️ Destroying Models](./destroying-models)
+- [🔍 Fetching Documents](./fetching-documents)

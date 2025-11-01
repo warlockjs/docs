@@ -19,7 +19,8 @@ The Null Cache Driver disables caching. It is useful for testing, debugging, or 
 - No data is cached, ever
 - Not for production use
 
-## Example Usage
+## Configuration
+
 ```ts title="src/config/cache.ts"
 import { cache, NullCacheDriver } from "@warlock.js/core";
 
@@ -28,8 +29,95 @@ cache.setConfigurations({
   drivers: {
     null: NullCacheDriver,
   },
+  options: {
+    null: {
+      // No specific options needed
+    },
+  },
+});
+```
+
+## Options {#options}
+
+The Null Cache Driver accepts any options but ignores them all. This makes it compatible with the cache interface while providing no functionality.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `*` | any | `undefined` | Any options are accepted but ignored |
+
+### Example Options (Ignored)
+
+```ts
+{
+  // All of these are ignored by the null driver
+  globalPrefix: "test",
+  ttl: 3600,
+  host: "localhost",
+  port: 6379,
+  customOption: "value",
+}
+```
+
+## Behavior
+
+The Null Cache Driver implements all cache methods but provides no actual caching:
+
+- **`set()`**: Always returns the value (no storage)
+- **`get()`**: Always returns `null` (no data retrieved)
+- **`remove()`**: Always succeeds (no data to remove)
+- **`flush()`**: Always succeeds (no data to clear)
+- **`removeNamespace()`**: Always succeeds (no data to clear)
+
+## Example Usage
+
+```ts
+import { cache } from "@warlock.js/core";
+
+// These operations appear to work but don't actually cache anything
+await cache.set("key", "value", 3600);  // Returns "value"
+const result = await cache.get("key");   // Returns null
+await cache.remove("key");               // Succeeds
+await cache.flush();                     // Succeeds
+```
+
+## Use Cases
+
+### Testing
+```ts
+// In your test configuration
+const testConfig = {
+  default: "null",
+  drivers: { null: NullCacheDriver },
+  options: { null: {} }
+};
+```
+
+### Debugging
+```ts
+// Temporarily disable cache to isolate issues
+const debugConfig = {
+  default: "null",
+  drivers: { null: NullCacheDriver },
+  options: { null: {} }
+};
+```
+
+### Performance Measurement
+```ts
+// Compare performance with and without cache
+const withCache = await measurePerformance(() => {
+  return cache.get("expensive-operation");
+});
+
+// Switch to null driver
+cache.use("null");
+
+const withoutCache = await measurePerformance(() => {
+  return cache.get("expensive-operation");
 });
 ```
 
 ## Troubleshooting
 - **Why is nothing cached?** This is expected! Switch to another driver for real caching.
+- **Performance is the same with/without cache?** The null driver is working correctly - it's not caching anything.
+- **Need to re-enable cache?** Switch back to a real driver like `memory` or `redis`.

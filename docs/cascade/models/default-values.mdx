@@ -2,65 +2,64 @@
 sidebar_position: 5
 ---
 
-# Default values
+# 📝 Default Values
 
-When creating new model, you can specify default values for fields. These values will be used when creating new records if the field is not specified.
+Never worry about missing data! Cascade lets you set default values for your model fields, so your documents are always complete and predictable. 🧩
 
-```ts title="src/models/post.ts"
-import { Model } from '@warlock.js/cascade'
+## 🏷️ Setting Default Values
 
-export class Post extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "posts";
+Just add a `defaults` property to your model:
 
-  /**
-   * {@inheritDoc}
-   */
-  public defaultValue: Document = {
-    isActive: false,
-  };
+```ts title="src/models/user.ts"
+import { Model, Casts } from "@warlock.js/cascade";
 
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    title: "string",
-    content: "string",
-    isActive: "boolean",
+export class User extends Model {
+  public static collection = "users";
+  protected defaults = {
+    isActive: true,
+    role: "user",
+    age: 18,
   };
 }
 ```
 
-We can also use callbacks to set default values for each field:
+## ⚡ Dynamic Defaults (Functions!)
 
-```ts title="src/models/post.ts"
-import { Model } from '@warlock.js/cascade'
+Need a default that changes? Use a function:
 
-export class Post extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "posts";
-
-  /**
-   * {@inheritDoc}
-   */
-  public defaultValue: Document = {
-    isActive: false,
-    views: () => {
-      return Math.floor(Math.random() * 1000); // random number between 0 and 1000
-    },
-  };
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    title: "string",
-    content: "string",
-    isActive: "boolean",
-  };
-}
+```ts title="src/models/user.ts"
+protected defaults = {
+  createdAt: () => new Date(),
+  token: () => Math.random().toString(36).slice(2),
+};
 ```
+
+The function will be called every time a new model is created!
+
+## 🧙‍♂️ Pro Tip: Defaults + Casting
+
+Defaults are applied **before** casting, so your types are always correct:
+
+```ts title="src/models/user.ts"
+protected casts: Casts = {
+  age: "number",
+};
+protected defaults = {
+  age: "21", // Will be cast to number!
+};
+```
+
+## ⚠️ Gotchas
+
+- Defaults only apply when a value is missing or `undefined`.
+- If you pass `null`, the default is **not** used.
+
+:::info
+Defaults make your models safer and your code cleaner. Use them for all optional fields!
+:::
+
+---
+
+## 🌟 What's Next?
+- [🧩 Embedded Documents](./embedded-documents)
+- [💾 Saving Models](./saving-models)

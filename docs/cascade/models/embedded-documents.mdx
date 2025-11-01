@@ -2,337 +2,87 @@
 sidebar_position: 7
 ---
 
-# Embedded documents
+# 🧩 Embedded Documents
 
-## Introduction
+MongoDB lets you nest documents inside each other—Cascade makes this powerful and easy! Use embedded documents to keep related data together, reduce joins, and make your data model shine. 🌟
 
-MongoDB flexibility allows us to store documents inside other documents. This is called embedded documents. In this section, we will learn how to use embedded documents using Cascade.
+## 🤝 What Are Embedded Documents?
 
-## Embedded data
+An embedded document is just a document inside another document. For example, a `Post` can embed a `Category`.
 
-Let's take a simple example of a category model:
+## 🏗️ How to Embed a Document
 
-```ts title="src/models/category.ts"
-import { Model, Casts } from "@warlock.js/cascade";
-
-export class Category extends Model {
-
-  /**
-   * Collection name
-   */
-  public static collection = "categories";
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-}
-```
-
-This category model has a simple structure, let's create a new category:
-
-```ts title="src/app.ts"
-import { Category } from "./models/category";
-
-async function main() {
-    const category = await Category.create({
-        name: "Sports",
-        isActive: true,
-    });
-
-    console.log(category.data);
-}
-
-main();
-```
-
-This will create a new category, and the `category.data` will be something like this:
-
-```json
-{
-    "id": 512312,
-    "_id": "5f9b1b3c1b9c4e0b4c7b23a1",
-    "name": "Sports",
-    "isActive": true,
-    "createdAt": "2020-10-30T12:00:00.000Z",
-    "updatedAt": "2020-10-30T12:00:00.000Z"
-}
-```
-
-The category that we created we need to embed it into our post model.
+1. **Define your models:**
+2. **Just use the model class in your casts!**
 
 ```ts title="src/models/post.ts"
-import { Model, Casts, castModel } from "@warlock.js/cascade";
+import { Model, Casts } from "@warlock.js/cascade";
 import { Category } from "./category";
 
 export class Post extends Model {
-
-  /**
-   * Collection name
-   */
   public static collection = "posts";
-
-  /**
-   * {@inheritDoc}
-   */
   protected casts: Casts = {
     title: "string",
     content: "string",
-    category: castModel(Category),
+    category: Category, // Just pass the model class!
   };
 }
 ```
 
-Now we can create a new post and embed the category into it:
-
-```ts title="src/app.ts"
-import { Post } from "./models/post";
-
-async function main() {
-    const post = await Post.create({
-        title: "Hello world",
-        content: "This is my first post",
-        category: 512312,
-    });
-
-    console.log(post.data);
-}
-
-main();
-```
-
-The output will be something like this:
-
-```json
-{
-    "id": 512312,
-    "_id": "5f9b1b3c1b9c4e0b4c7b23a1",
-    "title": "Hello world",
-    "content": "This is my first post",
-    "category": {
-        "id": 512312,
-        "_id": "5f9b1b3c1b9c4e0b4c7b23a1",
-        "name": "Sports",
-        "isActive": true,
-        "createdAt": "2020-10-30T12:00:00.000Z",
-        "updatedAt": "2020-10-30T12:00:00.000Z"
-    },
-    "createdAt": "2020-10-30T12:00:00.000Z",
-    "updatedAt": "2020-10-30T12:00:00.000Z"
-}
-```
-
-The data of the injected category has some redundant fields such as `_id`, `createdAt`, and `updatedAt`. In that sense, we can specify what data to be embedded from the category model:
-
-## Defining what data to be embedded
-
-Now we illustrated the problem, let's see how to solve it, when we want to specify what data to be embedded when the model is going to be embedded in another document, we can define the getter property `embeddedData` in the category model:
-
-```ts title="src/models/category.ts" 
-import { Model, Casts } from "@warlock.js/cascade";
-
-export class Category extends Model {
-
-  /**
-   * Collection name
-   */
-  public static collection = "categories";
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-
-  /**
-   * {@inheritDoc}
-   */
-  public get embeddedData() {
-    return this.only(['id', 'name']);
-  }
-}
-```
-
-Now when we create a new post, the category data will be something like this:
-
-```json
-{
-    "id": 512312,
-    "_id": "5f9b1b3c1b9c4e0b4c7b23a1",
-    "title": "Hello world",
-    "content": "This is my first post",
-    "category": {
-        "id": 512312,
-        "name": "Sports",
-    },
-    "createdAt": "2020-10-30T12:00:00.000Z",
-    "updatedAt": "2020-10-30T12:00:00.000Z"
-}
-```
-
-This makes the data more clean and readable and most important we added only what we need.
-
-## Using embedded property.
-
-Mongez `Model` class already implemented the `embeddedData` for you, to make it easier we can define the `embedded` property that receives the array of fields that we need to embed:
-
-```ts title="src/models/category.ts"
-import { Model, Casts } from "@warlock.js/cascade";
-
-export class Category extends Model {
-
-  /**
-   * Collection name
-   */
-  public static collection = "categories";
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-
-  /**
-   * {@inheritDoc}
-   */
-  public embedded = ['id', 'name'];
-}
-```
-
-This is the same as defining the `embeddedData` getter property but in a more readable and simpler way.
-
-## Embed documents except timestamps
-
-When we embed a document, we don't need to embed the timestamps,  To exclude the timestamps from the embedded document, we can use the `embedAllExceptTimestampsAndUserColumns` property:
-
-```ts title="src/models/category.ts"
-import { Model, Casts } from "@warlock.js/cascade";
-
-export class Category extends Model {
-
-  /**
-   * Collection name
-   */
-  public static collection = "categories";
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-
-  /**
-   * {@inheritDoc}
-   */
-  public embedAllExceptTimestampsAndUserColumns = true;
-}
-```
-
-## Embed all data except
-
-We can also exclude only some fields from the embedded document, to do that we can use the `embedAllExcept` property:
-
-```ts title="src/models/category.ts"
-import { Model, Casts } from "@warlock.js/cascade";
-
-export class Category extends Model {
-
-  /**
-   * Collection name
-   */
-  public static collection = "categories";
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-
-  /**
-   * {@inheritDoc}
-   */
-  public embedAllExcept = ['isActive'];
-}
-```
-
-## Default embedded data
-
-If none of the above embedded data properties are defined, then the default embedded data will be the entire document data.
-
-:::warning DO NOT DO THIS
-It's highly recommended to define the embedded data to avoid embedding the entire document data, this will cause a huge performance issue and the database size will increase dramatically.
+:::tip Did you know?
+You no longer need to use `castModel(Category)`—just pass the model class directly! This is the new, recommended way. `castModel` is still supported for backward compatibility.
 :::
 
-## Documents Association
+Now, when you create a post and pass a category id, Cascade will fetch and embed the category data for you!
 
-Let's say we have a post, with list of comments, we need to add the comment to the post's comments list, we can do this using `associate` method.
+## 🎯 Controlling Embedded Data
 
-```ts title="src/app.ts"
-import { Post } from "./models/post";
-import { Comment } from "./models/comment";
+By default, all fields are embedded. But you can control what gets embedded:
 
-const post = await Post.first();
+### 1. `embeddedData` Getter
 
-const comment = await Comment.create({
-    content: "This is my first comment",
-    post: post.only(['id']),
-});
+Override this getter in your model to specify exactly what to embed:
 
-post.associate('comments', comment);
-
-await post.save();
+```ts title="src/models/category.ts"
+public get embeddedData() {
+  return this.only(["id", "name"]);
+}
 ```
 
-The `associate` method will add the comment to the post's comments list, and save the post.
+### 2. `embedded` Property
 
-:::tip
-If the second argument is an instance of model, then the `associate` method will use the `embeddedData` property to embed the document.
+Or, just list the fields you want:
+
+```ts title="src/models/category.ts"
+public embedded = ["id", "name"];
+```
+
+### 3. `embedAllExceptTimestampsAndUserColumns`
+
+Exclude timestamps and user columns from embedding:
+
+```ts title="src/models/category.ts"
+public embedAllExceptTimestampsAndUserColumns = true;
+```
+
+### 4. `embedAllExcept`
+
+Exclude specific fields:
+
+```ts title="src/models/category.ts"
+public embedAllExcept = ["createdAt", "updatedAt"];
+```
+
+## 🧙‍♂️ Pro Tip
+You can combine these options for fine-grained control over what gets embedded!
+
+:::info
+Embedded documents are perfect for denormalizing data and making reads super fast. But be mindful of document size limits in MongoDB!
 :::
 
-To add certain fields, you must pass a plain object instead:
+---
 
-```ts title="src/app.ts"
-post.associate('comments', comment.only(['id', 'content']));
-
-// or using plain object
-post.associate('comments', comment.embedToPost); // you need to define it in the comment model
-```
-
-## Re-associate documents
-
-The `associate` method works only when we need to add new document to the list, but what if we need to update the comment inside the post's comments list? we can use the `reAssociate` method:
-
-```ts title="src/app.ts"
-const comment = await Comment.first();
-
-post.reassociate('comments', comment);
-
-await post.save();
-```
-
-:::tip
-You can use the `reassociate` method to add new document to the list, but it's recommended to use the `associate` method instead.
-:::
-
-## Disassociate documents
-
-If you want to pull a document from the list, you can use the `disassociate` method:
-
-```ts title="src/app.ts"
-const comment = await Comment.first();
-
-post.disassociate('comments', comment);
-
-await post.save();
-```
+## 🌟 What's Next?
+- [💾 Saving Models](./saving-models)
+- [🗑️ Destroying Models](./destroying-models)
+- [🔍 Fetching Documents](./fetching-documents)

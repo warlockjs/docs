@@ -114,6 +114,10 @@ export function createAppBuilder() {
 }
 
 export async function createBootstrapFile() {
+  if (await fileExistsAsync(warlockPath("bootstrap.ts"))) {
+    return "import './bootstrap'";
+  }
+
   await createWarlockFile(
     "bootstrap.ts",
     `import { bootstrap } from "@warlock.js/core";\n bootstrap();`,
@@ -123,6 +127,10 @@ export async function createBootstrapFile() {
 }
 
 export async function createEnvironmentModeDisplayFile() {
+  if (await fileExistsAsync(warlockPath("environment.ts"))) {
+    return "import './environment'";
+  }
+
   await createWarlockFile(
     "environment.ts",
     `import { displayEnvironmentMode } from "@warlock.js/core";\n displayEnvironmentMode();`,
@@ -174,12 +182,12 @@ export async function loadEventFiles() {
   // raise a warning if there is an index file inside the events directory
   for (const path of paths) {
     if (path.includes("index")) {
-      consoleLog.log(
-        "optimizer",
-        "events",
-        `${colors.gold(path)} found in the events directory, please remove it as it will be ignored in the next release of warlock`,
-        "warn",
-      );
+      consoleLog.log({
+        module: "optimizer",
+        action: "events",
+        message: `${colors.gold(path)} found in the events directory, please remove it as it will be ignored in the next release of warlock`,
+        type: "warn",
+      });
     }
   }
 

@@ -1,9 +1,8 @@
 import type { Model } from "@warlock.js/cascade";
-import type { BasicLogConfigurations } from "@warlock.js/logger";
+import type { BasicLogConfigurations, LoggingData } from "@warlock.js/logger";
 import {
   LogChannel,
   type LogContract,
-  type LogLevel,
   type LogMessage,
 } from "@warlock.js/logger";
 import { DatabaseLogModel } from "../database/models/database-log";
@@ -34,17 +33,13 @@ export class DatabaseLog
   /**
    * {@inheritdoc}
    */
-  public async log(
-    module: string,
-    action: string,
-    message: any,
-    level: LogLevel,
-  ) {
+  public async log(log: LoggingData) {
+    const { module, action, message, type: level } = log;
     const model = this.model;
 
     if (!model.database?.connection?.isConnected()) return;
 
-    if (!this.shouldBeLogged({ module, action, level, message })) return;
+    if (!this.shouldBeLogged(log)) return;
 
     const data: LogMessage = {
       module,

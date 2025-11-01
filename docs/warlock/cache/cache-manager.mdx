@@ -10,7 +10,7 @@ You can access the cache manager by importing `cache` from warlock.
 
 ## Setting Configurations
 
-After you define [Cache Configurations](./configurations), you can set them using the `setConfigurations` method.
+After you define [Cache Configurations](./configurations), you can set them using the `setCacheConfigurations` method.
 
 ```ts title="src/config/cache.ts"
 import { CacheConfigurations } from "@warlock.js/core";
@@ -47,12 +47,12 @@ If there is no current driver, then the cache manager will use the [NullCacheDri
 
 ## Set default driver
 
-To change the default driver, use `use` method, this method accepts the driver name Defined in [ Cache drivers list](./configurations#drivers) or pass the driver object directly.
+To change the default driver, use `use` method, this method accepts the driver name defined in [Cache drivers list](./configurations#drivers) or pass the driver object directly.
 
 ```ts
 import { cache } from "@warlock.js/core";
 
-cache.use("redis");
+await cache.use("redis");
 ```
 
 :::info
@@ -80,8 +80,19 @@ If the driver is not loaded before, the cache manager will load it first before 
 :::
 
 :::danger
-If the given driver name is listed in [ Cache drivers list](./configurations#drivers), it will throw an error.
+If the given driver name is not listed in [Cache drivers list](./configurations#drivers), it will throw an error.
 :::
+
+## Register Custom Driver
+
+You can register custom drivers at runtime:
+
+```ts
+import { cache } from "@warlock.js/core";
+import { CustomCacheDriver } from "./CustomCacheDriver";
+
+cache.registerDriver("custom", CustomCacheDriver);
+```
 
 ## Global prefix
 
@@ -220,6 +231,55 @@ await cache.removeNamespace("users");
 ```
 
 This will clear out all the values that are stored under the `users` namespace.
+
+## Parse Key
+
+The `parseKey` method converts keys to a consistent format:
+
+```ts
+import { cache } from "@warlock.js/core";
+
+// Parse object keys
+const key = await cache.parseKey({ id: 1, type: "user" });
+// Result: "id.1.type.user"
+
+// Parse string keys
+const key = await cache.parseKey("user:1");
+// Result: "user.1"
+```
+
+## Get Options
+
+Access the current driver's options:
+
+```ts
+import { cache } from "@warlock.js/core";
+
+const options = cache.options;
+```
+
+## Set Options
+
+Update the current driver's options:
+
+```ts
+import { cache } from "@warlock.js/core";
+
+cache.setOptions({
+  globalPrefix: "newprefix",
+  ttl: 7200,
+});
+```
+
+## Disconnect
+
+Disconnect from the current cache driver:
+
+```ts
+import { cache } from "@warlock.js/core";
+
+await cache.disconnect();
+```
 
 ## Set Default Driver at Runtime
 You can switch the default driver at runtime using `use`:

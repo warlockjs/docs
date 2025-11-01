@@ -36,7 +36,7 @@ export class MemoryExtendedCacheDriver
     if (ttl) {
       // reset the expiration time
       this.setTemporaryData(key, parsedKey, ttl);
-      value.expiresAt = this.getTtl(ttl);
+      value.expiresAt = this.getExpiresAt(ttl);
     }
 
     return this.parseCachedData(parsedKey, value);

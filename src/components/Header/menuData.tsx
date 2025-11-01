@@ -13,5 +13,11 @@ const menuData: Menu[] = [
     path: "/docs/cascade/getting-started/introduction",
     newTab: false,
   },
+  {
+    id: 3,
+    title: "Seal",
+    path: "/docs/seal/getting-started/introduction",
+    newTab: false,
+  },
 ];
 export default menuData;
