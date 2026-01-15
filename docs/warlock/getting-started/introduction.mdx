@@ -1,38 +1,79 @@
 ---
 sidebar_position: 1
+title: "Introduction"
+description: "Warlock.js is a TypeScript-first Node.js framework for building fast, scalable APIs with MongoDB"
 ---
 
-# 🌟 Introduction
+# Introduction
 
-**Warlock** is a powerful Node.js framework designed to simplify the development of APIs and web applications. Built on top of [Fastify](https://fastify.dev/) and [MongoDB](https://www.mongodb.com/), it offers a seamless development experience.
+**Warlock.js** is a TypeScript-first Node.js framework for building fast, scalable APIs. Built on [Fastify](https://fastify.dev/) and [MongoDB](https://www.mongodb.com/), it provides everything you need to create production-ready backends.
 
-## Highlighted Features
+## Why Warlock.js?
 
-- ⚡ Blazing fast performance.
-- 🔄 Hot Module Reload (MHR) for an incredibly fast development experience.
-- 📡 Event-Driven Architecture.
-- 🔄 Automatic Import of Events, Routes, and Localization.
-- 📊 Effortless management of API requests, routes, and responses.
-- ✉️ Mail Support with **React Components**.
-- 🧠 Redis Cache Support.
-- 🗂️ Module-Based Architecture.
-- 🚀 Entry Point (**main.ts**) for each module.
-- 🔒 Route-Based Middlewares with groups.
-- 🌍 Internationalization Support (i18n).
-- 📁 File uploads with image compression and resizing.
-- ☁️ AWS Upload Support.
-- 📜 Postman Generator for API Documentation.
-- 🗃️ Repositories using the Repository Design Pattern for managing database models.
-- ✅ Easy and comprehensive request validation.
-- 🌐 RESTful API support with a single base class for each module.
-- 👥 User Management and Authentication using JWT.
-- 🔄 Map Model data for responses using [Outputs](./../http/output).
-- ⚙️ Automatic Configuration Management.
-- 🗄️ [Full Support For MongoDB](https://mongodb.com) backed by [Cascade](./../../cascade/getting-started/introduction.mdx).
-- 🛠️ [Generator Z](https://marketplace.visualstudio.com/items?itemName=hassanzohdy.gnz): A VS Code extension to generate modules, request handlers, response outputs, database models, RESTful classes, and repositories.
+Warlock.js was designed with frontend developers in mind. You don't need deep backend expertise to build robust APIs:
 
-## The Backend For Frontend (BFF)
+- **Fast setup** - Create a working API in under 15 minutes
+- **Convention over configuration** - Sensible defaults that just work
+- **TypeScript-first** - Full type safety and excellent IDE support
+- **Module-based** - Organize code by feature, not by type
 
-When `Warlock` was designed, its primary focus was to ensure ease of use for frontend developers, minimizing the need for in-depth backend knowledge. This approach accelerates frontend application development, enabling teams to proceed without being dependent on backend progress.
+## Quick Example
 
-By leveraging `Warlock`, frontend developers can expedite their workflow and deliver high-quality applications swiftly, without having to wait for backend tasks to be completed. This framework streamlines the development process, empowering frontend teams to work autonomously and efficiently. 🚀
+Here's a complete API endpoint in Warlock.js:
+
+```ts title="src/app/users/routes.ts"
+import { router, Request, Response } from "@warlock.js/core";
+import { User } from "./models/user";
+
+router.get("/users", async (request: Request, response: Response) => {
+  const users = await User.list();
+  return response.success({ users });
+});
+```
+
+## Key Features
+
+### Core Framework
+- Hot Module Reload (HMR) for fast development
+- Event-driven architecture
+- Automatic route and module loading
+- Route-based middleware with groups
+
+### Data Layer ([Cascade](./../../cascade/getting-started/introduction.mdx))
+- Full MongoDB support with powerful ORM
+- Model relationships and syncing
+- Migrations and schema management
+
+### API Development
+- RESTful API support with a single base class
+- Request validation with [Seal](./../../seal/getting-started/introduction.mdx)
+- Response transformation with [Outputs](./../http/output.mdx)
+- Postman collection generator
+
+### Authentication & Security
+- JWT-based authentication
+- Role-based access control
+- Guest user support
+
+### Additional Features
+- File uploads with image compression
+- AWS S3 integration
+- Email with React components
+- [Redis caching](./../../cache/introduction.mdx)
+- Internationalization (i18n)
+
+## Tooling
+
+- **[Generator Z](https://marketplace.visualstudio.com/items?itemName=hassanzohdy.gnz)** - VS Code extension to generate modules, controllers, models, and more
+
+## Next Steps
+
+Ready to get started? Follow these steps:
+
+1. [Install Warlock.js](./installation.mdx) - Set up your development environment
+2. [Project Structure](./project-structure.mdx) - Understand how Warlock projects are organized
+3. [Create Your First Route](./../../warlock/http/routes.mdx) - Build your first API endpoint
+
+:::tip New to Warlock.js?
+Start with the [Installation Guide](./installation.mdx) to create your first project in minutes.
+:::

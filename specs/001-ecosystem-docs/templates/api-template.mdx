@@ -1,0 +1,304 @@
+---
+sidebar_position: 1
+title: "ClassName"
+description: "API reference for ClassName - brief description of its purpose"
+---
+
+# ClassName
+
+Brief description of what this class/function does and its primary use case.
+
+## Import
+
+```ts
+import { ClassName } from "@warlock.js/package";
+```
+
+## Constructor
+
+```ts
+new ClassName(options?: ClassNameOptions)
+```
+
+Creates a new instance of ClassName.
+
+### Options
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `option1` | `string` | Yes | - | Description of this option |
+| `option2` | `number` | No | `100` | Description of this option |
+| `option3` | `boolean` | No | `false` | Description of this option |
+
+### Example
+
+```ts title="src/example.ts"
+import { ClassName } from "@warlock.js/package";
+
+const instance = new ClassName({
+  option1: "value",
+  option2: 200,
+});
+```
+
+## Properties
+
+### data
+
+```ts
+readonly data: DataType
+```
+
+Returns the current data held by the instance.
+
+**Type:** `DataType`
+
+### isReady
+
+```ts
+readonly isReady: boolean
+```
+
+Indicates whether the instance has been initialized.
+
+**Type:** `boolean`
+
+## Methods
+
+### initialize()
+
+```ts
+async initialize(): Promise<void>
+```
+
+Initializes the instance. Must be called before using other methods.
+
+**Returns:** `Promise<void>`
+
+**Throws:** `InitializationError` if already initialized
+
+**Example:**
+
+```ts title="src/initialize-example.ts"
+import { ClassName } from "@warlock.js/package";
+
+const instance = new ClassName({ option1: "value" });
+await instance.initialize();
+// Instance is now ready to use
+```
+
+---
+
+### get()
+
+```ts
+async get(id: string): Promise<DataType | null>
+```
+
+Retrieves data by its identifier.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `id` | `string` | Yes | The unique identifier |
+
+**Returns:** `Promise<DataType | null>` - The data if found, null otherwise
+
+**Example:**
+
+```ts title="src/get-example.ts"
+import { ClassName } from "@warlock.js/package";
+
+const instance = new ClassName({ option1: "value" });
+await instance.initialize();
+
+const data = await instance.get("abc123");
+if (data) {
+  console.log(data);
+  // Output: { id: "abc123", name: "Example", ... }
+}
+```
+
+---
+
+### create()
+
+```ts
+async create(data: CreateInput): Promise<DataType>
+```
+
+Creates a new record with the provided data.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `data` | `CreateInput` | Yes | The data to create |
+
+**Returns:** `Promise<DataType>` - The created record
+
+**Throws:** `ValidationError` if data is invalid
+
+**Example:**
+
+```ts title="src/create-example.ts"
+import { ClassName } from "@warlock.js/package";
+
+const instance = new ClassName({ option1: "value" });
+await instance.initialize();
+
+const created = await instance.create({
+  name: "New Record",
+  email: "example@email.com",
+});
+
+console.log(created);
+// Output: { id: "generated-id", name: "New Record", email: "example@email.com", createdAt: "2026-01-15T..." }
+```
+
+---
+
+### update()
+
+```ts
+async update(id: string, data: UpdateInput): Promise<DataType>
+```
+
+Updates an existing record.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `id` | `string` | Yes | The record identifier |
+| `data` | `UpdateInput` | Yes | The data to update |
+
+**Returns:** `Promise<DataType>` - The updated record
+
+**Throws:** `NotFoundError` if record doesn't exist
+
+---
+
+### delete()
+
+```ts
+async delete(id: string): Promise<boolean>
+```
+
+Deletes a record by its identifier.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `id` | `string` | Yes | The record identifier |
+
+**Returns:** `Promise<boolean>` - True if deleted, false if not found
+
+## Static Methods
+
+### ClassName.create()
+
+```ts
+static async create(data: CreateInput): Promise<ClassName>
+```
+
+Factory method to create and initialize an instance in one step.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `data` | `CreateInput` | Yes | Initial data |
+
+**Returns:** `Promise<ClassName>` - A new, initialized instance
+
+**Example:**
+
+```ts title="src/static-create-example.ts"
+import { ClassName } from "@warlock.js/package";
+
+// Create and initialize in one step
+const instance = await ClassName.create({
+  name: "Example",
+  email: "example@email.com",
+});
+
+// Instance is ready to use immediately
+console.log(instance.data);
+```
+
+## Events
+
+### created
+
+Fired when a new record is created.
+
+```ts
+instance.on("created", (data: DataType) => {
+  console.log("New record created:", data);
+});
+```
+
+**Payload:** `DataType` - The created record
+
+### updated
+
+Fired when a record is updated.
+
+```ts
+instance.on("updated", (data: { old: DataType; new: DataType }) => {
+  console.log("Record updated from", data.old, "to", data.new);
+});
+```
+
+**Payload:** `{ old: DataType; new: DataType }` - The old and new record data
+
+## Types
+
+### ClassNameOptions
+
+```ts
+interface ClassNameOptions {
+  option1: string;
+  option2?: number;
+  option3?: boolean;
+}
+```
+
+### DataType
+
+```ts
+interface DataType {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### CreateInput
+
+```ts
+interface CreateInput {
+  name: string;
+  email: string;
+}
+```
+
+### UpdateInput
+
+```ts
+interface UpdateInput {
+  name?: string;
+  email?: string;
+}
+```
+
+## See Also
+
+- [Related Class](./related-class.mdx) - Works well with ClassName
+- [Usage Guide](../guides/using-classname.mdx) - Practical usage patterns
+- [Configuration](../getting-started/configuration.mdx) - Global configuration options

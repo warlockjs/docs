@@ -8,10 +8,10 @@ Caching is crucial when it comes to performance. Warlock provides a simple way t
 
 ## Prerequisites
 
-Make sure that you're already [Configured Cache](/docs/cache/introduction) and it is activated.
+Make sure that you're already [Configured Cache](../../cache/introduction) and it is activated.
 
 :::info Full Cache Documentation
-For comprehensive cache API documentation, see [Cache Package Documentation](/docs/cache/introduction). This section covers repository-specific caching features.
+For comprehensive cache API documentation, see [Cache Package Documentation](../../cache/introduction). This section covers repository-specific caching features.
 :::
 
 ## Introduction
@@ -67,7 +67,7 @@ export class UsersRepository extends RepositoryManager<User> {
 
 ## Set cache driver
 
-By default the cache driver of the repository will be the [Cache Manager](/docs/cache/cache-manager), however, you can set a different cache driver for the repository by setting the `cacheDriverName` property to the desired cache:
+By default the cache driver of the repository will be the [Cache Manager](../../cache/cache-manager), however, you can set a different cache driver for the repository by setting the `cacheDriverName` property to the desired cache:
 
 ```ts title="src/app/users/repositories/users-repository.ts"
 import {

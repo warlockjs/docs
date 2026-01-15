@@ -1,0 +1,96 @@
+---
+sidebar_position: 1
+title: "Page Title"
+description: "Brief description for SEO and search results"
+---
+
+# Page Title
+
+Brief introduction explaining what this page covers and why it matters.
+
+## Overview
+
+Explain the concept, feature, or topic in 2-3 paragraphs. Answer:
+- **What** is this?
+- **Why** would you use it?
+- **When** should you use it?
+
+## Prerequisites
+
+:::info Prerequisites
+Before proceeding, ensure you have:
+- Completed the [Getting Started guide](../getting-started/introduction.mdx)
+- Basic understanding of [related concept](./related-page.mdx)
+:::
+
+## Basic Usage
+
+The simplest way to use this feature:
+
+```ts title="src/example.ts"
+import { Feature } from "@warlock.js/package";
+
+// Create an instance
+const feature = new Feature({
+  option: "value",
+});
+
+// Use the feature
+const result = await feature.doSomething();
+console.log(result);
+// Output: { success: true, data: "..." }
+```
+
+## Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `option1` | `string` | `"default"` | Description of what this option does |
+| `option2` | `number` | `100` | Description of what this option does |
+| `option3` | `boolean` | `false` | Description of what this option does |
+
+## Common Patterns
+
+### Pattern 1: Basic Setup
+
+```ts title="src/patterns/basic.ts"
+import { Feature } from "@warlock.js/package";
+
+const feature = new Feature();
+await feature.initialize();
+```
+
+### Pattern 2: With Custom Configuration
+
+```ts title="src/patterns/custom.ts"
+import { Feature } from "@warlock.js/package";
+
+const feature = new Feature({
+  option1: "custom-value",
+  option2: 200,
+});
+```
+
+## Error Handling
+
+:::warning Common Errors
+**Error: Feature not initialized**
+- Cause: Calling methods before `initialize()`
+- Solution: Always call `await feature.initialize()` first
+
+**Error: Invalid option value**
+- Cause: Passing incorrect type to configuration
+- Solution: Check the Configuration Options table for correct types
+:::
+
+## Best Practices
+
+1. **Always initialize first** - Call `initialize()` before using any methods
+2. **Use TypeScript types** - Import and use provided types for better IDE support
+3. **Handle errors gracefully** - Wrap calls in try-catch blocks
+
+## Related
+
+- [Related Feature 1](./related-feature-1.mdx) - How this connects to other features
+- [Related Feature 2](../other-section/related-feature-2.mdx) - Cross-package relationship
+- [API Reference](./api-reference.mdx) - Detailed API documentation

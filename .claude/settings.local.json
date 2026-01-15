@@ -3,7 +3,9 @@
     "allow": [
       "Bash(git fetch:*)",
       "Bash(bash .specify/scripts/bash/create-new-feature.sh:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(timeout 15 yarn start:*)",
+      "Bash(yarn build:*)"
     ]
   }
 }
