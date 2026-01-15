@@ -1,0 +1,88 @@
+---
+sidebar_position: 2
+---
+
+# 📋 Listing Documents
+
+Need to fetch data fast? The Query manager gives you a toolbox of ways to list, filter, and analyze your documents—no models required! 🧰✨
+
+## 🗂️ List All Documents
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const users = await query.list("users");
+```
+
+## 🔍 Filter Results
+
+Pass a filter object as the second argument:
+
+```ts title="src/app.ts"
+const activeUsers = await query.list("users", { isActive: true });
+```
+
+## 🥇 Get the First or Last Document
+
+```ts title="src/app.ts"
+const firstUser = await query.first("users", { isActive: true });
+const lastUser = await query.last("users", { isActive: true });
+```
+
+## 🕒 Get the Latest Documents
+
+```ts title="src/app.ts"
+const latestUsers = await query.latest("users", { isActive: true });
+```
+
+:::tip
+`latest` returns documents sorted by `id` in descending order.
+:::
+
+## 🏷️ Get Distinct Values
+
+```ts title="src/app.ts"
+const emails = await query.distinct("users", "email");
+// With filter:
+const activeEmails = await query.distinct("users", "email", { isActive: true });
+```
+
+## 🔢 Count Documents
+
+```ts title="src/app.ts"
+const count = await query.count("users");
+const activeCount = await query.count("users", { isActive: true });
+```
+
+## 🧠 Explain a Query
+
+See how MongoDB will execute your query:
+
+```ts title="src/app.ts"
+const plan = await query.explain("users", { isActive: true });
+console.log(plan);
+```
+
+## 🧮 Aggregate Data
+
+Run powerful aggregation pipelines:
+
+```ts title="src/app.ts"
+const pipeline = [
+  { $match: { isActive: true } },
+  { $group: { _id: "$country", count: { $sum: 1 } } },
+];
+const result = await query.aggregate("users", pipeline);
+```
+
+## 🧙‍♂️ Pro Tips
+- Use filters for fast, targeted queries
+- Use `distinct` to get unique values for reporting
+- Use `aggregate` for advanced analytics and dashboards
+- Use `explain` to optimize your queries
+
+---
+
+## 🌟 What's Next?
+- [💾 Saving Documents](./saving-documents)
+- [🗑️ Deleting Documents](./deleting-documents)

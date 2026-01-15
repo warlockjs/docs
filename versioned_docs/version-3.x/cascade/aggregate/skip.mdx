@@ -1,0 +1,21 @@
+---
+sidebar_position: 5
+---
+
+# Skip
+
+Skip documents in the collection.
+
+## Method Signature
+
+```ts
+public skip(value: number): this;
+```
+
+## Example
+
+```ts
+const users = await aggregate.skip(10).get();
+```
+
+It will return all documents in the collection, starting from the `11th` document.

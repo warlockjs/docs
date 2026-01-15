@@ -1,0 +1,95 @@
+---
+sidebar_position: 1
+---
+
+# 🌐 Introduction
+
+HTTP requests are the backbone of any web application. Warlock provides a simple and intuitive API to handle HTTP requests efficiently.
+
+## 🚀 Basic Usage
+
+Following the principles of [Express](https://expressjs.com/) and [Fastify](https://www.fastify.io/), Warlock employs the concept of `request` and `response` objects.
+
+When a request is made, Warlock creates a `request` object containing all the information about the request, and a `response` object containing all the information about the response.
+
+Let's see a simple example:
+
+```ts title="src/app/general/routes.ts"
+import { router, type Request, type Response } from "@warlock.js/core";
+
+router.get("/", (request: Request, response: Response) => {
+  return response.success({
+    message: "Hello World",
+  });
+});
+```
+
+In this example, we created a simple route that returns a success response with the message `Hello World`.
+
+## 🔄 How it Works
+
+We define our [app routes](./routes) to specify which handlers will be executed when a request is made to a specific route.
+
+When a request is made, Warlock checks if there is a route that matches the request URL. If a match is found, it executes the handler and returns the response.
+
+## 🛡️ Middleware
+
+Middleware is a function executed before the handler. It's used to modify the request or response, or to execute some code before the handler.
+
+The HTTP cycle can be defined as follows:
+
+1. Define the routes
+2. Execute the middleware (if it exists)
+3. Execute the handler that receives the request and returns the response
+4. Send the response
+
+## 🤔 Handler or Controller?
+
+Both terms are interchangeable. We prefer to use `request handler`, but for consistency with other programming languages, we store all `handlers` inside the `controllers` directory.
+
+## 🆚 Function Handlers vs. Class Handlers
+
+In TypeScript, you can use both paradigms. Let's explore the differences.
+
+### Using Handlers
+
+Handlers are ideal for simple routes that perform straightforward tasks. They are perfect for decoupling code, such as a `login` route where you just need to validate the request and return the response.
+
+## Using Class Handlers
+
+In `Warlock`, we prefer using `classes` for `RESTful` APIs, as it makes the code easier to maintain and extend with additional features.
+
+That's why we [introduced Restful Classes](./restful) to simplify the creation of a `RESTful` API with around six routes in a single class.
+
+## 🔄 HTTP Request Life Cycle
+
+The HTTP request life cycle in Warlock can be outlined as follows:
+
+1. **Route Definition**: 
+   - Define the routes that the application will respond to. This involves specifying the URL patterns and associating them with specific request handlers or controllers.
+   - Example: `router.get("/users", getUsersHandler);`
+
+2. **Middleware Execution**: 
+   - Middleware functions are executed in the order they are defined. They can modify the request or response objects, perform authentication, logging, or other pre-processing tasks.
+   - Middleware can be applied globally, to specific routes, or to groups of routes.
+   - Example: `router.get("/users", getUsersHandler, { middleware: [authMiddleware] });`
+
+3. **Handler Execution**: 
+   - Once the middleware has been executed, the request handler is called. This is where the main logic for processing the request and generating the response resides.
+   - Handlers can be simple functions or more complex class-based controllers.
+   - Example: `function getUsersHandler(request, response) { /* logic */ }`
+
+4. **Response Preparation**: 
+   - The handler prepares the response by setting the appropriate status code, headers, and body content.
+   - Warlock provides helper methods like `response.success()` to simplify response creation.
+   - Example: `response.success({ message: "Data retrieved successfully" });`
+
+5. **Response Dispatch**: 
+   - The prepared response is sent back to the client, completing the request cycle.
+   - This step involves serializing the response data and transmitting it over the network to the client.
+
+6. **Post-Response Actions** (Optional): 
+   - After the response is sent, additional actions like logging or cleanup tasks can be performed.
+   - These actions do not affect the response sent to the client but can be useful for monitoring and maintenance.
+
+By understanding these steps, developers can effectively manage the flow of data and control the behavior of their web applications using Warlock.

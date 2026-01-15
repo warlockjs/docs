@@ -1,0 +1,75 @@
+---
+sidebar_position: 3
+---
+
+# 🛠️ Installation
+
+Welcome to the first step of your Cascade journey! 🎉
+
+Cascade is part of the [Warlock.js](https://github.com/hassanzohdy/warlock.js) full-stack framework, but you can use it standalone too. Let's get you set up in seconds!
+
+## 📦 Install the Package
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+<Tabs>
+  <TabItem value="NPM" label="NPM" default>
+
+```bash
+npm i @warlock.js/cascade
+```
+
+  </TabItem>
+  <TabItem value="Yarn" label="Yarn">
+
+```bash
+yarn add @warlock.js/cascade
+```
+
+  </TabItem>
+  <TabItem value="Pnpm" label="Pnpm">
+
+```bash
+pnpm add @warlock.js/cascade
+```
+
+  </TabItem>
+</Tabs>
+
+:::info
+Cascade depends on [Mongez Config](https://github.com/hassanzohdy/mongez-config) for easy configuration. Make sure it's installed and set up!
+:::
+
+:::tip
+We highly recommend using **Typescript** for the best developer experience. All docs and examples use Typescript.
+:::
+
+## 🌍 Timezone Support
+
+Want your dates to always be correct? Set your timezone in your app config:
+
+```ts {5}
+import config from '@mongez/config';
+
+config.set({
+    app: {
+        timezone: 'Africa/Cairo', 
+    }
+})
+```
+
+## 🦄 MongoDB Version
+
+- MongoDB Version : **6.0.6** or higher
+
+:::tip
+Cascade will always keep up with the latest MongoDB releases!
+:::
+
+---
+
+## 🌟 What's Next?
+- [🔌 Connecting to Database](./connecting-to-database)
+- [🗺️ Roadmap](./roadmap)
+- [🚀 Back to Introduction](./introduction)

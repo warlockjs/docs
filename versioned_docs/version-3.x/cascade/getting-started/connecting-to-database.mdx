@@ -1,0 +1,97 @@
+---
+sidebar_position: 4
+---
+
+# 🔌 Connecting to Your Database
+
+Let's get you connected! Cascade makes it super easy to connect to MongoDB, whether you're running locally or in the cloud. 🌐
+
+## 🏗️ Build Your Connection
+
+Just call `connectToDatabase` with your connection details:
+
+```ts
+import { connectToDatabase } from "@warlock.js/cascade";
+
+connectToDatabase({
+  host: "localhost",
+  port: 27017,
+  database: "my-database",
+  username: "my-username",
+  password: "my-password",
+  dbAuth: "admin",
+});
+```
+
+You can pass any [MongoClient options](https://mongodb.github.io/node-mongodb-native/5.5/interfaces/MongoClientOptions.html) too!
+
+```ts {10,11}
+import { connectToDatabase } from "@warlock.js/cascade";
+
+connectToDatabase({
+  host: "localhost",
+  port: 27017,
+  database: "my-database",
+  username: "my-username",
+  password: "my-password",
+  dbAuth: "admin",
+  retryWrites: true,
+  replicaSet: "rs0",
+});
+```
+
+## 🌐 Using a Connection URL
+
+Prefer a connection string? No problem!
+
+```ts
+import { connectToDatabase } from "@warlock.js/cascade";
+
+connectToDatabase({
+  url: "mongodb://localhost:27017/my-database",
+  database: "my-database",
+});
+```
+
+## 🦸‍♂️ Singleton Connection
+
+Cascade uses the Singleton pattern—call `connectToDatabase` as many times as you want, it'll only connect once!
+
+:::tip
+Need to use multiple databases? Use the `useDatabase` method to switch between them on the fly.
+:::
+
+## 🤹‍♂️ Multiple Connections
+
+Need more than one connection? Create a new `Connection` instance:
+
+```ts
+import { Connection } from "@warlock.js/cascade";
+
+const connection = new Connection();
+
+connection.connect({
+  // same options as connectToDatabase
+});
+```
+
+## ⏳ Wait for Connection
+
+Want to run code after connecting? Use `onceConnected`:
+
+```ts
+import { onceConnected } from "@warlock.js/cascade";
+
+onceConnected(() => {
+  // do something awesome!
+});
+```
+
+If the connection isn't ready, your callback will run as soon as it is. Otherwise, it runs immediately!
+
+---
+
+## 🌟 What's Next?
+- [🗺️ Roadmap](./roadmap)
+- [🚀 Back to Introduction](./introduction)
+- [🛠️ Installation](./installation)

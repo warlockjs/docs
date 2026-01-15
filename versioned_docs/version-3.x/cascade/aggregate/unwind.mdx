@@ -1,0 +1,28 @@
+---
+sidebar_position: 7
+---
+
+# Unwind
+
+Unpack an array field from the input documents to output a document for each element.
+
+This is extremely useful specially if you're working with a column that have a list of values or when using `group` stage.
+
+## Method Signature
+
+```ts
+public unwind(column: string, {
+    includeArrayIndex?: string,
+    preserveNullAndEmptyArrays?: boolean
+}): this;
+```
+
+## Example
+
+```ts
+const users = await aggregate.unwind("hobbies").get();
+```
+
+Read more about [unwind](https://docs.mongodb.com/manual/reference/operator/aggregation/unwind/).
+
+By default `preserveNullAndEmptyArrays` is set to `false` this will trim the result to only documents that have the `hobbies` field.

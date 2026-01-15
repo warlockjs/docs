@@ -1,0 +1,130 @@
+---
+sidebar_position: 3
+---
+
+# 🧠 MasterMind: Auto-Increment ID Manager
+
+The `MasterMind` class is Cascade's behind-the-scenes wizard for managing auto-incrementing numeric IDs! It keeps track of the last used ID for each collection, ensuring your auto-increment IDs are always unique and collision-free. 🪄
+
+## 🚦 What Does MasterMind Do?
+- Stores the last used numeric ID for each collection in a special `MasterMind` collection.
+- Generates the next unique ID for new documents (auto-increment).
+- Lets you get, set, or update the last ID for any collection.
+- Handles renaming collections and syncing IDs.
+
+## 🏗️ How to Use MasterMind
+
+### Get the Last Used ID
+```ts title="src/app.ts"
+import { masterMind } from "@warlock.js/cascade";
+
+const lastId = await masterMind.getLastId("categories");
+console.log(lastId); // e.g., 42
+```
+
+### Set the Last Used ID
+```ts title="src/app.ts"
+await masterMind.setLastId("categories", 100);
+```
+
+### Generate the Next Auto-Increment ID
+```ts title="src/app.ts"
+const nextId = await masterMind.generateNextId("categories", 1, 1);
+console.log(nextId); // e.g., 43
+```
+- The second argument is the increment step (default: 1).
+- The third argument is the initial value if the collection is new (default: 1).
+
+### Rename a Collection in MasterMind
+```ts title="src/app.ts"
+await masterMind.renameCollection("oldName", "newName");
+```
+
+### Sync All Collections
+```ts title="src/app.ts"
+await masterMind.updateAllLastId();
+```
+
+## 🧙‍♂️ Pro Tip
+You rarely need to use `masterMind` directly—Cascade models handle auto-increment for you! But it's great for migrations, data repair, or advanced admin tools.
+
+## ⚠️ Best Practices
+- Use `generateNextId` for custom auto-increment logic.
+- Use `setLastId` if you manually insert data and need to update the counter.
+- Don't use MasterMind for multi-tenancy or tenant isolation—it's just for ID management!
+
+:::info
+MasterMind is the secret sauce behind Cascade's reliable, auto-incrementing numeric IDs. No more duplicate keys or manual tracking!
+:::
+
+---
+
+## 🌟 What's Next?
+
+## Introduction
+
+`MasterMind` is helper class that is fully dedicated to manage the model `id` field, it is used internally by the model class to keep tracking of generated ids and gets the proper next id.
+
+:::tip
+For SQL People, consider it more likely the `INFORMATION_SCHEMA` table.
+:::
+
+## Master Mind Collection
+
+Any model that is being saved, the model's collection name and the last saved id are stored in `MasterMind` collection, the purpose of this collection is to keep tracking of the last saved id for each collection
+
+## Get last id
+
+If you want to get the last id of any collection, consider the following snippet:
+
+```ts src/app.ts
+import { masterMind } from "@warlock.js/cascade";
+
+async function main() {
+  const lastId = await masterMind.getLastId("categories");
+
+  console.log(lastId); // 512344
+}
+
+main();
+```
+
+:::note
+We imported `masterMind` as an object, if you want to create a new instance of it, you may import `MasterMind` class instead.
+:::
+
+## Generate next id
+
+To generate the next id of any collection, consider the following snippet:
+
+```ts src/app.ts
+import { masterMind } from "@warlock.js/cascade";
+
+async function main() {
+  const initialId = 1;
+  const incrementBy = 1;
+  const nextId = await masterMind.getNextId(
+    "categories",
+    initialId,
+    incrementBy
+  );
+
+  console.log(nextId); // 1
+
+  const nextId2 = await masterMind.getNextId(
+    "categories",
+    initialId,
+    incrementBy
+  );
+
+  console.log(nextId); // 2
+}
+
+main();
+```
+
+`getNextId` method accepts three arguments:
+
+- `collectionName`: The collection name
+- `initialId`: The initial id value, it will be used if the collection name does not exist in the `MasterMind` collection
+- `incrementBy`: The increment value, it will be used if the collection name does not exist in the `MasterMind` collection

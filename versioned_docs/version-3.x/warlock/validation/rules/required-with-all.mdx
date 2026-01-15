@@ -1,0 +1,29 @@
+---
+sidebar_position: 26
+---
+
+# Required With All
+
+The input under validation must be present and not empty only if `all` of the other specified fields are present.
+
+The validation rule **does not require a value** to run.
+
+## Example
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    title: ["string"],
+    content: ["string"],
+    "series.name": ["string"],
+    "series.order": ["requiredWithAll:series,title,content"],
+  },
+};
+```
+
+The `series.order` will be marked as invalid only if `series`, `title` and `content` are present and `series.order` is empty.
+
+:::tip
+If you want to validate the input to be present if any of the other specified fields are present, use the [`requiredWith`](./required-with) rule.
+:::

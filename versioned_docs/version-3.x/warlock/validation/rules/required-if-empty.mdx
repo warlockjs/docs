@@ -1,0 +1,23 @@
+---
+sidebar_position: 27
+---
+
+# Required If Empty
+
+The input must be present and not empty if another input is empty.
+
+The validation rule **does not require a value** to run.
+
+## Example
+
+```ts title="src/app/users/controllers/register.ts"
+// ...
+createAccount.validation = {
+  rules: {
+    email: ["requiredIfEmpty:phoneNumber", "email"],
+    phoneNumber: ["requiredIfEmpty:email"],
+  },
+};
+```
+
+In the above case, both inputs are optional, however, if one of them has a value, the other one must be empty, if both are empty then the email input will be required.

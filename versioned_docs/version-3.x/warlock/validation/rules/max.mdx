@@ -1,0 +1,22 @@
+---
+sidebar_position: 18
+---
+
+# Max
+
+Check if the input value is less than or equal to the given maximum value.
+
+> The validation rule **requires a value** to run against the input value.
+
+The `max` rule works against floats and integers.
+
+## Example
+
+```ts title="src/app/users/controllers/create-user.ts"
+// ...
+createUser.validation = {
+  rules: {
+    adultAge: ["required", "max:18"],
+  },
+};
+```

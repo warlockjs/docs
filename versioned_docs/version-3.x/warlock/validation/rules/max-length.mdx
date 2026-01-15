@@ -1,0 +1,22 @@
+---
+sidebar_position: 17
+---
+
+# Max Length
+
+Check if the input value length is less than or equal to the given length.
+
+> The validation rule **requires a value** to run against the input value.
+
+It requires to pass the maximum length as a parameter by adding a colon `:` then the maximum length.
+
+## Example
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+createAccount.validation = {
+  rules: {
+    username: ["required", "maxLength:10"],
+  },
+};
+```

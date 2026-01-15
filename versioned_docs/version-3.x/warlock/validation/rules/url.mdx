@@ -1,0 +1,20 @@
+---
+sidebar_position: 32
+---
+
+# Url
+
+Check if the input value is a valid url
+
+> The validation rule **requires a value** to run against the input value.
+
+## Example
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+createAccount.validation = {
+  rules: {
+    facebookUrl: ["url"],
+  },
+};
+```

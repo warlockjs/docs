@@ -1,0 +1,34 @@
+---
+sidebar_position: 1
+---
+
+# 🤝 Relationships in Cascade
+
+Relationships are the magic that connects your data! Whether you want to nest documents (embedding) or link across collections (joins), Cascade makes it easy, fast, and delightful. ✨
+
+## 🧩 Why Relationships?
+- Keep related data together for blazing-fast reads
+- Model real-world connections (users, posts, comments, categories…)
+- Choose the best pattern for your use case: **embed** for speed, **join** for flexibility
+
+## 🏗️ Embedded vs Referenced (Joined) Relationships
+
+### 🗂️ Embedded Documents
+- Store related data *inside* the parent document
+- Super fast reads—everything in one place!
+- Great for data that changes together (like author info in a post)
+
+### 🔗 Referenced (Joined) Documents
+- Store only a reference (like an ID) to related data
+- Use joins/lookups to fetch related data on demand
+- Perfect for large or frequently changing related data (like comments on a post)
+
+## 🧙‍♂️ Pro Tip
+Cascade gives you the best of both worlds: easy embedding, powerful joins, and even automatic syncing to keep embedded data fresh!
+
+---
+
+## 🌟 What's Next?
+- [🧩 Embedded Documents](./embedded-documents)
+- [🔄 Syncing Models](./syncing-models)
+- [🔗 Joins (Lookups)](./joins)

@@ -1,0 +1,37 @@
+---
+sidebar_position: 1
+---
+
+# 🔍 Query Manager: Direct Database Power!
+
+Sometimes you want to work with raw collections—no models, no frills, just pure MongoDB power. That's where Cascade's **Query manager** shines! 🚀
+
+## 🧰 What is the Query Manager?
+- A direct, flexible way to run queries on any collection
+- Perfect for scripts, migrations, admin tools, or when you don't need a full model
+- Gives you access to all the CRUD operations, filtering, aggregation, and more
+
+## 🏗️ Basic Usage
+Import the `query` instance and go:
+
+```ts title="src/app.ts"
+import { query } from "@warlock.js/cascade";
+
+const users = await query.list("users");
+```
+
+You can filter, sort, count, aggregate, and more—just pass the collection name and your options!
+
+## 🤔 When to Use Query Manager vs Models?
+- **Use Models** for business logic, events, casting, and relationships
+- **Use Query Manager** for quick scripts, admin dashboards, migrations, or when you want full control
+
+## 🧙‍♂️ Pro Tip
+You can mix and match! Use models for most of your app, and drop down to the Query manager for power-user tasks.
+
+---
+
+## 🌟 What's Next?
+- [📋 Listing Documents](./listing-documents)
+- [💾 Saving Documents](./saving-documents)
+- [🗑️ Deleting Documents](./deleting-documents)

@@ -1,0 +1,36 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+MongoDB has a [powerful Aggregation framework](https://docs.mongodb.com/manual/aggregation/) that allows you to perform complex queries on your data. This package provides a simple way to build and execute these queries.
+
+## What is Aggregate framework?
+
+The MongoDB Aggregation Framework is a powerful tool for processing and analyzing data within MongoDB. It provides a set of operators and stages that allow you to perform complex data manipulations and transformations, similar to the capabilities of SQL's GROUP BY and JOIN operations.
+
+## How does it work?
+
+The Aggregation framework is a pipeline of stages. Each stage takes the output of the previous stage as input and performs a specific operation on the data. The output of the last stage is the result of the aggregation pipeline.
+
+## What is a stage?
+
+A stage is a step in the aggregation pipeline. Each stage takes the output of the previous stage as input and performs a specific operation on the data. The output of the last stage is the result of the aggregation pipeline.
+
+We can say that a stage is an operation over the current state of the documents, which is the result of the previous stage.
+
+## What is a pipeline?
+
+A pipeline is a sequence of stages. Each stage takes the output of the previous stage as input and performs a specific operation on the data. The output of the last stage is the result of the aggregation pipeline.
+
+## What is a stage operator?
+
+A stage operator is a MongoDB operator that performs a specific operation on the data. For example, the `$match` operator filters documents based on a condition.
+
+
+## Aggregate vs Find
+
+The find method is used to retrieve documents from a collection based on specified criteria. It returns a cursor that allows you to iterate over the matched documents. The find method is commonly used for simple queries to retrieve documents that match certain conditions. You can specify various query criteria using operators such as `$eq`, `$gt`, `$lt`, `$in`, etc. Additionally, you can chain additional methods like `sort`, `limit`, `skip`, and `projection` to further customize the query.
+
+The aggregation framework is used to perform complex queries on your data. It allows you to perform various operations on the data such as grouping, sorting, filtering, and projecting. The aggregation framework is commonly used for more complex queries that require multiple stages to be executed in order to retrieve the desired result.

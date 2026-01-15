@@ -1,0 +1,39 @@
+---
+sidebar_position: 6
+---
+
+# Repository Destroyer
+
+When it comes to deleting records, repository manager provides two ways of deleting records.
+
+## Delete by ID
+
+The first way is to delete a record by its ID. The `RepositoryManager` class provides a `delete` method that you can use to delete a record by its ID.
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users-repository";
+
+usersRepository.delete(1);
+```
+
+The delete method accepts an integer (as id) or an instance of model as well:
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users-repository";
+
+const user = await usersRepository.find(1);
+
+usersRepository.delete(user);
+```
+
+## Delete multiple documents
+
+To delete multiple documents using the repository, you can use the `deleteMany` method, it accepts a filter object, if not passed, all documents will be DELETED!
+
+```ts title="src/app/main.ts"
+import { usersRepository } from "app/users/repositories/users-repository";
+
+usersRepository.deleteMany({
+  age: 18,
+});
+```

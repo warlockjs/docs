@@ -1,0 +1,82 @@
+---
+sidebar_position: 1
+---
+
+# 🚀 Welcome to Cascade!
+
+> **Part of the [Warlock.js](https://github.com/hassanzohdy/warlock.js) Full-Stack Framework**
+
+Hey there! 👋 Ready to supercharge your Node.js apps with a delightful MongoDB experience? **Cascade** is your new best friend for all things database: easy, powerful, and fun to use!
+
+## 🤔 Why Cascade?
+
+There are a few MongoDB tools out there (like [Mongoose](https://mongoosejs.com/) and [Prisma](https://www.prisma.io/)), but Cascade is:
+
+- 🧩 **Simple & Intuitive:** Just a thin, friendly wrapper around the MongoDB driver.
+- 🔌 **Multi-connection & Multi-database:** Connect to as many databases as you want, easily.
+- 🧙‍♂️ **Full-featured Models:** Models are first-class citizens, with tons of utilities.
+- 🏗️ **Powerful Aggregation:** Build complex queries with a breeze.
+- ⚡ **Events-Driven:** Listen and react to database events (before/after create, update, delete, etc.).
+- 🗃️ **Embedded Documents:** Nest documents inside each other, no sweat.
+- 🔄 **Syncing Models:** *Auto-update related data when things change—see below!*
+- 🗑️ **Recycle Bin:** Soft-delete with a trash collection.
+- 🛠️ **Migration System:** Evolve your schema with confidence.
+- 🧙‍♂️ **Auto-increment & Random IDs:** Choose your own adventure for primary keys.
+- 🧪 **Data Casting:** Type-safe, custom, and automatic casting.
+- 📦 **Pagination, Output Formatting, and More!**
+
+:::tip Did you know?
+**Syncing Models** is a rare and powerful feature—almost no other MongoDB ORM or framework offers it! With Cascade, you can automatically keep related documents in sync. For example, when you update a user's profile, all related posts or comments can be updated too, *automagically* ✨. [Learn more about syncing models &rarr;](../relationships/syncing-models)
+:::
+
+And that's just the start! Cascade is designed to be **delightful** for both beginners and pros.
+
+## 👀 Quick Peek: Defining a Model
+
+```ts title="src/models/user.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class User extends Model {
+  /**
+   * The collection name (required)
+   */
+  public static collection = "users";
+}
+```
+
+## ✨ Creating a User (So Easy!)
+
+```ts title="src/controllers/users.ts"
+import { User } from "src/models/user";
+
+export async function createUser() {
+  const user = await User.create({
+    name: "Hasan Zohdy",
+    email: "hassanzohdy@gmail.com",
+  });
+
+  console.log(user.data);
+}
+```
+
+Outputs:
+
+```json
+{
+  "id": 1231412,
+  "_id": "fagtrw43qwedasjoijwq",
+  "name": "Hasan Zohdy",
+  "email": "hassanzohdy@gmail.com",
+  "createdAt": "2023-06-01 00:00:00",
+  "updatedAt": "2023-06-01 00:00:00"
+}
+```
+
+---
+
+## 🌟 What's Next?
+- [🛠️ Installation](./installation)
+- [🔌 Connecting to Database](./connecting-to-database)
+- [🗺️ Roadmap](./roadmap)
+
+Happy coding! 🎉

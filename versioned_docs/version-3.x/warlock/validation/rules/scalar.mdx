@@ -1,0 +1,22 @@
+---
+sidebar_position: 27
+---
+
+# Scalar
+
+Check if the input value is a scalar value.
+
+> The validation rule **requires a value** to run against the input value.
+
+A scalar value is a value that can be represented as a `string`, `number`, or `boolean`.
+
+## Example
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    title: ["required", "scalar"],
+  },
+};
+```

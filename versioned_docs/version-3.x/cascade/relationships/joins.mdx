@@ -1,0 +1,540 @@
+---
+sidebar_position: 4
+---
+
+# Joins (Lookups)
+
+Joins mean data is fetched from two or more collections in one query, for example, fetching posts, each post has a user id, and we want to fetch the user data for each post.
+
+Or we may fetch multiple documents, for example, fetch comments when fetching posts.
+
+This could be done in MongoDB using [Lookups](https://docs.mongodb.com/manual/reference/operator/aggregation/lookup/).
+
+But in Cascade, we have a better way to do it.
+
+## The joinings method
+
+Any model has its own [Aggregate model class](./../aggregate/model-aggregate.mdx), the idea here is to make the code more readable and easier to maintain.
+
+Let's take an example of the basic lookup pipeline and see how we can transform it into a more readable code.
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate()
+  .lookup({
+    from: "comments",
+    localField: "id",
+    foreignField: "post.id",
+    as: "comments",
+  })
+  .get();
+```
+
+This will fetch all posts and join the user data for each post, which gives an output like this:
+
+```json
+[
+  {
+    "id": "1",
+    "title": "Post 1",
+    "createdBy": {
+      "id": "2",
+      "name": "User 1",
+      "image": "path-to-image.jpg"
+    },
+    "comments": [
+      {
+        "id": "1",
+        "content": "Comment 1",
+        "createdBy": {
+          "id": "3",
+          "name": "User 2",
+          "image": "path-to-image.jpg"
+        }
+      },
+      {
+        "id": "2",
+        "content": "Comment 2",
+        "createdBy": {
+          "id": "4",
+          "name": "User 3",
+          "image": "path-to-image.jpg"
+        }
+      }
+    ]
+  }
+]
+```
+
+## Joinings
+
+So the concept is simple, we define a list of static `joinings` in the model, each joining has a name, and a `Joinable` instance.
+
+We have two types of joinings, the first one is we want to make a [1-1 relationship](<https://en.wikipedia.org/wiki/One-to-one_(data_model)>) between the two collections, and the second one is we want to make a [1-many relationship](<https://en.wikipedia.org/wiki/One-to-many_(data_model)>).
+
+Let's see each one
+
+## 1-1 Relationship
+
+Let's say we have a `Post` model, and we want to join the user data for each post, we can define a joining like this:
+
+```ts title="src/models/post.ts"
+import { Model } from "@warlock.js/cascade";
+import { User } from "./user";
+
+export class Post extends Model {
+  static collectionName = "posts";
+
+  /**
+   * List of joinings
+   */
+  public static joinings = {
+    author: User.joinable("createdBy.id", "id").single().as("author"),
+  };
+}
+```
+
+This will join the user data for each post, and the output will be like this:
+
+```json
+[
+  {
+    "id": "1",
+    "title": "Post 1",
+    "author": {
+      "id": "2",
+      "name": "User 1",
+      "image": "path-to-image.jpg"
+    }
+  }
+]
+```
+
+As it performs a [Lookup Pipeline](https://docs.mongodb.com/manual/reference/operator/aggregation/lookup/), it will return an array of documents, so we need to use the `single` method to tell The Joiner that we want to return only one document.
+
+This will make a lookup object with the following properties:
+
+```json
+{
+  "from": "users",
+  "localField": "createdBy.id",
+  "foreignField": "id",
+  "as": "author"
+}
+```
+
+## 1-many Relationship
+
+Suppose we want to return list of comments for each post, we can define a joining like this:
+
+```ts title="src/models/post.ts"
+import { Model } from "@warlock.js/cascade";
+import { Comment } from "./comment";
+
+export class Post extends Model {
+  static collectionName = "posts";
+
+  /**
+   * List of joinings
+   */
+  public static joinings = {
+    comments: Comment.joinable("id", "post.id"),
+  };
+}
+```
+
+This will make a lookup object with the following properties:
+
+```json
+{
+  "from": "comments",
+  "localField": "id",
+  "foreignField": "post.id",
+  "as": "comments"
+}
+```
+
+We can alternatively, use `localField` and `foreignField` properties to define the fields
+
+```ts title="src/models/post.ts"
+import { Model } from "@warlock.js/cascade";
+import { User } from "./user";
+import { Comment } from "./comment";
+
+export class Post extends Model {
+  static collectionName = "posts";
+
+  /**
+   * List of joinings
+   */
+  public static joinings = {
+    author: User.joinable()
+      .single(true)
+      .localField("createdBy.id")
+      .foreignField("id"),
+    comments: Comment.joinable().localField("id").foreignField("post.id"),
+  };
+}
+```
+
+Now let's see how we can use it:
+
+## Using Joinings
+
+To use any of these joinings in a [Model Aggregate](./../aggregate/model-aggregate.mdx) query, we can use `joining` method which accepts two argument, the first one is the joining name or the `Joinable instance`, the second argument is the `options` object.
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate()
+  .joining("author")
+  .joining("comments")
+  .get();
+```
+
+We can refer to the reference of the joining directly from the static property `joinings`:
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate()
+  .joining(Post.joinings.author)
+  .joining(Post.joinings.comments)
+  .get();
+```
+
+The second solution gives you more flexibility and more typescript support.
+
+## Joining Options
+
+So now we saw how to perform a lookup using the `joining` method, but what if we want to customize the lookup options?
+
+For example, let's say we want to get only the approved comments with the post not all comments.
+
+We can pass the options object as the second argument to the `joining` method:
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate()
+  .joining("author")
+  .joining("comments")
+  .get();
+```
+
+We may also define what to be selected from the joined collection:
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate()
+  .joining("author")
+  .joining("comments", {
+    where: {
+      isApproved: true,
+    },
+    select: ["id", "content"],
+  })
+  .get();
+```
+
+:::tip
+These can also be done when declaring the joinings list, but sometimes we want to make more filter based on the current situation.
+:::
+
+We can also use the `where` and `select` methods from the joining instance:
+
+```ts {6}
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate()
+  .joining("author")
+  .joining(
+    Post.joinings.comments.where({ isApproved: true }).select(["id", "content"])
+  )
+  .joining()
+  .get();
+```
+
+:::info Did you know?
+When using the `where` method from the joining instance, you can use any of the [where operators](./../aggregate/filtering.mdx)
+:::
+
+## Auto Detecting Fields
+
+By default the `Joinable` class will set the local field to `id`.
+
+Regarding `as` and `foreignField` properties, it will depend on the `single` type, if it set to `true`, then it will be the singular of the joining model `collection` value, otherwise it will be the plural of the joining model `collection` value.
+
+And the foreign field will be the same as `as` but suffixed with `Id`.
+
+Let's see the both example, the first one if we provided all [Lookup](https://docs.mongodb.com/manual/reference/operator/aggregation/lookup/) options:
+
+```ts title="src/models/post.ts"
+import { Model } from "@warlock.js/cascade";
+import { User } from "./user";
+
+export class Post extends Model {
+  static collectionName = "posts";
+
+  /**
+   * List of joinings
+   */
+  public static joinings = {
+    author: User.joinable()
+      .single(true)
+      .localField("createdBy.id")
+      .foreignField("id")
+      .as("author"),
+  };
+}
+```
+
+Now let's see the second example, if we didn't provide any options:
+
+```ts title="src/models/post.ts"
+import { Model } from "@warlock.js/cascade";
+import { User } from "./user";
+
+export class Post extends Model {
+  static collectionName = "posts";
+
+  /**
+   * List of joinings
+   */
+  public static joinings = {
+    author: User.joinable().single(true),
+  };
+}
+```
+
+This will be translated to:
+
+```ts
+import { Model } from "@warlock.js/cascade";
+import { User } from "./user";
+
+export class Post extends Model {
+  static collectionName = "posts";
+
+  /**
+   * List of joinings
+   */
+  public static joinings = {
+    author: User.joinable()
+      .single(true)
+      .localField("user.id")
+      .foreignField("id")
+      .as("user"),
+  };
+}
+```
+
+It is pretty near to be accurate, but if the user that is stored in the `Post` model is `createdBy`, then we need to change the `localField` to `createdBy.id`:
+
+You could also pass the four values as follows:
+
+```ts title="src/models/post.ts"
+import { Model } from "@warlock.js/cascade";
+import { User } from "./user";
+
+export class Post extends Model {
+  static collectionName = "posts";
+
+  /**
+   * List of joinings
+   */
+  public static joinings = {
+    author: User.joinable("createdBy.id", "id", true, "author"),
+  };
+}
+```
+
+:::tip
+calling `single` method with **true** value will only return one document, otherwise it will return list of documents from the joined collection, default value to `single` is **false**.
+:::
+
+## Counting Joined Documents
+
+Sometimes we just need to count the documents from the joined collection, for example we need to count total number of comments for each post, in that situation we can use the `countJoining` method:
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate().countJoining("comments").get();
+```
+
+> Please note that the first and second argument of the `countJoining` method are the same as the `joining` method.
+
+This will return a new property called `commentsCount` for each post, if you want to set a custom name for the property, you can pass the `as` property in the options object:
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate()
+  .countJoining("comments", {
+    as: "totalComments",
+  })
+  .get();
+```
+
+## Using Aggregate pipeline
+
+So if we need to add more pipeline options to the joining (lookup) collection, we can use the second argument to the `joining` method, it receives a callback function which receives the `Joinable` instance for the joined collection, which we can use any [Aggregate](./../aggregate/introduction) method on it.
+
+### Example
+
+This will be the default setup to join comments for the post:
+
+```ts
+import { Model } from "@warlock.js/cascade";
+import { Post } from "./models/post";
+import { Comment } from "./models/comment";
+
+export class Post extends Model {
+  static collectionName = "posts";
+
+  /**
+   * List of joinings
+   */
+  public static joinings = {
+    comments: Comment.joinable("id", "post.id"),
+  };
+}
+```
+
+Now we can get all comments for the post like this:
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate().joining("comments").get();
+```
+
+Or we can get only the approved comments:
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate()
+  .joining("comments", (query) => query.where("isApproved", true))
+  .get();
+```
+
+:::tip
+The query used here will be on the joined collection, which will be applied on the `comments` collection.
+:::
+
+## Advanced Examples
+
+We have `Post` model, represents **posts collection**, `Comment` model represents **comments collection** and `Like` model represents **likes collection**.
+
+The `Like` model has two properties, `type` and `typeId`, so we can store inside it post and/or comment likes.
+
+Let's see how we can fetch the posts with the comments and likes count for each post:
+
+```ts models/post.ts {11}
+import { Model } from "@warlock.js/cascade";
+import { Like } from "./like";
+import { Comment } from "./comment";
+
+export class Post extends Model {
+  static collectionName = "posts";
+
+  /**
+   * List of joinings
+   */
+  public static joinings = {
+    likes: Like.joinable("id", "type.id").where("type", "post"),
+    comments: Comment.joinable("id", "post.id"),
+  };
+}
+```
+
+```ts models/like.ts
+import { Model, Casts } from "@warlock.js/cascade";
+
+export class Like extends Model {
+  static collectionName = "likes";
+
+  /**
+   * {@inheritDoc}
+   */
+  protected casts: Casts = {
+    type: "string",
+    typeId: "int",
+  };
+}
+```
+
+Now let's count the comments and likes for each post:
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate()
+  .countJoining("likes")
+  .countJoining("comments")
+  .get();
+```
+
+This will return something like this: (I'm using `console.log` to make it more readable)
+
+```json
+[
+  {
+    "id": "1",
+    "title": "Post 1",
+    "likesCount": 2,
+    "commentsCount": 2
+  }
+]
+```
+
+### Counting Likes and Comments for only current user
+
+Let's say we want to count the likes and comments for only the current user, we can do it like this:
+
+> We'll assume any like or comment has a `createdBy` object of a `User` model.
+
+```ts
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate()
+  .countJoining("likes", query => query.where('createdBy.id', 1))
+  .countJoining("comments", query => query.where("createdBy.id": 1))
+  .get();
+```
+
+This will return something like this:
+
+```json
+[
+  {
+    "id": "1",
+    "title": "Post 1",
+    "likesCount": 1,
+    "commentsCount": 1
+  }
+]
+```
+
+In that scenario we only returned the likes and comments for the current user.
+
+### Get total likes and check if current user liked the post
+
+Let's say we want to get the total likes for each post, and check if the current user liked the post or not.
+
+We can do it like this:
+
+```ts
+import { $agg } from "@warlock.js/cascade";
+import { Post } from "./models/post";
+
+const posts = await Post.aggregate()
+  .countJoining("likes")
+  .joining("likes", join => join.where("createdBy.id", 1).single(true).as("userLike"))
+  .addField('liked', $agg.booleanCond($agg.eq("$userLike", null))
+  .get();
+```

@@ -1,0 +1,22 @@
+---
+sidebar_position: 19
+---
+
+# Min Length
+
+Check if the input value length is greater than or equal to the given length.
+
+> The validation rule **requires a value** to run against the input value.
+
+It requires to pass the minimum length as a parameter by adding a colon `:` then the minimum length.
+
+## Example
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    title: ["required", "minLength:10"],
+  },
+};
+```

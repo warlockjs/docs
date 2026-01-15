@@ -1,0 +1,19 @@
+---
+sidebar_position: 9
+---
+
+# Delete Documents
+
+Delete Documents using `Aggregate` class.
+
+## Introduction
+
+`Aggregate` class also provides a way to delete documents of collection using the `aggregate` framework.
+
+## Example
+
+```ts
+const totalDeletedUsers = await aggregate.where("age", ">", 18).delete();
+```
+
+This will delete all users with age greater than 18 and return the number of deleted documents.

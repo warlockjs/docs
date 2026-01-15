@@ -1,0 +1,63 @@
+---
+sidebar_position: 2
+---
+
+# ✨ Creating Documents
+
+Creating new documents in Cascade is a breeze! Whether you like the classic OOP way or prefer a one-liner, Cascade has you covered. 🪄
+
+## 🏗️ The Classic Way: New + Save
+
+1. **Create an instance:**
+2. **Call `save()` to persist it:**
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+const user = new User({
+  name: "Hasan Zohdy",
+  email: "hassanzohdy@gmail.com",
+  isActive: true,
+});
+
+await user.save();
+```
+
+This gives you full control—modify fields, run methods, and then save when you're ready.
+
+## 🚀 The Fast Lane: Static `create`
+
+For most cases, you'll love the static `create` method. It creates and saves in one go:
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+const user = await User.create({
+  name: "Hasan Zohdy",
+  email: "hassanzohdy@gmail.com",
+  isActive: true,
+});
+
+console.log(user.data); // outputs all data
+```
+
+:::tip
+**Recommended!** The static `create` method is the cleanest and most common way to add new documents.
+:::
+
+## 📝 What Happens Under the Hood?
+- Cascade auto-generates an `id` (number) and `_id` (ObjectId) for you.
+- Default values and type casting are applied automatically.
+- Any model events (like `onCreating`, `onCreated`) will run.
+
+## 🧙‍♂️ Pro Tip: Use Model Methods
+You can add your own methods to models for custom logic before/after saving. Models are just classes—make them as smart as you want!
+
+---
+
+## 🌟 What's Next?
+- [🔮 Casting Data](./casting-data)
+- [🧩 Embedded Documents](./embedded-documents)
+- [💾 Saving Models](./saving-models)
+- [🗑️ Destroying Models](./destroying-models)
+- [🔍 Fetching Documents](./fetching-documents)

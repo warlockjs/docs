@@ -1,0 +1,35 @@
+---
+sidebar_position: 13
+---
+
+# In
+
+Check if the input value is in a given array.
+
+The validation rule **requires a value** to run.
+
+The rule accepts a single argument concatenated with `,` between each value.
+
+## Example
+
+```ts title="src/app/users/controllers/create-user.ts"
+// ...
+createUser.validation = {
+  rules: {
+    gender: ["required", "in:male,female"],
+  },
+};
+```
+
+If the value is in array, use the [join method](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/join) method to concatenate the array values.
+
+```ts title="src/app/users/controllers/create-user.ts"
+// ...
+const gender = ["male", "female"];
+
+createAccount.validate = {
+  rules: {
+    gender: ["in:" + gender.join(",")],
+  },
+};
+```

@@ -1,0 +1,175 @@
+---
+sidebar_position: 8
+---
+
+# Group By
+
+This stage represents the `$group` stage in MongoDB.
+
+## Method Signature
+
+```ts
+  public groupBy(
+    GroupByPipeline: GenericObject,
+    groupByData?: GenericObject,
+  ): this;
+  public groupBy(groupBy_id: string | null): this;
+  public groupBy(groupBy_id: string | null, groupByData: GenericObject): this;
+```
+
+## A quick brief about the groupBy pipeline
+
+The groupBy pipeline is a pipeline that contains the `_id` field and the fields that you want to group by, this allows you to group your data with certain fields and also return computed fields such as total documents, average, sum, etc.
+
+## Example
+
+Let's say we have a collection of users and we want to group them by their age and return the total number of users in each group.
+
+```ts
+const users = await aggregate
+  .groupBy("age", {
+    total: $agg.count(),
+  })
+  .get();
+```
+
+This will return an array of objects with output like this:
+
+```json
+[
+  {
+    "_id": 20,
+    "total": 2
+  },
+  {
+    "_id": 21,
+    "total": 1
+  },
+  {
+    "_id": 22,
+    "total": 1
+  }
+]
+```
+
+The previous example we passed the first argument with the column name that we will group with, the second argument is optionally to gather more data about the group.
+
+This is usually the most common use case for the groupBy pipeline.
+
+> Always head back to the [groupBy pipeline](https://www.mongodb.com/docs/manual/reference/operator/aggregation/group/) to see all the available operators.
+
+## Group by multiple fields
+
+Sometimes we need to group by multiple fields, in this case we can pass the first argument as an object, let's say we need to group all products by category and brand.
+
+```ts
+const products = await aggregate
+  .groupBy(
+    {
+      category: "$category",
+      brand: "$brand",
+    },
+    {
+      total: $agg.count(),
+      category: $agg.last("category"),
+      brand: $agg.last("brand"),
+    }
+  )
+  .get();
+```
+
+You may also pass the first argument as an array of strings, if the fields are not nested and you don't need to rename them.
+
+```ts
+const products = await aggregate
+  .groupBy(["category", "brand"], {
+    total: $agg.count(),
+  })
+  .get();
+```
+
+This is an exact match for the previous snippet.
+
+## Group By Using An object
+
+Alternatively, you may pass an object directly to the group by method, this is the native syntax of MongoDB group pipeline.
+
+```ts
+const products = await aggregate
+  .groupBy({
+    _id: {
+      category: "$category",
+      brand: "$brand",
+    },
+    total: $agg.count(),
+  })
+  .get();
+```
+
+## Group by year
+
+This method will group documents by year, this is useful if you want to group documents by year and return the total number of documents in each year.
+
+```ts
+const products = await aggregate
+  .groupByYear("createdAt", {
+    total: $agg.count(),
+  })
+  .get();
+```
+
+## Group by month
+
+If we want to group only by months, we can use `groupByMonth` method.
+
+```ts
+const products = await aggregate
+  .groupByMonth("createdAt", {
+    total: $agg.count(),
+  })
+  .get();
+```
+
+## Group by year and month
+
+This method will group documents by year and month, this is useful if you want to group documents by year and month and return the total number of documents in each year and month.
+
+```ts
+const products = await aggregate
+  .groupByYearMonth("createdAt", {
+    total: $agg.count(),
+  })
+  .get();
+```
+
+## Group by date
+
+We can group by by year/month/day using `groupByDate` method.
+
+```ts
+const products = await aggregate
+  .groupByDate("createdAt", {
+    total: $agg.count(),
+  })
+  .get();
+```
+
+## Group By day of month
+
+This method will group documents by day of month, this is useful if you want to group documents by day of month and return the total number of documents in each day of month.
+
+```ts
+const products = await aggregate
+  .groupByDayOfMonth("createdAt", {
+    total: $agg.count(),
+  })
+  .get();
+```
+
+So what is the difference between `groupByDate` and `groupByDayOfMonth`?
+
+`groupByDate` will group documents by year/month/day, while `groupByDayOfMonth` will group documents by day of month only.
+
+:::tip
+Group by accepts any valid Mongodb syntax for grouping, the main objective of this method is to make it easier to group documents by adding an additional layer over the builtin MongoDB group pipeline not to replace it.
+:::

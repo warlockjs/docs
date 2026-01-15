@@ -1,0 +1,85 @@
+---
+sidebar_position: 11
+---
+
+# Model Aggregate
+
+Combine Models with Aggregate Class.
+
+## Introduction
+
+We previously saw how `Aggregate` class work, also we had a pretty good look at the `Model` class as well, now let's see how we can combine them together.
+
+## Model Aggregate Class
+
+Each model by default has an `aggregate` method which returns an instance of `ModelAggregate` class, this class extends the `Aggregate` class and adds some useful methods to to, also it manipulates it to match the model nature and behavior.
+
+## Example of usage
+
+Let's say we have a `User` model, and we want to get the average age of all users.
+
+```ts title="src/models/user.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class User extends Model {
+  /**
+   * {@inheritDoc}
+   */
+  public static collection = "users";
+}
+```
+
+Now let's use the `aggregate` method to get the average age of all users.
+
+```ts title="src/index.ts"
+import { User } from "./models/user";
+
+const users = await User.aggregate().where("age", ">", 18).get();
+
+console.log(users);
+```
+
+Unlike the base `Aggregate` class, the `ModelAggregate`'s `get` method returns an array of models instead of plain objects, so we can use the model methods on the returned documents.
+
+If yoy want to override the returned model, pass the first argument with a callback to the `get` method.
+
+```ts
+const users = await User.aggregate()
+  .where("age", ">", 18)
+  .get((user) => {
+    return {
+      ...user,
+      fullName: `${user.firstName} ${user.lastName}`,
+    };
+  });
+```
+
+This would return an array of objects with the `fullName` property, but not an instance of `User` model.
+
+## Return first model
+
+To return the first model, we can use the `first` method.
+
+```ts
+const user = await User.aggregate().where("age", ">", 18).first();
+```
+
+## Pagination
+
+Pagination works exactly like normal `Aggregate.paginate` method but the returned documents are instances of the model.
+
+```ts
+const { documents: users, paginationInfo } = await User.aggregate()
+  .where("age", ">", 18)
+  .paginate(1, 10);
+```
+
+## Chunk
+
+Chunk method is also available, it works exactly like the `Aggregate.chunk` method but the returned documents are instances of the model.
+
+```ts
+await User.aggregate().where("age", ">", 18).chunk(10, (users) => {
+  console.log(users);
+});
+```

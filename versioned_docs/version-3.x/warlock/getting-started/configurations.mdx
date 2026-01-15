@@ -1,0 +1,80 @@
+---
+sidebar_position: 4
+---
+
+# ⚙️ Configurations
+
+Configurations are crucial for any application, and Warlock provides a straightforward way to manage them.
+
+## 📂 Config Directory
+
+All configurations are located inside the `src/config` directory and are automatically loaded when the application starts.
+
+## 🌐 Environment Variables
+
+Before proceeding, it's important to consider environment variables.
+
+[Environment Variables](./environment) are essential for distinguishing between different environments, such as development, staging, and production.
+
+When defining app configurations, ensure not to include sensitive information directly; use environment variables instead.
+
+## 🛠️ Configuration Types
+
+Application configurations encompass general settings, including:
+
+1. [App Configurations](#app-configurations): General settings like application name, URL, etc.
+2. [Auth Configurations](./../auth/configurations): Authentication settings.
+3. [Cache Configurations](/docs/cache/configurations): Cache settings.
+4. [Database Configurations](./../database/configurations): Database settings.
+5. [HTTP + CORS Configurations](./../http/configurations): CORS settings.
+6. [Log Configurations](./../logger/configurations): Logger settings.
+7. [Validation Configurations](./../validation/configurations): Validation settings.
+8. [Uploads Configurations](./../upload/configurations): Upload settings.
+
+## 📄 Configuration Files
+
+Since configurations are automatically loaded, each config file name is special and used to load the settings.
+
+Here is the list of all available files that can be loaded:
+
+- `app.ts`: Defines the [App Configurations](#app-configurations).
+- `auth.ts`: Defines the [Auth Configurations](./../auth/configurations).
+- `cache.ts`: Defines the [Cache Configurations](/docs/cache/configurations).
+- `database.ts`: Defines the [Database Configurations](./../database/configurations).
+- `http.ts`: Defines the [HTTP Configurations](./../http/configurations).
+- `log.ts`: Defines the [Log Configurations](./../logger/configurations).
+- `mail.ts`: Defines the [Mail Configurations](./../mail/configurations).
+- `validation.ts`: Defines the [Validation Configurations](./../validation/configurations).
+- `uploads.ts`: Defines the [Uploads Configurations](./../upload/configurations).
+
+:::note
+All configuration files must export a default object containing the configurations.
+:::
+
+:::danger
+Each file in the config directory must be named as defined in the [Configuration Types](#configurations-types) section.
+:::
+
+## 📝 App Configurations
+
+App configurations contain simple data, such as the application name, URL, debug mode, etc.
+
+- `baseUrl`: The application's base URL, used to generate full URLs. This is required.
+- `timezone`: The application's timezone, defaulting to `UTC`.
+- `localeCode`: Default locale code.
+
+### 🌐 Base URL
+
+The Base URL is used to generate [URLs](./../utils/urls) to ensure proper URL generation for each request.
+
+### 🕒 Timezone
+
+The timezone sets the default timezone for the application, ensuring all dates are generated with the correct timezone.
+
+:::tip
+Cascade relies on this timezone to generate the correct date for each user, so set it correctly.
+:::
+
+### 🌍 Locale Code
+
+The locale code is used for multilingual applications, providing a default fallback when an API request has an invalid or missing locale code.

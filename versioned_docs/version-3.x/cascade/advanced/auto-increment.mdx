@@ -1,0 +1,42 @@
+---
+sidebar_position: 2
+---
+
+# 🔢 Auto-Increment IDs
+
+Need sequential IDs like in SQL? Cascade's auto-increment feature gives you easy, reliable, and unique numbers for your documents! 🔥
+
+## 🚦 How It Works
+Cascade manages a special counter collection behind the scenes. Every time you create a new document, it grabs the next number for you—no collisions, no worries!
+
+## 🏗️ Enabling Auto-Increment
+Just set `autoIncrement = true` in your model:
+
+```ts title="src/models/order.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Order extends Model {
+  public static collection = "orders";
+  public autoIncrement = true;
+}
+```
+
+## 🧙‍♂️ Pro Tip: Custom Start Value
+You can set a custom starting value:
+
+```ts title="src/models/order.ts"
+public autoIncrement = { start: 1000 };
+```
+
+## ⚠️ Gotchas
+- Auto-increment is great for user-facing IDs, but not for sharding or distributed writes.
+- Use MongoDB's ObjectId for globally unique IDs.
+
+:::info
+Auto-increment works perfectly with all Cascade features—casting, events, and more!
+:::
+
+---
+
+## 🌟 What's Next?
+- [🧠 Master-Mind Pattern](./master-mind)

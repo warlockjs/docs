@@ -1,0 +1,89 @@
+---
+sidebar_position: 9
+---
+
+# 🗑️ Destroying Models
+
+Sometimes, you need to say goodbye to your data. Cascade makes deleting (and restoring!) models safe, easy, and powerful. 💥
+
+## 🧹 Deleting a Model
+
+Just call `destroy()` on a model instance:
+
+```ts title="src/app.ts"
+const category = await Category.find(1);
+if (category) {
+  await category.destroy();
+}
+```
+
+Or use the static `destroy` method:
+
+```ts title="src/app.ts"
+await Category.destroy(1); // By ID
+await Category.destroy({ name: "Sports" }); // By filter
+```
+
+## 🦺 Soft Deletes (The Safety Net!)
+
+By default, Cascade uses **soft deletes**—your data isn't really gone, just marked as deleted! (Unless you say otherwise.)
+
+```ts title="src/models/category.ts"
+export class Category extends Model {
+  public static collection = "categories";
+  public softDelete = true; // This is the default!
+}
+```
+
+When you destroy a model, it sets the `deletedAt` field instead of removing the document. You can still query, restore, or force-delete it later!
+
+## ♻️ Restoring Soft-Deleted Models
+
+Bring your data back from the grave:
+
+```ts title="src/app.ts"
+const category = await Category.find(1, { withTrashed: true });
+if (category && category.isTrashed()) {
+  await category.restore();
+}
+```
+
+Or restore many at once:
+
+```ts title="src/app.ts"
+await Category.restore({ isActive: false });
+```
+
+## 💣 Force Delete (No Going Back!)
+
+Want to really, truly, permanently delete? Use `forceDelete`:
+
+```ts title="src/app.ts"
+await category.forceDelete(); // Instance method
+await Category.forceDelete(1); // Static method
+```
+
+:::danger
+Force delete is permanent! Use with care. (There's no undo.)
+:::
+
+## ⚡ Model Events: Deletion Hooks
+
+Cascade's event system lets you hook into deletion actions:
+
+```ts title="src/app/main.ts"
+Category.events()
+  .onDeleting((category) => console.log("Deleting!"))
+  .onDeleted((category) => console.log("Deleted!"));
+```
+
+Use these for logging, cleanup, or syncing related data.
+
+## 🧙‍♂️ Pro Tip
+Soft deletes are great for audit trails and accidental-deletion recovery. But if you need to save space or comply with regulations, use force delete!
+
+---
+
+## 🌟 What's Next?
+- [🔍 Fetching Documents](./fetching-documents)
+- [🔗 Relationships](../relationships/introduction)

@@ -1,0 +1,33 @@
+---
+sidebar_position: 6
+---
+
+# Confirmed
+
+Check if the input value is confirmed by another input value.
+
+> The validation rule **requires a value** to run against the input value.
+
+If the rule does not receive an option, the comparing input will be `confirm{inputName}`, i.e `confirmPassword`.
+
+## Example
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+createAccount.validation = {
+  rules: {
+    password: ["confirmed"],
+  },
+};
+```
+
+When passing an option:
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+createAccount.validation = {
+  rules: {
+    password: ["confirmed:confirm_password"],
+  },
+};
+```

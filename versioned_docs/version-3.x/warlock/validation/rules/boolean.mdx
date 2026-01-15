@@ -1,0 +1,24 @@
+---
+sidebar_position: 5
+---
+
+# Boolean
+
+Check if the input is a boolean.
+
+> The validation rule **requires a value** to run against the input value.
+
+If the input's value is not a boolean, the validation will fail.
+
+If the input's value is a string that equals to `true` or `false`, the validation will pass.
+
+## Example
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    isActive: ["boolean"],
+  },
+};
+```

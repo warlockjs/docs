@@ -1,0 +1,43 @@
+---
+sidebar_position: 12
+---
+
+# 📊 Aggregations
+
+Need powerful data crunching? Cascade lets you use MongoDB's aggregation pipelines right from your models—no sweat! 🧮
+
+## 🚀 What's Aggregation?
+Aggregation lets you process data records and return computed results—think sums, averages, grouping, and more!
+
+## 🏗️ How to Use Aggregation
+Just call the `aggregate` method on your model:
+
+```ts title="src/app.ts"
+const results = await Order.aggregate([
+  { $match: { status: "completed" } },
+  { $group: { _id: "$customerId", total: { $sum: "$amount" } } },
+]);
+```
+
+## 🧩 Common Use Cases
+- **Sum**: Total up values
+- **Average**: Find the mean
+- **Group**: Organize by fields
+- **Match**: Filter your data
+- **Project**: Shape your output
+
+## 🧙‍♂️ Pro Tip: Use with Models
+You can use aggregation for advanced reporting, analytics, and dashboards—all with your familiar model classes!
+
+## ⚠️ Best Practices
+- Use aggregation for heavy data processing, not simple queries.
+- Keep pipelines as short as possible for best performance.
+
+:::info
+Aggregation is super powerful—combine it with Cascade's models for next-level data magic!
+:::
+
+---
+
+## 🌟 What's Next?
+- [🧰 Advanced Usage](../advanced/introduction) 

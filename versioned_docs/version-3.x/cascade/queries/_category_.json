@@ -1,0 +1,8 @@
+{
+  "label": "Queries",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "description": "Create queries over mongodb database."
+  }
+}

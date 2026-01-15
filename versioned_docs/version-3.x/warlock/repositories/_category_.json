@@ -1,0 +1,8 @@
+{
+  "label": "Repositories",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "Repository Design Pattern In Warlock"
+  }
+}

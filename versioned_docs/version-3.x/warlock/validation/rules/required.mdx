@@ -1,0 +1,20 @@
+---
+sidebar_position: 27
+---
+
+# Required
+
+Check if the input value is not empty.
+
+The validation rule **does not require a value** to run.
+
+## Example
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    title: ["required"],
+  },
+};
+```

@@ -1,0 +1,8 @@
+{
+  "label": "Aggregation",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "A powerful aggregate framework management tool"
+  }
+}

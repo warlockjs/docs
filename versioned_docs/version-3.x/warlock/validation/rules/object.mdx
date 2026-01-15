@@ -1,0 +1,24 @@
+---
+sidebar_position: 22
+---
+
+# Object
+
+Check if the input value is an object.
+
+The validation rule **requires a value** to run.
+
+:::tip
+This works in both json and form data requests as warlock automatically parses the request body.
+:::
+
+## Example
+
+```ts title="src/app/products/controllers/create-product.ts"
+// ...
+createProduct.validation = {
+  rules: {
+    details: ["required", "object"],
+  },
+};
+```

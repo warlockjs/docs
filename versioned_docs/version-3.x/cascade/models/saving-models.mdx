@@ -1,0 +1,104 @@
+---
+sidebar_position: 8
+---
+
+# 💾 Saving Models
+
+Saving and updating your data is a breeze with Cascade! Whether you're creating, updating, or using powerful events, you're always in control. 💡
+
+## 🆕 Saving New Models
+
+Just call `save()` on a new instance, or use the static `create` method:
+
+```ts title="src/app.ts"
+import { Category } from "./models/category";
+
+const category = new Category({ name: "Sports", isActive: true });
+await category.save();
+
+// or, the one-liner:
+const category2 = await Category.create({ name: "Sports", isActive: true });
+```
+
+## 🔄 Updating Existing Models
+
+Fetch a model, change its data, and call `save()` again:
+
+```ts title="src/app.ts"
+const category = await Category.find(1);
+if (category) {
+  category.set("name", "Sports");
+  await category.save();
+}
+```
+
+Or use the static `update` method:
+
+```ts title="src/app.ts"
+const category = await Category.update(1, { name: "Sports" });
+```
+
+## 🧩 Passing Options to Save
+
+You can pass options to `save()` for extra control:
+
+```ts title="src/app.ts"
+await category.save({ refresh: true });
+```
+
+## 🚫 Disabling Casts
+
+Need to save without triggering casts? Pass `{ cast: false }` as the second argument:
+
+```ts title="src/app.ts"
+await category.save({}, { cast: false });
+```
+
+## ⚡ Model Events: Hooks for Everything!
+
+Cascade's event system lets you run code before/after every action. Listen to events like `onCreating`, `onUpdating`, `onSaving`, `onCreated`, `onUpdated`, `onSaved`, `onDeleting`, `onDeleted`, and more!
+
+```ts title="src/app/main.ts"
+Category.events()
+  .onCreating((category) => console.log("Creating!"))
+  .onUpdating((category, oldCategory) => console.log("Updating!"))
+  .onSaved((category, oldCategory) => console.log("Saved!"));
+```
+
+:::info
+Events can be synchronous (before actions) or asynchronous (after actions). Use them for validation, logging, syncing, and more!
+:::
+
+## 🌍 Real-World Example: Syncing Data
+
+```ts title="src/app/main.ts"
+Product.events().onSaved((product, oldProduct) => {
+  calculateCategoryProducts(product.get("category.id"));
+  if (oldProduct && oldProduct.get("category.id") !== product.get("category.id")) {
+    calculateCategoryProducts(oldProduct.get("category.id"));
+  }
+});
+
+async function calculateCategoryProducts(categoryId) {
+  const count = await Product.count({ "category.id": categoryId });
+  await Category.update(categoryId, { productsCount: count });
+}
+```
+
+## 🤫 Silent Saving
+
+Use `silentSaving()` to save without triggering any events:
+
+```ts title="src/app.ts"
+await category.silentSaving();
+```
+
+:::tip
+Use `silentSaving` when you want to update a model without firing events (e.g., internal updates).
+:::
+
+---
+
+## 🌟 What's Next?
+- [🗑️ Destroying Models](./destroying-models)
+- [🔍 Fetching Documents](./fetching-documents)

@@ -39,6 +39,21 @@ const config: Config = {
           sidebarPath: require.resolve("./sidebars.js"),
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
+          lastVersion: "current", // Makes "current" (v4) the default version
+          versions: {
+            current: {
+              label: "4.x (Latest)",
+              path: "docs", // v4 at: warlock.js.org/docs/...
+              badge: true,
+              banner: "none",
+            },
+            "3.x": {
+              label: "3.x",
+              path: "v3", // v3 at: warlock.js.org/v3/...
+              badge: true,
+              banner: "unmaintained",
+            },
+          },
         },
         theme: {
           customCss: "./src/css/custom.css",
@@ -94,6 +109,11 @@ const config: Config = {
           docId: "cache/introduction",
           position: "left",
           label: "Cache",
+        },
+        {
+          type: "docsVersionDropdown",
+          position: "right",
+          dropdownActiveClassDisabled: true,
         },
         {
           href: "https://github.com/hassanzohdy",

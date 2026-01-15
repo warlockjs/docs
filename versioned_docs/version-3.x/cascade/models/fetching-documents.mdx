@@ -1,0 +1,85 @@
+---
+sidebar_position: 10
+---
+
+# 🔍 Fetching Documents
+
+Getting your data out of the database is just as important as saving it! Cascade makes querying a joy, with powerful, expressive, and super-friendly APIs. 🕵️‍♂️
+
+## 🔎 Find by ID
+
+Fetch a single document by its ID:
+
+```ts title="src/app.ts"
+const user = await User.find(1);
+```
+
+## 🚨 Find or Fail
+
+Throw an error if not found (great for APIs!):
+
+```ts title="src/app.ts"
+const user = await User.findOrFail(1); // Throws if not found
+```
+
+## 📋 List All (with Filters!)
+
+Get all documents, or filter with powerful queries:
+
+```ts title="src/app.ts"
+const users = await User.list(); // All users
+const activeUsers = await User.list({ isActive: true }); // Filtered
+```
+
+## 🧙‍♂️ Pro Tip: Advanced Filters
+
+You can use advanced MongoDB-style queries:
+
+```ts title="src/app.ts"
+const users = await User.list({ age: { $gte: 18 } });
+```
+
+## 🪄 Including Soft-Deleted (Trashed) Documents
+
+Want to include soft-deleted docs? Use `withTrashed`:
+
+```ts title="src/app.ts"
+const users = await User.list({ withTrashed: true });
+```
+
+## 🤝 Eager Loading Relationships
+
+Fetch related data in one go with `with`:
+
+```ts title="src/app.ts"
+const posts = await Post.list({ with: ["category"] });
+```
+
+## 🧩 Embedding Models (New Pattern!)
+
+When you use the `with` option, just pass the model class directly for embedded relationships:
+
+```ts title="src/app.ts"
+const posts = await Post.list({ with: [Category] }); // New & recommended!
+```
+
+:::tip Did you know?
+You no longer need to use `castModel(Category)`—just pass the model class directly! This is the new, recommended way. `castModel` is still supported for backward compatibility.
+:::
+
+## 🏎️ Pagination & Sorting
+
+Cascade supports pagination and sorting out of the box:
+
+```ts title="src/app.ts"
+const users = await User.list({ page: 2, limit: 10, sort: { createdAt: -1 } });
+```
+
+## 🧙‍♂️ Pro Tip
+Combine filters, sorting, pagination, and relationships for supercharged queries!
+
+---
+
+## 🌟 What's Next?
+- [🔗 Relationships](../relationships/introduction)
+- [🧰 Advanced Usage](../advanced/introduction)

@@ -1,0 +1,65 @@
+---
+sidebar_position: 5
+---
+
+# 📝 Default Values
+
+Never worry about missing data! Cascade lets you set default values for your model fields, so your documents are always complete and predictable. 🧩
+
+## 🏷️ Setting Default Values
+
+Just add a `defaults` property to your model:
+
+```ts title="src/models/user.ts"
+import { Model, Casts } from "@warlock.js/cascade";
+
+export class User extends Model {
+  public static collection = "users";
+  protected defaults = {
+    isActive: true,
+    role: "user",
+    age: 18,
+  };
+}
+```
+
+## ⚡ Dynamic Defaults (Functions!)
+
+Need a default that changes? Use a function:
+
+```ts title="src/models/user.ts"
+protected defaults = {
+  createdAt: () => new Date(),
+  token: () => Math.random().toString(36).slice(2),
+};
+```
+
+The function will be called every time a new model is created!
+
+## 🧙‍♂️ Pro Tip: Defaults + Casting
+
+Defaults are applied **before** casting, so your types are always correct:
+
+```ts title="src/models/user.ts"
+protected casts: Casts = {
+  age: "number",
+};
+protected defaults = {
+  age: "21", // Will be cast to number!
+};
+```
+
+## ⚠️ Gotchas
+
+- Defaults only apply when a value is missing or `undefined`.
+- If you pass `null`, the default is **not** used.
+
+:::info
+Defaults make your models safer and your code cleaner. Use them for all optional fields!
+:::
+
+---
+
+## 🌟 What's Next?
+- [🧩 Embedded Documents](./embedded-documents)
+- [💾 Saving Models](./saving-models)

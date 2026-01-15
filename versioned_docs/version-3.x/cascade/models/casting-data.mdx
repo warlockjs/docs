@@ -1,0 +1,111 @@
+---
+sidebar_position: 3
+---
+
+# 🔮 Casting Data
+
+Cascade makes sure your data is always the right type—no more surprises! Whether you want strings, numbers, booleans, dates, or even geo locations, Cascade has you covered. 🧙‍♂️
+
+## 🧰 How to Cast Data
+Just define the `casts` property in your model:
+
+```ts title="src/models/user.ts"
+import { Model, Casts } from "@warlock.js/cascade";
+
+export class User extends Model {
+  public static collection = "users";
+  protected casts: Casts = {
+    name: "string",
+    email: "string",
+    age: "number",
+    isActive: "boolean",
+    birthDate: "date",
+  };
+}
+```
+
+## 🏷️ Built-in Casts
+
+| Type             | Description                                                                                   |
+|------------------|-----------------------------------------------------------------------------------------------|
+| `string`         | Casts to a string                                                                             |
+| `number`         | Casts to a number                                                                             |
+| `int`/`integer`  | Casts to an integer                                                                           |
+| `float`          | Casts to a float                                                                              |
+| `bool`/`boolean` | Casts to a boolean                                                                            |
+| `date`           | Casts to a date                                                                               |
+| `array`          | Casts to an array                                                                             |
+| `object`         | Casts to an object                                                                            |
+| `any`/`mixed`    | No casting, keeps value as is                                                                 |
+| `location`       | Casts to a geo location object                                                                |
+| `localized`      | Stores as array of `{ localeCode, value }` for multilingual fields                           |
+
+:::info
+If a value is missing, Cascade uses a sensible default (e.g., `""` for string, `0` for number, `[]` for array, etc.).
+:::
+
+## 🌍 Geo Locations
+
+Use the `location` cast for geo points:
+
+```ts title="src/models/user.ts"
+protected casts: Casts = {
+  location: "location",
+};
+```
+
+```ts title="src/app.ts"
+const user = await User.create({
+  location: { lat: 30.123, lng: 31.123 },
+});
+console.log(user.get("location")); // { type: "Point", coordinates: [30.123, 31.123] }
+```
+
+## 🌐 Localized Values
+
+Use the `localized` cast for multilingual fields:
+
+```ts title="src/models/user.ts"
+protected casts: Casts = {
+  bio: "localized",
+};
+```
+
+```ts title="src/app.ts"
+const user = await User.create({
+  bio: [
+    { localeCode: "en", value: "English bio" },
+    { localeCode: "ar", value: "Arabic bio" },
+  ],
+});
+```
+
+## 🧩 Built-in Custom Casts
+
+### Embedding Models (🚀 New & Improved!)
+
+You can now embed another model just by passing the model class directly:
+
+```ts title="src/models/post.ts"
+import { Category } from "./category";
+
+protected casts: Casts = {
+  category: Category, // Just pass the model class!
+};
+```
+
+:::tip Did you know?
+You no longer need to use `castModel(Category)`—just pass the model class directly! This is the new, recommended way. `castModel` is still supported for backward compatibility.
+:::
+
+Pass the category id when creating a post, and Cascade will fetch and embed the category data for you!
+
+---
+
+## 🌟 What's Next?
+- [🧙‍♂️ Casting Custom Fields](./casting-custom-fields)
+- [📝 Default Values](./default-values)
+- [🧩 Embedded Documents](./embedded-documents)
+- [💾 Saving Models](./saving-models)
+- [🗑️ Destroying Models](./destroying-models)
+- [🔍 Fetching Documents](./fetching-documents)

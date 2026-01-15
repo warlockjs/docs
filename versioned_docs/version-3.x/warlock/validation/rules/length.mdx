@@ -1,0 +1,22 @@
+---
+sidebar_position: 15
+---
+
+# Length
+
+Check if the input value length equal to the given length.
+
+> The validation rule **requires a value** to run against the input value.
+
+It requires to pass the length as a parameter by adding a colon `:` then the length.
+
+## Example
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    title: ["required", "length:10"],
+  },
+};
+```

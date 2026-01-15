@@ -1,0 +1,22 @@
+---
+sidebar_position: 7
+---
+
+# Date
+
+Check if the input value is a valid date.
+
+> The validation rule **requires a value** to run against the input value.
+
+The passed date from the input should be a valid argument that can be passed to the `Date` constructor.
+
+## Example
+
+```ts title="src/app/users/controllers/create-account.ts"
+// ...
+createAccount.validation = {
+  rules: {
+    birthDate: ["date"],
+  },
+};
+```

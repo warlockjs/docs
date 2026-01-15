@@ -1,0 +1,66 @@
+---
+sidebar_position: 11
+---
+
+# 🏷️ Indexing
+
+Make your queries lightning-fast! Cascade makes it super easy to define and manage indexes for your collections. 🚀
+
+## ⚡ Why Indexes?
+Indexes help your database find data faster—think of them as magic bookmarks for your collections!
+
+## 🏗️ Defining Indexes
+Just add a static `indexes` property to your model:
+
+```ts title="src/models/user.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class User extends Model {
+  public static collection = "users";
+  public static indexes = [
+    { key: { email: 1 }, unique: true }, // Unique index on email
+    { key: { createdAt: -1 } }, // Sort by createdAt descending
+  ];
+}
+```
+
+## 🧩 Compound Indexes
+Combine multiple fields for even more powerful queries:
+
+```ts title="src/models/post.ts"
+public static indexes = [
+  { key: { authorId: 1, createdAt: -1 } },
+];
+```
+
+## ⏳ TTL (Time-To-Live) Indexes
+Automatically remove old documents:
+
+```ts title="src/models/session.ts"
+public static indexes = [
+  { key: { expiresAt: 1 }, expireAfterSeconds: 3600 },
+];
+```
+
+## 🧙‍♂️ Pro Tip: Background Indexes
+Build indexes in the background so your app stays fast:
+
+```ts title="src/models/user.ts"
+public static indexes = [
+  { key: { email: 1 }, background: true },
+];
+```
+
+## ⚠️ Best Practices
+- Always index fields you query or sort by often.
+- Use unique indexes for emails, usernames, etc.
+- Don't over-index—each index uses memory!
+
+:::info
+Indexes are managed automatically when you use migrations. No manual database work needed!
+:::
+
+---
+
+## 🌟 What's Next?
+- [🧰 Advanced Usage](../advanced/introduction) 

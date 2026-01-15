@@ -1,0 +1,88 @@
+---
+sidebar_position: 7
+---
+
+# 🧩 Embedded Documents
+
+MongoDB lets you nest documents inside each other—Cascade makes this powerful and easy! Use embedded documents to keep related data together, reduce joins, and make your data model shine. 🌟
+
+## 🤝 What Are Embedded Documents?
+
+An embedded document is just a document inside another document. For example, a `Post` can embed a `Category`.
+
+## 🏗️ How to Embed a Document
+
+1. **Define your models:**
+2. **Just use the model class in your casts!**
+
+```ts title="src/models/post.ts"
+import { Model, Casts } from "@warlock.js/cascade";
+import { Category } from "./category";
+
+export class Post extends Model {
+  public static collection = "posts";
+  protected casts: Casts = {
+    title: "string",
+    content: "string",
+    category: Category, // Just pass the model class!
+  };
+}
+```
+
+:::tip Did you know?
+You no longer need to use `castModel(Category)`—just pass the model class directly! This is the new, recommended way. `castModel` is still supported for backward compatibility.
+:::
+
+Now, when you create a post and pass a category id, Cascade will fetch and embed the category data for you!
+
+## 🎯 Controlling Embedded Data
+
+By default, all fields are embedded. But you can control what gets embedded:
+
+### 1. `embeddedData` Getter
+
+Override this getter in your model to specify exactly what to embed:
+
+```ts title="src/models/category.ts"
+public get embeddedData() {
+  return this.only(["id", "name"]);
+}
+```
+
+### 2. `embedded` Property
+
+Or, just list the fields you want:
+
+```ts title="src/models/category.ts"
+public embedded = ["id", "name"];
+```
+
+### 3. `embedAllExceptTimestampsAndUserColumns`
+
+Exclude timestamps and user columns from embedding:
+
+```ts title="src/models/category.ts"
+public embedAllExceptTimestampsAndUserColumns = true;
+```
+
+### 4. `embedAllExcept`
+
+Exclude specific fields:
+
+```ts title="src/models/category.ts"
+public embedAllExcept = ["createdAt", "updatedAt"];
+```
+
+## 🧙‍♂️ Pro Tip
+You can combine these options for fine-grained control over what gets embedded!
+
+:::info
+Embedded documents are perfect for denormalizing data and making reads super fast. But be mindful of document size limits in MongoDB!
+:::
+
+---
+
+## 🌟 What's Next?
+- [💾 Saving Models](./saving-models)
+- [🗑️ Destroying Models](./destroying-models)
+- [🔍 Fetching Documents](./fetching-documents)

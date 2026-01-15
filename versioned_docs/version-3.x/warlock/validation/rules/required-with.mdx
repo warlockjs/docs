@@ -1,0 +1,24 @@
+---
+sidebar_position: 25
+---
+
+# Required With
+
+The input under validation must be present and not empty only if any of the other specified fields are present.
+
+The validation rule **does not require a value** to run.
+
+## Example
+
+```ts title="src/app/posts/controllers/create-post.ts"
+// ...
+createPost.validation = {
+  rules: {
+    title: ["required"],
+    "series.name": ["string"],
+    "series.order": ["requiredWith:series.name"],
+  },
+};
+```
+
+It will fail ony and only if `series.name` is present and `series.order` is empty.

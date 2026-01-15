@@ -1,0 +1,107 @@
+---
+sidebar_position: 1
+---
+
+# 🧑‍💻 Models: Your Data, Supercharged!
+
+Models are the heart of Cascade! They turn raw MongoDB documents into powerful, object-oriented tools—making your code cleaner, safer, and way more fun. 🎉
+
+## 🤔 What is a Model?
+A **model** is a class that represents a single document in a collection. It gives you methods and properties to create, update, delete, and fetch documents, all with a sprinkle of magic.
+
+## 🚫 Why Not Just Use Documents Directly?
+Because as your app grows, you'll want:
+- Auto-generated IDs (no more manual work!)
+- Type casting and validation
+- Embedded documents
+- Events and hooks
+- Syncing related data (see below!)
+- Recycle bin and soft deletes
+- ...and so much more!
+
+## ✨ Creating a Model
+Just extend the `Model` class and set the `collection` property:
+
+```ts title="src/models/user.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class User extends Model {
+    /**
+    * The collection name (required)
+    */
+    public static collection = "users";
+}
+```
+
+## 🏗️ Instantiating a Model
+You can create a model instance with initial data:
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+const user = new User({
+    name: "Hasan Zohdy",
+    email: "hassanzohdy@gmail.com",
+    isActive: true,
+});
+```
+
+This just creates the instance—the data isn't saved yet!
+
+## 💾 Saving a Model
+Call `save()` to persist your model:
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+async function main() {
+    const user = new User({
+        name: "Hasan Zohdy",
+        email: "hassanzohdy@gmail.com",
+        isActive: true,
+    });
+
+    await user.save();
+}
+```
+
+Or use the static `create` method for a one-liner:
+
+```ts title="src/app.ts"
+const user = await User.create({
+    name: "Hasan Zohdy",
+    email: "hassanzohdy@gmail.com",
+    isActive: true,
+});
+```
+
+## 🆔 Accessing Document IDs
+MongoDB gives you a unique `_id` (ObjectId), but Cascade also gives you a friendly numeric `id`:
+
+```ts
+console.log(user._id); // ObjectId("5f9b2b3b3f3b9a0b3c3b9a0b")
+console.log(user.id);  // 1424151
+```
+
+:::tip Did you know?
+Cascade can auto-generate sequential or random IDs for you—no more manual ID headaches!
+:::
+
+## 🪄 Why Models Rock in Cascade
+- **Auto-casting**: Your data is always the right type.
+- **Embedded docs**: Nest models inside models, easily.
+- **Events**: Run code before/after create, update, delete, and more.
+- **Syncing**: Keep related data up-to-date automatically (unique to Cascade!).
+- **Recycle bin**: Soft delete with easy restore.
+- **Default values**: Set defaults for any field.
+- **Custom casting**: Generate slugs, computed fields, and more.
+
+---
+
+## 🌟 What's Next?
+- [✨ Creating Documents](./create-document)
+- [🔮 Casting Data](./casting-data)
+- [🧩 Embedded Documents](./embedded-documents)
+- [💾 Saving Models](./saving-models)
+- [🗑️ Destroying Models](./destroying-models)
+- [🔍 Fetching Documents](./fetching-documents)
