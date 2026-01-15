@@ -90,6 +90,12 @@ const config: Config = {
           label: "Seal",
         },
         {
+          type: "doc",
+          docId: "cache/introduction",
+          position: "left",
+          label: "Cache",
+        },
+        {
           href: "https://github.com/hassanzohdy",
           label: "GitHub",
           position: "right",

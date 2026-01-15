@@ -8,6 +8,7 @@ import fs from "fs/promises";
 import path from "path";
 import ts from "typescript";
 import { buildHttpApp, moduleBuilders } from "../builder/build-http-app";
+import { cleanStaleCache } from "../cache";
 import {
   checkSingleFile,
   configure as configureCodeQuality,
@@ -46,6 +47,23 @@ async function loadTsconfig() {
   tsconfigRaw = config;
 }
 
+/**
+ * Clear a cached file to force regeneration
+ */
+async function clearCachedFile(fileName: string) {
+  const cacheFilePath = path.resolve(
+    process.cwd(),
+    ".warlock/.cache",
+    fileName,
+  );
+  try {
+    await fs.unlink(cacheFilePath);
+    log.info("cache", "clear", `Cleared cached file: ${fileName}`);
+  } catch (error) {
+    // File doesn't exist, that's fine
+  }
+}
+
 export async function transformSingleFileAndCacheIt(filePath: string) {
   const relativePath = path
     .relative(process.cwd(), filePath)
@@ -65,7 +83,8 @@ export async function transformSingleFileAndCacheIt(filePath: string) {
   const { code } = await transform(content, {
     loader: filePath.endsWith(".tsx") ? "tsx" : "ts",
     format: "esm",
-    sourcemap: false,
+    sourcemap: "inline",
+    sourcefile: filePath,
     tsconfigRaw,
   });
 
@@ -81,9 +100,16 @@ export async function transformSingleFileAndCacheIt(filePath: string) {
 
 const log = httpLog;
 
-export async function startHttpApp(data: CommandActionData) {
-  if (data?.options?.fresh) {
+export async function startHttpApp(_data: CommandActionData) {
+  // Smart cache management: only delete .warlock if --fresh flag or cache is stale
+  if (_data?.options?.fresh) {
+    log.info("cache", "fresh", "Fresh build requested - clearing .warlock");
     await removeDirectoryAsync(warlockPath());
+  } else {
+    const result = await cleanStaleCache();
+    if (result.needsFullBuild) {
+      await removeDirectoryAsync(warlockPath());
+    }
   }
 
   log.info("http", "server", "Starting development server...");
@@ -110,11 +136,19 @@ export async function startHttpApp(data: CommandActionData) {
         `${dayjs().format("YYYY-MM-DD HH:mm:ss")} Restarting development server...`,
       ),
     );
-    if (["add", "unlink"].includes(event)) {
+    if (["add", "unlink", "unlinkDir"].includes(event)) {
       // Rebuild manifest when files are added or removed
       moduleBuilders.mainfest();
-      if (filePath.includes("routes.ts")) await moduleBuilders.routes();
-      if (filePath.endsWith("main.ts")) await moduleBuilders.main();
+      if (filePath.includes("routes.ts") || event === "unlinkDir") {
+        await moduleBuilders.routes();
+        // Clear the cached routes file to force regeneration
+        await clearCachedFile("warlock-routes.ts");
+      }
+      if (filePath.endsWith("main.ts") || event === "unlinkDir") {
+        await moduleBuilders.main();
+        // Clear the cached main file to force regeneration
+        await clearCachedFile("warlock-main.ts");
+      }
       // Regenerate config types when config files change
       if (
         filePath.includes("src/config/") ||
@@ -130,7 +164,7 @@ export async function startHttpApp(data: CommandActionData) {
     }
 
     await restartServer();
-  }, 50);
+  }, 250);
 
   watcher
     .on("add", filePath => rebuild("add", filePath))

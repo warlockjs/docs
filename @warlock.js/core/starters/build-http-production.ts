@@ -22,12 +22,12 @@ export async function buildHttpForProduction() {
     platform: "node",
     entryPoints: [httpPath],
     bundle: true,
-    // packages: config.build.bundle ?? "external",
     packages: "external",
     minify: true,
     legalComments: "linked",
     target: ["esnext"],
     format: "esm",
+    sourcemap: config.build.sourcemap,
     outfile: path.resolve(config.build.outDirectory, config.build.outFile),
     plugins: [nativeNodeModulesPlugin],
   });

@@ -90,7 +90,7 @@ This will create routes for the previous methods as follows:
 
 The `list` method is used to list records, it sends all request inputs to the repository's `list` method.
 
-> If [Cache](./../cache/introduction) is enabled then `repository.listCached` method will be used instead of `repository.list`.
+> If [Cache](/docs/cache/introduction) is enabled then `repository.listCached` method will be used instead of `repository.list`.
 
 By default when calling `/users` the response will be returned with pagination (Because list method has default pagination option to **true**) so there will be two keys that will be sent to the response:
 
@@ -182,7 +182,7 @@ The `restful.get` method sends the `id` to the repository's `find` method.
 
 If the record is not found, a `404` response is returned.
 
-> If [Cache](./../cache/introduction) is enabled then `repository.findCached` method will be used instead of `repository.find`.
+> If [Cache](/docs/cache/introduction) is enabled then `repository.findCached` method will be used instead of `repository.find`.
 
 ### Get middleware
 

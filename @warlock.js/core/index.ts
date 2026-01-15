@@ -6,6 +6,7 @@ export * from "./aws";
 export * from "./bootstrap";
 export * from "./bootstrap/setup";
 export * from "./builder";
+export * from "./cache";
 export * from "./config/index";
 export * from "./console";
 export * from "./database";

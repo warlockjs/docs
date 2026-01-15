@@ -1,5 +1,5 @@
 import { copyFile, ensureDirectory } from "@mongez/fs";
-import Endpoint from "@mongez/http";
+import { Endpoint } from "@mongez/http";
 import type { GenericObject } from "@mongez/reinforcements";
 import { Random, ltrim, trim } from "@mongez/reinforcements";
 import { isUrl } from "@mongez/supportive-is";

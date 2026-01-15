@@ -189,7 +189,7 @@ export class Response {
     event: ResponseEvent,
     listener: (response: Response) => void,
   ): EventSubscription {
-    return events.subscribe(event, listener);
+    return events.subscribe(`response.${event}`, listener);
   }
 
   /**
@@ -199,7 +199,7 @@ export class Response {
     // make a timeout to make sure the request events is executed first
     return new Promise(resolve => {
       setTimeout(async () => {
-        await events.triggerAllAsync(event, ...args);
+        await events.triggerAllAsync(`response.${event}`, ...args);
         resolve(true);
       }, 0);
     });
@@ -300,7 +300,7 @@ export class Response {
 
     this.log("Sending response");
     // trigger the sending event
-    if (typeof this.currentBody === "object") {
+    if (Array.isArray(this.currentBody) || isPlainObject(this.currentBody)) {
       this.setContentType("application/json");
     }
 
@@ -310,13 +310,17 @@ export class Response {
       await callback(this);
     }
 
-    for (const callback of this.events.get("sendingJson") || []) {
-      await callback(this);
-    }
-
-    if (this.isOk) {
-      for (const callback of this.events.get("sendingSuccessJson") || []) {
+    if (this.isJson) {
+      await Response.trigger("sendingJson", this);
+      for (const callback of this.events.get("sendingJson") || []) {
         await callback(this);
+      }
+
+      if (this.isOk) {
+        await Response.trigger("sendingSuccessJson", this);
+        for (const callback of this.events.get("sendingSuccessJson") || []) {
+          await callback(this);
+        }
       }
     }
 

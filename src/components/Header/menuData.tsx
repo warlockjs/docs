@@ -19,5 +19,11 @@ const menuData: Menu[] = [
     path: "/docs/seal/getting-started/introduction",
     newTab: false,
   },
+  {
+    id: 4,
+    title: "Cache",
+    path: "/docs/cache/introduction",
+    newTab: false,
+  },
 ];
 export default menuData;

@@ -10,7 +10,6 @@ import {
   rtrim,
   set,
   unset,
-  type GenericObject,
 } from "@mongez/reinforcements";
 import { isEmpty } from "@mongez/supportive-is";
 import type { LogLevel } from "@warlock.js/logger";
@@ -41,7 +40,7 @@ type StandardHeaders = {
 
 type HeaderKeys = keyof StandardHeaders;
 
-export class Request<User = any> {
+export class Request<User = any, RequestValidation = any> {
   /**
    * Fastify Request object
    */
@@ -96,7 +95,7 @@ export class Request<User = any> {
   /**
    * Validated data
    */
-  protected validatedData?: GenericObject;
+  protected validatedData?: RequestValidation;
 
   /**
    * Request id
@@ -539,9 +538,11 @@ export class Request<User = any> {
    * Get inputs that has been validated only
    * You can also pass an array of inputs to get only the validated inputs
    */
-  public validated(inputs?: string[]) {
+  public validated<Output = RequestValidation>(inputs?: string[]): Output {
     if (this.validatedData) {
-      return inputs ? only(this.validatedData, inputs) : this.validatedData;
+      return inputs
+        ? only(this.validatedData as Output, inputs)
+        : (this.validatedData as Output);
     }
 
     let rules = this.getHandler()?.validation?.rules || {};
@@ -560,14 +561,14 @@ export class Request<User = any> {
   /**
    * Get inputs that has been validated except the given inputs
    */
-  public validatedExcept(...inputs: string[]) {
+  public validatedExcept(...inputs: string[]): RequestValidation {
     return except(this.validated(), inputs);
   }
 
   /**
    * Set validated data
    */
-  public setValidatedData(data: GenericObject) {
+  public setValidatedData(data: RequestValidation) {
     this.validatedData = data;
   }
 

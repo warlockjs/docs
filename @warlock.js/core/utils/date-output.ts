@@ -94,7 +94,7 @@ export function dateOutput(
     return date;
   }
 
-  if (!date?.getTime) return date;
+  // if (!date?.getTime) return date;
 
   const optionsData = {
     ...defaultOptions,
@@ -125,7 +125,7 @@ export function dateOutput(
     }
 
     if (optionsData.timestamp) {
-      outputObject.timestamp = date.getTime();
+      outputObject.timestamp = dayjsDate.toDate().getTime();
     }
 
     if (optionsData.offset) {
@@ -153,8 +153,6 @@ export function dateOutput(
     return outputObject;
   } catch (error: any) {
     log.error("dateOutput", "error", error.message);
-
-    console.log("error", error);
 
     return date;
   }

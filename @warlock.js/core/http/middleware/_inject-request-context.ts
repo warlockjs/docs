@@ -5,6 +5,12 @@
 import { trans } from "@mongez/localization";
 import type { Model } from "@warlock.js/cascade";
 import { createStore, useStore } from "../../store";
+import {
+  BadRequestError,
+  ForbiddenError,
+  ResourceNotFoundError,
+  UnAuthorizedError,
+} from "../errors";
 import type { Request } from "../request";
 import type { Response } from "../response";
 
@@ -48,6 +54,30 @@ export function createuseRequestStore(
           // call executedAction event
           request.trigger("executedAction", request.route);
         } catch (error: any) {
+          if (error instanceof ResourceNotFoundError) {
+            return response.notFound({
+              error: error.message,
+            });
+          }
+
+          if (error instanceof UnAuthorizedError) {
+            return response.unauthorized({
+              error: error.message,
+            });
+          }
+
+          if (error instanceof ForbiddenError) {
+            return response.forbidden({
+              error: error.message,
+            });
+          }
+
+          if (error instanceof BadRequestError) {
+            return response.badRequest({
+              error: error.message,
+            });
+          }
+
           reject(error);
           return response.badRequest({
             error: error.message,

@@ -19,6 +19,7 @@ export function getLocalized(
   if (!localeCode) {
     localeCode = useRequestStore().request?.getLocaleCode();
   }
+
   if (Array.isArray(values)) {
     return values.find(value => value.localeCode === localeCode)?.[
       key as keyof LocalizedObject

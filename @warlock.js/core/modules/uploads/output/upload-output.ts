@@ -1,7 +1,7 @@
-import config from "@mongez/config";
 import { getAWSConfig } from "../../../aws";
 import type { FinalOutput } from "../../../output";
 import { Output } from "../../../output";
+import { config } from "./../../../config";
 
 export class UploadOutput extends Output {
   /**
@@ -48,7 +48,7 @@ export class UploadOutput extends Output {
       }
     }
 
-    await config.get("uploads.extend", () => {
+    await config.key("uploads.extend", () => {
       //
     })(this);
   }

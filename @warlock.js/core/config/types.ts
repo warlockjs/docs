@@ -29,6 +29,15 @@ export type WarlockConfigBuild = {
    * @default false
    */
   bundle?: boolean;
+  /**
+   * Enable or disable source maps for production builds.
+   *
+   * When enabled, creates a separate .map file with a reference comment,
+   * allowing Node.js to show original source file locations in error stack traces.
+   *
+   * @default true
+   */
+  sourcemap?: boolean;
 };
 
 export type WarlockConfig = {
