@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch:*)",
+      "Bash(bash .specify/scripts/bash/create-new-feature.sh:*)",
+      "Bash(bash:*)"
+    ]
+  }
+}
