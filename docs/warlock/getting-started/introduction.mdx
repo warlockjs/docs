@@ -1,79 +1,118 @@
 ---
 sidebar_position: 1
 title: "Introduction"
-description: "Warlock.js is a TypeScript-first Node.js framework for building fast, scalable APIs with MongoDB"
+description: "Warlock.js is a batteries-included Node.js framework for building production-ready APIs fast"
 ---
 
-# Introduction
+# Welcome to Warlock.js 👋
 
-**Warlock.js** is a TypeScript-first Node.js framework for building fast, scalable APIs. Built on [Fastify](https://fastify.dev/) and [MongoDB](https://www.mongodb.com/), it provides everything you need to create production-ready backends.
+Hey there! If you're looking to build APIs without drowning in boilerplate, you're in the right place.
 
-## Why Warlock.js?
+**Warlock.js** is a TypeScript-first Node.js framework that gives you everything you need to ship production-ready backends—fast. We're talking database, auth, validation, file uploads, emails, caching... all wired up and ready to go.
 
-Warlock.js was designed with frontend developers in mind. You don't need deep backend expertise to build robust APIs:
+## What Makes Warlock Different?
 
-- **Fast setup** - Create a working API in under 15 minutes
-- **Convention over configuration** - Sensible defaults that just work
-- **TypeScript-first** - Full type safety and excellent IDE support
-- **Module-based** - Organize code by feature, not by type
+Most frameworks give you a skeleton and say "good luck." Warlock gives you a complete toolkit:
 
-## Quick Example
+- **Zero-config dev server** with Hot Module Reload—change your code, see it live instantly
+- **Built-in ORM** supporting both MongoDB and PostgreSQL
+- **Type-safe validation** that actually makes sense
+- **File storage** that works locally or with S3
+- **Email templates** with React components (yes, really)
+- **Authentication** with JWT, roles, and permissions out of the box
 
-Here's a complete API endpoint in Warlock.js:
+The philosophy is simple: **spend your time building features, not configuring infrastructure.**
 
-```ts title="src/app/users/routes.ts"
-import { router, Request, Response } from "@warlock.js/core";
-import { User } from "./models/user";
+## Highlighted Features
 
-router.get("/users", async (request: Request, response: Response) => {
-  const users = await User.list();
-  return response.success({ users });
-});
+- ⚡ **Blazing Fast Performance** — Built on Fastify for maximum speed.
+- 🔄 **Hot Module Reload (HMR)** — Instant feedback dev server, faster than `nodemon`.
+- 🔌 **Superb Development Experience** — TypeScript by default, health checks, and auto-configuration.
+- 📡 **Event-Driven Architecture** — Decoupled logic with a powerful event system.
+- 🔄 **Automatic Imports** — Routes, events, and localization files load automatically.
+- 📊 **Restful API Support** — Built-in RESTful controllers and fluent Route Builder.
+- ✉️ **React Email Templates** — Write emails using React components. Goodbye ugly HTML strings.
+- 🧠 **Powerful Caching** — Integrated caching with **7+ drivers** (including Redis) and tag support.
+- 🗂️ **Module-Based Architecture** — Keep features self-contained and organized.
+- 🔒 **Authentication & ACL** — JWT auth, role-based guards, and permissions out of the box.
+- 🌍 **Internationalization (i18n)** — Built-in translation support for multi-language APIs.
+- 📁 **Powerful File Storage** — Multi-driver support (S3, Local) with image compression and resizing.
+- 🗃️ **Database Agnostic** — Full support for **MongoDB** and **PostgreSQL** via [Cascade](./../database/introduction).
+- 📢 **Herald Message Bus** — Async communication with RabbitMQ/Kafka support.
+- 🏢 **Multi-Tenancy** — Native support for SaaS apps via Context package.
+- ✅ **Seal Validation** — Type-safe, extensive schema validation.
+- ⚙️ **Zero Config** — Sensible defaults so you can start coding immediately.
+
+## Quick Taste
+
+Here's how you'd build a posts module. First, define your routes:
+
+```typescript title="src/app/posts/routes.ts"
+import { router } from "@warlock.js/core";
+import { createPostController } from "./controllers/create-post.controller";
+import { listPostsController } from "./controllers/list-posts.controller";
+
+router.get("/posts", listPostsController);
+router.post("/posts", createPostController);
 ```
 
-## Key Features
+Then your controllers handle the requests:
 
-### Core Framework
-- Hot Module Reload (HMR) for fast development
-- Event-driven architecture
-- Automatic route and module loading
-- Route-based middleware with groups
+```typescript title="src/app/posts/controllers/list-posts.controller.ts"
+import { type RequestHandler } from "@warlock.js/core";
+import { Post } from "../models/post";
 
-### Data Layer ([Cascade](./../../cascade/getting-started/introduction.mdx))
-- Full MongoDB support with powerful ORM
-- Model relationships and syncing
-- Migrations and schema management
+export const listPostsController: RequestHandler = async () => {
+  const posts = await Post.list();
 
-### API Development
-- RESTful API support with a single base class
-- Request validation with [Seal](./../../seal/getting-started/introduction.mdx)
-- Response transformation with [Outputs](./../http/output.mdx)
-- Postman collection generator
+  return response.success({ posts });
+};
+```
 
-### Authentication & Security
-- JWT-based authentication
-- Role-based access control
-- Guest user support
+```typescript title="src/app/posts/controllers/create-post.controller.ts"
+import { type RequestHandler } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+import { Post } from "../models/post";
 
-### Additional Features
-- File uploads with image compression
-- AWS S3 integration
-- Email with React components
-- [Redis caching](./../../cache/introduction.mdx)
-- Internationalization (i18n)
+export const createPostController: RequestHandler = async (
+  request,
+  response
+) => {
+  const post = await Post.create(request.validated());
 
-## Tooling
+  return response.success({ post });
+};
 
-- **[Generator Z](https://marketplace.visualstudio.com/items?itemName=hassanzohdy.gnz)** - VS Code extension to generate modules, controllers, models, and more
+createPostController.validation = {
+  schema: v.object({
+    title: v.string().required(),
+    content: v.string().required(),
+  }),
+};
+```
 
-## Next Steps
+Clean separation. Type-safe validation. No ceremony.
 
-Ready to get started? Follow these steps:
+## Who's This For?
 
-1. [Install Warlock.js](./installation.mdx) - Set up your development environment
-2. [Project Structure](./project-structure.mdx) - Understand how Warlock projects are organized
-3. [Create Your First Route](./../../warlock/http/routes.mdx) - Build your first API endpoint
+Warlock is perfect if you:
 
-:::tip New to Warlock.js?
-Start with the [Installation Guide](./installation.mdx) to create your first project in minutes.
+- Want to build APIs without endless configuration
+- Prefer conventions over "figure it out yourself"
+- Value developer experience (we really do)
+- Need a production-ready setup, not a starting point
+
+Whether you're a frontend dev venturing into backend territory or a seasoned backend engineer who's tired of wiring up the same stuff over and over—we've got you.
+
+## Let's Go
+
+Ready to build something? Here's your path:
+
+1. **[Why Warlock?](./why-warlock)** — See how we compare to the alternatives
+2. **[Installation](./installation)** — Get up and running in 2 minutes
+3. **[Concepts](./concepts)** — Understand the mental model
+4. **[Project Structure](./project-structure)** — Know where everything lives
+
+:::tip First time here?
+Jump straight to [Installation](./installation) and have your first API running before your coffee gets cold. ☕
 :::

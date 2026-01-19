@@ -1,0 +1,205 @@
+---
+sidebar_position: 6
+title: "⚙️ Environment & Config"
+description: "Configure your Warlock.js application with environment variables and config files"
+---
+
+# Environment & Configuration
+
+Warlock uses a simple pattern: **environment variables hold secrets**, **config files hold logic**.
+
+## The Pattern
+
+```
+.env (secrets) → config (logic) → app (usage)
+```
+
+- `.env`: Passwords, API keys, hosts
+- `config`: Default values, conditional logic
+- App code: Access via `config()` helper
+
+## Environment Variables
+
+### The `.env` File
+
+Your project includes a `.env` file. Here's a typical setup:
+
+```env title=".env"
+# Application
+APP_NAME=myapp
+TIMEZONE=UTC
+
+# Server
+PORT=3000
+HOST=127.0.0.1
+BASE_URL=http://${HOST}:${PORT}
+
+# Database (MongoDB)
+DB_HOST=127.0.0.1
+DB_PORT=27017
+DB_NAME=myapp
+
+# Database (PostgreSQL) - alternative
+# PG_HOST=127.0.0.1
+# PG_PORT=5432
+# PG_NAME=myapp
+# PG_USER=postgres
+# PG_PASSWORD=secret
+
+# Mail
+MAIL_HOST=smtp.example.com
+MAIL_PORT=465
+MAIL_USERNAME=
+MAIL_PASSWORD=
+
+# Cache
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+```
+
+### Environment File Types
+
+| File              | When Used                      |
+| ----------------- | ------------------------------ |
+| `.env`            | Development (default)          |
+| `.env.production` | Production builds              |
+| `.env.shared`     | Shared across all environments |
+
+:::tip
+Create `.env.production` for production-specific values. Warlock loads the right one automatically.
+:::
+
+### Accessing Environment Values
+
+```typescript
+import { env } from "@warlock.js/core";
+
+// Get value
+const port = env("PORT");
+
+// With default
+const host = env("HOST", "127.0.0.1");
+
+// Type conversion
+const port = env("PORT", 3000); // Returns number if default is number
+```
+
+## Configuration Files
+
+### Config Directory
+
+All config files live in `src/config/`:
+
+```
+src/config/
+├── app.ts          # Application settings
+├── database.ts     # Database connection
+├── http.ts         # HTTP server & CORS
+├── auth.ts         # Authentication
+├── mail.ts         # Email settings
+├── cache.ts        # Redis/cache
+└── storage.ts      # File storage
+```
+
+Each file exports a default object with the configuration.
+
+### App Configuration
+
+```typescript title="src/config/app.ts"
+import { env } from "@warlock.js/core";
+
+export default {
+  name: env("APP_NAME", "warlock"),
+  baseUrl: env("BASE_URL"),
+  timezone: env("TIMEZONE", "UTC"),
+  localeCode: "en",
+};
+```
+
+### Database Configuration
+
+```typescript title="src/config/database.ts"
+import { env } from "@warlock.js/core";
+
+export default {
+  // MongoDB
+  driver: "mongodb",
+  host: env("DB_HOST", "127.0.0.1"),
+  port: env("DB_PORT", 27017),
+  name: env("DB_NAME"),
+
+  // PostgreSQL
+  // driver: "postgresql",
+  // host: env("PG_HOST"),
+  // port: env("PG_PORT", 5432),
+  // database: env("PG_NAME"),
+  // user: env("PG_USER"),
+  // password: env("PG_PASSWORD"),
+};
+```
+
+### HTTP Configuration
+
+```typescript title="src/config/http.ts"
+import { env } from "@warlock.js/core";
+
+export default {
+  port: env("PORT", 3000),
+  host: env("HOST", "127.0.0.1"),
+
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+  },
+};
+```
+
+### Mail Configuration
+
+```typescript title="src/config/mail.ts"
+import { env } from "@warlock.js/core";
+
+export default {
+  host: env("MAIL_HOST"),
+  port: env("MAIL_PORT", 465),
+  secure: true,
+  auth: {
+    user: env("MAIL_USERNAME"),
+    pass: env("MAIL_PASSWORD"),
+  },
+  from: {
+    name: env("APP_NAME"),
+    address: env("MAIL_FROM_ADDRESS"),
+  },
+};
+```
+
+## Accessing Configuration
+
+Use the `config()` helper anywhere in your app:
+
+```typescript
+import { config } from "@warlock.js/core";
+
+// Get nested value
+const dbHost = config("database.host");
+
+// With default
+const timeout = config("http.timeout", 5000);
+
+// Get entire section
+const mailConfig = config("mail");
+```
+
+## Best Practices
+
+1. **Never hardcode secrets** — Use `.env` for all sensitive values
+2. **Use defaults** — Always provide fallbacks in config files
+3. **Keep `.env` out of git** — Add it to `.gitignore`
+4. **Document variables** — Create a `.env.example` with all keys
+
+## Next Steps
+
+1. **[Connectors](./connectors)** — How services connect
+2. **[Localization](./localization)** — Multi-language support
+3. **[Dev Server Overview](./dev-server-overview)** — Development workflow

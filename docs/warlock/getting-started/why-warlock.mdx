@@ -1,0 +1,169 @@
+---
+sidebar_position: 2
+title: "Why Warlock?"
+description: "See how Warlock.js compares to other Node.js frameworks and why it might be right for you"
+---
+
+# Why Warlock.js?
+
+Every framework has its philosophy. Here's ours.
+
+## The Problem
+
+You've got an idea. You want to build an API. You pick a framework, and then spend days:
+
+- Choosing and configuring an ORM
+- Setting up authentication
+- Wiring up validation
+- Adding file uploads and storage
+- Creating a dev workflow that doesn't make you wait
+
+By the time you write your first real endpoint, you're exhausted.
+
+## Our Solution
+
+Warlock.js gives you a **complete, integrated toolkit from day one**. Not a skeleton—a production-ready foundation where everything works together.
+
+```bash
+yarn create warlock
+yarn dev
+# Done. Build your features.
+```
+
+## How We Compare
+
+| Feature                | Express         | NestJS                | Warlock.js                    |
+| ---------------------- | --------------- | --------------------- | ----------------------------- |
+| **Learning Curve**     | Low             | Medium-High           | Low-Medium                    |
+| **Database ORM**       | Choose your own | Choose your own       | ✅ Cascade (Mongo + Postgres) |
+| **Authentication**     | DIY             | Passport integration  | ✅ JWT built-in               |
+| **HMR Dev Server**     | ❌ nodemon      | ❌ nodemon            | ✅ Dev Server v2              |
+| **Validation**         | Choose your own | class-validator       | ✅ Seal (type-safe)           |
+| **File Storage**       | DIY             | DIY                   | ✅ Multi-driver (S3, Local)   |
+| **Caching**            | DIY             | cache-manager         | ✅ 7+ drivers built-in        |
+| **Message Queue**      | DIY             | Bull/BullMQ           | ✅ Herald (RabbitMQ, Kafka)   |
+| **Email Templates**    | DIY             | DIY                   | ✅ React components           |
+| **Philosophy**         | Unopinionated   | Opinionated structure | Opinionated + integrated      |
+| **Time to Production** | Weeks           | Weeks                 | Days                          |
+
+## What Makes Us Different
+
+### 🚀 Dev Server v2: Vite-Like Experience
+
+Other frameworks use `nodemon` or `ts-node-dev`—slow, full restarts every time. Warlock has **Hot Module Reload** built-in. Change your code, see it live in milliseconds. TypeScript and ESLint checks run in the background without blocking you.
+
+### 🗄️ Database: MongoDB or PostgreSQL
+
+Pick your database, configure it once, and go. **Cascade ORM** supports both MongoDB and PostgreSQL with the same API. Models, relations, migrations, repositories—all included.
+
+```typescript
+// Same code, different database
+const user = await User.find(id); // Works with Mongo or Postgres
+```
+
+### ✅ Validation: Type-Safe with Seal
+
+**Seal** gives you type-safe schemas that work everywhere—requests, models, custom logic. Attach validation to your controller function and it just works.
+
+```typescript
+myController.validation = {
+  schema: v.object({
+    email: v.string().email().unique("User"), // or pass the class reference directly
+    password: v.string().minLength(8).required(),
+  }),
+};
+```
+
+Database rules like `unique()` and `exists()` are built-in.
+
+### 📁 File Storage: Multi-Driver from Day One
+
+Upload to local storage or S3 with the same API. Image compression, resizing, signed URLs—all built-in.
+
+```typescript
+await storage.put("avatars/user.jpg", file);
+const url = storage.url("avatars/user.jpg");
+```
+
+Switch drivers in config. No code changes.
+
+### 🔐 Authentication: JWT, Guards, Permissions
+
+JWT authentication, role-based guards, and permissions are ready to use. Protect routes with a single middleware.
+
+```typescript
+router.group(
+  {
+    middleware: [authMiddleware("admin")],
+  },
+  () => {
+    router.get("/admin/dashboard", dashboardController);
+  }
+);
+```
+
+### 📧 Email Templates: Write React, Send HTML
+
+Write email templates as React components. Type-safe props, reusable components, no ugly HTML strings.
+
+```tsx
+sendMail({
+  to: "hello@world.com",
+  subject: "Welcome to our app",
+  component: <WelcomeEmail name={user.name} verifyUrl={url} />,
+});
+```
+
+### 📢 Herald: Message Bus Built-In
+
+Need async communication? **Herald** supports RabbitMQ and Kafka out of the box.
+
+```typescript
+await communicators().publish("user.created", { userId: user.id });
+```
+
+### 🧠 Caching: 7+ Drivers
+
+Redis, Memcached, file-based, in-memory—pick your driver. Tagged cache for smart invalidation.
+
+```typescript
+await cache.tags(["users"]).set("key", value);
+await cache.tags(["users"]).flush(); // Clear all user cache
+```
+
+## Who Should Use Warlock?
+
+### ✅ Use Warlock if you:
+
+- Want to **ship fast** without sacrificing quality
+- Prefer **integrated tools** over assembling packages
+- Value **developer experience** and productivity
+- Need a **production-ready foundation**, not a starting point
+- Want **conventions** that guide you instead of endless choices
+
+### ⚠️ Consider alternatives if you:
+
+- Need a **minimal foundation** with zero opinions (→ Express)
+- Prefer **enterprise Java-like architecture** with decorators everywhere (→ NestJS)
+- Are building a **simple proxy** or single-purpose microservice
+- Want to **assemble your own stack** from scratch
+
+## Our Philosophy
+
+We believe in three core principles:
+
+### 1. Productivity > Flexibility
+
+Sensible defaults beat infinite configuration. You can still customize, but you shouldn't have to for common cases.
+
+### 2. Developer Experience Matters
+
+If it's painful to develop, it's painful to maintain. Fast feedback loops, clear errors, and helpful tooling aren't luxuries—they're essentials.
+
+### 3. Integration > Assembly
+
+Pieces that work together beat pieces you assemble yourself. We integrate the best tools so you don't have to.
+
+## Ready to Build?
+
+👉 **[Installation](./installation)** — Get your first project running in 2 minutes

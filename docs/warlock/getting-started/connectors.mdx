@@ -1,0 +1,142 @@
+---
+sidebar_position: 7
+title: "🔌 Connectors"
+description: "Understand how Warlock manages external service connections"
+---
+
+# Connectors
+
+Connectors manage connections to external services—database, cache, message bus, etc. Warlock handles their lifecycle so you don't have to.
+
+## What Are Connectors?
+
+A connector is responsible for:
+
+- **Starting** a connection when the app boots
+- **Restarting** when configuration changes (during development)
+- **Shutting down** cleanly when the app stops
+
+You configure them; Warlock manages them.
+
+## Built-in Connectors
+
+| Connector    | Priority | What It Manages                 |
+| ------------ | -------- | ------------------------------- |
+| Database     | 1        | MongoDB / PostgreSQL connection |
+| Cache        | 2        | Redis connection                |
+| HTTP         | 3        | Fastify server                  |
+| Storage      | 4        | File storage (local/S3)         |
+| Communicator | 5        | Message bus (Herald)            |
+
+Priority determines the order they start and stop.
+
+## Lifecycle
+
+### Startup
+
+When you run `yarn dev` or `yarn start`:
+
+```
+1. Database.connect()      → MongoDB/PostgreSQL ready
+2. Cache.connect()         → Redis ready
+3. HTTP.start()            → Server listening
+4. Storage.init()          → File system ready
+5. Communicator.connect()  → Message bus ready
+```
+
+### Shutdown
+
+When you stop the app (Ctrl+C):
+
+```
+1. Communicator.disconnect()
+2. Storage.cleanup()
+3. HTTP.stop()
+4. Cache.disconnect()
+5. Database.disconnect()
+```
+
+Reverse order ensures dependencies are respected.
+
+### Restart (Dev Server Only)
+
+When you change a config file during development:
+
+```
+Config changed → Affected connector restarts → HMR continues
+```
+
+Only the affected connector restarts—not the whole app.
+
+## Configuration
+
+Each connector reads from its config file in `src/config/`:
+
+| Connector    | Config File       |
+| ------------ | ----------------- |
+| Database     | `database.ts`     |
+| Cache        | `cache.ts`        |
+| HTTP         | `http.ts`         |
+| Storage      | `storage.ts`      |
+| Communicator | `communicator.ts` |
+
+Example database connector config:
+
+```typescript title="src/config/database.ts"
+export default {
+  driver: "mongodb",
+  host: env("DB_HOST", "127.0.0.1"),
+  port: env("DB_PORT", 27017),
+  name: env("DB_NAME", "myapp"),
+};
+```
+
+## Connection States
+
+During startup, you might see:
+
+```
+🔌 Database: connecting...
+✅ Database: connected
+🔌 Cache: connecting...
+⚠️  Cache: connection failed, retrying...
+✅ Cache: connected
+🚀 Server running at http://127.0.0.1:3000
+```
+
+Connectors retry automatically. Your app starts even if some services are temporarily unavailable.
+
+## Custom Connectors
+
+Need to connect to something else? Create a custom connector:
+
+```typescript title="src/connectors/my-service.connector.ts"
+import { Connector } from "@warlock.js/core";
+
+export class MyServiceConnector extends Connector {
+  name = "my-service";
+  priority = 10; // After built-in connectors
+
+  async connect() {
+    // Initialize your service
+    this.client = await MyService.connect();
+  }
+
+  async disconnect() {
+    // Clean up
+    await this.client.close();
+  }
+}
+```
+
+Then register it in your app's main file.
+
+:::note
+Custom connectors are an advanced topic. See the [Advanced section](../advanced/extending) for full details.
+:::
+
+## Next Steps
+
+1. **[Localization](./localization)** — Multi-language support
+2. **[Dev Server Overview](./dev-server-overview)** — Development workflow
+3. **[HTTP Routes](../http/routing)** — Build your first routes

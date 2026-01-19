@@ -1,0 +1,249 @@
+---
+sidebar_position: 4
+title: "Concepts"
+description: "Understand the core concepts and mental models behind Warlock.js"
+---
+
+# Concepts
+
+Before diving into code, let's understand how Warlock thinks. This will make everything else click.
+
+## Modules: Your Building Blocks
+
+In Warlock.js, your app is organized into **modules**. Each module is a self-contained feature:
+
+```
+src/app/
+├── users/         # Everything about users
+├── posts/         # Everything about posts
+├── orders/        # Everything about orders
+└── shared/         # Shared utilities
+```
+
+A module contains all the code for one feature: routes, controllers, models, events—everything in one place.
+
+## Configurations
+
+Warlock uses a simple pattern: **environment variables hold secrets**, **config files hold settings**.
+
+```
+.env (secrets) → config (settings) → app (usage)
+```
+
+All config files live in `src/config/` and are auto-loaded on startup:
+
+```
+src/config/
+├── app.ts          # Application settings
+├── database.ts     # Database connection
+├── http.ts         # Server & CORS
+├── auth.ts         # Authentication
+└── ...
+```
+
+Access config anywhere:
+
+```typescript
+import { config } from "@warlock.js/core";
+
+const dbHost = config.key("database.host");
+```
+
+## Connectors: Bridges to Features
+
+Connectors act as **bridges** between Warlock and external services or features. They automatically manage connections based on your configuration.
+
+### Smart Activation
+
+Connectors only activate if their configuration exists. Each connector checks for its config at startup:
+
+```typescript
+// Inside DatabaseConnector
+const databaseConfig = config.get("database");
+if (!databaseConfig) {
+  return; // Skip activation
+}
+```
+
+**What this means:**
+
+- No `src/config/database.ts`? → Database connector skips
+- No `src/config/cache.ts`? → Cache connector skips
+- No `src/config/communicator.ts`? → Message bus connector skips
+
+You only pay for what you configure.
+
+### Priority-Based Startup
+
+Connectors start in priority order to respect dependencies:
+
+| Priority | Connector    | Why This Order         |
+| -------- | ------------ | ---------------------- |
+| 1        | Database     | Data layer first       |
+| 2        | Cache        | Depends on database    |
+| 3        | HTTP         | Needs data layer ready |
+| 4        | Storage      | File system setup      |
+| 5        | Communicator | Message bus last       |
+
+Shutdown happens in **reverse order** to cleanly close dependencies.
+
+### Auto-Restart on Config Changes
+
+Each connector watches specific files. When they change, only that connector restarts:
+
+```typescript
+// DatabaseConnector watches:
+[".env", "src/config/database.ts"][
+  // CacheConnector watches:
+  (".env", "src/config/cache.ts")
+];
+```
+
+Change `database.ts`? → Only database restarts. Everything else keeps running.
+
+**On app shutdown:**
+All connectors shut down cleanly in reverse priority order.
+
+No manual connection handling. No lifecycle management. Just configure and go.
+
+## HMR: Hot Module Reload
+
+Warlock's Dev Server has **Hot Module Reload** built-in. Change your code, see it live in milliseconds. No restarts, no waiting.
+
+```
+📝 File changed: posts.controller.ts
+🔄 Reloading: posts.controller.ts + 2 dependents
+✅ Done in 45ms
+```
+
+See [Dev Server Overview](./dev-server-overview) for details.
+
+## The Request Lifecycle
+
+When a request hits your API, here's the flow:
+
+```
+Request
+   ↓
+Route Match       → Which endpoint?
+   ↓
+Middleware        → Auth? Rate limit?
+   ↓
+Validation        → Is the data valid?
+   ↓
+Controller        → Handle the request
+   ↓
+Repository        → Access the database
+   ↓
+Model             → Data entity
+   ↓
+Response          → Send it back
+```
+
+### Controllers: Handle Requests
+
+Controllers are functions that handle HTTP requests:
+
+```typescript title="src/app/posts/controllers/get-post.controller.ts"
+import { type RequestHandler } from "@warlock.js/core";
+import { Post } from "../models/post";
+
+export const getPostController: RequestHandler = async (request, response) => {
+  const post = await Post.find(request.int("id"));
+
+  if (!post) {
+    return response.notFound({
+      error: "Post not found",
+    });
+  }
+
+  return response.success({ post });
+};
+```
+
+Keep controllers thin—they orchestrate, not compute.
+
+## Models: Your Data
+
+Models represent database entities. Define the shape, and Cascade handles the rest:
+
+```typescript title="src/app/posts/models/post/post.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+
+export class Post extends Model {
+  public static table = "posts";
+
+  public static schema = v.object({
+    title: v.string().required(),
+    content: v.string().required(),
+    authorId: v.int().required(),
+  });
+}
+```
+
+## Repositories: Data Access Layer
+
+Repositories sit between controllers and models. They handle listing, filtering, and caching:
+
+```typescript title="src/app/posts/repositories/posts.repository.ts"
+import { RepositoryManager } from "@warlock.js/core";
+import { Post } from "../models/post";
+
+class PostsRepository extends RepositoryManager<Post> {
+  public source = Post;
+
+  public filterBy = {
+    title: "like",
+    status: "=",
+  };
+}
+
+export const postsRepository = new PostsRepository();
+```
+
+**Why repositories?**
+
+- Centralize filtering logic
+- Enable caching
+- Keep controllers clean
+
+## Events: Side Effects
+
+When something happens, other things might need to react. Events handle this:
+
+```typescript title="src/app/posts/events/send-notification.ts"
+import events from "@mongez/events";
+
+events.on("post.created", async (post) => {
+  // Send notification to followers
+  await notifyFollowers(post.authorId);
+});
+```
+
+Events keep your code decoupled. The controller doesn't need to know about notifications.
+
+## Putting It Together
+
+Here's how a typical request flows through a module:
+
+```
+1. Route matches → /posts/:id
+2. Middleware runs → Check auth
+3. Validation runs → Validate params
+4. Controller executes → getPostController
+5. Repository queries → postsRepository.find(id)
+6. Model fetches → Post.find(id)
+7. Event fires → post.viewed
+8. Response sent → { post }
+```
+
+Each piece has its job. Keep them focused.
+
+## Next Steps
+
+Now you understand the mental model:
+
+1. **[Project Structure](./project-structure)** — See the full directory layout
+2. **[Environment & Config](./env-config)** — Configure your app
+3. **[Connectors](./connectors)** — Understand service management

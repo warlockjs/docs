@@ -1,35 +1,42 @@
 ---
-sidebar_position: 2
-title: 🚀 Installation
+sidebar_position: 3
+title: "🚀 Installation"
+description: "Get your first Warlock.js project up and running in minutes"
 ---
 
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
-## Pre-requisites
+# Installation
 
-Warlock.js requires Node.js version <span className="text-primary">20</span> or higher. You can download and install Node.js from the official website [nodejs.org](https://nodejs.org/). Ensure you also check the [MongoDB Requirements](./../../cascade/getting-started/installation.mdx).
+Let's get you set up. This should take about 2 minutes.
 
-## Installation
+## Prerequisites
 
-To start a new Warlock.js project, execute the following command:
+You'll need:
+
+- **Node.js 20+** — [Download here](https://nodejs.org/)
+- **A database** — MongoDB or PostgreSQL (we'll show both)
+- **A package manager** — Yarn, NPM, or Pnpm
+
+## Create Your Project
 
 <Tabs>
-  <TabItem value="Yarn" label="Yarn">
+  <TabItem value="yarn" label="Yarn" default>
 
 ```bash
 yarn create warlock
 ```
 
   </TabItem>
-  <TabItem value="NPM" label="NPM">
+  <TabItem value="npm" label="NPM">
 
 ```bash
 npx create-warlock
 ```
 
   </TabItem>
-  <TabItem value="Pnpm" label="Pnpm">
+  <TabItem value="pnpm" label="Pnpm">
 
 ```bash
 pnpm create warlock
@@ -38,36 +45,98 @@ pnpm create warlock
   </TabItem>
 </Tabs>
 
-Follow the installation instructions, and you're all set! 🎉
+Follow the prompts. You'll be asked for:
 
-## VSCode Extension
+- Project name
+- Database type (MongoDB or PostgreSQL)
 
-Warlock.js modules can be generated using the [Generator Z](https://marketplace.visualstudio.com/items?itemName=hassanzohdy.gnz) VSCode extension. Install it from the [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=hassanzohdy.gnz).
+## What Gets Created
 
-## Run the project
+```
+my-project/
+├── src/
+│   ├── app/           # Your application modules
+│   └── config/        # Configuration files
+├── storage/           # Uploaded files, logs
+├── .env               # Environment variables
+├── warlock.config.ts  # Warlock configuration
+└── package.json
+```
 
-Navigate to the project directory and run the following command:
+## Start the Dev Server
+
+Navigate to your project and start it up:
 
 <Tabs>
-  <TabItem value="Yarn" label="Yarn">
+  <TabItem value="yarn" label="Yarn" default>
 
 ```bash
-yarn start
+cd my-project
+yarn dev
 ```
 
   </TabItem>
-  <TabItem value="NPM" label="NPM">
+  <TabItem value="npm" label="NPM">
 
 ```bash
-npm start
+cd my-project
+npm run dev
 ```
 
   </TabItem>
-  <TabItem value="Pnpm" label="Pnpm">
+  <TabItem value="pnpm" label="Pnpm">
 
 ```bash
-pnpm start
+cd my-project
+pnpm dev
 ```
 
   </TabItem>
 </Tabs>
+
+## What Happens on First Run
+
+When you run `yarn dev`, here's what you'll see something like:
+
+```
+🔧 Processing files...
+✅ Processed 42 files
+✅ Watching for file changes
+🔌 Database connected
+🚀 Server running at http://127.0.0.1:2030
+```
+
+The dev server:
+
+1. **Processes** all your TypeScript files
+2. **Builds** a dependency graph for HMR
+3. **Connects** to your database
+4. **Starts** watching for changes
+
+From now on, any change you make will hot-reload instantly. No restarts needed.
+
+## Verify It's Working
+
+Open your browser to:
+
+```
+http://127.0.0.1:2030
+```
+
+You should see a welcome response. You're ready to build!
+
+## Optional: VSCode Extension
+
+If you use VSCode, install [Generator Z](https://marketplace.visualstudio.com/items?itemName=hassanzohdy.gnz) to generate modules, controllers, and models with a right-click.
+
+## Next Steps
+
+Now that you're running:
+
+1. **[Concepts](./concepts)** — Understand how Warlock is structured
+2. **[Project Structure](./project-structure)** — Learn where everything goes
+3. **[Create Your First Route](../http/routing)** — Build your first endpoint
+
+:::tip Database not set up yet?
+You can still start the dev server. The database connector will retry connecting. Get your database running and it'll connect automatically.
+:::

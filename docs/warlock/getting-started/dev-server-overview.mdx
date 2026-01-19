@@ -1,0 +1,154 @@
+---
+sidebar_position: 9
+title: "⚡ Dev Server"
+description: "Overview of Warlock's development server with Hot Module Reload"
+---
+
+# Development Server Overview
+
+Warlock's dev server gives you a **Vite-like experience** for backend development. Change your code, see it live—instantly.
+
+## What Makes It Special?
+
+### Hot Module Reload (HMR)
+
+No more waiting for restarts. When you save a file:
+
+1. Warlock detects the change
+2. Transpiles only the changed file
+3. Reloads affected modules
+4. Your server stays running
+
+**Result**: Sub-second reloads instead of multi-second restarts.
+
+### Health Checks
+
+While you code, Warlock runs checks in the background:
+
+- **TypeScript**: Type errors without blocking your flow
+- **ESLint**: Lint warnings in real-time
+
+Errors show in your terminal—your server keeps running.
+
+### Type Generation
+
+Warlock auto-generates types for your configuration, so you get autocomplete for:
+
+```typescript
+config("database.host"); // ✅ Autocomplete works
+```
+
+## Starting the Dev Server
+
+```bash
+yarn dev
+```
+
+You'll see:
+
+```
+🔧 Processing files...
+✅ Processed 42 files
+✅ Watching for changes (HMR enabled)
+🔌 Database connected
+🚀 Server running at http://127.0.0.1:3000
+
+💡 Health checks running:
+   ├── TypeScript: ✅ No errors
+   └── ESLint: ⚠️ 2 warnings in routes.ts
+```
+
+## What Happens Under the Hood
+
+```
+1. Process Files
+   └── Transpile TypeScript → JavaScript
+   └── Transform imports for HMR
+   └── Cache to .warlock/
+
+2. Build Dependency Graph
+   └── Track which files depend on which
+   └── Used for smart reloading
+
+3. Load Special Files (in order)
+   └── Locales → Events → Main → Routes
+
+4. Start Watchers
+   └── File changes trigger HMR
+   └── Config changes restart connectors
+
+5. Run Background Tasks
+   └── TypeScript checker
+   └── ESLint checker
+   └── Type generators
+```
+
+## HMR in Action
+
+Save a file and watch:
+
+```
+📝 File changed: posts.controller.ts
+🔄 Reloading: posts.controller.ts + 2 dependents
+✅ Done in 45ms
+```
+
+45ms. Not 3 seconds. Not a full restart.
+
+## The `.warlock/` Directory
+
+The dev server creates a cache directory:
+
+```
+.warlock/
+├── cache/          # Transpiled files
+└── manifest.json   # File metadata
+```
+
+If you have weird issues, delete this folder and restart.
+
+## Configuration
+
+Customize the dev server in `warlock.config.ts`:
+
+```typescript title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  devServer: {
+    // Enable/disable health checks
+    healthChecks: {
+      typescript: true,
+      eslint: true,
+    },
+  },
+});
+```
+
+## When to Restart Manually
+
+HMR handles most changes, but you'll need a full restart for:
+
+- Installing new packages (`yarn add ...`)
+- Changes to `warlock.config.ts`
+- Major structural changes
+
+Just stop (`Ctrl+C`) and run `yarn dev` again.
+
+## Learn More
+
+This was just an overview. For deep dives:
+
+- **[Development Server](../development-server/introduction)** — Full documentation
+- **[HMR Details](../development-server/hmr)** — How it works
+- **[Troubleshooting](../development-server/troubleshooting)** — Common issues
+
+## What's Next?
+
+You've completed Getting Started! Time to build:
+
+1. **[HTTP Routes](../http/routing)** — Create your API endpoints
+2. **[Validation](../validation/introduction)** — Validate requests
+3. **[Database](../database/introduction)** — Work with data
+
+Happy coding! 🚀
