@@ -6,7 +6,7 @@ description: "Understand the core concepts and mental models behind Warlock.js"
 
 # Concepts
 
-Before diving into code, let's understand how Warlock thinks. This will make everything else click.
+Before diving into code, let's understand how Warlock.js thinks. This will make everything else click.
 
 ## Modules: Your Building Blocks
 
@@ -17,14 +17,14 @@ src/app/
 ├── users/         # Everything about users
 ├── posts/         # Everything about posts
 ├── orders/        # Everything about orders
-└── shared/         # Shared utilities
+└── shared/        # Shared utilities
 ```
 
 A module contains all the code for one feature: routes, controllers, models, events—everything in one place.
 
 ## Configurations
 
-Warlock uses a simple pattern: **environment variables hold secrets**, **config files hold settings**.
+Warlock.js uses a simple pattern: **environment variables hold secrets**, **config files hold settings**.
 
 ```
 .env (secrets) → config (settings) → app (usage)
@@ -49,9 +49,13 @@ import { config } from "@warlock.js/core";
 const dbHost = config.key("database.host");
 ```
 
+:::tip
+Keep in mind that each config file name is acting as a config group key, for example `src/config/google.ts` will allow you accessing google configurations using `config.key("google.x");
+:::
+
 ## Connectors: Bridges to Features
 
-Connectors act as **bridges** between Warlock and external services or features. They automatically manage connections based on your configuration.
+Connectors act as **bridges** between Warlock.js and external services or features. They automatically manage connections based on your configuration.
 
 ### Smart Activation
 
@@ -93,10 +97,10 @@ Each connector watches specific files. When they change, only that connector res
 
 ```typescript
 // DatabaseConnector watches:
-[".env", "src/config/database.ts"][
-  // CacheConnector watches:
-  (".env", "src/config/cache.ts")
-];
+[".env", "src/config/database.ts"];
+
+// CacheConnector watches:
+[".env", "src/config/cache.ts"];
 ```
 
 Change `database.ts`? → Only database restarts. Everything else keeps running.
@@ -163,6 +167,33 @@ export const getPostController: RequestHandler = async (request, response) => {
 
 Keep controllers thin—they orchestrate, not compute.
 
+You may also tail it with a validation schema:
+
+```typescript title="src/app/posts/controllers/get-posts.controller.ts"
+import { type RequestHandler } from "@warlock.js/core";
+import { Post } from "../models/post";
+import { v } from "@warlock.js/seal";
+
+export const getPostsController: RequestHandler = async (request, response) => {
+  const { data: posts, pagination } = await Post.paginate({
+    limit: request.int("limit"),
+    page: request.int("page"),
+    filter: {
+      // if passed
+      title: request.string("title"),
+    },
+  });
+
+  return response.success({ posts, pagination });
+};
+
+export const getPostsControllerValidation = v.object({
+  limit: v.numeric().default(15).optional(),
+  page: v.numeric().default(1).optional(),
+  title: v.string().optional(),
+});
+```
+
 ## Models: Your Data
 
 Models represent database entities. Define the shape, and Cascade handles the rest:
@@ -215,10 +246,18 @@ When something happens, other things might need to react. Events handle this:
 ```typescript title="src/app/posts/events/send-notification.ts"
 import events from "@mongez/events";
 
-events.on("post.created", async (post) => {
+const subscription = events.on("post.created", async (post) => {
   // Send notification to followers
   await notifyFollowers(post.authorId);
 });
+
+// cleanup is important while development server is running
+export const cleanup = [subscription];
+// or pass it as callback directly:
+
+export const cleanup = () => {
+  subscription.unsubscribe();
+};
 ```
 
 Events keep your code decoupled. The controller doesn't need to know about notifications.

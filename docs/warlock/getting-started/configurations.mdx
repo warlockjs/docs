@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # ⚙️ Configurations
 
-Configurations are crucial for any application, and Warlock provides a straightforward way to manage them.
+Configurations are crucial for any application, and Warlock.js provides a straightforward way to manage them.
 
 ## 📂 Config Directory
 
@@ -29,7 +29,8 @@ Application configurations encompass general settings, including:
 5. [HTTP + CORS Configurations](./../http/configurations): CORS settings.
 6. [Log Configurations](./../logger/configurations): Logger settings.
 7. [Validation Configurations](./../validation/configurations): Validation settings.
-8. [Uploads Configurations](./../upload/configurations): Upload settings.
+8. [Storage Configurations](./../storage/configurations): Storage settings.
+9. [Herald Configurations](./../herald/configurations): Herald (Event Bus Messaging) settings.
 
 ## 📄 Configuration Files
 
@@ -62,6 +63,7 @@ App configurations contain simple data, such as the application name, URL, debug
 - `baseUrl`: The application's base URL, used to generate full URLs. This is required.
 - `timezone`: The application's timezone, defaulting to `UTC`.
 - `localeCode`: Default locale code.
+- `localeCodes`: List of available locale codes.
 
 ### 🌐 Base URL
 
@@ -71,10 +73,8 @@ The Base URL is used to generate [URLs](./../utils/urls) to ensure proper URL ge
 
 The timezone sets the default timezone for the application, ensuring all dates are generated with the correct timezone.
 
-:::tip
-Cascade relies on this timezone to generate the correct date for each user, so set it correctly.
-:::
-
 ### 🌍 Locale Code
 
 The locale code is used for multilingual applications, providing a default fallback when an API request has an invalid or missing locale code.
+
+`localeCodes` is used to define the available locale codes, if this is defined, any passed locale code aparat from the declared ones will throw an error.

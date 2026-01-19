@@ -4,7 +4,7 @@ sidebar_position: 5
 
 # 🌍 Environment Variables
 
-`Warlock` is powered by [Mongez Dotenv](https://github.com/hassanzohdy/mongez-dotenv), which comes with powerful features. Let's explore how it works.
+`Warlock.js` is powered by [Mongez Dotenv](https://github.com/hassanzohdy/mongez-dotenv), which comes with powerful features. Let's explore how it works.
 
 ## 🔧 Variables
 
@@ -16,14 +16,14 @@ Here's a look at the default `.env` file contents:
 # App Configurations
 APP_NAME="ecommerce"
 
-TIMEZONE=UTC
-
 # Http Configurations
-PORT=2025
-HOST=127.0.0.1
-BASE_URL=http://${HOST}:${PORT}
+HTTP_PORT=2025
+HTTP_HOST=127.0.0.1
+BASE_URL=http://${HTTP_HOST}:${HTTP_PORT}
 
 # Database Configurations
+
+DB_DRIVER=mongodb
 DB_AUTH=admin
 DB_PORT=27017
 DB_HOST=127.0.0.1
@@ -45,10 +45,10 @@ MAIL_FROM_ADDRESS=
 Let's go through each variable and see what it does.
 
 - `APP_NAME`: Sets the application name, used in the mailer and other places.
-- `TIMEZONE`: Sets the timezone for the application, used in the mailer and other places.
-- `PORT`: Sets the port for the HTTP server.
-- `HOST`: Sets the host for the HTTP server.
+- `HTTP_PORT`: Sets the port for the HTTP server.
+- `HTTP_HOST`: Sets the host for the HTTP server.
 - `BASE_URL`: Sets the base URL for the application, used with [URL functions](./../utils//urls.mdx).
+- `DB_DRIVER`: Sets the database driver for the database connection.
 - `DB_AUTH`: Sets the authentication database for the database connection.
 - `DB_PORT`: Sets the port for the database connection.
 - `DB_HOST`: Sets the host for the database connection.

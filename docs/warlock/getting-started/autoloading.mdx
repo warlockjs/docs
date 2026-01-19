@@ -12,8 +12,11 @@ import TabItem from "@theme/TabItem";
 Here are the files that are auto-loaded in sequence:
 
 - `src/config`: All files within this directory are loaded first.
-- `src/main.ts`: Loaded after importing the configuration files.
-- `src/app/main.ts`: Loaded once the HTTP server and database connection are warming up (but not yet connected).
+- `src/app/*/utils/locales.ts`: Load all locales files.
+- `src/app/*/events`: Load all events files.
+- `src/app/main.ts`: Load `Main App` file (If exists).
+- `src/app/*/main.ts`: Load all modules main files (If exists).
+- `src/app/*/routes.ts`: Load all modules routes files (If exists).
 
 These are the primary files that are loaded. Now, let's explore what happens within each module.
 
@@ -21,32 +24,25 @@ These are the primary files that are loaded. Now, let's explore what happens wit
 
 As mentioned in the previous section, each directory inside the `src/app` directory is considered a `module`. **Warlock** will attempt to locate and import the following files from each module:
 
-- `module/main.ts`: This file is loaded first if it exists.
 - `module/utils/locales.ts`: Loaded after `module/main.ts` if it exists.
-- `module/routes.ts`: Loaded after `module/utils/locales.ts` if it exists.
 - `module/events`: This directory is loaded after `module/routes.ts` if it exists.
+- `module/main.ts`: Main file in a module is acting as an entry point.
+- `module/routes.ts`: Final file to be loaded (If exists).
 
 ## 🌍 Module Localization File
 
-Each module has a `utils` directory. Inside that directory, `Warlock` will look for a `locales.ts` file and import it if found.
-
-## 🛤️ Module Routes File
-
-This file is called after `module/main.ts` and `module/utils/locales.ts` if they exist. It defines the module routes, which can be grouped by middleware, use RESTful resources, or be basic routes.
+Each module has a `utils` directory. Inside that directory, `Warlock.js` will look for a `locales.ts` file and import it if found.
 
 ## 📅 Module Events
 
 The events directory handles all events that need to be triggered when certain actions occur. It's a crucial concept for any successful and scalable application.
 
-Loading events can be done in two ways:
+> Please keep in mind events are side effects, so please consider exporting a `cleanup` function to remove the event listener when the module is unloaded or file changed during development server.
 
-1. If the `module/events` has an `index.ts` file, it will be loaded.
-2. If the `module/events` lacks an `index.ts`, all files within the events directory will be imported.
+## 🛤️ Module Routes File
+
+Define the module routes in this file, keep it only for that purpose.
 
 ## 🔄 Autoloading Order
 
 The order of module loading is important. Modules are loaded in alphabetical order. For example, if you have a module named `users` and another named `posts`, the `posts` module will be loaded first.
-
-### Enhancement Suggestion
-
-Consider adding a section on how to customize the autoloading process if needed. This could include instructions on how to exclude certain files or directories from being auto-loaded, which might be useful for advanced users who want more control over the loading process.
