@@ -1,6 +1,4 @@
-# Development Server v2 - Complete Flow (HMR-Only)
-
-> **IMPORTANT**: Currently only HMR is implemented. FSR (Full Server Restart) is planned for future versions.
+# Development Server v2 - Complete Flow (HMR)
 
 ## Entry Point
 
@@ -161,25 +159,21 @@ Runs in separate process to avoid blocking dev server.
 ### User-Facing Documentation
 
 1. **Getting Started**
-
    - How to start dev server
    - What to expect on first run
    - File processing behavior
 
 2. **HMR Guide**
-
    - How it works
    - Import transformation
    - Cache busting explained
 
 3. **Configuration**
-
    - warlock.config.ts options
    - Watch configuration
    - Performance tuning
 
 4. **Troubleshooting**
-
    - Circular dependencies
    - Import resolution errors
    - Cache issues
@@ -193,7 +187,6 @@ Runs in separate process to avoid blocking dev server.
 ### Technical Documentation
 
 6. **Architecture**
-
    - FilesOrchestrator
    - DependencyGraph
    - Module loading

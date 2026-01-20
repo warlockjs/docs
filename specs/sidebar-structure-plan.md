@@ -92,9 +92,9 @@ docs/warlock/
 │
 ├── 13. Advanced/
 │   ├── Image Processing
-│   ├── Logger
+│   ├── Multi Tenancy
+│   ├── Logging
 │   ├── Utilities
-│   ├── Extending Framework
 │   └── Deep Concepts (theory + examples)
 │
 └── Future:
@@ -222,13 +222,11 @@ docs/warlock/
 ## Next Steps
 
 1. **Start with Getting Started section**
-
    - Review existing pages
    - Update for v4
    - Create new pages (Concepts, Connectors)
 
 2. **Then Development Server**
-
    - Mostly new pages
    - Use dev-server-complete-flow.md as reference
 
