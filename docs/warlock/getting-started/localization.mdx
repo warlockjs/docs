@@ -6,7 +6,7 @@ description: "Add multi-language support to your Warlock.js API"
 
 # Localization
 
-Building a multilingual API? Warlock has i18n built in.
+Building a multilingual API? Warlock.js has i18n built in.
 
 ## Quick Setup
 
@@ -23,23 +23,18 @@ export default {
 Each module can have its own translations:
 
 ```typescript title="src/app/users/utils/locales.ts"
-import { setTranslations } from "@warlock.js/core";
+import { groupedTranslations } from "@warlock.js/core";
 
 setTranslations("users", {
-  en: {
-    welcome: "Welcome",
-    goodbye: "Goodbye",
-    emailSent: "Email sent successfully",
+  welcome: {
+    en: "Welcome",
+    ar: "مرحباً",
+    es: "Bienvenido",
   },
-  ar: {
-    welcome: "مرحباً",
-    goodbye: "وداعاً",
-    emailSent: "تم إرسال البريد بنجاح",
-  },
-  es: {
-    welcome: "Bienvenido",
-    goodbye: "Adiós",
-    emailSent: "Correo enviado exitosamente",
+  greeting: {
+    en: "Welcome :name",
+    ar: "مرحباً :name",
+    es: "Bienvenido :name",
   },
 });
 ```
@@ -47,22 +42,22 @@ setTranslations("users", {
 ### 3. Use Translations
 
 ```typescript
-import { trans } from "@warlock.js/core";
+import { t } from "@warlock.js/core";
 
 // Returns translation based on current request locale
-trans("users.welcome"); // "Welcome" or "مرحباً" etc.
+t("users.welcome"); // "Welcome" or "مرحباً" etc.
 
 // With parameters
-trans("users.greeting", { name: "John" });
-// Template: "Hello, {name}!"
-// Result: "Hello, John!"
+t("users.greeting", { name: "John" });
+// Template: "Welcome :name"
+// Result: "Welcome John"
 ```
 
 ## How Locale Is Detected
 
-Warlock checks these in order:
+Warlock.js checks these in order:
 
-1. **Request header**: `Accept-Language: ar`
+1. **Request header**: `locale: ar`
 2. **Query param**: `?locale=ar`
 3. **Default**: Falls back to `config.localeCode`
 
@@ -71,9 +66,9 @@ Warlock checks these in order:
 Keys follow the pattern: `module.key`
 
 ```typescript
-trans("users.welcome"); // users module, welcome key
-trans("posts.created"); // posts module, created key
-trans("common.success"); // common module, success key
+t("users.welcome"); // users module, welcome key
+t("posts.created"); // posts module, created key
+t("common.success"); // common module, success key
 ```
 
 ## Validation Errors
@@ -81,16 +76,21 @@ trans("common.success"); // common module, success key
 Validation error messages can be localized too:
 
 ```typescript title="src/app/users/utils/locales.ts"
-setTranslations("validation", {
-  en: {
-    required: "This field is required",
-    email: "Please enter a valid email",
-    min: "Must be at least {min} characters",
+groupedTranslations("validation", {
+  required: {
+    en: "This field is required",
+    ar: "هذا الحقل مطلوب",
+    es: "Este campo es obligatorio",
   },
-  ar: {
-    required: "هذا الحقل مطلوب",
-    email: "يرجى إدخال بريد إلكتروني صحيح",
-    min: "يجب أن يكون على الأقل {min} حروف",
+  email: {
+    en: "Please enter a valid email",
+    ar: "يرجى إدخال بريد إلكتروني صحيح",
+    es: "Por favor, ingresa un correo electrónico válido",
+  },
+  min: {
+    en: "Must be at least {min} characters",
+    ar: "يجب أن يكون على الأقل {min} حروف",
+    es: "Debe tener al menos {min} caracteres",
   },
 });
 ```
@@ -106,7 +106,7 @@ src/app/users/
 └── ...
 ```
 
-The dev server loads `locales.ts` files automatically before routes.
+Warlock.js loads `locales.ts` files automatically before routes.
 
 ## Getting Current Locale
 

@@ -184,7 +184,7 @@ Now the post will be returned, the `castModel` in the post model will set the em
 
 Thanks to the `PostOutput` only the needed data will be sent to the response.
 
-But as you can see in the previous example, the post's author has an image, but we didn't define it yet in the user output, most of the time the image is an instance of `Upload` model, which already is built in inside Warlock and has as well `UploadOutput` class.
+But as you can see in the previous example, the post's author has an image, but we didn't define it yet in the user output, most of the time the image is an instance of `Upload` model, which already is built in inside Warlock.js and has as well `UploadOutput` class.
 
 Let's update the user output to include the image
 
@@ -428,7 +428,7 @@ In this example, we got the user object from the request context, and we checked
 
 ## Built-in types
 
-Warlock has some built-in types that can be used in the output class.
+Warlock.js has some built-in types that can be used in the output class.
 
 - `int`: integer number.
 - `float`: float number.
@@ -443,7 +443,7 @@ Warlock has some built-in types that can be used in the output class.
 
 ### Date Format
 
-When dealing with date objects, Warlock will format it in multiple formats, so for each date object is sent to the output, the response shape will be like this:
+When dealing with date objects, Warlock.js will format it in multiple formats, so for each date object is sent to the output, the response shape will be like this:
 
 ```json
 {
@@ -496,7 +496,7 @@ export class UserOutput extends Output {
 
 ## Manually using the output class
 
-It's not just related to Warlock response, you can use it to filter the given data and be sent in a certain format based on the output data.
+It's not just related to Warlock.js response, you can use it to filter the given data and be sent in a certain format based on the output data.
 
 In that sense, you can use it in any place in your application.
 

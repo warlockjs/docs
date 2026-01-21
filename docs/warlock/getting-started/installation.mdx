@@ -1,142 +1,172 @@
 ---
 sidebar_position: 3
-title: "🚀 Installation"
-description: "Get your first Warlock.js project up and running in minutes"
+title: "Installation"
+description: "Get Warlock.js up and running in minutes"
 ---
+
+# Installation
+
+Let's get you up and running. You'll have a working API in less than 2 minutes.
+
+## Prerequisites
+
+Before you start, make sure you have:
+
+- **Node.js 20+** ([Download here](https://nodejs.org/))
+- **Package manager** (Yarn, NPM, or Pnpm)
+- **Database** (MongoDB or PostgreSQL)
+
+:::tip Database Setup
+Don't have a database yet? For local development:
+
+- **MongoDB**: [Download MongoDB Community](https://www.mongodb.com/try/download/community) or use [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) (free tier)
+- **PostgreSQL**: [Download PostgreSQL](https://www.postgresql.org/download/) or use [Supabase](https://supabase.com/) (free tier)
+  :::
+
+## Create a New Project
+
+Run the interactive setup wizard:
 
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
-# Installation
-
-Let's get you set up. This should take about 2 minutes.
-
-## Prerequisites
-
-You'll need:
-
-- **Node.js 20+** — [Download here](https://nodejs.org/)
-- **A database** — MongoDB or PostgreSQL (we'll show both)
-- **A package manager** — Yarn, NPM, or Pnpm
-
-## Create Your Project
-
 <Tabs>
   <TabItem value="yarn" label="Yarn" default>
-
-```bash
-yarn create warlock
-```
-
+    ```bash yarn create warlock ```
   </TabItem>
   <TabItem value="npm" label="NPM">
-
-```bash
-npx create-warlock
-```
-
+    ```bash npx create-warlock ```
   </TabItem>
   <TabItem value="pnpm" label="Pnpm">
-
-```bash
-pnpm create warlock
-```
-
+    ```bash pnpm create warlock ```
   </TabItem>
 </Tabs>
 
-Follow the prompts. You'll be asked for:
+The wizard will ask you:
 
-- Project name
-- Database type (MongoDB or PostgreSQL)
+1. **Project name** — Your app's directory name
+2. **Database driver** — MongoDB or PostgreSQL
+3. **Features** — Auth, File Storage, Caching, etc.
+4. **Git initialization** — Create a git repo?
+5. **JWT secret** — Auto-generated for auth
+
+:::info What Gets Installed?
+The wizard installs only the packages you need based on your selections. If you choose Auth, it adds `@warlock.js/auth`. If you choose File Storage, it adds `@warlock.js/storage`. No bloat.
+:::
 
 ## What Gets Created
 
+After installation, you'll have this structure:
+
 ```
-my-project/
+my-app/
 ├── src/
 │   ├── app/           # Your application modules
+│   │   └── utils/     # Shared utilities
 │   └── config/        # Configuration files
-├── storage/           # Uploaded files, logs
+├── storage/           # File uploads, logs
 ├── .env               # Environment variables
-├── warlock.config.ts  # Warlock configuration
-└── package.json
+├── .env.shared        # Shared env variables
+├── warlock.config.ts  # Warlock.js configuration
+├── package.json       # Dependencies
+└── tsconfig.json      # TypeScript config
 ```
 
-## Start the Dev Server
+Your `.env` file will be pre-configured with sensible defaults based on your database choice.
 
-Navigate to your project and start it up:
+## Start the Development Server
 
-<Tabs>
-  <TabItem value="yarn" label="Yarn" default>
+Navigate to your project and start the dev server:
 
 ```bash
-cd my-project
+cd my-app
 yarn dev
 ```
 
-  </TabItem>
-  <TabItem value="npm" label="NPM">
+You'll see output like this:
+
+```
+ℹ (2026-01-20T10:30:45.123Z) [warlock] bootstrap Starting application in development mode
+✓ Processing files... (245ms)
+✓ Health checks passed
+✓ Database connected
+✓ Routes loaded (12 routes)
+
+🚀 Server ready at http://localhost:2030
+🔥 Hot Module Reload enabled
+```
+
+:::tip What Just Happened?
+Warlock's dev server:
+
+1. **Transpiled** your TypeScript files
+2. **Loaded** all configurations
+3. **Connected** to your database
+4. **Registered** all routes and events
+5. **Started** the HTTP server with HMR enabled
+
+All in under a second.
+:::
+
+## Test Your API
+
+Open your browser or use `curl`:
 
 ```bash
-cd my-project
-npm run dev
+curl http://localhost:2030
 ```
 
-  </TabItem>
-  <TabItem value="pnpm" label="Pnpm">
+You should see a welcome response:
 
-```bash
-cd my-project
-pnpm dev
+```json
+{
+  "message": "Welcome to Warlock.js!",
+  "version": "4.0.0"
+}
 ```
 
-  </TabItem>
-</Tabs>
+## Hot Module Reload in Action
 
-## What Happens on First Run
+Try editing a file while the server is running:
 
-When you run `yarn dev`, here's what you'll see something like:
+1. Open `src/app/utils/routes.ts`
+2. Change a route or add a new one
+3. Save the file
 
-```
-🔧 Processing files...
-✅ Processed 42 files
-✅ Watching for file changes
-🔌 Database connected
-🚀 Server running at http://127.0.0.1:2030
-```
-
-The dev server:
-
-1. **Processes** all your TypeScript files
-2. **Builds** a dependency graph for HMR
-3. **Connects** to your database
-4. **Starts** watching for changes
-
-From now on, any change you make will hot-reload instantly. No restarts needed.
-
-## Verify It's Working
-
-Open your browser to:
+You'll see:
 
 ```
-http://127.0.0.1:2030
+🔄 File changed: src/app/utils/routes.ts
+✓ Reloaded in 45ms
 ```
 
-You should see a welcome response. You're ready to build!
+No server restart. No waiting. Just instant feedback.
 
-## Optional: VSCode Extension
+## Tooling (Optional)
 
-If you use VSCode, install [Generator Z](https://marketplace.visualstudio.com/items?itemName=hassanzohdy.gnz) to generate modules, controllers, and models with a right-click.
+For an even better experience, install the **Generator Z** VSCode extension:
+
+1. Open VSCode
+2. Go to Extensions (Ctrl+Shift+X)
+3. Search for "Generator Z"
+4. Install it
+
+Generator Z gives you:
+
+- **Code generators** — Create controllers, models, and more with commands
+- **Snippets** — Quick templates for common patterns
+- **File templates** — Consistent structure across your app
 
 ## Next Steps
 
-Now that you're running:
+You're all set! Here's what to explore next:
 
-1. **[Concepts](./concepts)** — Understand how Warlock is structured
-2. **[Project Structure](./project-structure)** — Learn where everything goes
-3. **[Create Your First Route](../http/routing)** — Build your first endpoint
+- **[Concepts](./concepts)** — Understand Warlock's architecture
+- **[Project Structure](./project-structure)** — Know where everything lives
+- **[Environment & Config](./env-config)** — Configure your app properly
 
-:::tip Database not set up yet?
-You can still start the dev server. The database connector will retry connecting. Get your database running and it'll connect automatically.
+:::tip First Feature
+Ready to build? Check out the [HTTP section](../http/routing-basics) to create your first route, or jump to [Database](../database/introduction) to set up your models.
 :::
+
+Still stuck? Check the [Discord community](https://discord.gg/x3W9SN2jvx).

@@ -14,7 +14,7 @@ Warlock's dev server gives you a **Vite-like experience** for backend developmen
 
 No more waiting for restarts. When you save a file:
 
-1. Warlock detects the change
+1. Warlock.js detects the change
 2. Transpiles only the changed file
 3. Reloads affected modules
 4. Your server stays running
@@ -23,7 +23,7 @@ No more waiting for restarts. When you save a file:
 
 ### Health Checks
 
-While you code, Warlock runs checks in the background:
+While you code, Warlock.js runs checks in the background:
 
 - **TypeScript**: Type errors without blocking your flow
 - **ESLint**: Lint warnings in real-time
@@ -32,10 +32,10 @@ Errors show in your terminal—your server keeps running.
 
 ### Type Generation
 
-Warlock auto-generates types for your configuration, so you get autocomplete for:
+Warlock.js auto-generates types for your configuration, so you get autocomplete for:
 
 ```typescript
-config("database.host"); // ✅ Autocomplete works
+config.key("database.host"); // ✅ Autocomplete works
 ```
 
 ## Starting the Dev Server
@@ -51,7 +51,7 @@ You'll see:
 ✅ Processed 42 files
 ✅ Watching for changes (HMR enabled)
 🔌 Database connected
-🚀 Server running at http://127.0.0.1:3000
+🚀 Server running at http://localhost:2030
 
 💡 Health checks running:
    ├── TypeScript: ✅ No errors
@@ -124,6 +124,13 @@ export default defineConfig({
   },
 });
 ```
+
+## Force start fresh
+
+By default dev server caches last transpiled files, when server starts again, it checks the source files for changes, if detected any changes,
+a reconciliation will occur to changed files.
+
+You can force a fresh start by running `yarn dev --fresh` or by using short option `yarn dev -f`.
 
 ## When to Restart Manually
 

@@ -4,7 +4,7 @@ sidebar_position: 3
 
 # Request
 
-**Warlock Request** is the incoming request object, it contains all the information about the request, and it is used to get the request body, query string, headers, and more.
+**Warlock.js Request** is the incoming request object, it contains all the information about the request, and it is used to get the request body, query string, headers, and more.
 
 ## Request params
 
@@ -324,7 +324,7 @@ import { User } from "./../models/user";
 
 export async function createUser(request: Request, response: Response) {
   const user = await User.create(
-    request.except(["id", "createdAt", "updatedAt"])
+    request.except(["id", "createdAt", "updatedAt"]),
   ); // { name: "John", age: 20 }
 
   response.success({

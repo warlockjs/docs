@@ -8,15 +8,15 @@ Almost no application is complete without uploading files, especially images, th
 
 ## Setup
 
-Warlock is shipped with [Sharp](https://sharp.pixelplumbing.com) which is a high performance Node.js image processing library.
+Warlock.js is shipped with [Sharp](https://sharp.pixelplumbing.com) which is a high performance Node.js image processing library.
 
 ## Upload an image
 
-When [Uploading images](./../upload/compressing-images) and with the **compress** mode activated, Warlock uses Sharp to compress the images.
+When [Uploading images](./../upload/compressing-images) and with the **compress** mode activated, Warlock.js uses Sharp to compress the images.
 
 ## Manual image processing
 
-Warlock provides a simple way to process images using Sharp by wrapping the `Sharp` class by Warlock `Image` class.
+Warlock.js provides a simple way to process images using Sharp by wrapping the `Sharp` class by Warlock.js `Image` class.
 
 ## Basic Usage
 
@@ -54,7 +54,7 @@ Here we resized the image to 200x200, and saved it to `storage/images/resized-im
 
 ## Watermark
 
-Another good and important feature is to add watermarks in the images, luckily, Warlock provides a simple way to do that.
+Another good and important feature is to add watermarks in the images, luckily, Warlock.js provides a simple way to do that.
 
 ```ts title="src/app/main.ts"
 import { storagePath, Image } from "@warlock.js/core";

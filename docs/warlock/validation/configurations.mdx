@@ -41,7 +41,7 @@ Lets break down the above code:
 - `stopOnFirstFailure`: Stop the validation process on the first failure so it won't continue to validate the rest of the rules for the same input, default to `true`.
 - `returnErrorStrategy`: if `stopOnFIrstFailure` is set to `false`, then you can decide what errors to be returned, for example if the input has 3 errors, you can return the first error or `all` errors, default to `first`.
 - `responseStatus`: The response status code to be returned when validation fails, default to `400`.
-- `rules`: Rules list that will be used in the `validation.rules` as a `string`, Warlock has a `+30` different rules that will cover most of the validation cases, but you can add your own rules though.
+- `rules`: Rules list that will be used in the `validation.rules` as a `string`, Warlock.js has a `+30` different rules that will cover most of the validation cases, but you can add your own rules though.
 - `keys`: The keys used to return the errors, you can change it to whatever you want.
 - `keys.response`: The key used to return the errors, default to `messages`.
 - `keys.inputKey`: The key used to return the input key, default to `key`.

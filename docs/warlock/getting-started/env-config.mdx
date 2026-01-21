@@ -1,205 +1,633 @@
 ---
 sidebar_position: 6
-title: "⚙️ Environment & Config"
-description: "Configure your Warlock.js application with environment variables and config files"
+title: "Environment & Configuration"
+description: "Learn how to manage environment variables and configuration in Warlock.js"
 ---
 
 # Environment & Configuration
 
-Warlock uses a simple pattern: **environment variables hold secrets**, **config files hold logic**.
+Warlock.js uses a **three-layer pattern** for configuration: environment variables feed config files, which feed your application code. Let's break it down.
 
 ## The Pattern
 
 ```
-.env (secrets) → config (logic) → app (usage)
+.env (secrets) → config files (logic) → app code (usage)
 ```
 
-- `.env`: Passwords, API keys, hosts
-- `config`: Default values, conditional logic
-- App code: Access via `config()` helper
+This separation keeps secrets out of your code and makes configuration testable.
 
 ## Environment Variables
 
-### The `.env` File
+Environment variables store **secrets** and **environment-specific values** like database credentials, API keys, and ports.
 
-Your project includes a `.env` file. Here's a typical setup:
+### `.env` — Development (Default)
+
+Your local development environment:
 
 ```env title=".env"
-# Application
+# App Configurations
 APP_NAME=myapp
+LOCALE_CODE=en
 TIMEZONE=UTC
 
-# Server
-PORT=3000
-HOST=127.0.0.1
-BASE_URL=http://${HOST}:${PORT}
+# Http Configurations
+HTTP_PORT=2030
+HTTP_HOST=localhost
+BASE_URL=http://${HTTP_HOST}:${HTTP_PORT}
 
-# Database (MongoDB)
-DB_HOST=127.0.0.1
+# Database Configurations
+DB_DRIVER=mongodb
+DB_AUTH=admin
 DB_PORT=27017
+DB_HOST=localhost
 DB_NAME=myapp
-
-# Database (PostgreSQL) - alternative
-# PG_HOST=127.0.0.1
-# PG_PORT=5432
-# PG_NAME=myapp
-# PG_USER=postgres
-# PG_PASSWORD=secret
-
-# Mail
-MAIL_HOST=smtp.example.com
-MAIL_PORT=465
-MAIL_USERNAME=
-MAIL_PASSWORD=
+DB_USERNAME=root
+DB_PASSWORD=root
 
 # Cache
-REDIS_HOST=127.0.0.1
+CACHE_DRIVER=memory
+## Redis
+REDIS_HOST=localhost
 REDIS_PORT=6379
+# or using redis url
+#REDIS_URL=
+
+# Mail
+MAIL_HOST=
+MAIL_PORT=465
+MAIL_ENCRYPTION=ssl
+MAIL_SECURE=true
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_FROM_NAME=${APP_NAME}
+MAIL_FROM_ADDRESS=
+
+# Auth
+JWT_SECRET=your-generated-secret-key
 ```
 
-### Environment File Types
-
-| File              | When Used                      |
-| ----------------- | ------------------------------ |
-| `.env`            | Development (default)          |
-| `.env.production` | Production builds              |
-| `.env.shared`     | Shared across all environments |
-
-:::tip
-Create `.env.production` for production-specific values. Warlock loads the right one automatically.
+:::tip Variable Interpolation
+Notice how `BASE_URL` uses `${HTTP_HOST}:${HTTP_PORT}` to reference other variables. Warlock.js supports variable interpolation in `.env` files, making your configuration more maintainable.
 :::
 
-### Accessing Environment Values
+### `.env.shared` — Shared Variables
+
+Variables shared across **all environments**:
+
+```env title=".env.shared"
+APP_NAME=myapp
+LOCALE_CODE=en
+TIMEZONE=UTC
+```
+
+To reduce duplication between environment files, create a `.env.shared` file with common variables. It will be loaded automatically across all environments.
+
+### `.env.production` — Production
+
+Production-specific variables:
+
+```env title=".env.production"
+HTTP_PORT=8080
+HTTP_HOST=0.0.0.0
+
+# Production Database
+DB_HOST=prod-db.example.com
+DB_NAME=myapp_production
+DB_USERNAME=prod_user
+DB_PASSWORD=super-secure-password
+
+# Production Cache
+CACHE_DRIVER=redis
+REDIS_HOST=prod-redis.example.com
+REDIS_PORT=6379
+
+# Production Mail
+MAIL_HOST=smtp.mailgun.org
+MAIL_PORT=587
+MAIL_USERNAME=postmaster@yourdomain.com
+MAIL_PASSWORD=your-mail-password
+MAIL_SECURE=true
+
+# Production Auth
+JWT_SECRET=super-secure-production-secret
+```
+
+### How Warlock.js Loads Env Files
+
+Warlock.js loads environment files in this order:
+
+1. `.env.shared` (always loaded)
+2. `.env.{NODE_ENV}` (e.g., `.env.production`)
+3. `.env` (if `NODE_ENV` is not set or is `development`)
+
+Variables in later files **override** earlier ones.
+
+:::tip
+You can use `.env.development` and `.env.production` to distinguish between environments, but it's recommended to use `.env` and `.env.production` to avoid confusion.
+
+Set `NODE_ENV=production` to load `.env.production` instead of `.env`.
+:::
+
+## Accessing Environment Variables
+
+Use the `env()` helper to read environment variables:
 
 ```typescript
 import { env } from "@warlock.js/core";
 
-// Get value
-const port = env("PORT");
+const port = env("PORT", 2030); // Default to 2030
+const dbHost = env("DB_HOST"); // Required (throws if missing)
+const appName = env("APP_NAME", "Warlock.js");
+```
 
-// With default
-const host = env("HOST", "127.0.0.1");
+### Type Conversion
 
-// Type conversion
-const port = env("PORT", 3000); // Returns number if default is number
+The `env()` helper auto-converts types:
+
+```typescript
+const port = env("PORT", 2030); // number
+const debug = env("DEBUG", false); // boolean
+const tags = env("TAGS", []); // array (comma-separated)
+const secure = env("MAIL_SECURE", true); // boolean
 ```
 
 ## Configuration Files
 
+Config files live in `src/config/` and transform environment variables into structured configuration.
+
 ### Config Directory
 
-All config files live in `src/config/`:
+All configurations are located inside the `src/config` directory and are **automatically loaded** when the application starts.
 
-```
-src/config/
-├── app.ts          # Application settings
-├── database.ts     # Database connection
-├── http.ts         # HTTP server & CORS
-├── auth.ts         # Authentication
-├── mail.ts         # Email settings
-├── cache.ts        # Redis/cache
-└── storage.ts      # File storage
-```
+:::danger Important
+Each config file must be named correctly for auto-loading to work. The filename determines which configuration type it defines.
+:::
 
-Each file exports a default object with the configuration.
+### Available Config Files
 
-### App Configuration
+Here's the list of all available config files:
+
+- `app.ts` — Application settings (name, URL, locale, timezone)
+- `database.ts` — Database connection
+- `http.ts` — HTTP server and CORS settings
+- `auth.ts` — Authentication and JWT
+- `cache.ts` — Cache drivers and settings
+- `mail.ts` — Email/SMTP configuration
+- `storage.ts` — File storage drivers (local, AWS S3, R2)
+- `log.ts` — Logger configuration
+- `validation.ts` — Validation rules and settings
+
+:::note
+All configuration files must export a **default object** containing the configurations.
+:::
+
+### Core Config Examples
+
+#### `app.ts` — Application Config
 
 ```typescript title="src/config/app.ts"
+import type { AppConfigurations } from "@warlock.js/core";
 import { env } from "@warlock.js/core";
 
-export default {
-  name: env("APP_NAME", "warlock"),
-  baseUrl: env("BASE_URL"),
+const appConfigurations: AppConfigurations = {
+  appName: env("APP_NAME", "Warlock.js"),
   timezone: env("TIMEZONE", "UTC"),
-  localeCode: "en",
+  baseUrl: env("BASE_URL", "http://localhost:2030"),
+  localeCode: env("LOCALE_CODE", "en"),
+  localeCodes: ["en", "ar"],
 };
+
+export default appConfigurations;
 ```
 
-### Database Configuration
+**App Configuration Options:**
+
+- `appName` — Application name, used in emails and other places
+- `baseUrl` — Application's base URL, used to generate full URLs (required)
+- `timezone` — Application timezone, defaults to `UTC`
+- `localeCode` — Default locale code for multilingual apps
+- `localeCodes` — List of available locale codes (validates incoming requests)
+
+#### `database.ts` — Database Config
 
 ```typescript title="src/config/database.ts"
+import type {
+  ConnectionOptions,
+  MongoDriverOptions,
+  MongoClientOptions,
+} from "@warlock.js/cascade";
 import { env } from "@warlock.js/core";
 
-export default {
-  // MongoDB
-  driver: "mongodb",
-  host: env("DB_HOST", "127.0.0.1"),
+const databaseConfigurations: ConnectionOptions<
+  MongoDriverOptions,
+  MongoClientOptions
+> = {
+  driver: env("DB_DRIVER", "mongodb"),
+  name: "default",
+  database: env("DB_NAME"),
+  host: env("DB_HOST", "localhost"),
   port: env("DB_PORT", 27017),
-  name: env("DB_NAME"),
-
-  // PostgreSQL
-  // driver: "postgresql",
-  // host: env("PG_HOST"),
-  // port: env("PG_PORT", 5432),
-  // database: env("PG_NAME"),
-  // user: env("PG_USER"),
-  // password: env("PG_PASSWORD"),
+  username: env("DB_USERNAME"),
+  password: env("DB_PASSWORD"),
+  authSource: env("DB_AUTH"),
+  uri: env("DB_URL"),
+  driverOptions: {
+    autoGenerateId: true,
+    counterCollection: "counters",
+  },
+  defaultDeleteStrategy: "permanent",
+  modelOptions: {
+    randomIncrement: true,
+    initialId: 1,
+    timestamps: true,
+    strictMode: "strip",
+  },
 };
+
+export default databaseConfigurations;
 ```
 
-### HTTP Configuration
+**Database Configuration Options:**
+
+- `driver` — Database driver (mongodb, postgres)
+- `name` — Connection name (default: "default")
+- `database` — Database name
+- `host` — Database host
+- `port` — Database port
+- `username` — Database username
+- `password` — Database password
+- `authSource` — Authentication database (MongoDB)
+- `uri` — Full database URL (overrides individual fields)
+- `driverOptions` — Driver-specific options
+- `modelOptions` — Default model configuration
+
+:::note Unified Database Config
+Warlock.js uses unified database configuration across all adapters (MongoDB, PostgreSQL, etc.). Use the same environment variable names regardless of your database choice.
+:::
+
+#### `http.ts` — HTTP Server Config
 
 ```typescript title="src/config/http.ts"
 import { env } from "@warlock.js/core";
+import type { HttpConfigurations } from "@warlock.js/core";
 
-export default {
-  port: env("PORT", 3000),
-  host: env("HOST", "127.0.0.1"),
-
+const httpConfigurations: HttpConfigurations = {
+  port: env("HTTP_PORT", 2030),
+  host: env("HTTP_HOST", "localhost"),
+  log: true,
+  fileUploadLimit: 20 * 1024 * 1024, // 20MB
+  rateLimit: {
+    max: 260, // max requests per duration
+    duration: 60 * 1000, // 1 minute
+  },
   cors: {
     origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   },
 };
+
+export default httpConfigurations;
 ```
 
-### Mail Configuration
+**HTTP Configuration Options:**
+
+- `port` — HTTP server port
+- `host` — HTTP server host
+- `log` — Enable request logging
+- `fileUploadLimit` — Maximum file upload size in bytes
+- `rateLimit` — Rate limiting configuration
+- `cors` — CORS configuration (origin, methods)
+
+#### `auth.ts` — Authentication Config
+
+```typescript title="src/config/auth.ts"
+import { NO_EXPIRATION, type AuthConfigurations } from "@warlock.js/auth";
+import { env } from "@warlock.js/core";
+import { User } from "app/users/models/user";
+
+const authConfigurations: AuthConfigurations = {
+  userType: {
+    user: User,
+  },
+  jwt: {
+    secret: env("JWT_SECRET"),
+    expiresIn: NO_EXPIRATION,
+    refresh: {
+      expiresIn: "7d",
+      enabled: false,
+      secret: env("JWT_REFRESH_SECRET"),
+    },
+  },
+};
+
+export default authConfigurations;
+```
+
+**Auth Configuration Options:**
+
+- `userType` — User model types (user, admin, etc.)
+- `jwt.secret` — JWT secret key (required)
+- `jwt.expiresIn` — JWT token expiration (use `NO_EXPIRATION` for never)
+- `jwt.refresh` — Refresh token configuration (optional)
+
+#### `cache.ts` — Caching Config
+
+```typescript title="src/config/cache.ts"
+import { env } from "@warlock.js/core";
+import type { CacheConfigurations } from "@warlock.js/cache";
+import {
+  FileCacheDriver,
+  MemoryCacheDriver,
+  RedisCacheDriver,
+} from "@warlock.js/cache";
+
+const globalPrefix = () => {
+  return env("CACHE_PREFIX", env("APP_NAME", "warlock"));
+};
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    file: FileCacheDriver,
+    memory: MemoryCacheDriver,
+    redis: RedisCacheDriver,
+  },
+  default: env("CACHE_DRIVER", "memory"),
+  options: {
+    memory: {
+      globalPrefix,
+    },
+    redis: {
+      host: env("REDIS_HOST"),
+      port: env("REDIS_PORT"),
+      url: env("REDIS_URL"),
+      globalPrefix,
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+**Cache Configuration Options:**
+
+- `drivers` — Available cache drivers (file, memory, redis, etc.)
+- `default` — Default cache driver to use
+- `options` — Driver-specific options
+
+:::tip
+Warlock.js supports 7+ cache drivers. See the [Cache section](../../cache/configurations) for detailed driver configuration.
+:::
+
+#### `mail.ts` — Email Config
 
 ```typescript title="src/config/mail.ts"
 import { env } from "@warlock.js/core";
+import type { MailConfigurations } from "@warlock.js/core";
+
+const mailConfigurations: MailConfigurations = {
+  host: env("MAIL_HOST"),
+  username: env("MAIL_USERNAME"),
+  password: env("MAIL_PASSWORD"),
+  port: env("MAIL_PORT"),
+  secure: env("MAIL_SECURE"),
+  encryption: env("MAIL_ENCRYPTION"),
+  from: {
+    name: env("MAIL_FROM_NAME"),
+    address: env("MAIL_FROM_ADDRESS"),
+  },
+};
+
+export default mailConfigurations;
+```
+
+**Mail Configuration Options:**
+
+- `host` — SMTP host
+- `port` — SMTP port
+- `username` — SMTP username
+- `password` — SMTP password
+- `secure` — Use TLS/SSL
+- `encryption` — Encryption type (ssl, tls)
+- `from` — Default sender name and address
+
+#### `storage.ts` — File Storage Config
+
+```typescript title="src/config/storage.ts"
+import {
+  env,
+  type StorageConfigurations,
+  storageConfigurations,
+  uploadsPath,
+} from "@warlock.js/core";
+
+const storageOptions: StorageConfigurations = {
+  default: "local",
+  drivers: {
+    local: storageConfigurations.local({
+      root: uploadsPath(),
+      urlPrefix: "/uploads",
+    }),
+    aws: storageConfigurations.aws({
+      accessKeyId: env("AWS_ACCESS_KEY_ID"),
+      secretAccessKey: env("AWS_SECRET_ACCESS_KEY"),
+      region: env("AWS_REGION"),
+      bucket: env("AWS_BUCKET"),
+    }),
+    r2: storageConfigurations.r2({
+      bucket: env("R2_BUCKET"),
+      endpoint: env("R2_ENDPOINT"),
+      accessKeyId: env("R2_ACCESS_KEY_ID"),
+      secretAccessKey: env("R2_SECRET_ACCESS_KEY"),
+      accountId: env("R2_ACCOUNT_ID"),
+      region: env("R2_REGION", "auto"),
+      publicDomain: env("R2_BASE_URL"),
+    }),
+  },
+};
+
+export default storageOptions;
+```
+
+**Storage Configuration Options:**
+
+- `default` — Default storage driver to use
+- `drivers.local` — Local filesystem storage
+- `drivers.aws` — AWS S3 storage
+- `drivers.r2` — Cloudflare R2 storage
+
+### Auto-Loading
+
+All config files in `src/config/` are **auto-loaded** on startup. You don't need to import them manually.
+
+## Custom Configuration files
+
+You can easily add any `configuration file` in the config directory, the file name will be the config group, and each key in the exported default object will be the nested key for it.
+
+```typescript title="src/config/notifications";
+import { env } from "@warlock.js/core";
 
 export default {
-  host: env("MAIL_HOST"),
-  port: env("MAIL_PORT", 465),
-  secure: true,
-  auth: {
-    user: env("MAIL_USERNAME"),
-    pass: env("MAIL_PASSWORD"),
-  },
-  from: {
-    name: env("APP_NAME"),
-    address: env("MAIL_FROM_ADDRESS"),
+  channel: "slack",
+  options: {
+    slack: {
+      webhookUrl: env("SLACK_WEBHOOK_URL"),
+    },
   },
 };
 ```
 
-## Accessing Configuration
+Now you can use it in your app like this:
 
-Use the `config()` helper anywhere in your app:
+```typescript title="src/app/main.ts"
+import { config } from "@warlock.js/core";
+
+console.log(config.key("notifications.options.slack")); // Returns the object of Slack options
+
+// Get the entire configurations
+const notificationsConfig = config.get("notifications");
+```
+
+## Using Config in Your App
+
+Access configuration using the `config()` helper:
 
 ```typescript
 import { config } from "@warlock.js/core";
 
-// Get nested value
+// Get entire config file
+const dbConfig = config("database");
+
+// Get specific key
 const dbHost = config("database.host");
 
-// With default
-const timeout = config("http.timeout", 5000);
+// With default value
+const port = config("http.port", 2030);
+```
 
-// Get entire section
-const mailConfig = config("mail");
+### Example: Controller Using Config
+
+```typescript title="src/app/users/controllers/create-user.ts"
+import { type RequestHandler, config } from "@warlock.js/core";
+import { User } from "../models/user";
+
+export const createUserController: RequestHandler = async (
+  request,
+  response,
+) => {
+  const appName = config.key("app.appName");
+  const user = await User.create(request.validated());
+
+  return response.success({
+    message: `Welcome to ${appName}!`,
+    user,
+  });
+};
+```
+
+## Environment-Specific Behavior
+
+Use `NODE_ENV` to change behavior:
+
+```typescript
+import { env } from "@warlock.js/core";
+
+const isDevelopment = env("NODE_ENV") === "development";
+const isProduction = env("NODE_ENV") === "production";
+
+if (isDevelopment) {
+  console.log("Running in development mode");
+}
+```
+
+Or use the `environment()` helper:
+
+```typescript
+import { environment } from "@warlock.js/core";
+
+if (environment() === "production") {
+  // Production-only code
+}
 ```
 
 ## Best Practices
 
-1. **Never hardcode secrets** — Use `.env` for all sensitive values
-2. **Use defaults** — Always provide fallbacks in config files
-3. **Keep `.env` out of git** — Add it to `.gitignore`
-4. **Document variables** — Create a `.env.example` with all keys
+### ✅ Do This
+
+- **Use `.env` for secrets** — Never commit secrets to git
+- **Use config files for logic** — Transform env vars into structured config
+- **Provide defaults** — Use `env("KEY", default)` for optional values
+- **Use `.env.shared`** — For values shared across all environments
+- **Validate required vars** — Throw errors if critical vars are missing
+- **Use variable interpolation** — Reference other env variables with `${VAR_NAME}`
+
+### ❌ Avoid This
+
+- **Don't hardcode secrets** — Use environment variables
+- **Don't put logic in `.env`** — Keep it simple (key=value)
+- **Don't commit `.env`** — It's gitignored for a reason
+- **Don't access `process.env` directly** — Use `env()` helper
+- **Don't duplicate variables** — Use `.env.shared` for common values
+
+## Example: Multi-Environment Setup
+
+### Development
+
+```env title=".env"
+DB_HOST=localhost
+CACHE_DRIVER=memory
+MAIL_HOST=
+```
+
+### Staging
+
+```env title=".env.staging"
+DB_HOST=staging-db.example.com
+CACHE_DRIVER=redis
+MAIL_HOST=smtp.mailtrap.io
+```
+
+### Production
+
+```env title=".env.production"
+DB_HOST=prod-db.example.com
+CACHE_DRIVER=redis
+MAIL_HOST=smtp.mailgun.org
+```
+
+Run with:
+
+```bash
+# Development
+yarn dev
+
+# Staging
+NODE_ENV=staging yarn start
+
+# Production
+NODE_ENV=production yarn start
+```
+
+## Configuration Reference
+
+For detailed configuration options for specific features, see their respective sections:
+
+- [Auth Configurations](./../auth/configurations)
+- [Cache Configurations](../../cache/configurations)
+- [Database Configurations](./../database/configurations)
+- [HTTP + CORS Configurations](./../http/configurations)
+- [Log Configurations](./../logger/configurations)
+- [Validation Configurations](./../validation/configurations)
+- [Storage Configurations](./../storage/configurations)
+- [Herald Configurations](./../herald/configurations)
 
 ## Next Steps
 
-1. **[Connectors](./connectors)** — How services connect
-2. **[Localization](./localization)** — Multi-language support
-3. **[Dev Server Overview](./dev-server-overview)** — Development workflow
+Now that you understand configuration:
+
+- **[HTTP Basics](../http/routing-basics)** — Start building routes
+- **[Database](../database/introduction)** — Set up your models
+- **[Authentication](../auth/introduction)** — Secure your API
+
+:::tip Quick Reference
+The pattern is simple: `.env` → `src/config/` → `config()` in your app. Keep secrets in `.env`, logic in config files, and access via `config()`.
+:::

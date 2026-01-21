@@ -10,9 +10,9 @@ Hey there! If you're looking to build APIs without drowning in boilerplate, you'
 
 **Warlock.js** is a TypeScript-first Node.js framework that gives you everything you need to ship production-ready backends—fast. We're talking database, auth, validation, file uploads, emails, caching... all wired up and ready to go.
 
-## What Makes Warlock Different?
+## What Makes Warlock.js Different?
 
-Most frameworks give you a skeleton and say "good luck." Warlock gives you a complete toolkit:
+Most frameworks give you a skeleton and say "good luck." Warlock.js gives you a complete toolkit:
 
 - **Zero-config dev server** with Hot Module Reload—change your code, see it live instantly
 - **Built-in ORM** supporting both MongoDB and PostgreSQL
@@ -62,7 +62,10 @@ Then your controllers handle the requests:
 import { type RequestHandler } from "@warlock.js/core";
 import { Post } from "../models/post";
 
-export const listPostsController: RequestHandler = async () => {
+export const listPostsController: RequestHandler = async (
+  request,
+  response,
+) => {
   const posts = await Post.list();
 
   return response.success({ posts });
@@ -76,7 +79,7 @@ import { Post } from "../models/post";
 
 export const createPostController: RequestHandler = async (
   request,
-  response
+  response,
 ) => {
   const post = await Post.create(request.validated());
 
@@ -95,7 +98,7 @@ Clean separation. Type-safe validation. No ceremony.
 
 ## Who's This For?
 
-Warlock is perfect if you:
+Warlock.js is perfect if you:
 
 - Want to build APIs without endless configuration
 - Prefer conventions over "figure it out yourself"

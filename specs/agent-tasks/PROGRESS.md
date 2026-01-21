@@ -1,17 +1,18 @@
 # Warlock.js Docs - Agent Progress Tracker
 
 > **Purpose**: Track all agent progress across batches
+> Always reference for the framework as `Warlock.js` not `Warlock`
 
 ---
 
 ## Overall Progress
 
-| Batch   | Sections                              | Pages | Status         |
-| ------- | ------------------------------------- | ----- | -------------- |
-| Batch 1 | Getting Started, HTTP, Validation     | 23    | ⏳ Not Started |
-| Batch 2 | Repositories, Database, Auth, Storage | 23    | ⏳ Not Started |
-| Batch 3 | Cache, Dev Server, Mail, CLI          | 18    | ⏳ Not Started |
-| Batch 4 | Production, Advanced, Upcoming        | 15    | ⏳ Not Started |
+| Batch   | Sections                              | Pages | Status                 |
+| ------- | ------------------------------------- | ----- | ---------------------- |
+| Batch 1 | Getting Started, HTTP, Validation     | 23    | ⏳ In Progress (12/23) |
+| Batch 2 | Repositories, Database, Auth, Storage | 23    | ⏳ Not Started         |
+| Batch 3 | Cache, Dev Server, Mail, CLI          | 18    | ⏳ Not Started         |
+| Batch 4 | Production, Advanced, Upcoming        | 15    | ⏳ Not Started         |
 
 **Total**: ~79 pages
 
@@ -19,18 +20,25 @@
 
 ## Batch 1 Status
 
-### Agent A: Getting Started (6 pages)
+### Agent A: Getting Started (12 pages) ✅ Complete
 
 **Task File**: `specs/agent-tasks/batch1-getting-started.md`
+**Instructions**: `specs/agent-tasks/AGENT_INSTRUCTIONS.md`
 
-| Page                  | Status | Agent Notes |
-| --------------------- | ------ | ----------- |
-| introduction.mdx      | ⬜     |             |
-| why-warlock.mdx       | ⬜     |             |
-| installation.mdx      | ⬜     |             |
-| concepts.mdx          | ⬜     |             |
-| project-structure.mdx | ⬜     |             |
-| env-config.mdx        | ⬜     |             |
+| Page                    | Status | Agent Notes                                         |
+| ----------------------- | ------ | --------------------------------------------------- |
+| introduction.mdx        | ✅     | Fixed missing response param in listPostsController |
+| why-warlock.mdx         | ✅     | Added comparison table and trade-offs               |
+| installation.mdx        | ✅     | Wizard flow, HMR explanation                        |
+| concepts.mdx            | ✅     | Mermaid diagram for request lifecycle               |
+| project-structure.mdx   | ✅     | Complete directory structure with examples          |
+| env-config.mdx          | ✅     | All config files from v4 template, storage.ts       |
+| connectors.mdx          | ✅     | Refined definition, corrected priority order        |
+| localization.mdx        | ✅     | Updated to use t() and groupedTranslations()        |
+| dev-server-overview.mdx | ✅     | Added --fresh flag, config.key() usage              |
+| autoloading.mdx         | ✅     | Fixed naming consistency                            |
+| generating.mdx          | ✅     | Generator Z documentation complete                  |
+| _category_.json         | ✅     | Exists                                              |
 
 ---
 

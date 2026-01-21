@@ -31,7 +31,7 @@ guarded(() => {
   // Upload chunked files
   router.post(
     ["/uploads/chunks", adminPath("/uploads/chunks")],
-    uploadChunkedFiles
+    uploadChunkedFiles,
   );
   // Delete file by hash from the database
   router.delete(["/uploads/:hash", adminPath("/uploads/:hash")], deleteFile);
@@ -47,7 +47,7 @@ Let's break it down into pieces:
 
 ## Uploading Files
 
-Warlock has two ways to upload files, either uploading a one or more files, or uploading a chunked file.
+Warlock.js has two ways to upload files, either uploading a one or more files, or uploading a chunked file.
 
 [Read more about uploading files](./uploading-files)
 

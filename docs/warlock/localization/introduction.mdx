@@ -9,11 +9,11 @@ Localization (also known as internationalization) is the process of adapting a p
 
 ## Localization In Warlock
 
-Warlock supports localization out of the box, it heavily depends on [Mongez Localization](https://github.com/hassanzohdy/mongez-localization).
+Warlock.js supports localization out of the box, it heavily depends on [Mongez Localization](https://github.com/hassanzohdy/mongez-localization).
 
 ## How it works
 
-As you already now know, Warlock autoloads many files automatically, including the localization files.
+As you already now know, Warlock.js autoloads many files automatically, including the localization files.
 
 To declare a localization file, go to the `src/app` directory and inside any module (folder) create `utils/locales.ts` file.
 
@@ -30,7 +30,7 @@ groupedTranslation("users", {
 });
 ```
 
-Warlock will import and configure the localization files automatically.
+Warlock.js will import and configure the localization files automatically.
 
 Now you can use the `username` key anywhere in the application as all localization files are loaded automatically before the application starts.
 
@@ -41,7 +41,7 @@ A localized data considered an array of objects, each object contains two keys:
 - `localeCode`: The locale code, for example `en` or `ar`.
 - `value`: The value of the localized data.
 
-This approach is used widely in Warlock and MonPulse as well.
+This approach is used widely in Warlock.js and MonPulse as well.
 
 Typically, you may want to use it in the output files, model casting columns and validation rules [localized rule](./../validation/rules/localized).
 

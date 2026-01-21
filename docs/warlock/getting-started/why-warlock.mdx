@@ -1,169 +1,152 @@
 ---
 sidebar_position: 2
 title: "Why Warlock?"
-description: "See how Warlock.js compares to other Node.js frameworks and why it might be right for you"
+description: "Understand how Warlock.js compares to other Node.js frameworks and why it might be the right choice for your project"
 ---
 
-# Why Warlock.js?
+# Why Warlock?
 
-Every framework has its philosophy. Here's ours.
+Choosing a framework is a big decision. Let's talk about what makes Warlock.js different—and when it might (or might not) be the right fit for you.
 
-## The Problem
+## The Philosophy
 
-You've got an idea. You want to build an API. You pick a framework, and then spend days:
+Warlock.js is **opinionated for productivity**. We believe that:
 
-- Choosing and configuring an ORM
-- Setting up authentication
-- Wiring up validation
-- Adding file uploads and storage
-- Creating a dev workflow that doesn't make you wait
+- **Convention over configuration** gets you shipping faster
+- **Integrated tooling** beats stitching together 20 packages
+- **Developer experience** directly impacts product quality
+- **Sensible defaults** should "just work" for 80% of use cases
 
-By the time you write your first real endpoint, you're exhausted.
+If you prefer total flexibility and building everything from scratch, frameworks like Express might be a better fit. But if you want to focus on your product instead of infrastructure, keep reading.
 
-## Our Solution
+## Quick Comparison
 
-Warlock.js gives you a **complete, integrated toolkit from day one**. Not a skeleton—a production-ready foundation where everything works together.
+Here's how Warlock.js stacks up against popular alternatives:
 
-```bash
-yarn create warlock
-yarn dev
-# Done. Build your features.
+| Feature                   | Express | NestJS  | Warlock.js      |
+| ------------------------- | ------- | ------- | --------------- |
+| **Learning Curve**        | Low     | Medium  | Low             |
+| **Built-in ORM**          | ❌      | ❌      | ✅              |
+| **Built-in Auth**         | ❌      | Partial | ✅              |
+| **HMR Dev Server**        | ❌      | ❌      | ✅              |
+| **File Storage**          | ❌      | ❌      | ✅              |
+| **Email Templates**       | ❌      | ❌      | ✅ (React)      |
+| **Validation**            | ❌      | Partial | ✅              |
+| **Caching**               | ❌      | Partial | ✅ (7+ drivers) |
+| **Event System**          | ❌      | ✅      | ✅              |
+| **Multi-Tenancy**         | ❌      | ❌      | ✅              |
+| **Opinionated**           | ❌      | ⚠️      | ✅              |
+| **TypeScript-First**      | ❌      | ✅      | ✅              |
+| **Performance (Fastify)** | ❌      | ✅      | ✅              |
+
+## What Makes Warlock.js Different?
+
+### 1. Batteries Included
+
+Most frameworks give you routing and... that's it. Warlock.js ships with:
+
+- **Database ORM** (MongoDB + PostgreSQL)
+- **Authentication** (JWT, roles, permissions)
+- **File Storage** (S3, local, with image processing)
+- **Email System** (with React templates)
+- **Caching** (Redis, Memory, File, and more)
+- **Validation** (type-safe schemas)
+- **Event Bus** (for decoupled architecture)
+
+You don't need to research, compare, and integrate these yourself. They're already wired up.
+
+### 2. Development Experience That Doesn't Suck
+
+Warlock's dev server is **fast**:
+
+- **Hot Module Reload** — Change code, see it instantly (no server restart)
+- **Health Checks** — Know exactly what's broken and where
+- **Type Generation** — Auto-generate types for your API
+- **Smart File Watching** — Only rebuilds what changed
+
+No `nodemon`. No waiting. Just code and see results.
+
+### 3. Module-Based Architecture
+
+Organize your code by **feature**, not by layer:
+
+```
+src/app/
+├── users/
+│   ├── controllers/
+│   ├── models/
+│   ├── routes.ts
+│   └── events/
+├── posts/
+└── orders/
 ```
 
-## How We Compare
+Each module is self-contained. Want to remove a feature? Delete the folder. Want to share code? Move it to `utils/`. Simple.
 
-| Feature                | Express         | NestJS                | Warlock.js                    |
-| ---------------------- | --------------- | --------------------- | ----------------------------- |
-| **Learning Curve**     | Low             | Medium-High           | Low-Medium                    |
-| **Database ORM**       | Choose your own | Choose your own       | ✅ Cascade (Mongo + Postgres) |
-| **Authentication**     | DIY             | Passport integration  | ✅ JWT built-in               |
-| **HMR Dev Server**     | ❌ nodemon      | ❌ nodemon            | ✅ Dev Server v2              |
-| **Validation**         | Choose your own | class-validator       | ✅ Seal (type-safe)           |
-| **File Storage**       | DIY             | DIY                   | ✅ Multi-driver (S3, Local)   |
-| **Caching**            | DIY             | cache-manager         | ✅ 7+ drivers built-in        |
-| **Message Queue**      | DIY             | Bull/BullMQ           | ✅ Herald (RabbitMQ, Kafka)   |
-| **Email Templates**    | DIY             | DIY                   | ✅ React components           |
-| **Philosophy**         | Unopinionated   | Opinionated structure | Opinionated + integrated      |
-| **Time to Production** | Weeks           | Weeks                 | Days                          |
+### 4. Type Safety Without the Ceremony
 
-## What Makes Us Different
-
-### 🚀 Dev Server v2: Vite-Like Experience
-
-Other frameworks use `nodemon` or `ts-node-dev`—slow, full restarts every time. Warlock has **Hot Module Reload** built-in. Change your code, see it live in milliseconds. TypeScript and ESLint checks run in the background without blocking you.
-
-### 🗄️ Database: MongoDB or PostgreSQL
-
-Pick your database, configure it once, and go. **Cascade ORM** supports both MongoDB and PostgreSQL with the same API. Models, relations, migrations, repositories—all included.
+Validation that feels natural:
 
 ```typescript
-// Same code, different database
-const user = await User.find(id); // Works with Mongo or Postgres
-```
+import { v } from "@warlock.js/seal";
 
-### ✅ Validation: Type-Safe with Seal
-
-**Seal** gives you type-safe schemas that work everywhere—requests, models, custom logic. Attach validation to your controller function and it just works.
-
-```typescript
-myController.validation = {
+createPostController.validation = {
   schema: v.object({
-    email: v.string().email().unique("User"), // or pass the class reference directly
-    password: v.string().minLength(8).required(),
+    title: v.string().required().min(3),
+    content: v.string().required(),
+    tags: v.array(v.string()).optional(),
   }),
 };
 ```
 
-Database rules like `unique()` and `exists()` are built-in.
+No decorators on every property. No separate DTO classes. Just clean, readable validation.
 
-### 📁 File Storage: Multi-Driver from Day One
+### 5. Production-Ready Out of the Box
 
-Upload to local storage or S3 with the same API. Image compression, resizing, signed URLs—all built-in.
+Warlock.js includes features most frameworks make you build yourself:
 
-```typescript
-await storage.put("avatars/user.jpg", file);
-const url = storage.url("avatars/user.jpg");
-```
+- **Multi-Tenancy** — Built-in support for SaaS apps
+- **Rate Limiting** — Protect your APIs from abuse
+- **CORS** — Configured and ready
+- **Error Handling** — Consistent error responses
+- **Logging** — Structured logs with multiple transports
+- **Health Checks** — Monitor your app's status
 
-Switch drivers in config. No code changes.
+## For Teams Who Want...
 
-### 🔐 Authentication: JWT, Guards, Permissions
+Warlock.js is perfect if you:
 
-JWT authentication, role-based guards, and permissions are ready to use. Protect routes with a single middleware.
+- **Want to ship fast** — Spend time on features, not infrastructure
+- **Value conventions** — Prefer "the Warlock.js way" over endless options
+- **Need integrated tooling** — Don't want to maintain 20+ dependencies
+- **Care about DX** — Developer happiness leads to better products
+- **Build SaaS apps** — Multi-tenancy and auth are first-class citizens
 
-```typescript
-router.group(
-  {
-    middleware: [authMiddleware("admin")],
-  },
-  () => {
-    router.get("/admin/dashboard", dashboardController);
-  }
-);
-```
+## When Warlock.js Might Not Be Right
 
-### 📧 Email Templates: Write React, Send HTML
+We're honest about trade-offs. Warlock.js might not be ideal if you:
 
-Write email templates as React components. Type-safe props, reusable components, no ugly HTML strings.
+- **Need maximum flexibility** — Warlock.js is opinionated by design
+- **Want to use specific tools** — We have preferred solutions (e.g., Cascade ORM)
+- **Have a tiny microservice** — Warlock's power shines in full-featured APIs
+- **Prefer class-based everything** — We use functional controllers (though classes are supported)
 
-```tsx
-sendMail({
-  to: "hello@world.com",
-  subject: "Welcome to our app",
-  component: <WelcomeEmail name={user.name} verifyUrl={url} />,
-});
-```
+## The Bottom Line
 
-### 📢 Herald: Message Bus Built-In
+**Express** gives you freedom but requires you to build everything.  
+**NestJS** gives you structure but can feel heavy and complex.  
+**Warlock** gives you a complete, integrated toolkit with great DX.
 
-Need async communication? **Herald** supports RabbitMQ and Kafka out of the box.
+If you want to build production-ready APIs without the configuration overhead, Warlock.js is built for you.
 
-```typescript
-await communicators().publish("user.created", { userId: user.id });
-```
+## Ready to Try It?
 
-### 🧠 Caching: 7+ Drivers
+Let's get you up and running:
 
-Redis, Memcached, file-based, in-memory—pick your driver. Tagged cache for smart invalidation.
+- **[Installation](./installation)** — Create your first project in 2 minutes
+- **[Concepts](./concepts)** — Understand the mental model
+- **[Project Structure](./project-structure)** — Know where everything lives
 
-```typescript
-await cache.tags(["users"]).set("key", value);
-await cache.tags(["users"]).flush(); // Clear all user cache
-```
-
-## Who Should Use Warlock?
-
-### ✅ Use Warlock if you:
-
-- Want to **ship fast** without sacrificing quality
-- Prefer **integrated tools** over assembling packages
-- Value **developer experience** and productivity
-- Need a **production-ready foundation**, not a starting point
-- Want **conventions** that guide you instead of endless choices
-
-### ⚠️ Consider alternatives if you:
-
-- Need a **minimal foundation** with zero opinions (→ Express)
-- Prefer **enterprise Java-like architecture** with decorators everywhere (→ NestJS)
-- Are building a **simple proxy** or single-purpose microservice
-- Want to **assemble your own stack** from scratch
-
-## Our Philosophy
-
-We believe in three core principles:
-
-### 1. Productivity > Flexibility
-
-Sensible defaults beat infinite configuration. You can still customize, but you shouldn't have to for common cases.
-
-### 2. Developer Experience Matters
-
-If it's painful to develop, it's painful to maintain. Fast feedback loops, clear errors, and helpful tooling aren't luxuries—they're essentials.
-
-### 3. Integration > Assembly
-
-Pieces that work together beat pieces you assemble yourself. We integrate the best tools so you don't have to.
-
-## Ready to Build?
-
-👉 **[Installation](./installation)** — Get your first project running in 2 minutes
+:::tip Still deciding?
+Check out the [Introduction](./introduction) for a quick code example, or jump to [Installation](./installation) and try it yourself. The best way to evaluate a framework is to build something with it.
+:::

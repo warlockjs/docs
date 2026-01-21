@@ -1,14 +1,22 @@
 ---
 sidebar_position: 7
 title: "🔌 Connectors"
-description: "Understand how Warlock manages external service connections"
+description: "Understand how Warlock.js manages external service connections"
 ---
 
 # Connectors
 
-Connectors manage connections to external services—database, cache, message bus, etc. Warlock handles their lifecycle so you don't have to.
+Connectors manage connections to external services—database, cache, message bus, etc. Warlock.js handles their lifecycle so you don't have to.
 
 ## What Are Connectors?
+
+Connectors are **lifecycle managers** for external service connections. They handle:
+
+- **Auto-connecting** to services (database, cache, message bus) when the app starts
+- **Auto-disconnecting** gracefully when the app shuts down
+- **Auto-restarting** when their config files change during development
+
+Unlike adapters (which translate interfaces), connectors focus purely on the connect/disconnect lifecycle.
 
 A connector is responsible for:
 
@@ -16,17 +24,17 @@ A connector is responsible for:
 - **Restarting** when configuration changes (during development)
 - **Shutting down** cleanly when the app stops
 
-You configure them; Warlock manages them.
+You configure them; Warlock.js manages them.
 
 ## Built-in Connectors
 
 | Connector    | Priority | What It Manages                 |
 | ------------ | -------- | ------------------------------- |
 | Database     | 1        | MongoDB / PostgreSQL connection |
-| Cache        | 2        | Redis connection                |
-| HTTP         | 3        | Fastify server                  |
-| Storage      | 4        | File storage (local/S3)         |
-| Communicator | 5        | Message bus (Herald)            |
+| Communicator | 2        | Message bus (Herald)            |
+| Cache        | 3        | Redis / Memory cache            |
+| HTTP         | 4        | Fastify server                  |
+| Storage      | 5        | File storage (local/S3/R2)      |
 
 Priority determines the order they start and stop.
 
@@ -38,10 +46,10 @@ When you run `yarn dev` or `yarn start`:
 
 ```
 1. Database.connect()      → MongoDB/PostgreSQL ready
-2. Cache.connect()         → Redis ready
-3. HTTP.start()            → Server listening
-4. Storage.init()          → File system ready
-5. Communicator.connect()  → Message bus ready
+2. Communicator.connect()  → Message bus ready
+3. Cache.connect()         → Redis/Memory cache ready
+4. HTTP.start()            → Server listening
+5. Storage.init()          → File system ready
 ```
 
 ### Shutdown
@@ -49,10 +57,10 @@ When you run `yarn dev` or `yarn start`:
 When you stop the app (Ctrl+C):
 
 ```
-1. Communicator.disconnect()
-2. Storage.cleanup()
-3. HTTP.stop()
-4. Cache.disconnect()
+1. Storage.cleanup()
+2. HTTP.stop()
+3. Cache.disconnect()
+4. Communicator.disconnect()
 5. Database.disconnect()
 ```
 
@@ -85,7 +93,7 @@ Example database connector config:
 ```typescript title="src/config/database.ts"
 export default {
   driver: "mongodb",
-  host: env("DB_HOST", "127.0.0.1"),
+  host: env("DB_HOST", "localhost"),
   port: env("DB_PORT", 27017),
   name: env("DB_NAME", "myapp"),
 };
@@ -101,7 +109,7 @@ During startup, you might see:
 🔌 Cache: connecting...
 ⚠️  Cache: connection failed, retrying...
 ✅ Cache: connected
-🚀 Server running at http://127.0.0.1:3000
+🚀 Server running at http://localhost:2030
 ```
 
 Connectors retry automatically. Your app starts even if some services are temporarily unavailable.
@@ -132,7 +140,7 @@ export class MyServiceConnector extends Connector {
 Then register it in your app's main file.
 
 :::note
-Custom connectors are an advanced topic. See the [Advanced section](../advanced/extending) for full details.
+Custom connectors are an advanced topic. See the [Advanced section](../advanced/advanced-connectors) for full details.
 :::
 
 ## Next Steps

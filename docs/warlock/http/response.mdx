@@ -16,7 +16,7 @@ By default any of response object methods is used to handle the response body fo
 
 ## Sending response
 
-A `Warlock response` object is attached to every request handler/controller and middleware as well.
+A `Warlock.js response` object is attached to every request handler/controller and middleware as well.
 
 To send a success json response, use `response.success(data)` which will return a `200` status code.
 
@@ -41,7 +41,7 @@ A good example of this case when we send list of users models or even a single m
 
 As a model is basically an open object, we can't send it directly to the response, we need to convert it to a plain object first.
 
-`Warlock response` will parse every data returned in the response, if the value is a plain then it will be sent as-is, if it is an array it will be looped and parsed each value.
+`Warlock.js response` will parse every data returned in the response, if the value is a plain then it will be sent as-is, if it is an array it will be looped and parsed each value.
 
 Now what about models or any custom classes?
 
@@ -310,7 +310,7 @@ import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
-  response: Response
+  response: Response,
 ) {
   const avatar = await Avatar.find(request.input("id"));
 
@@ -329,7 +329,7 @@ import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
-  response: Response
+  response: Response,
 ) {
   const avatar = await Avatar.find(request.input("id"));
 
@@ -348,7 +348,7 @@ import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
-  response: Response
+  response: Response,
 ) {
   const avatar = await Avatar.find(request.input("id"));
 
@@ -462,7 +462,7 @@ import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
-  response: Response
+  response: Response,
 ) {
   const avatar = await Avatar.find(request.input("id"));
 
@@ -472,7 +472,7 @@ export default async function downloadAvatar(
 
   response.header(
     "Content-Disposition",
-    `attachment; filename="${avatar.name}"`
+    `attachment; filename="${avatar.name}"`,
   );
 
   return response.sendFile(avatar.path);
@@ -488,7 +488,7 @@ import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
-  response: Response
+  response: Response,
 ) {
   const avatar = await Avatar.find(request.input("id"));
 
@@ -514,7 +514,7 @@ import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
-  response: Response
+  response: Response,
 ) {
   const avatar = await Avatar.find(request.input("id"));
 
@@ -557,7 +557,7 @@ import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
-  response: Response
+  response: Response,
 ) {
   const avatar = await Avatar.find(request.input("id"));
 
@@ -582,7 +582,7 @@ import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
-  response: Response
+  response: Response,
 ) {
   const avatar = await Avatar.find(request.input("id"));
 
@@ -607,7 +607,7 @@ import { Request, Response } from "@warlock.js/core";
 
 export default async function downloadAvatar(
   request: Request,
-  response: Response
+  response: Response,
 ) {
   const avatar = await Avatar.find(request.input("id"));
 

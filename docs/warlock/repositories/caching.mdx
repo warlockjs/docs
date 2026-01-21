@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Repository Caching
 
-Caching is crucial when it comes to performance. Warlock provides a simple way to cache your repositories.
+Caching is crucial when it comes to performance. Warlock.js provides a simple way to cache your repositories.
 
 ## Prerequisites
 
@@ -149,7 +149,7 @@ export class UsersRepository extends RepositoryManager<User> {
     // we don't need to await the cache driver to finish caching the data so we will not add the await keyword
     this.cacheDriver.set(
       cacheKey,
-      maleUsers.map((user) => user.data)
+      maleUsers.map((user) => user.data),
     );
 
     // return the list of models

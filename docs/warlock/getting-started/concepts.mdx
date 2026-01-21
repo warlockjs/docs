@@ -1,288 +1,308 @@
 ---
 sidebar_position: 4
-title: "Concepts"
-description: "Understand the core concepts and mental models behind Warlock.js"
+title: "Core Concepts"
+description: "Understand the fundamental concepts and mental models behind Warlock.js"
 ---
 
-# Concepts
+# Core Concepts
 
-Before diving into code, let's understand how Warlock.js thinks. This will make everything else click.
+Before diving into code, let's understand how Warlock.js thinks. These concepts will help you structure your applications effectively.
 
-## Modules: Your Building Blocks
+## Modules
 
-In Warlock.js, your app is organized into **modules**. Each module is a self-contained feature:
+Warlock.js organizes code by **features**, not by layers. Each module is a self-contained directory that represents one feature of your application.
 
 ```
 src/app/
-├── users/         # Everything about users
-├── posts/         # Everything about posts
-├── orders/        # Everything about orders
-└── shared/        # Shared utilities
+├── users/          # Everything about users
+├── posts/          # Everything about posts
+├── orders/         # Everything about orders
+└── utils/          # Shared utilities
 ```
 
-A module contains all the code for one feature: routes, controllers, models, events—everything in one place.
+### Why Modules?
+
+- **Cohesion** — Related code stays together
+- **Scalability** — Add features without touching existing ones
+- **Clarity** — New developers know exactly where to look
+- **Portability** — Move or remove features easily
+
+### Typical Module Structure
+
+```
+users/
+├── controllers/       # Request handlers
+├── models/            # Database entities
+├── repositories/      # Data access layer
+├── output/            # Response transformers
+├── events/            # Event handlers
+├── utils/             # Module-specific utilities
+│   ├── flags.ts       # Constants and enums
+│   └── locales.ts     # Translations
+├── routes.ts          # Route definitions
+└── main.ts            # Module entry point (optional)
+```
+
+You don't need all these directories for every module. Start simple and add as needed.
 
 ## Configurations
 
-Warlock.js uses a simple pattern: **environment variables hold secrets**, **config files hold settings**.
+Warlock.js uses a **three-layer configuration pattern**:
 
 ```
-.env (secrets) → config (settings) → app (usage)
+.env (secrets) → config files (logic) → app code (usage)
 ```
 
-All config files live in `src/config/` and are auto-loaded on startup:
+### 1. Environment Variables (`.env`)
 
-```
-src/config/
-├── app.ts          # Application settings
-├── database.ts     # Database connection
-├── http.ts         # Server & CORS
-├── auth.ts         # Authentication
-└── ...
+Store secrets and environment-specific values:
+
+```env
+DB_HOST=localhost
+DB_PORT=27017
+JWT_SECRET=your-secret-key
 ```
 
-Access config anywhere:
+### 2. Config Files (`src/config/`)
+
+Transform env variables into structured configuration:
+
+```typescript title="src/config/database.ts"
+import { env } from "@warlock.js/core";
+
+export default {
+  driver: env("DB_DRIVER", "mongodb"),
+  host: env("DB_HOST"),
+  port: env("DB_PORT"),
+  name: env("DB_NAME"),
+};
+```
+
+### 3. App Code
+
+Use the config in your application:
 
 ```typescript
 import { config } from "@warlock.js/core";
 
-const dbHost = config.key("database.host");
+const dbName = config("database.name");
 ```
+
+All config files in `src/config/` are **auto-loaded** on startup.
+
+## Connectors
+
+Connectors manage external service connections. Warlock.js includes connectors for:
+
+- **Database** — MongoDB or PostgreSQL
+- **Cache** — Redis, Memory, File, etc.
+- **HTTP** — Fastify server
+- **Storage** — S3, Local file storage
+- **Communicator** — RabbitMQ, Kafka (via Herald)
+
+### Lifecycle
+
+Connectors have a lifecycle:
+
+1. **Initialize** — Connect to the service
+2. **Restart** — Reconnect if needed
+3. **Shutdown** — Clean up on app exit
+
+You rarely interact with connectors directly—Warlock.js handles them for you.
+
+## Hot Module Reload (HMR)
+
+Warlock's dev server watches your files and reloads changes **instantly**—no server restart needed.
+
+### How It Works
+
+1. You save a file
+2. Dev server detects the change
+3. Only the affected modules are reloaded
+4. Server stays running
+
+### What Gets Reloaded?
+
+- **Routes** — Add, remove, or change routes
+- **Controllers** — Update request handlers
+- **Events** — Modify event listeners
+- **Configs** — Change configuration files
 
 :::tip
-Keep in mind that each config file name is acting as a config group key, for example `src/config/google.ts` will allow you accessing google configurations using `config.key("google.x");
+HMR is **much faster** than `nodemon` because it doesn't restart the entire server. It only reloads what changed.
 :::
 
-## Connectors: Bridges to Features
+Learn more in the [Dev Server](./dev-server-overview) section.
 
-Connectors act as **bridges** between Warlock.js and external services or features. They automatically manage connections based on your configuration.
+## Request Lifecycle
 
-### Smart Activation
+Understanding how a request flows through Warlock.js helps you know where to put your code.
 
-Connectors only activate if their configuration exists. Each connector checks for its config at startup:
-
-```typescript
-// Inside DatabaseConnector
-const databaseConfig = config.get("database");
-if (!databaseConfig) {
-  return; // Skip activation
-}
+```mermaid
+graph LR
+    A[Request] --> B[Route]
+    B --> C[Middleware]
+    C --> D[Validation]
+    D --> E[Controller]
+    E --> F[Repository]
+    F --> G[Model]
+    G --> H[Database]
+    H --> G
+    G --> F
+    F --> E
+    E --> I[Response]
 ```
 
-**What this means:**
+### Step-by-Step
 
-- No `src/config/database.ts`? → Database connector skips
-- No `src/config/cache.ts`? → Cache connector skips
-- No `src/config/communicator.ts`? → Message bus connector skips
+1. **Request** — Client sends HTTP request
+2. **Route** — Warlock.js matches the URL to a route
+3. **Middleware** — Auth, logging, etc. run first
+4. **Validation** — Request data is validated
+5. **Controller** — Your handler processes the request
+6. **Repository** — Data access layer queries the database
+7. **Model** — ORM interacts with the database
+8. **Response** — Controller returns formatted response
 
-You only pay for what you configure.
+## Models
 
-### Priority-Based Startup
+Models represent **database entities** using the Cascade ORM.
 
-Connectors start in priority order to respect dependencies:
-
-| Priority | Connector    | Why This Order         |
-| -------- | ------------ | ---------------------- |
-| 1        | Database     | Data layer first       |
-| 2        | Cache        | Depends on database    |
-| 3        | HTTP         | Needs data layer ready |
-| 4        | Storage      | File system setup      |
-| 5        | Communicator | Message bus last       |
-
-Shutdown happens in **reverse order** to cleanly close dependencies.
-
-### Auto-Restart on Config Changes
-
-Each connector watches specific files. When they change, only that connector restarts:
-
-```typescript
-// DatabaseConnector watches:
-[".env", "src/config/database.ts"];
-
-// CacheConnector watches:
-[".env", "src/config/cache.ts"];
-```
-
-Change `database.ts`? → Only database restarts. Everything else keeps running.
-
-**On app shutdown:**
-All connectors shut down cleanly in reverse priority order.
-
-No manual connection handling. No lifecycle management. Just configure and go.
-
-## HMR: Hot Module Reload
-
-Warlock's Dev Server has **Hot Module Reload** built-in. Change your code, see it live in milliseconds. No restarts, no waiting.
-
-```
-📝 File changed: posts.controller.ts
-🔄 Reloading: posts.controller.ts + 2 dependents
-✅ Done in 45ms
-```
-
-See [Dev Server Overview](./dev-server-overview) for details.
-
-## The Request Lifecycle
-
-When a request hits your API, here's the flow:
-
-```
-Request
-   ↓
-Route Match       → Which endpoint?
-   ↓
-Middleware        → Auth? Rate limit?
-   ↓
-Validation        → Is the data valid?
-   ↓
-Controller        → Handle the request
-   ↓
-Repository        → Access the database
-   ↓
-Model             → Data entity
-   ↓
-Response          → Send it back
-```
-
-### Controllers: Handle Requests
-
-Controllers are functions that handle HTTP requests:
-
-```typescript title="src/app/posts/controllers/get-post.controller.ts"
-import { type RequestHandler } from "@warlock.js/core";
-import { Post } from "../models/post";
-
-export const getPostController: RequestHandler = async (request, response) => {
-  const post = await Post.find(request.int("id"));
-
-  if (!post) {
-    return response.notFound({
-      error: "Post not found",
-    });
-  }
-
-  return response.success({ post });
-};
-```
-
-Keep controllers thin—they orchestrate, not compute.
-
-You may also tail it with a validation schema:
-
-```typescript title="src/app/posts/controllers/get-posts.controller.ts"
-import { type RequestHandler } from "@warlock.js/core";
-import { Post } from "../models/post";
-import { v } from "@warlock.js/seal";
-
-export const getPostsController: RequestHandler = async (request, response) => {
-  const { data: posts, pagination } = await Post.paginate({
-    limit: request.int("limit"),
-    page: request.int("page"),
-    filter: {
-      // if passed
-      title: request.string("title"),
-    },
-  });
-
-  return response.success({ posts, pagination });
-};
-
-export const getPostsControllerValidation = v.object({
-  limit: v.numeric().default(15).optional(),
-  page: v.numeric().default(1).optional(),
-  title: v.string().optional(),
-});
-```
-
-## Models: Your Data
-
-Models represent database entities. Define the shape, and Cascade handles the rest:
-
-```typescript title="src/app/posts/models/post/post.model.ts"
+```typescript title="src/app/posts/models/post.ts"
 import { Model } from "@warlock.js/cascade";
-import { v } from "@warlock.js/seal";
 
 export class Post extends Model {
-  public static table = "posts";
+  public static collection = "posts";
 
-  public static schema = v.object({
-    title: v.string().required(),
-    content: v.string().required(),
-    authorId: v.int().required(),
-  });
+  protected schema = {
+    title: String,
+    content: String,
+    authorId: Number,
+    createdAt: Date,
+  };
 }
 ```
 
-## Repositories: Data Access Layer
+Models handle:
 
-Repositories sit between controllers and models. They handle listing, filtering, and caching:
+- **Schema definition** — What fields exist
+- **Relations** — How entities connect
+- **Queries** — Finding and updating data
+- **Validation** — Database-level constraints
 
-```typescript title="src/app/posts/repositories/posts.repository.ts"
+Learn more in the [Database](../database/introduction) section.
+
+## Repositories
+
+Repositories are the **data access layer**. They sit between controllers and models, providing a clean API for data operations.
+
+```typescript title="src/app/posts/repositories/posts-repository.ts"
 import { RepositoryManager } from "@warlock.js/core";
 import { Post } from "../models/post";
 
-class PostsRepository extends RepositoryManager<Post> {
-  public source = Post;
+export class PostsRepository extends RepositoryManager {
+  public model = Post;
 
-  public filterBy = {
-    title: "like",
-    status: "=",
+  protected filterBy = {
+    authorId: "int",
+    published: "boolean",
   };
 }
 
 export const postsRepository = new PostsRepository();
 ```
 
-**Why repositories?**
+### Why Use Repositories?
 
-- Centralize filtering logic
-- Enable caching
-- Keep controllers clean
+- **Abstraction** — Controllers don't need to know about database queries
+- **Filtering** — Built-in support for query parameters
+- **Pagination** — Automatic pagination support
+- **Caching** — Optional caching layer
+- **Consistency** — Standardized data access patterns
 
-## Events: Side Effects
+Learn more in the [Repositories](../repositories/introduction) section.
 
-When something happens, other things might need to react. Events handle this:
+## Events
 
-```typescript title="src/app/posts/events/send-notification.ts"
-import events from "@mongez/events";
+Events let you **decouple side effects** from your main business logic.
 
-const subscription = events.on("post.created", async (post) => {
-  // Send notification to followers
-  await notifyFollowers(post.authorId);
-});
+### Publishing Events
 
-// cleanup is important while development server is running
-export const cleanup = [subscription];
-// or pass it as callback directly:
+```typescript title="src/app/posts/controllers/create-post.controller.ts"
+import { events } from "@warlock.js/core";
 
-export const cleanup = () => {
-  subscription.unsubscribe();
+export const createPostController: RequestHandler = async (
+  request,
+  response,
+) => {
+  const post = await Post.create(request.validated());
+
+  // Publish event
+  events.trigger("posts.created", post);
+
+  return response.success({ post });
 };
 ```
 
-Events keep your code decoupled. The controller doesn't need to know about notifications.
+### Listening to Events
 
-## Putting It Together
+```typescript title="src/app/posts/events/post-created.ts"
+import { events } from "@warlock.js/core";
+import { sendEmail } from "@warlock.js/postman";
 
-Here's how a typical request flows through a module:
+events.on("posts.created", async (post) => {
+  // Send notification email
+  await sendEmail({
+    to: post.author.email,
+    subject: "Your post was published!",
+    template: "post-published",
+    data: { post },
+  });
+});
+```
+
+### Why Events?
+
+- **Decoupling** — Controllers stay focused on the request
+- **Reusability** — Multiple listeners can react to one event
+- **Testability** — Easy to test event handlers in isolation
+- **Scalability** — Move to message queues later without changing code
+
+## Putting It All Together
+
+Here's how these concepts work together in a real feature:
 
 ```
-1. Route matches → /posts/:id
-2. Middleware runs → Check auth
-3. Validation runs → Validate params
-4. Controller executes → getPostController
-5. Repository queries → postsRepository.find(id)
-6. Model fetches → Post.find(id)
-7. Event fires → post.viewed
-8. Response sent → { post }
+posts/
+├── routes.ts              # Define /posts endpoints
+├── controllers/
+│   └── create-post.ts     # Handle POST /posts
+├── models/
+│   └── post.ts            # Post database schema
+├── repositories/
+│   └── posts-repo.ts      # Data access for posts
+└── events/
+    └── post-created.ts    # Send email when post is created
 ```
 
-Each piece has its job. Keep them focused.
+**Flow:**
+
+1. User hits `POST /posts`
+2. Route matches and runs validation
+3. Controller creates post via repository
+4. Repository uses model to save to database
+5. Controller publishes `posts.created` event
+6. Event handler sends notification email
+7. Controller returns success response
 
 ## Next Steps
 
-Now you understand the mental model:
+Now that you understand the concepts, let's explore the structure:
 
-1. **[Project Structure](./project-structure)** — See the full directory layout
-2. **[Environment & Config](./env-config)** — Configure your app
-3. **[Connectors](./connectors)** — Understand service management
+- **[Project Structure](./project-structure)** — See where everything lives
+- **[Environment & Config](./env-config)** — Configure your app
+- **[HTTP Basics](../http/routing-basics)** — Start building routes
+
+:::tip Quick Reference
+Bookmark this page! These concepts apply throughout Warlock. Understanding them will make the rest of the docs much easier to follow.
+:::

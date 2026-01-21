@@ -4,27 +4,28 @@ sidebar_position: 1
 
 # Cache
 
-Warlock framework uses the [@warlock.js/cache](../../cache/introduction) package for caching. This page covers **framework-specific features only**. For comprehensive cache API documentation, see the [Cache Package Documentation](../../cache/introduction).
+Warlock.js framework uses the [@warlock.js/cache](../../cache/introduction) package for caching. This page covers **framework-specific features only**. For comprehensive cache API documentation, see the [Cache Package Documentation](../../cache/introduction).
 
 :::info Full API Documentation
-All cache features work in Warlock exactly as documented in the standalone package. See [Cache Package Documentation](../../cache/introduction) for:
+All cache features work in Warlock.js exactly as documented in the standalone package. See [Cache Package Documentation](../../cache/introduction) for:
+
 - Complete API reference
 - All cache drivers (Memory, Redis, File, LRU, etc.)
 - Advanced features (tags, events, atomic operations)
 - Best practices and examples
-:::
+  :::
 
 ## Framework Integration
 
-The Warlock framework provides automatic cache initialization and includes a special **Database Cache Driver** that stores cache in your MongoDB database.
+The Warlock.js framework provides automatic cache initialization and includes a special **Database Cache Driver** that stores cache in your MongoDB database.
 
 ### Key Differences from Standalone Package
 
-| Feature | Standalone | Warlock Framework |
-|---------|-----------|-------------------|
-| **Initialization** | Manual (`cache.init()`) | Automatic during bootstrap |
-| **Config Loading** | Manual import and setup | Auto-loaded from `src/config/cache.ts` |
-| **DatabaseCacheDriver** | Not available | Available and auto-registered |
+| Feature                 | Standalone              | Warlock.js Framework                   |
+| ----------------------- | ----------------------- | -------------------------------------- |
+| **Initialization**      | Manual (`cache.init()`) | Automatic during bootstrap             |
+| **Config Loading**      | Manual import and setup | Auto-loaded from `src/config/cache.ts` |
+| **DatabaseCacheDriver** | Not available           | Available and auto-registered          |
 
 ## Automatic Initialization
 
@@ -37,7 +38,12 @@ In Warlock, cache is automatically initialized when your application starts. You
 3. Cache is initialized and ready to use
 
 ```ts title="src/config/cache.ts"
-import { CacheConfigurations, DatabaseCacheDriver, RedisCacheDriver, CACHE_FOR } from "@warlock.js/cache";
+import {
+  CacheConfigurations,
+  DatabaseCacheDriver,
+  RedisCacheDriver,
+  CACHE_FOR,
+} from "@warlock.js/cache";
 
 const cacheConfigurations: CacheConfigurations = {
   drivers: {
@@ -71,12 +77,14 @@ The **DatabaseCacheDriver** is a Warlock-specific cache driver that stores cache
 ### When to Use DatabaseCacheDriver
 
 ✅ **Good for:**
+
 - Applications already using MongoDB
 - Single-server deployments
 - When you want cache data to persist in the database
 - Development environments
 
 ❌ **Not recommended for:**
+
 - High-traffic applications (use Redis instead)
 - Distributed/multi-server setups (use Redis)
 - Applications that need sub-millisecond cache access
@@ -84,7 +92,11 @@ The **DatabaseCacheDriver** is a Warlock-specific cache driver that stores cache
 ### Configuration
 
 ```ts title="src/config/cache.ts"
-import { CacheConfigurations, DatabaseCacheDriver, CACHE_FOR } from "@warlock.js/cache";
+import {
+  CacheConfigurations,
+  DatabaseCacheDriver,
+  CACHE_FOR,
+} from "@warlock.js/cache";
 import { CacheModel } from "@warlock.js/core"; // Optional custom model
 
 const cacheConfigurations: CacheConfigurations = {
@@ -96,10 +108,10 @@ const cacheConfigurations: CacheConfigurations = {
     database: {
       // Optional: Custom model (defaults to CacheModel)
       model: CacheModel,
-      
+
       // Optional: Global prefix for all cache keys
       globalPrefix: "myapp",
-      
+
       // Optional: Default TTL in seconds
       ttl: CACHE_FOR.ONE_HOUR,
     },
@@ -169,4 +181,3 @@ Restful controllers automatically use cached repository methods when cache is en
 - [Repository Caching](./../repositories/caching) - Repository-specific caching
 - [Restful API](./../http/restful) - RESTful endpoint caching
 - [Cache Configurations](../../cache/configurations) - Configuration options
-

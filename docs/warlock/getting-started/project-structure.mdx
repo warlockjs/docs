@@ -1,227 +1,320 @@
 ---
 sidebar_position: 5
-title: "🏗️ Project Structure"
+title: "Project Structure"
 description: "Understand where everything lives in a Warlock.js project"
 ---
 
-import Tabs from "@theme/Tabs";
-import TabItem from "@theme/TabItem";
-
 # Project Structure
 
-Here's how a Warlock.js project is organized. Know this, and you'll always know where to put things.
+Knowing where to put your code is half the battle. Let's walk through a Warlock.js project's structure and explain what each directory does.
 
 ## Root Structure
 
+After running `create-warlock`, you'll have this structure:
+
 ```
-my-project/
-├── src/
-│   ├── app/              # Your application modules
+my-app/
+├── src/                  # Source code
+│   ├── app/              # Application modules
 │   └── config/           # Configuration files
-├── storage/              # Files, logs (gitignored)
-├── .warlock/             # Dev server cache (gitignored)
+├── storage/              # File uploads, logs
+├── .warlock/             # Dev server cache (auto-generated)
 ├── .env                  # Environment variables
-├── warlock.config.ts     # Warlock configuration
-├── tsconfig.json
-├── eslint.config.js
-└── package.json
+├── .env.shared           # Shared env variables
+├── .env.production       # Production env variables
+├── warlock.config.ts     # Warlock.js configuration
+├── package.json          # Dependencies
+├── tsconfig.json         # TypeScript config
+└── .gitignore            # Git ignore rules
 ```
 
-## The `src/` Directory
+Let's break down each part.
 
-### `src/config/`
+## `src/` Directory
 
-All your configuration files. Loaded automatically on startup:
+All your application code lives here.
+
+### `src/config/` — Configuration Files
+
+Configuration files that transform environment variables into structured config:
 
 ```
 src/config/
-├── app.ts          # App name, timezone, locale
-├── database.ts     # Database connection
-├── http.ts         # Server port, CORS
-├── auth.ts         # JWT settings
-├── mail.ts         # SMTP settings
-├── cache.ts        # Redis/cache settings
-├── storage.ts      # File storage drivers
-├── log.ts          # Logging configuration
-├── validation.ts   # Validation settings
-└── tests.ts        # Test configuration
+├── app.ts           # App name, locale, timezone
+├── database.ts      # Database connection
+├── http.ts          # HTTP server settings
+├── auth.ts          # Authentication config
+├── cache.ts         # Caching config
+├── mail.ts          # Email config
+├── uploads.ts       # File upload config
+└── validation.ts    # Validation config
 ```
 
-### `src/app/`
+**Example:**
 
-Your application code, organized by module:
+```typescript title="src/config/database.ts"
+import { env } from "@warlock.js/core";
+
+export default {
+  driver: env("DB_DRIVER", "mongodb"),
+  host: env("DB_HOST", "localhost"),
+  port: env("DB_PORT", 27017),
+  name: env("DB_NAME", "myapp"),
+};
+```
+
+All files here are **auto-loaded** on startup. You don't need to import them manually.
+
+### `src/app/` — Application Modules
+
+This is where your features live. Each subdirectory is a **module**:
 
 ```
 src/app/
-├── users/          # User module
-├── posts/          # Posts module
-├── auth/           # Authentication module
-├── uploads/        # File uploads module
-├── shared/         # Shared components
+├── users/           # User management
+├── posts/           # Blog posts
+├── orders/          # E-commerce orders
+└── utils/           # Shared utilities
 ```
+
+The `utils/` directory is special—it's for code shared across modules.
 
 ## Module Structure
 
-Every module follows the same pattern. Here's a typical module:
+Let's look at a typical module:
 
 ```
-src/app/users/
-├── controllers/              # Request handlers
-│   ├── list-users.controller.ts
-│   ├── create-user.controller.ts
-│   ├── get-user.controller.ts
-│   ├── update-user.controller.ts
-│   └── delete-user.controller.ts
-├── events/                   # Events
-├── models/                   # Database models
-│   └── user/
-│       ├── user.model.ts
-│       └── migrations/       # Model migrations
-├── repositories/             # Data access layer
-│   └── users.repository.ts
-├── services/                 # Business logic
-│   └── user.service.ts
-├── resources/                 # Resource transformers (For http response output)
-│   └── user.resource.ts
-├── events/                   # Event handlers
-│   ├── index.ts              # Event exports
-│   └── on-user-created.ts
-├── commands/                 # CLI commands
-│   └── create-admin.command.ts
-├── seeds/                    # Database seeders
-│   └── users.seeder.ts
-├── utils/                    # Utilities
-│   └── locales.ts            # Translations
-│   └── flags.ts              # Static data
-│   └── types.ts              # TypeScript types
-├── routes.ts                 # Route definitions
-└── main.ts                   # Module entry (optional)
+users/
+├── controllers/          # Request handlers
+│   ├── create-user.ts
+│   ├── list-users.ts
+│   └── get-user.ts
+├── models/               # Database models
+│   └── user.ts
+├── repositories/         # Data access layer
+│   └── users-repository.ts
+├── output/               # Response transformers
+│   └── user-output.ts
+├── events/               # Event handlers
+│   ├── user-created.ts
+│   └── user-updated.ts
+├── utils/                # Module utilities
+│   ├── flags.ts          # Constants, enums
+│   └── locales.ts        # Translations
+├── routes.ts             # Route definitions
+└── main.ts               # Module entry point (optional)
 ```
 
-### Special Files
+### Key Files
 
-These files are auto-loaded by the dev server:
+#### `routes.ts` — Route Definitions
 
-| File            | Purpose               | When It Loads       |
-| --------------- | --------------------- | ------------------- |
-| `utils/locales` | Translations          | First to be loaded  |
-| `events/`       | Event handlers        | Second to be loaded |
-| `main.ts`       | Module initialization | Third to be loaded  |
-| `routes.ts`     | Route definitions     | Fourth to be loaded |
+Define all routes for this module:
 
-### Loading Order
+```typescript title="src/app/users/routes.ts"
+import { router } from "@warlock.js/core";
+import { createUserController } from "./controllers/create-user";
+import { listUsersController } from "./controllers/list-users";
 
-Warlock loads these files in a specific order:
-
-```
-1. src/config/*           # All configs first
-2. src/app/main.ts            # App entry (if exists)
-3. Per module:
-   ├── utils/locales.ts            # Translations (if exists)
-   ├── events/*           # Events files (if exists)
-   ├── main.ts            # Module init (if exists)
-   └── routes.ts          # Routes (if exists)
+router.post("/users", createUserController);
+router.get("/users", listUsersController);
 ```
 
-## The `storage/` Directory
+Routes are **auto-loaded** from all modules.
 
-Files that shouldn't be in version control:
+#### `main.ts` — Module Entry Point (Optional)
 
-```
-storage/
-├── uploads/        # Uploaded files
-├── logs/           # Application logs
-└── cache/          # File-based cache (if used)
-```
+Use this for module-level initialization:
 
-Make sure this is in your `.gitignore`.
+```typescript title="src/app/users/main.ts"
+import { events } from "@warlock.js/core";
 
-## The `.warlock/` Directory
-
-Dev server internals. Completely managed by Warlock:
-
-```
-.warlock/
-├── cache/          # Transpiled TypeScript files
-└── manifest.json   # File metadata for HMR
+// Register event listeners
+events.on("app.ready", () => {
+  console.log("Users module initialized");
+});
 ```
 
-**Don't edit these files.** If you have issues, delete the folder and restart.
+#### `utils/flags.ts` — Constants
 
-## Configuration Files
+Store module-specific constants:
 
-### `warlock.config.ts`
+```typescript title="src/app/users/utils/flags.ts"
+export const USER_ROLES = {
+  ADMIN: "admin",
+  USER: "user",
+  GUEST: "guest",
+} as const;
 
-Controls Warlock-specific settings:
+export const USER_STATUS = {
+  ACTIVE: "active",
+  INACTIVE: "inactive",
+  BANNED: "banned",
+} as const;
+```
 
-```typescript title="warlock.config.ts"
-import { defineConfig } from "@warlock.js/core";
-import { authMigrations } from "@warlock.js/auth";
+#### `utils/locales.ts` — Translations
 
-export default defineConfig({
-  cli: {
-    commands: [
-      // Register custom CLI commands
-    ],
+Define translations for this module:
+
+```typescript title="src/app/users/utils/locales.ts"
+import { groupedTranslations } from "@mongez/localization";
+
+export default groupedTranslations({
+  userCreated: {
+    en: "User created successfully",
+    ar: "تم إنشاء المستخدم بنجاح",
   },
-  database: {
-    migrations: authMigrations,
+  userNotFound: {
+    en: "User not found",
+    ar: "المستخدم غير موجود",
+  },
+  userInvalidEmail: {
+    en: "Invalid email address",
+    ar: "عنوان البريد الإلكتروني غير صالح",
   },
 });
 ```
 
-### `.env`
+Locale files are **auto-loaded** from all modules.
 
-Environment variables. Keep secrets here:
+## `storage/` Directory
 
-```env title=".env"
-# App
-APP_NAME=myapp
-LOCALE_CODE=en
-TIMEZONE=UTC
+Stores uploaded files, logs, and temporary data:
 
-# HTTP
-HTTP_PORT=2030
-HTTP_HOST=127.0.0.1
-BASE_URL=http://${HTTP_HOST}:${HTTP_PORT}
-
-# Database
-DB_HOST=127.0.0.1
-DB_PORT=27017
-DB_NAME=myapp
-DB_USERNAME=root
-DB_PASSWORD=root
-
-# Cache
-CACHE_DRIVER=memory
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-
-# Mail
-MAIL_HOST=
-MAIL_PORT=465
-MAIL_USERNAME=
-MAIL_PASSWORD=
+```
+storage/
+├── uploads/         # User-uploaded files
+├── logs/            # Application logs
+└── temp/            # Temporary files
 ```
 
-See [Environment & Config](./env-config) for details.
+This directory is **gitignored** by default.
 
-## File Naming Conventions
+## `.warlock/` Directory (v4)
 
-| Type       | Pattern           | Example                     |
-| ---------- | ----------------- | --------------------------- |
-| Controller | `*.controller.ts` | `create-post.controller.ts` |
-| Model      | `*.model.ts`      | `post.model.ts`             |
-| Repository | `*.repository.ts` | `posts.repository.ts`       |
-| Service    | `*.service.ts`    | `post.service.ts`           |
-| Event      | `*.event.ts`      | `post-created.event.ts`     |
-| Resource   | `*.resource.ts`   | `post.resource.ts`          |
-| Command    | `*.command.ts`    | `create-admin.command.ts`   |
-| Seeder     | `*.seeder.ts`     | `users.seeder.ts`           |
-| Routes     | `routes.ts`       | `routes.ts`                 |
+The dev server cache. **Never edit this manually.**
+
+```
+.warlock/
+├── cache/           # Transpiled TypeScript files
+└── manifest.json    # File metadata
+```
+
+This directory is **auto-generated** and **gitignored**.
+
+:::tip Why `.warlock/`?
+Warlock's dev server transpiles your TypeScript files and caches them here. This makes HMR blazing fast because it only re-transpiles changed files.
+:::
+
+## Environment Files
+
+### `.env` — Development Environment
+
+Default environment variables for local development:
+
+```env
+# App
+APP_NAME=myapp
+HTTP_PORT=2030
+HOST=localhost
+
+# Database (MongoDB)
+DB_DRIVER=mongodb
+DB_HOST=localhost
+DB_PORT=27017
+DB_NAME=myapp
+```
+
+## `warlock.config.ts` — Warlock.js Configuration
+
+Configure Warlock-specific settings:
+
+```typescript title="warlock.config.ts"
+import { defineConfig } from "@warlock.js/core";
+
+export default defineConfig({
+  build?: {
+    /**
+     * Output directory
+     */
+    outDirectory: "./dist",
+    /**
+     * Output file
+     */
+    outFile: "app.js",
+    /**
+     * Minify output
+     */
+    minify: true,
+    /**
+     * Generate sourcemap
+     */
+    sourcemap: true,
+  };
+});
+```
+
+Learn more in the [Dev Server](./dev-server-overview) section.
+
+## Putting It All Together
+
+Here's a complete example of a posts module:
+
+```
+src/app/posts/
+├── controllers/
+│   ├── create-post.ts       # POST /posts
+│   ├── list-posts.ts        # GET /posts
+│   └── get-post.ts          # GET /posts/:id
+├── models/
+│   └── post.ts              # Post database model
+├── repositories/
+│   └── posts-repository.ts  # Data access for posts
+├── output/
+│   └── post-output.ts       # Transform post for response
+├── events/
+│   └── post-created.ts      # Send email on post creation
+├── utils/
+│   ├── flags.ts             # POST_STATUS constants
+│   └── locales.ts           # Post-related translations
+└── routes.ts                # Define /posts routes
+```
+
+**Flow:**
+
+1. User hits `GET /posts`
+2. Warlock.js loads `routes.ts` and matches the route
+3. Calls `listPostsController`
+4. Controller uses `postsRepository` to fetch data
+5. Repository queries `Post` model
+6. Controller transforms data with `postOutput`
+7. Returns JSON response
+
+## Best Practices
+
+### ✅ Do This
+
+- **Keep modules focused** — One module = one feature
+- **Use `utils/` for shared code** — Don't duplicate across modules
+- **Follow naming conventions** — `create-user.ts`, not `CreateUser.ts`
+- **Organize by feature** — Not by layer (controllers/, models/, etc.)
+
+### ❌ Avoid This
+
+- **Don't create giant modules** — Split large features into sub-modules
+- **Don't put business logic in controllers** — Use services or repositories
+- **Don't hardcode values** — Use `utils/flags.ts` for constants
+- **Don't edit `.warlock/`** — It's auto-generated
 
 ## Next Steps
 
-1. **[Environment & Config](./env-config)** — Configure your app
-2. **[Connectors](./connectors)** — Understand service management
-3. **[HTTP Routes](../http/routing)** — Build your first routes
+Now that you know where everything lives:
+
+- **[Environment & Config](./env-config)** — Configure your app properly
+- **[HTTP Basics](../http/routing-basics)** — Start building routes
+- **[Database](../database/introduction)** — Set up your models
+
+:::tip Quick Reference
+Keep this page bookmarked! You'll refer back to it often as you build your app.
+:::

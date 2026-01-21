@@ -12,7 +12,7 @@ In terms of our application, we highly use Repository as an abstraction layer ov
 
 ## Repository
 
-So how does Warlock leverage this pattern? Warlock provides a `RepositoryManager` class that you can extend to create your own repository. The `RepositoryManager` class provides a set of methods that you can use to interact with the database. The `RepositoryManager` class is a generic class that takes a model as a type parameter. This model is the model that the repository will be interacting with.
+So how does Warlock.js leverage this pattern? Warlock.js provides a `RepositoryManager` class that you can extend to create your own repository. The `RepositoryManager` class provides a set of methods that you can use to interact with the database. The `RepositoryManager` class is a generic class that takes a model as a type parameter. This model is the model that the repository will be interacting with.
 
 ```ts title="src/app/users/repositories/users.repository.ts"
 import {
