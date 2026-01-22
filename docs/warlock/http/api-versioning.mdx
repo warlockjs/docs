@@ -1,0 +1,178 @@
+---
+sidebar_position: 4
+title: "API Versioning"
+description: "Strategies for versioning your API in Warlock.js"
+---
+
+# API Versioning
+
+API versioning allows you to evolve your API while maintaining backward compatibility. Warlock.js supports multiple versioning strategies using route groups.
+
+## URL Path Versioning
+
+The most common approach is including the version in the URL path (e.g., `/v1/users`). Warlock.js provides a built-in `router.version()` helper for this:
+
+```ts title="src/app/api/routes.ts"
+import { router } from "@warlock.js/core";
+import * as v1 from "./v1/controllers";
+import * as v2 from "./v2/controllers";
+
+// Version 1 API -> /v1/users
+router.version(1, () => {
+  router.get("/users", v1.listUsers);
+  router.get("/users/:id", v1.getUser);
+  router.post("/users", v1.createUser);
+});
+
+// Version 2 API -> /v2/users
+router.version(2, () => {
+  router.get("/users", v2.listUsers); // Different response format
+  router.get("/users/:id", v2.getUser);
+  router.post("/users", v2.createUser); // Different validation
+  router.get("/users/:id/profile", v2.getUserProfile); // New endpoint
+});
+```
+
+### Nesting with API Prefix
+
+If you want your routes to be prefixed with `/api` (e.g., `/api/v1/users`), simply wrap the version blocks in a prefix group:
+
+```ts
+router.prefix("/api", () => {
+  router.version(1, () => {
+    // Routes: /api/v1/...
+  });
+
+  router.version(2, () => {
+    // Routes: /api/v2/...
+  });
+});
+```
+
+## Shared Routes Across Versions
+
+For endpoints that don't change between versions, share the handler:
+
+```ts title="src/app/api/routes.ts"
+import { router } from "@warlock.js/core";
+import { healthCheck } from "./controllers/health";
+import * as v1 from "./v1/controllers";
+import * as v2 from "./v2/controllers";
+
+// Shared health check
+router.get("/health", healthCheck);
+
+// Version-specific routes
+router.version(1, () => {
+  router.get("/users", v1.listUsers);
+});
+
+router.version(2, () => {
+  router.get("/users", v2.listUsers);
+});
+```
+
+## Versioned RESTful Resources
+
+Combine versioning with RESTful controllers:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@warlock.js/core";
+import restfulUsersV1 from "./v1/restful-users";
+import restfulUsersV2 from "./v2/restful-users";
+
+router.version(1, () => {
+  router.restfulResource("users", restfulUsersV1);
+});
+
+router.version(2, () => {
+  router.restfulResource("users", restfulUsersV2);
+});
+```
+
+## Deprecation Headers
+
+Add deprecation warnings for old versions:
+
+```ts title="src/app/middleware/deprecation.ts"
+import type { RequestHandler } from "@warlock.js/core";
+
+export const deprecationWarning: RequestHandler = async (request, response) => {
+  response.header("Deprecation", "true");
+  response.header("Sunset", "2025-12-31");
+  response.header("Link", '</v2>; rel="successor-version"');
+};
+```
+
+Apply to deprecated versions:
+
+```ts title="src/app/api/routes.ts"
+import { router } from "@warlock.js/core";
+import { deprecationWarning } from "./middleware/deprecation";
+import * as v1 from "./v1/controllers";
+import * as v2 from "./v2/controllers";
+
+// Deprecated v1
+router.group(
+  {
+    prefix: "/v1",
+    middleware: [deprecationWarning],
+  },
+  () => {
+    router.get("/users", v1.listUsers);
+  },
+);
+
+// Current v2
+router.version(2, () => {
+  router.get("/users", v2.listUsers);
+});
+```
+
+## Version Negotiation
+
+Support version selection via headers:
+
+```ts title="src/app/middleware/version-negotiation.ts"
+import type { RequestHandler } from "@warlock.js/core";
+
+export const versionNegotiation: RequestHandler = async (request, response) => {
+  const requestedVersion = request.header("API-Version", "2");
+
+  // Store version for later use
+  request.set("apiVersion", parseInt(requestedVersion, 10));
+};
+```
+
+```ts title="src/app/api/controllers/users.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import * as v1 from "./v1/users";
+import * as v2 from "./v2/users";
+
+export const listUsers: RequestHandler = async (request, response) => {
+  const version = request.input("apiVersion") || 2;
+
+  if (version === 1) {
+    return v1.listUsers(request, response);
+  }
+
+  return v2.listUsers(request, response);
+};
+```
+
+## Best Practices
+
+:::tip Versioning Guidelines
+
+1. **Start with v1** - Always version from the beginning
+2. **Semantic versioning** - Major versions for breaking changes
+3. **Document changes** - Maintain a changelog per version
+4. **Set sunset dates** - Communicate deprecation timelines
+5. **Support 2 versions** - Maintain current and previous major version
+   :::
+
+## Related
+
+- [Route Groups](./route-groups) - Grouping routes with shared options
+- [Middleware](./middleware) - Request interceptors for version handling
+- [RESTful Controllers](./restful/overview) - Versioned RESTful resources

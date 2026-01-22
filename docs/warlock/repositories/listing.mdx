@@ -246,7 +246,7 @@ Filters are listed in the `filterBy` property, it is a key/value object, the key
 
 Let's take an example of usage:
 
-```ts {22} title="src/main.ts"
+```ts {22} title="src/app/main.ts"
 import { usersRepository } from "app/users/repositories/users.repository";
 
 const { documents: users } = await usersRepository.list({
@@ -497,7 +497,6 @@ As we saw in the `RepositoryOptions` type, the `orderBy` options has some nice f
 
 To order documents by single column, we can do it in two ways: by passing an array or passing an objet:
 
-
 ### Order by array
 
 We can order documents by passing `orderBy` with an array, the first item in the array is the column name and the second is the order direction:
@@ -526,7 +525,6 @@ const { documents: users, paginationInfo } = await usersRepository.list({
   },
 });
 ```
-
 
 :::note
 Please note that the order of listed keys matter, as it will first order the user by name ascending, then by id descending.

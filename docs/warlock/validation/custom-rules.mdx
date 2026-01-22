@@ -1,0 +1,338 @@
+---
+sidebar_position: 4
+---
+
+# Custom Rules
+
+Seal's plugin system allows you to create reusable validation rules. This page covers how to create custom rules and extend validators.
+
+## Creating a Rule
+
+A rule is an object with a `name`, validation function, and error messages:
+
+```typescript
+import type { SchemaRule } from "@warlock.js/seal";
+import { invalidRule, VALID_RULE } from "@warlock.js/seal";
+
+export const slugRule: SchemaRule = {
+  name: "slug",
+  defaultErrorMessage: "The :input must be a valid URL slug",
+  async validate(value, context) {
+    const isValid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
+    return isValid ? VALID_RULE : invalidRule(this, context);
+  },
+};
+```
+
+### Using the Rule
+
+Add rules to validators using `addRule()`:
+
+```typescript
+import { v, StringValidator } from "@warlock.js/seal";
+import { slugRule } from "./rules/slug";
+
+const schema = v.object({
+  slug: v.string().addRule(slugRule),
+});
+```
+
+## Rules with Options
+
+Pass configuration to your rules:
+
+```typescript
+import type { SchemaRule } from "@warlock.js/seal";
+import { invalidRule, VALID_RULE } from "@warlock.js/seal";
+
+type PhonePrefixOptions = {
+  country: "US" | "UK" | "FR";
+};
+
+const phonePrefixes = {
+  US: "+1",
+  UK: "+44",
+  FR: "+33",
+};
+
+export const phoneCountryRule: SchemaRule<PhonePrefixOptions> = {
+  name: "phoneCountry",
+  defaultErrorMessage: "The :input must start with :country prefix",
+  async validate(value, context) {
+    const { country } = this.context.options;
+    const prefix = phonePrefixes[country];
+
+    if (!value.startsWith(prefix)) {
+      return invalidRule(this, context);
+    }
+
+    return VALID_RULE;
+  },
+};
+```
+
+Usage:
+
+```typescript
+const schema = v.object({
+  phone: v.string().addRule(phoneCountryRule, undefined, { country: "US" }),
+});
+```
+
+## Async Rules
+
+Rules can be asynchronous for database lookups or API calls:
+
+```typescript
+import type { SchemaRule } from "@warlock.js/seal";
+import { invalidRule, VALID_RULE } from "@warlock.js/seal";
+
+export const disposableEmailRule: SchemaRule = {
+  name: "disposableEmail",
+  defaultErrorMessage: "Disposable email addresses are not allowed",
+  async validate(value, context) {
+    const domain = value.split("@")[1];
+
+    // Check against a list of disposable domains
+    const isDisposable = await checkDisposableDomain(domain);
+
+    return isDisposable ? invalidRule(this, context) : VALID_RULE;
+  },
+};
+```
+
+## Creating a Plugin
+
+For reusable validation methods, create a Seal plugin:
+
+```typescript
+import type { SealPlugin } from "@warlock.js/seal";
+import { StringValidator, registerPlugin } from "@warlock.js/seal";
+import { slugRule } from "./rules/slug";
+
+export const slugPlugin: SealPlugin = {
+  name: "slug",
+  version: "1.0.0",
+  description: "Adds slug validation to StringValidator",
+
+  install() {
+    Object.assign(StringValidator.prototype, {
+      slug(this: StringValidator, errorMessage?: string) {
+        this.addRule(slugRule, errorMessage);
+        return this;
+      },
+    });
+  },
+};
+
+// Register the plugin
+registerPlugin(slugPlugin);
+```
+
+### TypeScript Support
+
+Augment the module for type-safe usage:
+
+```typescript
+// types.ts
+declare module "@warlock.js/seal" {
+  interface StringValidator {
+    slug(errorMessage?: string): this;
+  }
+}
+```
+
+Now use it anywhere:
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const schema = v.object({
+  slug: v.string().required().slug(),
+});
+```
+
+## Accessing Context
+
+Rules have access to the full validation context:
+
+```typescript
+export const matchesFieldRule: SchemaRule<{ field: string }> = {
+  name: "matchesField",
+  defaultErrorMessage: "The :input must match :field",
+  async validate(value, context) {
+    const { field } = this.context.options;
+
+    // Access all submitted values
+    const otherValue = context.allValues[field];
+
+    if (value !== otherValue) {
+      return invalidRule(this, context);
+    }
+
+    return VALID_RULE;
+  },
+};
+```
+
+### Context Properties
+
+```typescript
+context.key; // Current field name
+context.path; // Full path (e.g., "user.address.city")
+context.value; // Current field value
+context.allValues; // All submitted values
+context.parent; // Parent object (for nested schemas)
+```
+
+## Extending Built-in Validators
+
+Add methods to any validator:
+
+```typescript
+import type { SealPlugin } from "@warlock.js/seal";
+import { NumberValidator, registerPlugin } from "@warlock.js/seal";
+import { invalidRule, VALID_RULE, type SchemaRule } from "@warlock.js/seal";
+
+const currencyRule: SchemaRule = {
+  name: "currency",
+  defaultErrorMessage: "The :input must be a valid currency amount",
+  async validate(value, context) {
+    // Valid currency: up to 2 decimal places
+    const isValid =
+      Number.isFinite(value) && Math.round(value * 100) === value * 100;
+    return isValid ? VALID_RULE : invalidRule(this, context);
+  },
+};
+
+export const currencyPlugin: SealPlugin = {
+  name: "currency",
+  install() {
+    Object.assign(NumberValidator.prototype, {
+      currency(this: NumberValidator, errorMessage?: string) {
+        this.addRule(currencyRule, errorMessage);
+        return this;
+      },
+    });
+  },
+};
+
+registerPlugin(currencyPlugin);
+```
+
+## Plugin Registration
+
+Register plugins early in your application, typically in your main entry file:
+
+```typescript title="src/app/main.ts"
+import { registerPlugin } from "@warlock.js/seal";
+import { slugPlugin } from "./validation/plugins/slug";
+import { currencyPlugin } from "./validation/plugins/currency";
+
+// Register plugins before using them
+registerPlugin(slugPlugin);
+registerPlugin(currencyPlugin);
+```
+
+## Real-World Example: Subscription Plugin
+
+```typescript
+import type { SealPlugin, SchemaRule } from "@warlock.js/seal";
+import {
+  StringValidator,
+  registerPlugin,
+  invalidRule,
+  VALID_RULE,
+} from "@warlock.js/seal";
+
+const creditCardRule: SchemaRule = {
+  name: "creditCard",
+  defaultErrorMessage: "The :input must be a valid credit card number",
+  async validate(value, context) {
+    // Luhn algorithm validation
+    const digits = value.replace(/\D/g, "");
+    if (digits.length < 13 || digits.length > 19) {
+      return invalidRule(this, context);
+    }
+
+    let sum = 0;
+    let isDouble = false;
+
+    for (let i = digits.length - 1; i >= 0; i--) {
+      let digit = parseInt(digits[i], 10);
+      if (isDouble) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      isDouble = !isDouble;
+    }
+
+    return sum % 10 === 0 ? VALID_RULE : invalidRule(this, context);
+  },
+};
+
+const cardExpiryRule: SchemaRule = {
+  name: "cardExpiry",
+  defaultErrorMessage: "The :input must be a valid expiry date (MM/YY)",
+  async validate(value, context) {
+    const match = value.match(/^(0[1-9]|1[0-2])\/(\d{2})$/);
+    if (!match) return invalidRule(this, context);
+
+    const [, month, year] = match;
+    const expiry = new Date(2000 + parseInt(year), parseInt(month) - 1);
+    const now = new Date();
+
+    return expiry > now ? VALID_RULE : invalidRule(this, context);
+  },
+};
+
+const cvvRule: SchemaRule = {
+  name: "cvv",
+  defaultErrorMessage: "The :input must be a valid CVV",
+  async validate(value, context) {
+    const isValid = /^\d{3,4}$/.test(value);
+    return isValid ? VALID_RULE : invalidRule(this, context);
+  },
+};
+
+export const paymentsPlugin: SealPlugin = {
+  name: "payments",
+  version: "1.0.0",
+  description: "Payment validation methods",
+
+  install() {
+    Object.assign(StringValidator.prototype, {
+      creditCard(this: StringValidator, errorMessage?: string) {
+        this.addRule(creditCardRule, errorMessage);
+        return this;
+      },
+      cardExpiry(this: StringValidator, errorMessage?: string) {
+        this.addRule(cardExpiryRule, errorMessage);
+        return this;
+      },
+      cvv(this: StringValidator, errorMessage?: string) {
+        this.addRule(cvvRule, errorMessage);
+        return this;
+      },
+    });
+  },
+};
+
+// Register
+registerPlugin(paymentsPlugin);
+```
+
+Usage:
+
+```typescript
+const paymentSchema = v.object({
+  cardNumber: v.string().required().creditCard(),
+  expiry: v.string().required().cardExpiry(),
+  cvv: v.string().required().cvv(),
+});
+```
+
+## What's Next
+
+- [Error Messages](./error-messages) — Customize and localize validation messages

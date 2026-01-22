@@ -1,8 +1,8 @@
 {
-  "label": "Http Requests",
+  "label": "HTTP",
   "position": 3,
   "link": {
     "type": "generated-index",
-    "description": "Warlock.js Http Requests"
+    "description": "Build APIs with Warlock.js routing, request handling, and RESTful controllers"
   }
 }

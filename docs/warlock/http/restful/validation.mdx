@@ -1,0 +1,174 @@
+---
+sidebar_position: 4
+title: "RESTful Validation"
+description: "Declarative request validation in Warlock.js RESTful controllers"
+---
+
+# RESTful Validation
+
+RESTful controllers in **Warlock.js** support declarative validation for `create`, `update`, and `patch` operations. You can define schemas using **Seal** and add custom validation logic.
+
+## Validation Structure
+
+Validation is defined in the `validation` property of the controller.
+
+```ts title="src/app/users/controllers/restful-users.ts"
+import { Restful } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+import type { RouteResource } from "@warlock.js/core";
+import type { User } from "../models/user";
+
+class RestfulUsers extends Restful<User> {
+  // ... configuration
+
+  public validation: RouteResource["validation"] = {
+    create: {
+      schema: v.object({
+        name: v.string().required(),
+        email: v.string().required().email(),
+      }),
+    },
+    update: {
+      schema: v.object({
+        name: v.string().required(),
+      }),
+    },
+  };
+}
+```
+
+## Shared Validation (`all`)
+
+The `all` key allows you to define rules that apply to `create` and `update` operations.
+
+```ts
+public validation: RouteResource["validation"] = {
+  all: {
+    schema: v.object({
+      title: v.string().required().minLength(3),
+      content: v.string().required(),
+    }),
+  },
+};
+```
+
+### Schema Merging
+
+If you define both `all` and a specific operation (e.g., `create`), **Warlock.js** will merge the schemas, with the operation-specific rules taking precedence.
+
+```ts
+public validation: RouteResource["validation"] = {
+  all: {
+    schema: v.object({
+      title: v.string().required(),
+      status: v.string().in(["draft", "published"]),
+    }),
+  },
+  create: {
+    schema: v.object({
+      // status is overridden to only allow draft on create
+      status: v.string().only(["draft"]),
+    }),
+  },
+};
+```
+
+## Patch Validation
+
+> [!NOTE]
+> The `patch` operation does not automatically inherit from `all`. This is because `patch` is designed for partial updates, while `all` usually contains required rules for full creation/updates.
+
+When using `patch`, it is recommended to define a specific schema where most fields are optional but still follow format rules (e.g., `minLength`, `email`).
+
+## Custom Validation Logic
+
+Beyond schemas, you can provide a `validate` function for complex checks (e.g., database lookups).
+
+```ts
+public validation: RouteResource["validation"] = {
+  create: {
+    schema: v.object({
+      email: v.string().required().email(),
+    }),
+    validate: async (request: Request, response: Response) => {
+      const email = request.input("email");
+      if (await this.repository.exists({ email })) {
+        return response.badRequest({
+          error: "Email already exists",
+        });
+      }
+    },
+  },
+};
+```
+
+## Validating Specific Sources
+
+By default, **Warlock.js** validates the merged body and query parameters. You can restrict validation to specific sources using the `validating` property.
+
+| Option      | Description                                |
+| ----------- | ------------------------------------------ |
+| `"body"`    | Validate request body (default)            |
+| `"query"`   | Validate query string parameters (default) |
+| `"params"`  | Validate URL route parameters              |
+| `"headers"` | Validate request headers                   |
+
+```ts
+public validation: RouteResource["validation"] = {
+  create: {
+    validating: ["body", "headers"], // Only validate body and headers
+    schema: v.object({
+      // ...
+    }),
+  },
+};
+```
+
+## Common Database Rules
+
+### Unique Check
+
+```ts
+import { User } from "../models/user";
+
+v.object({
+  email: v.string().required().email().unique(User),
+});
+
+// Using uniqueExceptCurrentId for updates
+v.object({
+  email: v.string().required().email().uniqueExceptCurrentId(User),
+});
+```
+
+### Existence Check
+
+```ts
+import { Category } from "../models/category";
+
+v.object({
+  categoryId: v.int().required().exists(Category),
+});
+```
+
+## Error Protocol
+
+If validation fails, **Warlock.js** automatically returns a `400 Bad Request` with a standardized error object:
+
+```json
+{
+  "errors": [
+    {
+      "key": "email",
+      "error": "The email field is required"
+    }
+  ]
+}
+```
+
+## Related
+
+- [Overview](./overview) — RESTful system introduction
+- [Controllers](./controllers) — Controller configuration
+- [Lifecycle Hooks](./lifecycle-hooks) — Before/after operation hooks
+- [Validation Basics](../../request.mdx#validation) — Core validation features

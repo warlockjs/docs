@@ -1,0 +1,147 @@
+---
+sidebar_position: 11
+title: "Error Handling"
+description: "Graceful error handling and automatic response parsing in Warlock.js"
+---
+
+# Error Handling
+
+Warlock.js features a sophisticated error handling system designed to minimize boilerplate. While you can manually return error responses, the framework's "BIG feature" is its ability to automatically catch and format thrown errors.
+
+## Automatic Error Handling
+
+In Warlock.js, you don't need to wrap every service call in a `try-catch` block inside your controllers. If a service, repository, or even a deeply nested utility throws an instance of `HttpError`, the framework automatically catches it and returns the appropriate HTTP response.
+
+### Throwing Errors
+
+Warlock.js provides several standard error classes for common HTTP scenarios.
+
+```typescript title="src/app/users/services/user-service.ts"
+import { ResourceNotFoundError, BadRequestError } from "@warlock.js/core";
+import { User } from "../models/user";
+
+export async function getRequiredUser(id: string) {
+  const user = await User.find(id);
+
+  if (!user) {
+    // Warlock.js will catch this and return a 404 response
+    throw new ResourceNotFoundError(`User with ID ${id} not found`);
+  }
+
+  if (user.isSuspended) {
+    // Warlock.js will catch this and return a 400 response
+    throw new BadRequestError("This user account is suspended");
+  }
+
+  return user;
+}
+```
+
+### The Clean Controller
+
+Because the framework handles these errors, your controllers remain clean and focused on the "happy path":
+
+```typescript title="src/app/users/controllers/get-user.ts"
+import { type RequestHandler } from "@warlock.js/core";
+import { getRequiredUser } from "../services/user-service";
+
+export const getUser: RequestHandler = async (request, response) => {
+  // No try-catch needed!
+  // If getRequiredUser throws, the client gets the proper error response automatically.
+  const user = await getRequiredUser(request.input("id"));
+
+  return response.success({ user });
+};
+```
+
+## Standard Error Classes
+
+All standard errors extend from the base `HttpError` class.
+
+| Class                   | Status Code | Default Behavior                                             |
+| :---------------------- | :---------- | :----------------------------------------------------------- |
+| `BadRequestError`       | 400         | Returns the error message and optional payload.              |
+| `UnAuthorizedError`     | 401         | Returns "unauthorized" error.                                |
+| `ForbiddenError`        | 403         | Returns "forbidden" error.                                   |
+| `ResourceNotFoundError` | 404         | Returns "not found" error.                                   |
+| `NotAllowedError`       | 405         | Returns "method not allowed" error.                          |
+| `ConflictError`         | 409         | Returns conflict details.                                    |
+| `ServerError`           | 500         | Returns generic server error (details hidden in production). |
+
+## Manual Error Responses
+
+If you prefer manual control, the `Response` object provides semantic methods for all common error types.
+
+```typescript
+return response.notFound({ error: "Product not found" });
+return response.badRequest({ error: "Invalid coupon code" });
+return response.unauthorized();
+return response.forbidden();
+```
+
+### Status Code Table
+
+| Method                       | Status | Use Case                                       |
+| :--------------------------- | :----- | :--------------------------------------------- |
+| `response.badRequest()`      | 400    | Validation fails or invalid logic.             |
+| `response.unauthorized()`    | 401    | Missing or invalid authentication.             |
+| `response.forbidden()`       | 403    | Authenticated but lacks permissions.           |
+| `response.notFound()`        | 404    | Missing database record or route.              |
+| `response.conflict()`        | 409    | Data state conflict (e.g., unique constraint). |
+| `response.tooManyRequests()` | 429    | Rate limit exceeded.                           |
+| `response.serverError()`     | 500    | Uncaught exceptions or internal failures.      |
+
+## Validation Errors
+
+When manually validating data using `request.validate()`, use `response.failedSchema()` to return formatted errors.
+
+```typescript
+const validation = await request.validate(mySchema);
+
+if (validation.fails()) {
+  return response.failedSchema(validation);
+}
+```
+
+This returns a standardized error structure that usually looks like this (depending on your `validation.ts` config):
+
+```json
+{
+  "errors": [
+    { "input": "email", "error": "The email must be a valid email address" }
+  ]
+}
+```
+
+## Custom Error Classes
+
+You can create your own error classes by extending `HttpError` to maintain consistent behavior across your application.
+
+```typescript title="src/app/shared/errors/payment-error.ts"
+import { HttpError } from "@warlock.js/core";
+
+export class PaymentError extends HttpError {
+  public constructor(message: string, payload?: any) {
+    super(402, message, payload); // 402 Payment Required
+    this.name = "PaymentError";
+  }
+}
+```
+
+## Production vs Development
+
+Warlock.js automatically adjusts error verbosity based on the environment. In development (`environment() === 'development'`), error responses include the `stack` trace to help with debugging. In production, stack traces are stripped for security.
+
+## Response Events
+
+You can listen to error events globally to perform logging or external monitoring.
+
+```typescript title="src/app/main.ts"
+import { Response } from "@warlock.js/core";
+
+Response.on("error", (response) => {
+  console.error(
+    `Request ${response.request.id} failed with ${response.statusCode}`,
+  );
+});
+```

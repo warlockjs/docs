@@ -7,12 +7,12 @@
 
 ## Overall Progress
 
-| Batch   | Sections                              | Pages | Status                 |
-| ------- | ------------------------------------- | ----- | ---------------------- |
-| Batch 1 | Getting Started, HTTP, Validation     | 23    | ⏳ In Progress (12/23) |
-| Batch 2 | Repositories, Database, Auth, Storage | 23    | ⏳ Not Started         |
-| Batch 3 | Cache, Dev Server, Mail, CLI          | 18    | ⏳ Not Started         |
-| Batch 4 | Production, Advanced, Upcoming        | 15    | ⏳ Not Started         |
+| Batch   | Sections                              | Pages | Status              |
+| ------- | ------------------------------------- | ----- | ------------------- |
+| Batch 1 | Getting Started, HTTP, Validation     | 29    | ✅ Complete (29/29) |
+| Batch 2 | Repositories, Database, Auth, Storage | 23    | ⏳ Not Started      |
+| Batch 3 | Cache, Dev Server, Mail, CLI          | 18    | ⏳ Not Started      |
+| Batch 4 | Production, Advanced, Upcoming        | 15    | ⏳ Not Started      |
 
 **Total**: ~79 pages
 
@@ -46,37 +46,37 @@
 
 **Task File**: `specs/agent-tasks/batch1-http.md`
 
-| Page                        | Status | Agent Notes |
-| --------------------------- | ------ | ----------- |
-| routing-basics.mdx          | ⬜     |             |
-| route-builder.mdx           | ⬜     |             |
-| route-groups.mdx            | ⬜     |             |
-| api-versioning.mdx          | ⬜     |             |
-| request.mdx                 | ⬜     |             |
-| response.mdx                | ⬜     |             |
-| middleware.mdx              | ⬜     |             |
-| cors.mdx                    | ⬜     |             |
-| rate-limiting.mdx           | ⬜     |             |
-| file-uploads.mdx            | ⬜     |             |
-| error-handling.mdx          | ⬜     |             |
-| restful/overview.mdx        | ⬜     |             |
-| restful/controllers.mdx     | ⬜     |             |
-| restful/lifecycle-hooks.mdx | ⬜     |             |
-| restful/validation.mdx      | ⬜     |             |
+| Page                        | Status | Agent Notes                                        |
+| --------------------------- | ------ | -------------------------------------------------- |
+| routing-basics.mdx          | ✅     | HTTP methods, params, named routes, static files   |
+| route-builder.mdx           | ✅     | v4 fluent API, chaining, nesting, CRUD             |
+| route-groups.mdx            | ✅     | Groups, prefixes, middleware, reusable helpers     |
+| api-versioning.mdx          | ✅     | URL versioning, helpers, deprecation headers       |
+| request.mdx                 | ✅     | Updated sidebar position                           |
+| response.mdx                | ✅     | Added v4 streaming + React rendering sections      |
+| middleware.mdx              | ✅     | Updated sidebar position                           |
+| cors.mdx                    | ✅     | CORS config, origins, credentials, headers         |
+| rate-limiting.mdx           | ✅     | Global + per-route limiting, custom key/response   |
+| file-uploads.mdx            | ✅     | Upload handling, validation, storage integration   |
+| error-handling.mdx          | ✅     | Error methods, custom errors, logging, production  |
+| restful/overview.mdx        | ✅     | Refined with correct route options and imports     |
+| restful/controllers.mdx     | ✅     | Added cache, returnOn, and internal middleware     |
+| restful/lifecycle-hooks.mdx | ✅     | Verified hook order and params from source code    |
+| restful/validation.mdx      | ✅     | Added validating property and patch specific logic |
 
 ---
 
-### Agent C: Validation (5 pages)
+### Agent C: Validation (5 pages) ✅ Complete
 
 **Task File**: `specs/agent-tasks/batch1-validation.md`
 
-| Page                  | Status | Agent Notes |
-| --------------------- | ------ | ----------- |
-| introduction.mdx      | ⬜     |             |
-| schema-validation.mdx | ⬜     |             |
-| framework-plugins.mdx | ⬜     |             |
-| custom-rules.mdx      | ⬜     |             |
-| error-messages.mdx    | ⬜     |             |
+| Page                  | Status | Agent Notes                                            |
+| --------------------- | ------ | ------------------------------------------------------ |
+| introduction.mdx      | ✅     | Rewritten for v4 Seal schema-based approach            |
+| schema-validation.mdx | ✅     | Comprehensive object, array, tuple, record, union docs |
+| framework-plugins.mdx | ✅     | v.file(), unique(), exists() with all variants         |
+| custom-rules.mdx      | ✅     | Rules, plugins, context, payments example              |
+| error-messages.mdx    | ✅     | Localization, placeholders, config, full example       |
 
 ---
 

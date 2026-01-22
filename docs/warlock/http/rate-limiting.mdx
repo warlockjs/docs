@@ -1,0 +1,249 @@
+---
+sidebar_position: 9
+title: "Rate Limiting"
+description: "Protect your Warlock.js API with request rate limiting"
+---
+
+# Rate Limiting
+
+Rate limiting protects your API from abuse by limiting the number of requests a client can make within a time window.
+
+## Basic Configuration
+
+Configure rate limiting in your HTTP config:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  rateLimit: {
+    max: 100, // Maximum requests
+    timeWindow: 60000, // Per 1 minute (in milliseconds)
+  },
+};
+
+export default httpConfig;
+```
+
+## Rate Limit Options
+
+| Option                  | Type       | Default       | Description                     |
+| ----------------------- | ---------- | ------------- | ------------------------------- |
+| `max`                   | `number`   | `100`         | Maximum requests per window     |
+| `timeWindow`            | `number`   | `60000`       | Time window in milliseconds     |
+| `keyGenerator`          | `function` | IP-based      | Function to generate client key |
+| `errorResponseBuilder`  | `function` | Default error | Custom error response           |
+| `skipFailRequest`       | `boolean`  | `false`       | Don't count failed requests     |
+| `skipSuccessfulRequest` | `boolean`  | `false`       | Don't count successful requests |
+
+## Custom Time Windows
+
+Set different time windows:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  rateLimit: {
+    max: 1000,
+    timeWindow: 60 * 60 * 1000, // 1 hour
+  },
+};
+
+export default httpConfig;
+```
+
+## Custom Key Generator
+
+Rate limit by user ID instead of IP:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations, Request } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  rateLimit: {
+    max: 100,
+    timeWindow: 60000,
+    keyGenerator: (request: Request) => {
+      // Use user ID if authenticated, otherwise IP
+      return request.user?.id?.toString() || request.ip;
+    },
+  },
+};
+
+export default httpConfig;
+```
+
+## Custom Error Response
+
+Customize the rate limit error message:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations, Request, Response } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  rateLimit: {
+    max: 100,
+    timeWindow: 60000,
+    errorResponseBuilder: (request: Request, context) => {
+      return {
+        statusCode: 429,
+        error: "Too Many Requests",
+        message: `You have exceeded the ${context.max} requests in ${context.after} limit.`,
+        retryAfter: context.after,
+      };
+    },
+  },
+};
+
+export default httpConfig;
+```
+
+## Per-Route Rate Limiting
+
+Apply different limits to specific routes:
+
+```ts title="src/app/auth/routes.ts"
+import { router } from "@warlock.js/core";
+import { login, register, forgotPassword } from "./controllers";
+
+// Strict rate limiting for auth routes
+router.post("/auth/login", login, {
+  rateLimit: {
+    max: 5,
+    timeWindow: 60000, // 5 attempts per minute
+  },
+});
+
+router.post("/auth/register", register, {
+  rateLimit: {
+    max: 3,
+    timeWindow: 60 * 60 * 1000, // 3 per hour
+  },
+});
+
+router.post("/auth/forgot-password", forgotPassword, {
+  rateLimit: {
+    max: 3,
+    timeWindow: 60 * 60 * 1000, // 3 per hour
+  },
+});
+```
+
+## Skip Certain Requests
+
+Don't count specific requests toward the limit:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  rateLimit: {
+    max: 100,
+    timeWindow: 60000,
+    skipFailRequest: true, // Don't count 4xx/5xx responses
+  },
+};
+
+export default httpConfig;
+```
+
+## Whitelist Trusted Clients
+
+Skip rate limiting for trusted IPs or API keys:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations, Request } from "@warlock.js/core";
+
+const trustedIPs = ["192.168.1.100", "10.0.0.1"];
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  rateLimit: {
+    max: 100,
+    timeWindow: 60000,
+    skip: (request: Request) => {
+      // Skip for trusted IPs
+      if (trustedIPs.includes(request.ip)) {
+        return true;
+      }
+
+      // Skip for requests with valid API key
+      const apiKey = request.header("X-API-Key");
+      if (apiKey === process.env.INTERNAL_API_KEY) {
+        return true;
+      }
+
+      return false;
+    },
+  },
+};
+
+export default httpConfig;
+```
+
+## Response Headers
+
+Rate limit information is included in response headers:
+
+| Header                  | Description                      |
+| ----------------------- | -------------------------------- |
+| `X-RateLimit-Limit`     | Maximum requests allowed         |
+| `X-RateLimit-Remaining` | Remaining requests in window     |
+| `X-RateLimit-Reset`     | Unix timestamp when limit resets |
+| `Retry-After`           | Seconds until retry (on 429)     |
+
+## Environment-Based Configuration
+
+Different limits for development vs production:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+import { env, Application } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  rateLimit: Application.isDevelopment
+    ? false // Disable in development
+    : {
+        max: 100,
+        timeWindow: 60_000,
+      },
+};
+
+export default httpConfig;
+```
+
+## Disable Rate Limiting
+
+For internal services or development:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  rateLimit: false,
+};
+
+export default httpConfig;
+```
+
+## Related
+
+- [CORS](./cors) - Cross-origin configuration
+- [Middleware](./middleware) - Custom request interceptors
+- [Error Handling](./error-handling) - Handling rate limit errors gracefully

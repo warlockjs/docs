@@ -26,6 +26,7 @@ Consider the following example:
 
 ```ts {7,24} title="src/app/users/controllers/login.ts"
 import { Request, Response } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
 import { User } from "../models/user";
 
 export default async function login(request: Request, response: Response) {
@@ -42,13 +43,13 @@ export default async function login(request: Request, response: Response) {
 }
 
 login.validation = {
-  rules: {
-    email: ["required", "email"],
-    password: ["required"],
-  },
+  schema: v.object({
+    email: v.string().required().email(),
+    password: v.string().required(),
+  }),
   validate: async (request: Request, response: Response) => {
     // verify the user credentials
-    const user = await User.attempt(request.only(["email", "password"]));
+    const user = await User.attempt(request.validated());
 
     if (!user) {
       return response.badRequest({
@@ -83,7 +84,7 @@ import { User } from "../models/user";
 
 export default async function logout(
   request: Request<User>,
-  response: Response
+  response: Response,
 ) {
   const user: User = request.user;
 

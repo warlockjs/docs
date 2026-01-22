@@ -1,0 +1,222 @@
+---
+sidebar_position: 3
+title: "Route Groups"
+description: "Organize routes with shared middleware, prefixes, and options in Warlock.js"
+---
+
+# Route Groups
+
+Route groups allow you to apply shared options (middleware, prefixes, names) to multiple routes at once. This keeps your route definitions DRY and organized.
+
+## Basic Grouping
+
+Use `router.group()` to wrap routes with shared options:
+
+```ts title="src/app/admin/routes.ts"
+import { router } from "@warlock.js/core";
+import { listUsers, getUser, createUser, deleteUser } from "./controllers";
+import { adminAuth } from "../middleware/admin-auth";
+
+router.group(
+  {
+    middleware: [adminAuth],
+  },
+  () => {
+    router.get("/admin/users", listUsers);
+    router.get("/admin/users/:id", getUser);
+    router.post("/admin/users", createUser);
+    router.delete("/admin/users/:id", deleteUser);
+  },
+);
+```
+
+## Group Options
+
+| Option       | Type           | Description                         |
+| ------------ | -------------- | ----------------------------------- |
+| `prefix`     | `string`       | Path prefix for all routes in group |
+| `middleware` | `Middleware[]` | Middleware applied to all routes    |
+| `name`       | `string`       | Name prefix for route naming        |
+
+## Prefix Groups
+
+Add a common prefix to all routes in the group:
+
+```ts title="src/app/api/routes.ts"
+import { router } from "@warlock.js/core";
+import { listProducts, getProduct, listOrders, getOrder } from "./controllers";
+
+router.group(
+  {
+    prefix: "/api/v1",
+  },
+  () => {
+    router.get("/products", listProducts); // GET /api/v1/products
+    router.get("/products/:id", getProduct); // GET /api/v1/products/:id
+    router.get("/orders", listOrders); // GET /api/v1/orders
+    router.get("/orders/:id", getOrder); // GET /api/v1/orders/:id
+  },
+);
+```
+
+### Prefix Shorthand
+
+For prefix-only groups, use `router.prefix()`:
+
+```ts title="src/app/api/routes.ts"
+import { router } from "@warlock.js/core";
+import { listProducts, getProduct } from "./controllers";
+
+router.prefix("/api/v2", () => {
+  router.get("/products", listProducts); // GET /api/v2/products
+  router.get("/products/:id", getProduct); // GET /api/v2/products/:id
+});
+```
+
+## Middleware Groups
+
+Apply middleware to all routes in a group:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@warlock.js/core";
+import {
+  getProfile,
+  updateProfile,
+  getSettings,
+  updateSettings,
+} from "./controllers";
+import { authMiddleware } from "../middleware/auth";
+
+router.group(
+  {
+    middleware: [authMiddleware],
+  },
+  () => {
+    router.get("/profile", getProfile);
+    router.put("/profile", updateProfile);
+    router.get("/settings", getSettings);
+    router.put("/settings", updateSettings);
+  },
+);
+```
+
+:::info Middleware Merging
+If a route inside a group has its own middleware, it's merged with the group middleware. Group middleware runs first.
+:::
+
+## Combined Options
+
+Combine prefix and middleware for organized API sections:
+
+```ts title="src/app/admin/routes.ts"
+import { router } from "@warlock.js/core";
+import { dashboard, listUsers, listOrders, systemHealth } from "./controllers";
+import { adminAuth, superAdminAuth } from "../middleware";
+
+router.group(
+  {
+    prefix: "/admin",
+    middleware: [adminAuth],
+  },
+  () => {
+    router.get("/dashboard", dashboard);
+    router.get("/users", listUsers);
+    router.get("/orders", listOrders);
+
+    // Nested group for super admin only
+    router.group(
+      {
+        middleware: [superAdminAuth],
+      },
+      () => {
+        router.get("/system/health", systemHealth);
+      },
+    );
+  },
+);
+```
+
+## Nested Groups
+
+Groups can be nested for hierarchical organization:
+
+```ts title="src/app/api/routes.ts"
+import { router } from "@warlock.js/core";
+import { listPublic, listPrivate, adminDashboard } from "./controllers";
+import { authMiddleware, adminAuth } from "../middleware";
+
+router.group({ prefix: "/api" }, () => {
+  // Public API routes
+  router.get("/public", listPublic);
+
+  // Authenticated routes
+  router.group({ middleware: [authMiddleware] }, () => {
+    router.get("/private", listPrivate);
+
+    // Admin routes (authenticated + admin)
+    router.group(
+      {
+        prefix: "/admin",
+        middleware: [adminAuth],
+      },
+      () => {
+        router.get("/dashboard", adminDashboard);
+        // Results in: GET /api/admin/dashboard
+        // With middleware: [authMiddleware, adminAuth]
+      },
+    );
+  });
+});
+```
+
+## Reusable Group Functions
+
+Create reusable group functions for common patterns:
+
+```ts title="src/app/shared/route-groups.ts"
+import { router } from "@warlock.js/core";
+import { authMiddleware } from "../middleware/auth";
+import { adminAuth } from "../middleware/admin-auth";
+
+export function authenticatedRoutes(callback: () => void) {
+  router.group(
+    {
+      middleware: [authMiddleware],
+    },
+    callback,
+  );
+}
+
+export function adminRoutes(callback: () => void) {
+  router.group(
+    {
+      prefix: "/admin",
+      middleware: [authMiddleware, adminAuth],
+    },
+    callback,
+  );
+}
+```
+
+Use in your modules:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@warlock.js/core";
+import { adminRoutes, authenticatedRoutes } from "../shared/route-groups";
+import { listUsers, getProfile } from "./controllers";
+
+authenticatedRoutes(() => {
+  router.get("/profile", getProfile);
+});
+
+adminRoutes(() => {
+  router.get("/users", listUsers); // GET /admin/users with auth + admin middleware
+});
+```
+
+## Related
+
+- [Routing Basics](./routing-basics) - Core routing concepts
+- [Route Builder](./route-builder) - Fluent API for route definitions
+- [API Versioning](./api-versioning) - Versioning your API with groups
+- [Middleware](./middleware) - Creating and using middleware

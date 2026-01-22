@@ -2,70 +2,175 @@
 sidebar_position: 1
 ---
 
-# Introduction
+# Validation
 
-Validation is a common task in web applications, it's used to validate the user input, and make sure it's valid before processing it.
+Warlock.js uses **Seal** (`@warlock.js/seal`) for schema-based validation. Seal is a standalone TypeScript validation library, and Warlock.js extends it with framework-specific features like file uploads and database rules.
 
-## How it works
+## How it Works
 
-There are two ways of validating a request, either by using [Validation Rules](#validation-rules) or by using [Custom Validator](#custom-validator).
+Validation in Warlock.js follows a declarative pattern using the `v` schema factory:
 
-Each request handler can add it's validation criteria by extending the function with a static property called `validation`.
+```typescript
+import { v } from "@warlock.js/seal";
 
-The `validation` object has two keys:
-
-- `rules`: An object that contains the validation rules, which acts exactly like a [validation rules](./validation-rules).
-- `validate`: A function that accepts the request and response objects, which acts exactly like a [middleware](./../http/middleware).
-
-## Validation Rules
-
-Validation rules are rules that are used to validate the request input, it's used to validate the request body, query, and params.
-
-[Read more about validation rules](./validation-rules)
-
-## Custom Validator
-
-Consider a custom validator as the final middleware interceptor before processing the request, it's used to validate the request after the validation rules.
-
-[Read more about custom validator](./custom-validator)
-
-## Example
-
-Let's consider using the login request as an example:
-
-```ts title="src/app/users/routes.ts"
-import { router } from "@warlock.js/core";
-import { login } from "./controllers/auth/login";
-
-router.post("/login", login);
+const userSchema = v.object({
+  name: v.string().required().minLength(2),
+  email: v.string().required().email(),
+  age: v.int().min(18).max(120),
+});
 ```
 
-Now let's head to `src/app/users/controllers/auth/login.ts` and see what's inside:
+The schema is attached to your request handler via the `validation` property:
 
-```ts title="src/app/users/controllers/auth/login.ts"
-import { Request, Response } from "@warlock.js/core";
-import { User } from "app/users/models/user";
+```typescript title="src/app/users/controllers/register.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
 
-export default async function login(request: Request, response: Response) {
-  // do logic here
-}
+export const register: RequestHandler = async (request, response) => {
+  // Data is already validated at this point
+  const data = request.validated();
+  // ... create user
+  return response.success({ user: data });
+};
+
+register.validation = {
+  schema: v.object({
+    name: v.string().required().minLength(2),
+    email: v.string().required().email(),
+    password: v.string().required().minLength(8),
+  }),
+};
+```
+
+## Seal vs Core
+
+**Seal** (`@warlock.js/seal`) is the standalone validation library:
+
+- Works anywhere (CLI tools, frontend, Node.js)
+- Type-safe schema definitions
+- All base validators: string, number, object, array, date, boolean, etc.
+- Chainable rules and transformers
+- Zero framework dependencies
+
+**Core Extensions** (`@warlock.js/core`) adds:
+
+- `v.file()` — File upload validation
+- `unique()` / `exists()` — Database rules
+- `request.validated()` — Access validated data
+- Automatic HTTP error responses
+
+## Basic Usage
+
+### Defining a Schema
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+export const createPostSchema = v.object({
+  title: v.string().required().minLength(5).maxLength(200),
+  content: v.string().required(),
+  categoryId: v.int().required().positive(),
+  tags: v.array(v.string()).optional(),
+  publishedAt: v.date().optional(),
+});
+```
+
+### Attaching to Routes
+
+```typescript title="src/app/posts/controllers/create.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { createPostSchema } from "../validation";
+
+export const createPost: RequestHandler = async (request, response) => {
+  const data = request.validated();
+  // data is typed based on the schema
+  return response.success({ post: data });
+};
+
+createPost.validation = {
+  schema: createPostSchema,
+};
+```
+
+### Custom Validation Logic
+
+For complex validation that requires business logic:
+
+```typescript title="src/app/users/controllers/login.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+import { User } from "../models/user";
+
+export const login: RequestHandler = async (request, response) => {
+  const user = request.user;
+  // Generate token and return
+  return response.success({ token: user.generateToken() });
+};
 
 login.validation = {
-  rules: {
-    email: ["required", "email"],
-    password: ["required", "string"],
-  },
-  validate: async (request: Request, response: Response) => {
-    // custom validation here
-    const user = await User.attempt(request.only(["email", "password"]));
+  schema: v.object({
+    email: v.string().required().email(),
+    password: v.string().required(),
+  }),
+  async validate(request, response) {
+    const { email, password } = request.validated();
+    const user = await User.attempt({ email, password });
 
     if (!user) {
-      return response.unauthorized();
+      return response.unauthorized({
+        error: "Invalid credentials",
+      });
     }
 
-    // inject the user object to the request object
-    // Make sure to not return a value, otherwise the request will be terminated
+    // Attach user to request for use in handler
     request.user = user;
+    // Return nothing to continue to handler
   },
 };
 ```
+
+## Validation Flow
+
+When a request arrives, Warlock.js validates in this order:
+
+1. **Schema Validation** — `validation.schema` runs first
+2. **Custom Validation** — `validation.validate` runs second
+3. **Request Handler** — Only if both pass
+
+If validation fails, Warlock.js automatically returns an error response:
+
+```json
+{
+  "statusCode": 400,
+  "body": {
+    "errors": {
+      "email": "The email field is required",
+      "password": "The password must be at least 8 characters"
+    }
+  }
+}
+```
+
+## Type Inference
+
+Seal provides full TypeScript inference. Use `Infer` to extract types:
+
+```typescript
+import { v, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().required().email(),
+  role: v.string().oneOf(["admin", "user"]).default("user"),
+});
+
+type User = Infer<typeof userSchema>;
+// { name: string; email: string; role: "admin" | "user" }
+```
+
+## What's Next
+
+- [Schema Validation](./schema-validation) — Deep dive into `v.object()` and `v.array()`
+- [Framework Plugins](./framework-plugins) — File uploads and database rules
+- [Custom Rules](./custom-rules) — Creating your own validation rules
+- [Error Messages](./error-messages) — Customizing and localizing errors

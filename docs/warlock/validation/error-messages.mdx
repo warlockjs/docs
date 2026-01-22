@@ -1,0 +1,355 @@
+---
+sidebar_position: 5
+---
+
+# Error Messages
+
+Warlock.js integrates Seal with its localization system, allowing you to customize and translate validation error messages.
+
+## Default Error Format
+
+When validation fails, Warlock.js returns errors in this format:
+
+```json
+{
+  "statusCode": 400,
+  "body": {
+    "errors": {
+      "email": "The email field is required",
+      "password": "The password must be at least 8 characters"
+    }
+  }
+}
+```
+
+## Inline Custom Messages
+
+Override error messages directly on rules:
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const schema = v.object({
+  email: v
+    .string()
+    .required("Please provide your email address")
+    .email("That doesn't look like a valid email"),
+
+  password: v
+    .string()
+    .required("Password is required")
+    .minLength(8, "Password must be at least 8 characters long"),
+});
+```
+
+## Message Placeholders
+
+Use placeholders in error messages:
+
+```typescript
+const schema = v.object({
+  username: v
+    .string()
+    .minLength(3, "Username must be at least :min characters")
+    .maxLength(20, "Username cannot exceed :max characters"),
+
+  age: v
+    .int()
+    .min(18, "You must be at least :min years old")
+    .max(120, "Age cannot exceed :max"),
+});
+```
+
+### Available Placeholders
+
+| Placeholder | Description                |
+| ----------- | -------------------------- |
+| `:input`    | Field name (e.g., "email") |
+| `:value`    | The actual value submitted |
+| `:min`      | Minimum value/length       |
+| `:max`      | Maximum value/length       |
+| `:length`   | Expected length            |
+| `:pattern`  | Regex pattern              |
+
+## Localized Error Messages
+
+### Translation Setup
+
+Warlock.js automatically uses your localization system. Create translation files:
+
+```typescript title="src/app/shared/locales/en.ts"
+import { groupedTranslations } from "@warlock.js/core";
+
+export default groupedTranslations({
+  validation: {
+    required: {
+      en: "The :input field is required",
+      ar: "حقل :input مطلوب",
+    },
+    email: {
+      en: "The :input must be a valid email address",
+      ar: ":input يجب أن يكون بريدًا إلكترونيًا صالحًا",
+    },
+    minLength: {
+      en: "The :input must be at least :min characters",
+      ar: ":input يجب أن يحتوي على :min حروف على الأقل",
+    },
+    maxLength: {
+      en: "The :input must not exceed :max characters",
+      ar: ":input يجب ألا يتجاوز :max حرفًا",
+    },
+  },
+});
+```
+
+### Attribute Names
+
+Translate field names instead of using raw keys:
+
+```typescript title="src/app/shared/locales/en.ts"
+import { groupedTranslations } from "@warlock.js/core";
+
+export default groupedTranslations({
+  attributes: {
+    email: {
+      en: "Email Address",
+      ar: "البريد الإلكتروني",
+    },
+    password: {
+      en: "Password",
+      ar: "كلمة المرور",
+    },
+    firstName: {
+      en: "First Name",
+      ar: "الاسم الأول",
+    },
+  },
+});
+```
+
+Now errors show translated field names:
+
+```json
+{
+  "errors": {
+    "email": "Email Address is required",
+    "firstName": "First Name must be at least 2 characters"
+  }
+}
+```
+
+## Configuration
+
+Configure validation settings in `src/config/validation.ts`:
+
+```typescript title="src/config/validation.ts"
+import type { ValidationConfiguration } from "@warlock.js/core";
+
+const validationConfig: ValidationConfiguration = {
+  // Translation group prefix for rule messages
+  // Default: "validation"
+  // The rule "required" looks for translation at "validation.required"
+  translationGroup: "validation",
+
+  // Translation group prefix for field names
+  // Default: "attributes"
+  // Field "email" looks for translation at "attributes.email"
+  attributeGroup: "attributes",
+
+  // Return only the first error per field
+  // Default: true
+  firstErrorOnly: true,
+};
+
+export default validationConfig;
+```
+
+### Custom Translation Functions
+
+For advanced translation needs:
+
+```typescript title="src/config/validation.ts"
+import type { ValidationConfiguration } from "@warlock.js/core";
+import { customTranslate } from "./i18n";
+
+const validationConfig: ValidationConfiguration = {
+  // Custom rule translation
+  translateRule({ rule, attributes }) {
+    // Use your custom translation system
+    return customTranslate(`errors.${rule.name}`, attributes);
+  },
+
+  // Custom attribute translation
+  translateAttribute({ attribute, context }) {
+    return customTranslate(`fields.${attribute}`);
+  },
+};
+
+export default validationConfig;
+```
+
+## Per-Validator Attributes
+
+Set custom attribute names on validators:
+
+```typescript
+const schema = v.object({
+  email: v.string().required().email().attributes({ input: "Email Address" }),
+
+  confirmPassword: v
+    .string()
+    .matches("password")
+    .attributes({
+      input: "Password Confirmation",
+      matches: { password: "Password" },
+    }),
+});
+```
+
+## All Errors vs First Error Only
+
+By default, only the first error per field is returned. To get all errors:
+
+```typescript title="src/config/validation.ts"
+const validationConfig: ValidationConfiguration = {
+  firstErrorOnly: false, // Return all errors
+};
+```
+
+Response with multiple errors:
+
+```json
+{
+  "errors": {
+    "password": [
+      "Password is required",
+      "Password must be at least 8 characters",
+      "Password must contain at least one number"
+    ]
+  }
+}
+```
+
+## Custom Rule Error Messages
+
+When creating custom rules, provide good defaults:
+
+```typescript
+import type { SchemaRule } from "@warlock.js/seal";
+import { invalidRule, VALID_RULE } from "@warlock.js/seal";
+
+export const strongPasswordRule: SchemaRule = {
+  name: "strongPassword",
+  defaultErrorMessage:
+    "The :input must contain uppercase, lowercase, number, and special character",
+  async validate(value, context) {
+    const hasUpper = /[A-Z]/.test(value);
+    const hasLower = /[a-z]/.test(value);
+    const hasNumber = /\d/.test(value);
+    const hasSpecial = /[!@#$%^&*]/.test(value);
+
+    if (hasUpper && hasLower && hasNumber && hasSpecial) {
+      return VALID_RULE;
+    }
+
+    return invalidRule(this, context);
+  },
+};
+```
+
+Then add translations for the rule:
+
+```typescript title="src/app/shared/locales/en.ts"
+export default groupedTranslations({
+  validation: {
+    strongPassword: {
+      en: "Password must include uppercase, lowercase, number, and special character",
+      ar: "كلمة المرور يجب أن تحتوي على حروف كبيرة وصغيرة وأرقام ورموز خاصة",
+    },
+  },
+});
+```
+
+## Complete Localization Example
+
+```typescript title="src/app/shared/locales/validation.ts"
+import { groupedTranslations } from "@warlock.js/core";
+
+export default groupedTranslations({
+  validation: {
+    required: {
+      en: "The :input field is required",
+      ar: "حقل :input مطلوب",
+      fr: "Le champ :input est requis",
+    },
+    email: {
+      en: "Please enter a valid email address",
+      ar: "يرجى إدخال بريد إلكتروني صالح",
+      fr: "Veuillez entrer une adresse email valide",
+    },
+    min: {
+      en: ":input must be at least :min",
+      ar: ":input يجب أن يكون :min على الأقل",
+      fr: ":input doit être au moins :min",
+    },
+    max: {
+      en: ":input must not exceed :max",
+      ar: ":input يجب ألا يتجاوز :max",
+      fr: ":input ne doit pas dépasser :max",
+    },
+    minLength: {
+      en: ":input must be at least :min characters",
+      ar: ":input يجب أن يحتوي على :min حروف على الأقل",
+      fr: ":input doit contenir au moins :min caractères",
+    },
+    maxLength: {
+      en: ":input must not exceed :max characters",
+      ar: ":input يجب ألا يتجاوز :max حرفًا",
+      fr: ":input ne doit pas dépasser :max caractères",
+    },
+    unique: {
+      en: "This :input is already taken",
+      ar: "هذا :input مستخدم بالفعل",
+      fr: "Ce :input est déjà utilisé",
+    },
+    exists: {
+      en: "The selected :input is invalid",
+      ar: ":input المحدد غير صالح",
+      fr: "Le :input sélectionné est invalide",
+    },
+  },
+
+  attributes: {
+    email: {
+      en: "email address",
+      ar: "البريد الإلكتروني",
+      fr: "adresse email",
+    },
+    password: {
+      en: "password",
+      ar: "كلمة المرور",
+      fr: "mot de passe",
+    },
+    name: {
+      en: "name",
+      ar: "الاسم",
+      fr: "nom",
+    },
+    phone: {
+      en: "phone number",
+      ar: "رقم الهاتف",
+      fr: "numéro de téléphone",
+    },
+  },
+});
+```
+
+## What You've Learned
+
+This concludes the Validation section. You've learned:
+
+1. **Introduction** — How Seal integrates with Warlock.js
+2. **Schema Validation** — Object, array, tuple, record, and union types
+3. **Framework Plugins** — File uploads and database rules
+4. **Custom Rules** — Creating and registering custom validation
+5. **Error Messages** — Customizing and localizing errors

@@ -1,0 +1,180 @@
+---
+sidebar_position: 3
+title: "Lifecycle Hooks"
+description: "Execute code before and after RESTful CRUD operations in Warlock.js"
+---
+
+# Lifecycle Hooks
+
+Lifecycle hooks in **Warlock.js** let you execute custom logic at specific points during CRUD operations—such as before saving, after creation, or before deletion.
+
+## Available Hooks
+
+### Create Hooks
+
+| Hook           | When                     | Parameters                    |
+| -------------- | ------------------------ | ----------------------------- |
+| `beforeCreate` | Before record is created | `(request, response, record)` |
+| `onCreate`     | After record is saved    | `(request, response, record)` |
+
+### Update & Patch Hooks
+
+| Hook           | When                           | Parameters                               |
+| -------------- | ------------------------------ | ---------------------------------------- |
+| `beforeUpdate` | Before full update is saved    | `(request, response, record, oldRecord)` |
+| `onUpdate`     | After full update is saved     | `(request, response, record, oldRecord)` |
+| `beforePatch`  | Before partial update is saved | `(request, response, record, oldRecord)` |
+| `onPatch`      | After partial update is saved  | `(request, response, record, oldRecord)` |
+
+### Delete Hooks
+
+| Hook           | When                     | Parameters                    |
+| -------------- | ------------------------ | ----------------------------- |
+| `beforeDelete` | Before record is deleted | `(request, response, record)` |
+| `onDelete`     | After record is deleted  | `(request, response, record)` |
+
+### Save Hooks (Shared)
+
+These run on **create**, **update**, and **patch** operations:
+
+| Hook         | When                                | Parameters                                 |
+| ------------ | ----------------------------------- | ------------------------------------------ |
+| `beforeSave` | Immediately before any save starts  | `(request, response, record?, oldRecord?)` |
+| `onSave`     | Immediately after any save finishes | `(request, response, record, oldRecord?)`  |
+
+## Execution Order
+
+### Create Operation
+
+1. `beforeCreate(request, response, record)`
+2. `beforeSave(request, response, record, undefined)`
+3. _Database Save_
+4. `onCreate(request, response, record)`
+5. `onSave(request, response, record, undefined)`
+
+### Update/Patch Operation
+
+1. `beforeUpdate` / `beforePatch`
+2. `beforeSave(request, response, record, oldRecord)`
+3. _Database Save_
+4. `onUpdate` / `onPatch`
+5. `onSave(request, response, record, oldRecord)`
+
+### Delete Operation
+
+1. `beforeDelete(request, response, record)`
+2. _Database Delete_
+3. `onDelete(request, response, record)`
+
+## Practical Examples
+
+### Setting Default Values
+
+Use `beforeCreate` to inject values before the record hits the database.
+
+```ts title="src/app/posts/controllers/restful-posts.ts"
+import { Restful } from "@warlock.js/core";
+import type { Request, Response } from "@warlock.js/core";
+import type { Post } from "../models/post";
+
+class RestfulPosts extends Restful<Post> {
+  // ... configuration
+
+  protected async beforeCreate(request: Request) {
+    // Inject values into the request payload
+    request.set("authorId", request.user.id);
+    request.set("status", "draft");
+  }
+}
+```
+
+### Performing Post-Save Actions
+
+Use `onCreate` or `onUpdate` to trigger side effects like sending emails or notifications.
+
+```ts title="src/app/posts/controllers/restful-posts.ts"
+import { Restful } from "@warlock.js/core";
+import type { Post } from "../models/post";
+import { notifyFollowers } from "../services/post-service";
+
+class RestfulPosts extends Restful<Post> {
+  // ... configuration
+
+  protected async onCreate(_request: any, _response: any, post: Post) {
+    // Notify followers after the post exists in the database
+    await notifyFollowers(post);
+  }
+}
+```
+
+### Authorization Checks
+
+Use `beforeDelete` to perform final authorization checks on the record being modified.
+
+```ts title="src/app/comments/controllers/restful-comments.ts"
+import { Restful } from "@warlock.js/core";
+import type { Request, Response } from "@warlock.js/core";
+import type { Comment } from "../models/comment";
+
+class RestfulComments extends Restful<Comment> {
+  // ... configuration
+
+  protected async beforeDelete(
+    request: Request,
+    response: Response,
+    comment: Comment,
+  ) {
+    const userId = request.user.id;
+    const authorId = comment.get("authorId");
+
+    if (userId !== authorId && !request.user.isAdmin) {
+      return response.forbidden({
+        error: "Forbidden",
+        message: "You can only delete your own comments",
+      });
+    }
+  }
+}
+```
+
+### Shared Logic with `beforeSave`
+
+Useful for operations that apply to both creation and updates, such as generating slugs.
+
+```ts title="src/app/articles/controllers/restful-articles.ts"
+import { Restful } from "@warlock.js/core";
+import type { Request } from "@warlock.js/core";
+import { generateSlug } from "../utils/slugger";
+
+class RestfulArticles extends Restful<Article> {
+  // ... configuration
+
+  protected async beforeSave(request: Request) {
+    const title = request.input("title");
+    if (title) {
+      request.set("slug", generateSlug(title));
+    }
+  }
+}
+```
+
+## Stopping Execution
+
+If any `before*` hook returns a response, the operation is aborted immediately, and that response is sent to the client.
+
+```ts
+protected async beforeCreate(request: Request, response: Response) {
+  if (await this.isSpamming(request.user.id)) {
+    return response.tooManyRequests({
+      error: "Rate limit exceeded",
+      message: "Please wait before creating more content."
+    });
+  }
+}
+```
+
+## Related
+
+- [Overview](./overview) — RESTful system introduction
+- [Controllers](./controllers) — Controller configuration
+- [Validation](./validation) — Request validation patterns

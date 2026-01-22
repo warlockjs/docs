@@ -5,7 +5,7 @@
 **Section**: HTTP  
 **Pages**: 12 (8 core + 4 RESTful nested)  
 **Priority**: CRITICAL (Batch 1)  
-**Status**: ⏳ Not Started
+**Status**: In Progress
 
 ---
 
@@ -201,3 +201,4 @@ Same as other agents - see `specs/001-ecosystem-docs/style-guide.md`
 ## Notes
 
 [Agent: Add notes here during work]
+Review source code per file before documenting it, split it into higher sections (headings) then go all the way down.

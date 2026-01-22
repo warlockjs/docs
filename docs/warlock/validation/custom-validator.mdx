@@ -1,14 +1,14 @@
 ---
-sidebar_position: 4
+sidebar_position: 6
 ---
 
 # Custom Validator
 
-Consider a custom validator as the final middleware interceptor before processing the request, it's used to validate the request after the validation rules.
+Consider a custom validator as the final middleware interceptor before processing the request, it's used to validate the request after the schema validation.
 
 ## How it works
 
-After running all validation rules, `Warlock` will try to identify the request handler `validate` method, if exists, it will run it, and pass the request and response objects to it.
+After running the validation schema, `Warlock.js` will try to identify the request handler `validate` method, if exists, it will run it, and pass the request and response objects to it.
 
 The `validate` method acts as a [middleware](./../http/middleware), it receives the request and response objects, if it returns a response object, then the request will be terminated, and the response will be sent back to the client, otherwise, the request will be processed normally.
 
@@ -35,7 +35,7 @@ export default async function login(request: Request, response: Response) {
 
 login.validation = {
   validate: async (request: Request, response: Response) => {
-    // custom validation here
+    // This runs AFTER schema validation (if any)
     const user = await User.attempt(request.only(["email", "password"]));
 
     if (!user) {
@@ -43,7 +43,6 @@ login.validation = {
     }
 
     // inject the user object to the request object
-    // Make sure to not return a value, otherwise the request will be terminated
     request.user = user;
   },
 };

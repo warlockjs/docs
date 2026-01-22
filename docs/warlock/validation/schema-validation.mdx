@@ -1,0 +1,329 @@
+---
+sidebar_position: 2
+---
+
+# Schema Validation
+
+Seal provides powerful schema-based validation through its fluent API. This page covers in-depth usage of object and array validation.
+
+## Object Validation
+
+Use `v.object()` to define structured schemas:
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().required().email(),
+  age: v.int().optional().min(0),
+});
+```
+
+### Required vs Optional
+
+By default, all fields are **optional**. Use `.required()` explicitly:
+
+```typescript
+const schema = v.object({
+  title: v.string().required(), // Must be present and non-empty
+  subtitle: v.string().optional(), // Can be missing or empty
+  description: v.string(), // Same as optional()
+});
+```
+
+### Default Values
+
+Provide default values for optional fields:
+
+```typescript
+const schema = v.object({
+  status: v.string().default("draft"),
+  priority: v.int().default(1),
+  isActive: v.boolean().default(true),
+});
+```
+
+### Nested Objects
+
+Objects can be nested to any depth:
+
+```typescript
+const profileSchema = v.object({
+  user: v.object({
+    name: v.string().required(),
+    contact: v.object({
+      email: v.string().email(),
+      phone: v.string().pattern(/^\+?[\d\s-]+$/),
+    }),
+  }),
+  settings: v.object({
+    notifications: v.boolean().default(true),
+    theme: v.string().oneOf(["light", "dark"]).default("light"),
+  }),
+});
+```
+
+### Schema Composition
+
+Reuse and extend schemas:
+
+```typescript
+const baseSchema = v.object({
+  id: v.int().required(),
+  createdAt: v.date(),
+  updatedAt: v.date(),
+});
+
+// Extend with additional fields
+const userSchema = baseSchema.extend({
+  name: v.string().required(),
+  email: v.string().email().required(),
+});
+
+// Pick specific fields
+const loginSchema = userSchema.pick("email");
+
+// Exclude fields
+const publicUserSchema = userSchema.without("createdAt", "updatedAt");
+
+// Merge two schemas
+const fullSchema = baseSchema.merge(
+  v.object({
+    metadata: v.object({}),
+  }),
+);
+```
+
+### Unknown Properties
+
+Control how unknown properties are handled:
+
+```typescript
+// Strip unknown properties (default)
+const strictSchema = v
+  .object({
+    name: v.string(),
+  })
+  .stripUnknown();
+
+// Allow unknown properties to pass through
+const looseSchema = v
+  .object({
+    name: v.string(),
+  })
+  .allowUnknown();
+
+// Allow specific additional keys
+const partialSchema = v
+  .object({
+    name: v.string(),
+  })
+  .allow("metadata", "extra");
+```
+
+## Array Validation
+
+Use `v.array()` to validate arrays with typed elements:
+
+```typescript
+const tagsSchema = v.array(v.string());
+
+const numbersSchema = v.array(v.int().positive());
+
+const usersSchema = v.array(
+  v.object({
+    name: v.string().required(),
+    role: v.string().oneOf(["admin", "user"]),
+  }),
+);
+```
+
+### Array Constraints
+
+```typescript
+const schema = v.object({
+  tags: v
+    .array(v.string())
+    .minLength(1) // At least 1 item
+    .maxLength(10) // At most 10 items
+    .distinct(), // No duplicates
+
+  scores: v.array(v.int()).length(5), // Exactly 5 items
+});
+```
+
+### Nested Arrays
+
+Arrays can contain arrays:
+
+```typescript
+const matrixSchema = v.array(v.array(v.number()));
+
+// Validates: [[1, 2], [3, 4], [5, 6]]
+```
+
+## Tuple Validation
+
+Use `v.tuple()` for fixed-length arrays with position-specific types:
+
+```typescript
+const coordinateSchema = v.tuple([
+  v.number(), // x
+  v.number(), // y
+]);
+
+const rgbSchema = v.tuple([
+  v.int().min(0).max(255),
+  v.int().min(0).max(255),
+  v.int().min(0).max(255),
+]);
+```
+
+## Record Validation
+
+Use `v.record()` for objects with dynamic keys:
+
+```typescript
+// Object with string keys and number values
+const scoresSchema = v.record(v.number());
+// Validates: { "math": 95, "science": 87, "history": 92 }
+
+// Object with string keys and user objects
+const userMapSchema = v.record(
+  v.object({
+    name: v.string(),
+    active: v.boolean(),
+  }),
+);
+```
+
+## Union Validation
+
+Use `v.union()` when a field can be multiple types:
+
+```typescript
+const flexibleIdSchema = v.union([v.string(), v.int()]);
+
+const responseSchema = v.object({
+  data: v.union([
+    v.object({ users: v.array(v.object({})) }),
+    v.object({ error: v.string() }),
+  ]),
+});
+```
+
+## Computed Fields
+
+Use `v.computed()` for derived values:
+
+```typescript
+const schema = v.object({
+  firstName: v.string().required(),
+  lastName: v.string().required(),
+  fullName: v.computed((data) => `${data.firstName} ${data.lastName}`),
+});
+```
+
+## Managed Fields
+
+Use `v.managed()` for framework-injected values:
+
+```typescript
+const schema = v.object({
+  title: v.string().required(),
+  createdBy: v.managed((context) => context.currentUser?.id),
+});
+```
+
+## Conditional Validation
+
+### Required Based on Other Fields
+
+```typescript
+const schema = v.object({
+  hasDiscount: v.boolean(),
+  discountCode: v.string().requiredIf("hasDiscount", true),
+});
+```
+
+### Required If Another Field Is Empty
+
+```typescript
+const schema = v.object({
+  email: v.string().email(),
+  phone: v.string().requiredIfEmpty("email"), // Required if email is empty
+});
+```
+
+### Forbidden If Conditions
+
+```typescript
+const schema = v.object({
+  type: v.string().oneOf(["basic", "premium"]),
+  premiumFeature: v.string().forbiddenIf("type", "basic"), // Not allowed for basic type
+});
+```
+
+## Real-World Example
+
+```typescript title="src/app/products/validation/create-product.ts"
+import { v } from "@warlock.js/seal";
+
+export const createProductSchema = v.object({
+  // Basic info
+  name: v.string().required().minLength(3).maxLength(200),
+  slug: v.string().lowercase().slug(),
+  description: v.string().maxLength(5000),
+
+  // Pricing
+  price: v.number().required().positive(),
+  salePrice: v.number().positive().optional(),
+  currency: v.string().length(3).uppercase().default("USD"),
+
+  // Inventory
+  sku: v.string().required().alphanumeric(),
+  quantity: v.int().min(0).default(0),
+
+  // Categorization
+  categoryId: v.int().required().positive(),
+  tags: v.array(v.string()).maxLength(20),
+
+  // Metadata
+  attributes: v.record(v.union([v.string(), v.number(), v.boolean()])),
+
+  // Status
+  status: v.string().oneOf(["draft", "active", "archived"]).default("draft"),
+  publishedAt: v.date().optional(),
+});
+```
+
+## Validation Outside HTTP
+
+Use schemas directly with `v.validate()`:
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const schema = v.object({
+  name: v.string().required(),
+  age: v.int().positive(),
+});
+
+async function validateData(data: unknown) {
+  const result = await v.validate(schema, data);
+
+  if (!result.isValid) {
+    console.log("Errors:", result.errors);
+    return null;
+  }
+
+  return result.data; // Typed as { name: string; age: number }
+}
+```
+
+## What's Next
+
+- [Framework Plugins](./framework-plugins) — Learn about `v.file()` and database rules
+- [Custom Rules](./custom-rules) — Create your own validation rules
+- [Error Messages](./error-messages) — Customize validation messages

@@ -1,0 +1,215 @@
+---
+sidebar_position: 8
+title: "CORS"
+description: "Configure Cross-Origin Resource Sharing (CORS) for your Warlock.js API"
+---
+
+# CORS Configuration
+
+Cross-Origin Resource Sharing (CORS) controls which domains can access your API. Warlock.js provides built-in CORS support via Fastify's CORS plugin.
+
+## Basic Configuration
+
+Configure CORS in your HTTP config file:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  cors: {
+    origin: true, // Allow all origins
+  },
+};
+
+export default httpConfig;
+```
+
+## CORS Options
+
+| Option           | Type                                      | Default         | Description                        |
+| ---------------- | ----------------------------------------- | --------------- | ---------------------------------- |
+| `origin`         | `boolean \| string \| string[] \| RegExp` | `false`         | Allowed origins                    |
+| `methods`        | `string[]`                                | All methods     | Allowed HTTP methods               |
+| `allowedHeaders` | `string[]`                                | Request headers | Headers clients can send           |
+| `exposedHeaders` | `string[]`                                | `[]`            | Headers clients can read           |
+| `credentials`    | `boolean`                                 | `false`         | Allow credentials (cookies)        |
+| `maxAge`         | `number`                                  | `86400`         | Preflight cache duration (seconds) |
+
+## Allow Specific Origins
+
+Restrict access to specific domains:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  cors: {
+    origin: [
+      "https://example.com",
+      "https://admin.example.com",
+      "http://localhost:3000", // Development
+    ],
+  },
+};
+
+export default httpConfig;
+```
+
+## Pattern Matching
+
+Use regex for flexible origin matching:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  cors: {
+    origin: /\.example\.com$/, // All subdomains of example.com
+  },
+};
+
+export default httpConfig;
+```
+
+## Allow Credentials
+
+Enable cookies and authentication headers:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  cors: {
+    origin: ["https://example.com"],
+    credentials: true,
+  },
+};
+
+export default httpConfig;
+```
+
+:::warning
+When `credentials: true`, you cannot use `origin: true` (wildcard). You must specify explicit origins.
+:::
+
+## Custom Headers
+
+Configure which headers clients can send and receive:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  cors: {
+    origin: true,
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "X-Custom-Header",
+    ],
+    exposedHeaders: ["X-Total-Count", "X-Page-Count"],
+  },
+};
+
+export default httpConfig;
+```
+
+## Restrict HTTP Methods
+
+Limit allowed HTTP methods:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  cors: {
+    origin: true,
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  },
+};
+
+export default httpConfig;
+```
+
+## Preflight Caching
+
+Increase preflight cache duration for better performance:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  cors: {
+    origin: true,
+    maxAge: 86400 * 7, // Cache for 7 days
+  },
+};
+
+export default httpConfig;
+```
+
+## Environment-Based Configuration
+
+Configure different CORS settings per environment:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+import { env, Application } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  cors: Application.isDevelopment
+    ? {
+        origin: true, // Allow all in development
+        credentials: true,
+      }
+    : {
+        origin: [
+          env("FRONTEND_URL", "https://example.com"),
+          env("ADMIN_URL", "https://admin.example.com"),
+        ],
+        credentials: true,
+        maxAge: 86400,
+      },
+};
+
+export default httpConfig;
+```
+
+## Disable CORS
+
+For internal APIs that don't need CORS:
+
+```ts title="src/config/http.ts"
+import type { HttpConfigurations } from "@warlock.js/core";
+
+const httpConfig: HttpConfigurations = {
+  port: 2030,
+  host: "localhost",
+  cors: false, // Disable CORS entirely
+};
+
+export default httpConfig;
+```
+
+## Related
+
+- [HTTP Configuration](../getting-started/env-config) - Full HTTP config reference
+- [Rate Limiting](./rate-limiting) - Request throttling
+- [Middleware](./middleware) - Custom request handling

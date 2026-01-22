@@ -1,0 +1,178 @@
+---
+sidebar_position: 1
+title: "RESTful Overview"
+description: "Build RESTful APIs with automatic CRUD operations in Warlock.js"
+---
+
+# RESTful Overview
+
+The RESTful system in **Warlock.js** lets you build complete CRUD APIs with minimal code. By providing a repository and (optionally) validation rules, the framework handles routing, request parsing, responses, and lifecycle hooks.
+
+## Why RESTful Controllers?
+
+Traditional CRUD requires repetitive route definitions for every resource:
+
+```ts
+// Without RESTful - repetitive boilerplate
+router.get("/users", listUsers);
+router.post("/users", createUser);
+router.get("/users/:id", getUser);
+router.put("/users/:id", updateUser);
+router.patch("/users/:id", patchUser);
+router.delete("/users/:id", deleteUser);
+router.delete("/users", bulkDeleteUsers);
+```
+
+With **Warlock.js** RESTful controllers, a single registration handles everything:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@warlock.js/core";
+import restfulUsers from "./controllers/restful-users";
+
+router.restfulResource("users", restfulUsers);
+```
+
+This generates the following routes automatically:
+
+| Method | Path         | Handler      | Description            |
+| ------ | ------------ | ------------ | ---------------------- |
+| GET    | `/users`     | `list`       | List all records       |
+| POST   | `/users`     | `create`     | Create a new record    |
+| GET    | `/users/:id` | `get`        | Get a single record    |
+| PUT    | `/users/:id` | `update`     | Full record update     |
+| PATCH  | `/users/:id` | `patch`      | Partial record update  |
+| DELETE | `/users/:id` | `delete`     | Delete a single record |
+| DELETE | `/users`     | `bulkDelete` | Delete multiple        |
+
+## Quick Start
+
+### 1. Create a RESTful Controller
+
+Extend the `Restful` class and provide your repository.
+
+```ts title="src/app/posts/controllers/restful-posts.ts"
+import { Restful } from "@warlock.js/core";
+import type { Post } from "../models/post";
+import postsRepository from "../repositories/posts-repository";
+
+class RestfulPosts extends Restful<Post> {
+  /**
+   * Repository for database operations
+   */
+  protected repository = postsRepository;
+
+  /**
+   * Response key for a single record
+   */
+  protected recordName = "post";
+
+  /**
+   * Response key for the records list
+   */
+  protected recordsListName = "posts";
+}
+
+const restfulPosts = new RestfulPosts();
+
+export default restfulPosts;
+```
+
+### 2. Register Routes
+
+Register the controller using `router.restfulResource()`.
+
+```ts title="src/app/posts/routes.ts"
+import { router } from "@warlock.js/core";
+import restfulPosts from "./controllers/restful-posts";
+
+router.restfulResource("posts", restfulPosts);
+```
+
+### 3. Add Validation
+
+Define validation schemas for data-modifying operations (`create`, `update`, `patch`).
+
+```ts title="src/app/posts/controllers/restful-posts.ts"
+import { Restful } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+import type { RouteResource } from "@warlock.js/core";
+import type { Post } from "../models/post";
+import postsRepository from "../repositories/posts-repository";
+
+class RestfulPosts extends Restful<Post> {
+  protected repository = postsRepository;
+  protected recordName = "post";
+  protected recordsListName = "posts";
+
+  /**
+   * Validation rules applied to create, update, and patch
+   */
+  public validation: RouteResource["validation"] = {
+    all: {
+      schema: v.object({
+        title: v.string().required().minLength(3),
+        content: v.string().required(),
+        status: v.string().in(["draft", "published"]),
+      }),
+    },
+  };
+}
+
+const restfulPosts = new RestfulPosts();
+
+export default restfulPosts;
+```
+
+## What You Get
+
+- **Automatic Routing**: All standard CRUD endpoints are registered with consistent naming.
+- **Declarative Validation**: Request validation is performed automatically before your controller logic runs.
+- **Smart Responses**: Automatic 404 handling for missing records and standardized success responses.
+- **Pagination & Filtering**: Integrated with the repository's listing system for built-in pagination.
+- **Lifecycle Hooks**: Methods like `beforeCreate` and `onSave` let you inject logic without overriding the main CRUD flow.
+- **Caching Integration**: Automatically switches to cached repository methods when caching is enabled.
+
+## Route Options
+
+Customize which routes are generated and apply middleware:
+
+```ts title="src/app/posts/routes.ts"
+import { router } from "@warlock.js/core";
+import { authMiddleware } from "../middleware/auth";
+import restfulPosts from "./controllers/restful-posts";
+
+router.restfulResource("posts", restfulPosts, {
+  middleware: [authMiddleware],
+  only: ["list", "get", "create", "update"], // Exclude delete and patch
+});
+```
+
+| Option       | Type                                     | Description                                       |
+| ------------ | ---------------------------------------- | ------------------------------------------------- |
+| `middleware` | `Middleware[]`                           | Applied to all generated routes                   |
+| `only`       | `ResourceMethod[]`                       | Only include these methods (excludes all others)  |
+| `except`     | `ResourceMethod[]`                       | Exclude these methods (includes all others)       |
+| `replace`    | `Record<ResourceMethod, RequestHandler>` | Replace specific framework handlers with your own |
+
+## Replace Specific Handlers
+
+You can override individual methods while still benefiting from the rest of the RESTful automation:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@warlock.js/core";
+import restfulUsers from "./controllers/restful-users";
+import { customListUsers } from "./controllers/custom-list-users";
+
+router.restfulResource("users", restfulUsers, {
+  replace: {
+    list: customListUsers,
+  },
+});
+```
+
+## Related
+
+- [Controllers](./controllers) — Detailed controller configuration and properties
+- [Lifecycle Hooks](./lifecycle-hooks) — Execute code before/after operations
+- [Validation](./validation) — Request validation patterns and rules
+- [Repositories](../../repositories/introduction) — Understanding the data access layer

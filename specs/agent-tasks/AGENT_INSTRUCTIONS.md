@@ -2,13 +2,15 @@
 
 > **Purpose**: Guidelines for agents writing Warlock.js v4 documentation
 
+> NEVER Update v3 docs and don't depend on it as there are major changes that not compatible with it, before creating the docs, read and review the source code for the part you're documenting in @warlock.js packages.
+
 ---
 
 ## Critical Rules
 
 ### 1. Framework Reference
 
-- **Always use `Warlock.js`** — Never just "Warlock"
+- **Always use `Warlock.js`** — Never just "Warlock" (unless referring to the class namespace)
 - Example: "Warlock.js uses a three-layer pattern" ✅
 - Not: "Warlock uses a three-layer pattern" ❌
 
@@ -21,6 +23,7 @@
 
 - Default port: **2030** (not 3000)
 - Default host: **localhost** (not 127.0.0.1)
+- Main entry file: **`src/app/main.ts`** (not `src/main.ts`)
 - Example: `http://localhost:2030`
 
 ### 4. Environment Variables
@@ -135,6 +138,7 @@ Before completing any page:
 - [ ] Host localhost used (not 127.0.0.1)
 - [ ] ENV variables match template (.env.example)
 - [ ] Config file examples match template (src/config/)
+- [ ] Entry file reference is `src/app/main.ts`
 - [ ] Imports use @warlock.js packages
 - [ ] Type imports come before value imports
 - [ ] No placeholders or TODOs

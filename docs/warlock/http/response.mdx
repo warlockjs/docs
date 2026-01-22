@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 6
 ---
 
 # Response
@@ -364,7 +364,7 @@ export default async function downloadAvatar(
 
 To send a xml response, use `response.xml()` method.
 
-```ts title="src/app/general/controllers/sitemap.ts"
+```ts title="src/app/shared/controllers/sitemap.ts"
 import { Request, Response } from "@warlock.js/core";
 import sitemap from "./../sitemap";
 
@@ -379,7 +379,7 @@ This will send a response with Content Type `application/xml`.
 
 To send a text response, use `response.text()` method.
 
-```ts title="src/app/general/controllers/robots.ts"
+```ts title="src/app/shared/controllers/robots.ts"
 import { Request, Response } from "@warlock.js/core";
 
 export default async function robots(request: Request, response: Response) {
@@ -393,7 +393,7 @@ This will send a response with Content Type `text/plain`.
 
 To send a html response, use `response.html()` method.
 
-```ts title="src/app/general/controllers/home.ts"
+```ts title="src/app/shared/controllers/home.ts"
 import { Request, Response } from "@warlock.js/core";
 
 export default async function home(request: Request, response: Response) {
@@ -618,6 +618,102 @@ export default async function downloadAvatar(
   return response.streamFile(avatar.path);
 }
 ```
+
+## Streaming API
+
+For real-time data streaming (e.g., AI responses, live updates):
+
+```ts title="src/app/chat/controllers/stream-response.ts"
+import type { RequestHandler } from "@warlock.js/core";
+
+export const streamResponse: RequestHandler = async (request, response) => {
+  const stream = response.stream("application/json");
+
+  // Send chunks over time
+  stream.send({ message: "Processing...", progress: 0 });
+
+  // Simulate work
+  for (let i = 1; i <= 5; i++) {
+    await delay(500);
+    stream.send({ message: `Step ${i} complete`, progress: i * 20 });
+  }
+
+  stream.send({ message: "Done!", progress: 100 });
+  stream.end();
+};
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+```
+
+### Stream Methods
+
+| Method                   | Description            |
+| ------------------------ | ---------------------- |
+| `stream.send(data)`      | Send a data chunk      |
+| `stream.render(element)` | Stream React component |
+| `stream.end()`           | Close the stream       |
+
+### Stream Content Types
+
+```ts
+// JSON streaming (default)
+const stream = response.stream("application/json");
+
+// Server-sent events
+const stream = response.stream("text/event-stream");
+
+// Plain text
+const stream = response.stream("text/plain");
+```
+
+## React Rendering
+
+Render React components directly in responses:
+
+```ts title="src/app/pages/controllers/home.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { HomePage } from "../components/HomePage";
+
+export const home: RequestHandler = async (request, response) => {
+  return response.render(<HomePage title="Welcome" user={request.user} />);
+};
+```
+
+### Streaming React Components
+
+Stream React components for incremental rendering:
+
+```ts title="src/app/reports/controllers/generate-report.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { ReportHeader, ReportSection, ReportFooter } from "../components";
+
+export const generateReport: RequestHandler = async (request, response) => {
+  const stream = response.stream("text/html");
+
+  // Stream header immediately
+  stream.render(<ReportHeader title="Sales Report" />);
+
+  // Stream sections as data loads
+  const sections = await loadReportSections();
+  for (const section of sections) {
+    stream.render(<ReportSection data={section} />);
+  }
+
+  // Stream footer and end
+  stream.render(<ReportFooter />);
+  stream.end();
+};
+```
+
+:::tip
+React streaming is ideal for:
+
+- Large reports that render sections progressively
+- AI-generated content that streams token by token
+- Live dashboards with real-time updates
+  :::
 
 ## Get response body
 

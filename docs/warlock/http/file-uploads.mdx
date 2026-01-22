@@ -1,0 +1,192 @@
+---
+sidebar_position: 10
+title: "File Uploads"
+description: "Handle file uploads with validation, storage, and image processing in Warlock.js"
+---
+
+# File Uploads
+
+Warlock.js provides a robust system for handling file uploads via `multipart/form-data`. Uploaded files are automatically encapsulated in a powerful `UploadedFile` class that provides a fluent API for validation, image processing, and storage.
+
+## Accessing Uploaded Files
+
+You can access uploaded files from the `request` object using `request.file()` for a single file or `request.files()` for multiple files.
+
+```typescript title="src/app/uploads/controllers/upload-avatar.ts"
+import { type RequestHandler } from "@warlock.js/core";
+
+export const uploadAvatar: RequestHandler = async (request, response) => {
+  const avatar = request.file("avatar");
+
+  if (!avatar) {
+    return response.badRequest({
+      error: "No file uploaded",
+    });
+  }
+
+  // Save to "avatars" directory in default storage
+  const storageFile = await avatar.save("avatars");
+
+  return response.success({
+    path: storageFile.path,
+  });
+};
+```
+
+### Multiple Files
+
+If the request contains multiple files for the same field, use `request.files()`:
+
+```typescript title="src/app/uploads/controllers/upload-gallery.ts"
+import { type RequestHandler } from "@warlock.js/core";
+
+export const uploadGallery: RequestHandler = async (request, response) => {
+  const images = request.files("images");
+
+  if (images.length === 0) {
+    return response.badRequest({
+      error: "No files uploaded",
+    });
+  }
+
+  // Process and save each file
+  const paths = await Promise.all(images.map((image) => image.save("gallery")));
+
+  return response.success({
+    uploaded: paths.length,
+    files: paths.map((file) => file.path),
+  });
+};
+```
+
+## The UploadedFile Class
+
+The `UploadedFile` instance provides several getters to inspect the file before saving:
+
+| Getter      | Type      | Description                                             |
+| :---------- | :-------- | :------------------------------------------------------ |
+| `name`      | `string`  | The sanitized original filename.                        |
+| `mimeType`  | `string`  | The file MIME type (e.g., `image/jpeg`).                |
+| `extension` | `string`  | The file extension without the dot (e.g., `jpg`).       |
+| `isImage`   | `boolean` | Whether the file is an image.                           |
+| `isVideo`   | `boolean` | Whether the file is a video.                            |
+| `isAudio`   | `boolean` | Whether the file is an audio file.                      |
+| `hash`      | `string`  | The file hash (available after `save()` or `saveAs()`). |
+
+### Async Properties
+
+Some information requires reading the file buffer and thus are asynchronous:
+
+```typescript
+const size = await avatar.size(); // Size in bytes
+const buffer = await avatar.buffer(); // Raw file buffer
+const dimensions = await avatar.dimensions(); // { width, height } for images
+const metadata = await avatar.metadata(); // Complete file metadata
+```
+
+## Saving Files
+
+Warlock.js uses a flexible storage system. By default, files are saved to the local storage.
+
+### Automatic Naming
+
+The `save()` method generates a random filename by default to prevent collisions:
+
+```typescript
+// Saves to storage/uploads/avatars/x7k9m2p4.jpg
+const storageFile = await file.save("avatars");
+```
+
+### Custom Naming Strategies
+
+You can control how the file is named using the `SaveOptions`:
+
+```typescript
+// Save with original filename
+await file.save("avatars", { name: "original" });
+
+// Save with a specific prefix
+await file.save("avatars", {
+  prefix: { format: "YYYY/MM/DD", as: "directory" },
+});
+// Result: avatars/2025/01/22/x7k9m2p4.jpg
+```
+
+### Explicit Path
+
+Use `saveAs()` if you want to provide the exact filename and skip the naming strategy:
+
+```typescript
+await file.saveAs("avatars/user-123.jpg");
+```
+
+## Image Processing
+
+Warlock.js features a built-in fluent API for image manipulation before storage. These operations only apply to image files; they are ignored for other file types.
+
+```typescript
+await file
+  .resize(800, 600) // Resize to 800x600
+  .grayscale() // Convert to black and white
+  .quality(85) // Set JPEG/WebP quality
+  .format("webp") // Convert to WebP format
+  .save("optimized");
+```
+
+Available transformations include: `resize`, `rotate`, `blur`, `grayscale`, `quality`, `format`, `flip`, `flop`, and `sharpen`.
+
+### Advanced Transformations
+
+For complete control, use the `transform()` method with a callback:
+
+```typescript
+await file
+  .transform((img) =>
+    img.resize({ width: 400 }).watermark("logo.png").sharpen(),
+  )
+  .save("products");
+```
+
+## Storage Drivers
+
+You can easily switch storage drivers (e.g., S3, Cloudinary) per upload:
+
+```typescript
+await file.use("s3").save("backups");
+```
+
+## Validation
+
+While you can manually call `file.validate()`, it is best practice to use the schema validator in your routes.
+
+```typescript title="src/app/users/routes.ts"
+import { router } from "@warlock.js/core";
+import { v } from "@warlock.js/core"; // Use core's v for file validator support
+
+router.post("/avatar", uploadAvatar, {
+  validation: {
+    schema: v.object({
+      avatar: v.file().required().image().maxSize("2mb"),
+    }),
+  },
+});
+```
+
+### Available Rules
+
+The `v.file()` validator provides several chaining methods:
+
+| Method                      | Description                                        |
+| :-------------------------- | :------------------------------------------------- |
+| `.image()`                  | Validates that the file is an image.               |
+| `.accept(['jpg', 'png'])`   | Limits allowed extensions.                         |
+| `.mimeType(['image/jpeg'])` | Limits allowed MIME types.                         |
+| `.maxSize('5mb')`           | Sets maximum allowed size (supports string units). |
+| `.minSize('100kb')`         | Sets minimum allowed size.                         |
+| `.maxWidth(1200)`           | Sets maximum image width.                          |
+| `.minWidth(200)`            | Sets minimum image width.                          |
+| `.saveTo('dir')`            | Automatically saves the file and returns the path. |
+
+:::tip
+When using `.saveTo('dir')` in your schema, the validated data will contain the **saved path** instead of the `UploadedFile` instance.
+:::

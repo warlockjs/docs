@@ -1,0 +1,352 @@
+---
+sidebar_position: 3
+---
+
+# Framework Plugins
+
+Warlock.js extends Seal with framework-specific validation features through plugins. These plugins add file upload validation and database rules that integrate with your ORM.
+
+## File Validation
+
+Use `v.file()` to validate uploaded files:
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const uploadSchema = v.object({
+  avatar: v.file().required().image().maxSize("2mb"),
+  resume: v.file().pdf().maxSize("10mb"),
+  documents: v.array(v.file()).maxLength(5),
+});
+```
+
+### Image Validation
+
+```typescript
+const schema = v.object({
+  // Must be an image file
+  photo: v.file().required().image().maxSize("5mb"),
+
+  // With dimension constraints
+  banner: v
+    .file()
+    .image()
+    .minWidth(1200)
+    .maxWidth(2400)
+    .minHeight(400)
+    .maxHeight(800),
+});
+```
+
+### File Extensions
+
+```typescript
+const schema = v.object({
+  // Accept specific extensions
+  document: v.file().accept(["pdf", "doc", "docx"]),
+
+  // Single extension
+  spreadsheet: v.file().accept("xlsx"),
+});
+```
+
+### MIME Types
+
+```typescript
+const schema = v.object({
+  // By MIME type
+  video: v.file().mimeType(["video/mp4", "video/webm"]),
+});
+```
+
+### File Size
+
+Sizes can be specified as numbers (bytes) or human-readable strings:
+
+```typescript
+const schema = v.object({
+  // Using string format
+  small: v.file().maxSize("500kb"),
+  medium: v.file().maxSize("5mb"),
+  large: v.file().maxSize("1gb"),
+
+  // Using bytes
+  tiny: v.file().maxSize(1024 * 100), // 100KB
+
+  // Min and max
+  avatar: v.file().minSize("10kb").maxSize("2mb"),
+});
+```
+
+### Common File Type Shortcuts
+
+```typescript
+const schema = v.object({
+  // PDF files
+  contract: v.file().pdf(),
+
+  // Excel files (.xls, .xlsx)
+  report: v.file().excel(),
+
+  // Word files (.doc, .docx)
+  letter: v.file().word(),
+
+  // Images (validates isImage property)
+  photo: v.file().image(),
+});
+```
+
+### Auto-Save Files
+
+Transform the file into a saved path automatically:
+
+```typescript
+const schema = v.object({
+  avatar: v.file().image().maxSize("2mb").saveTo("avatars"), // Saves to storage/avatars/
+
+  documents: v.array(v.file().saveTo("documents")),
+});
+
+// After validation, avatar will be a string path like:
+// "avatars/abc123.jpg"
+```
+
+### Complete File Validation Example
+
+```typescript title="src/app/posts/controllers/create.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+
+export const createPost: RequestHandler = async (request, response) => {
+  const data = request.validated();
+  // data.thumbnail is now a saved file path
+  return response.success({ post: data });
+};
+
+createPost.validation = {
+  schema: v.object({
+    title: v.string().required(),
+    content: v.string().required(),
+    thumbnail: v
+      .file()
+      .image()
+      .maxSize("5mb")
+      .minWidth(800)
+      .maxWidth(1920)
+      .saveTo("posts/thumbnails"),
+    attachments: v
+      .array(
+        v
+          .file()
+          .accept(["pdf", "doc", "docx", "zip"])
+          .maxSize("20mb")
+          .saveTo("posts/attachments"),
+      )
+      .maxLength(10)
+      .optional(),
+  }),
+};
+```
+
+## Database Rules
+
+### Unique Rule
+
+The `unique()` rule validates that a value doesn't already exist in the database:
+
+```typescript
+import { v } from "@warlock.js/seal";
+import { User } from "../models/user";
+
+const registerSchema = v.object({
+  email: v.string().required().email().unique(User), // Uses the field name as column
+
+  username: v.string().required().unique(User, { column: "username" }), // Explicit column
+});
+```
+
+#### Using Model Name
+
+You can pass the model name as a string instead of the class:
+
+```typescript
+const schema = v.object({
+  email: v.string().email().unique("User"),
+  slug: v.string().unique("Post", { column: "slug" }),
+});
+```
+
+#### Except Current Record
+
+When updating records, exclude the current record from the uniqueness check:
+
+```typescript title="src/app/users/controllers/update.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+import { User } from "../models/user";
+
+export const updateUser: RequestHandler = async (request, response) => {
+  const id = request.params.id;
+  const data = request.validated();
+  // ... update user
+};
+
+updateUser.validation = {
+  schema: v.object({
+    email: v.string().email().uniqueExceptCurrentId(User), // Excludes current :id param
+
+    username: v.string().uniqueExceptCurrentId(User, { column: "username" }),
+  }),
+};
+```
+
+#### Except Current User
+
+For profile updates, exclude the authenticated user:
+
+```typescript
+const updateProfileSchema = v.object({
+  email: v.string().email().uniqueExceptCurrentUser(User), // Excludes request.user
+});
+```
+
+#### Custom Query
+
+Add additional conditions to the uniqueness check:
+
+```typescript
+const schema = v.object({
+  slug: v.string().unique(Post, {
+    column: "slug",
+    query: ({ query, allValues }) => {
+      // Only check uniqueness within the same category
+      query.where("categoryId", allValues.categoryId);
+    },
+  }),
+});
+```
+
+### Exists Rule
+
+The `exists()` rule validates that a value exists in the database:
+
+```typescript
+const createPostSchema = v.object({
+  categoryId: v.int().required().exists(Category), // Uses the field name as column
+
+  authorId: v.int().required().exists(User, { column: "id" }),
+});
+```
+
+#### Custom Query
+
+Add conditions to the existence check:
+
+```typescript
+const schema = v.object({
+  categoryId: v.int().exists(Category, {
+    query: ({ query }) => {
+      query.where("isActive", true); // Only active categories
+    },
+  }),
+});
+```
+
+#### Variants
+
+```typescript
+const schema = v.object({
+  // Exclude the current record (in :id param)
+  parentId: v.int().existsExceptCurrentId(Category),
+
+  // Exclude the current user
+  managerId: v.int().existsExceptCurrentUser(User),
+});
+```
+
+## HTTP Validation Integration
+
+### Specifying What to Validate
+
+Control which parts of the request are validated:
+
+```typescript
+const handler: RequestHandler = async (request, response) => {
+  const data = request.validated();
+  return response.success(data);
+};
+
+handler.validation = {
+  schema: v.object({
+    page: v.int().default(1),
+    limit: v.int().default(20),
+  }),
+  validating: ["query"], // Only validate query params
+};
+```
+
+Available options:
+
+- `"body"` — Request body (POST/PUT data)
+- `"query"` — Query string parameters
+- `"params"` — URL path parameters
+- `"headers"` — Request headers
+
+Combine multiple:
+
+```typescript
+handler.validation = {
+  schema: mySchema,
+  validating: ["body", "query"], // Validate both
+};
+```
+
+### Accessing Validated Data
+
+```typescript
+const handler: RequestHandler = async (request, response) => {
+  // All validated data
+  const data = request.validated();
+
+  // Specific field
+  const { email, password } = request.validated();
+
+  // The data is typed based on your schema
+  return response.success(data);
+};
+```
+
+## Complete Example
+
+```typescript title="src/app/users/controllers/register.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { v } from "@warlock.js/seal";
+import { User } from "../models/user";
+
+export const register: RequestHandler = async (request, response) => {
+  const data = request.validated();
+
+  const user = await User.create({
+    name: data.name,
+    email: data.email,
+    password: data.password,
+    avatarPath: data.avatar, // Already saved path
+  });
+
+  return response.success({ user });
+};
+
+register.validation = {
+  schema: v.object({
+    name: v.string().required().minLength(2).maxLength(100),
+    email: v.string().required().email().unique(User),
+    password: v.string().required().strongPassword(),
+    avatar: v.file().image().maxSize("2mb").saveTo("avatars").optional(),
+  }),
+};
+```
+
+## What's Next
+
+- [Custom Rules](./custom-rules) — Create your own validation rules
+- [Error Messages](./error-messages) — Customize and localize error messages

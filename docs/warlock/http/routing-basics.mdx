@@ -1,0 +1,308 @@
+---
+sidebar_position: 1
+title: "Routing Basics"
+description: "Learn how to define routes and handle HTTP requests in Warlock.js"
+---
+
+# Routing Basics
+
+Routes map incoming HTTP requests to their controller functions. Warlock.js provides an intuitive routing API built on top of Fastify.
+
+## How Routing Works
+
+In Warlock.js, routing is designed to be simple and intuitive, similar to Express or Fastify.
+Each module inside `src/app` can have a `routes.ts` file that is automatically loaded at startup using the [Automated Routing](../getting-started/project-structure#automated-routing) system.
+
+## Defining a Route
+
+Creating a route is straightforward. You import the `router` and your controller, then define the HTTP method and path.
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@warlock.js/core";
+import { listUsersController } from "./controllers/list-users.controller";
+
+// Handle GET requests to /users
+router.get("/users", listUsersController);
+```
+
+When a request matches the URL `/users`, the `listUsersController` function is executed.
+
+## HTTP Methods
+
+Warlock.js supports all standard HTTP methods:
+
+```ts title="src/app/posts/routes.ts"
+import { router } from "@warlock.js/core";
+import {
+  listPostsController,
+  createPostController,
+  updatePostController,
+  patchPostController,
+  deletePostController,
+} from "./controllers";
+
+router.get("/posts", listPostsController); // GET requests
+router.post("/posts", createPostController); // POST requests
+router.put("/posts/:id", updatePostController); // PUT requests
+router.patch("/posts/:id", patchPostController); // PATCH requests
+router.delete("/posts/:id", deletePostController); // DELETE requests
+```
+
+Additional methods available:
+
+| Method             | Description              |
+| ------------------ | ------------------------ |
+| `router.head()`    | HEAD requests            |
+| `router.options()` | OPTIONS requests         |
+| `router.any()`     | Matches all HTTP methods |
+
+## Route Parameters
+
+Use `:paramName` syntax to capture dynamic segments:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@warlock.js/core";
+import { getUserController } from "./controllers/get-user.controller";
+
+router.get("/users/:id", getUserController);
+```
+
+Access parameters in your controller using `request.input()`:
+
+```ts title="src/app/users/controllers/get-user.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { User } from "../models/user";
+
+export const getUserController: RequestHandler = async (request, response) => {
+  const userId = request.input("id");
+  const user = await User.find(userId);
+
+  if (!user) {
+    return response.notFound();
+  }
+
+  return response.success({ user });
+};
+```
+
+:::tip
+`request.input()` retrieves values from route parameters, query string, and request body uniformly. It's the recommended way to access any request data.
+:::
+
+## Controller Validation
+
+Attach validation to controllers using the `.validation` property:
+
+```ts title="src/app/users/controllers/create-user.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { v } from "@warlock.js/core";
+import { User } from "../models/user";
+
+const createUserSchema = v.object({
+  name: v.string().required().minLength(2),
+  email: v.email().required(),
+  password: v.string().required().minLength(8),
+});
+
+export const createUserController: RequestHandler = async (
+  request,
+  response,
+) => {
+  // request.validated() returns only validated fields
+  const user = await User.create(request.validated());
+
+  return response.successCreate({ user });
+};
+
+createUserController.validation = {
+  schema: createUserSchema,
+};
+```
+
+## HTTP Request Life Cycle
+
+Understanding the flow of a request in Warlock.js is crucial for debugging and extending the framework. Here is the step-by-step lifecycle:
+
+1.  **Request Initiation**: The router matches the incoming request URL to a registered route.
+2.  **Context Initialization**: The framework creates a request store context, initializing request and response objects.
+3.  **Middleware Execution**: Global and route-specific middleware are executed in order. If any middleware returns a response, the cycle stops here.
+4.  **Validation Cycle**: The framework checks for a `validation` property on the controller. If present, it validates the request data. If validation fails, a `400 Bad Request` or `422 Unprocessable Entity` response is returned immediately.
+5.  **Pre-Action Event**: The `executingAction` event is triggered, allowing listeners to run before the controller.
+6.  **Controller Execution**: Your controller function (`handler`) is executed to process the request.
+7.  **Post-Action Event**: The `executedAction` event is triggered after successful controller execution.
+8.  **Response Finalization**: The controller's return value is processed and sent back to the client as an HTTP response.
+
+## Multiple Path Parameters
+
+Routes can have multiple parameters:
+
+```ts title="src/app/posts/routes.ts"
+import { router } from "@warlock.js/core";
+import { getCommentController } from "./controllers/get-comment.controller";
+
+// GET /posts/123/comments/456
+router.get("/posts/:postId/comments/:commentId", getCommentController);
+```
+
+```ts title="src/app/posts/controllers/get-comment.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+
+export const getCommentController: RequestHandler = async (
+  request,
+  response,
+) => {
+  const postId = request.input("postId");
+  const commentId = request.input("commentId");
+
+  // Fetch comment...
+  return response.success({ postId, commentId });
+};
+```
+
+## Route Options
+
+Each route method accepts an optional third parameter for configuration:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@warlock.js/core";
+import { getUserController } from "./controllers/get-user.controller";
+import { authMiddleware } from "../middleware/auth";
+
+router.get("/users/:id", getUserController, {
+  name: "users.show",
+  middleware: [authMiddleware],
+});
+```
+
+| Option       | Type           | Description                    |
+| ------------ | -------------- | ------------------------------ |
+| `name`       | `string`       | Named route for URL generation |
+| `middleware` | `Middleware[]` | Route-specific middleware      |
+
+## Named Routes
+
+Named routes enable URL generation without hardcoding paths:
+
+```ts title="src/app/users/routes.ts"
+import { router } from "@warlock.js/core";
+import { listUsersController, getUserController } from "./controllers";
+
+router.get("/users", listUsersController, { name: "users.list" });
+router.get("/users/:id", getUserController, { name: "users.show" });
+```
+
+Generate URLs using the `route()` helper:
+
+```ts title="src/app/users/controllers/list-users.controller.ts"
+import type { RequestHandler } from "@warlock.js/core";
+import { route } from "@warlock.js/core";
+import { User } from "../models/user";
+
+export const listUsersController: RequestHandler = async (
+  request,
+  response,
+) => {
+  const users = await User.list();
+
+  return response.success({
+    users,
+    links: {
+      self: route("users.list"),
+      // With parameters
+      first: route("users.show", { id: users[0]?.id }),
+    },
+  });
+};
+```
+
+:::info Default Route Names
+If no `name` is specified, Warlock.js generates one from the path: `/users/:id` becomes `users.id`.
+:::
+
+## Multiple Paths, Same Controller
+
+Register the same controller for multiple paths:
+
+```ts title="src/app/uploads/routes.ts"
+import { router } from "@warlock.js/core";
+import { uploadFileController } from "./controllers/upload.controller";
+
+// Both paths use the same controller
+router.post(["/uploads", "/admin/uploads"], uploadFileController);
+```
+
+## Static Files & Directories
+
+Serve static files and directories:
+
+```ts title="src/app/shared/routes.ts"
+import { router } from "@warlock.js/core";
+
+// Serve a single file
+router.file("/robots.txt", "public/robots.txt");
+
+// Serve with caching (1 year default)
+router.cachedFile("/favicon.ico", "public/favicon.ico");
+
+// Serve a directory
+router.directory({
+  path: "/assets",
+  directory: "public/assets",
+});
+```
+
+## Redirects
+
+Set up URL redirects:
+
+```ts title="src/app/shared/routes.ts"
+import { router } from "@warlock.js/core";
+
+// Temporary redirect (302)
+router.redirect("/old-path", "/new-path");
+
+// Permanent redirect (301)
+router.redirect("/legacy", "/modern", "permanent");
+```
+
+## Listing Routes
+
+View all registered routes programmatically:
+
+```ts
+import { router } from "@warlock.js/core";
+
+const allRoutes = router.list();
+console.log(allRoutes);
+// Output: Array of route objects with method, path, name, etc.
+```
+
+## Route Groups & Prefixes
+
+You can group routes to apply shared attributes like middleware or path prefixes using `router.group()` or the shorthand `router.prefix()`.
+
+```ts title="src/app/admin/routes.ts"
+import { router } from "@warlock.js/core";
+import { listUsersController } from "./controllers";
+import { adminAuth } from "../middleware";
+
+// Apply /admin prefix and auth middleware to all routes
+router.group(
+  {
+    prefix: "/admin",
+    middleware: [adminAuth],
+  },
+  () => {
+    router.get("/users", listUsersController); // GET /admin/users
+  },
+);
+```
+
+For more details on grouping, nesting, and reusable groups, see [Route Groups](./route-groups).
+
+## Related
+
+- [Route Builder](./route-builder) - Fluent API for complex route definitions
+- [Route Groups](./route-groups) - Grouping routes with shared options
+- [Middleware](./middleware) - Request/response interceptors
+- [Request](./request) - Accessing request data

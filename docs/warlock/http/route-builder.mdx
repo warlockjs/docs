@@ -1,0 +1,235 @@
+---
+sidebar_position: 2
+title: "Route Builder"
+description: "Fluent API for building routes with chaining, nesting, and RESTful shortcuts in Warlock.js"
+---
+
+# Route Builder
+
+The Route Builder provides a fluent, chainable API for defining routes. It's especially powerful for building RESTful APIs with less boilerplate.
+
+## Basic Usage
+
+Access the Route Builder via `router.route()`:
+
+```ts title="src/app/posts/routes.ts"
+import { router } from "@warlock.js/core";
+import {
+  listPosts,
+  createPost,
+  getPost,
+  updatePost,
+  deletePost,
+} from "./controllers";
+
+router.route("/posts").get(listPosts).post(createPost);
+
+router.route("/posts/:id").get(getPost).put(updatePost).delete(deletePost);
+```
+
+## HTTP Method Chaining
+
+Chain multiple HTTP methods on the same path:
+
+```ts title="src/app/articles/routes.ts"
+import { router } from "@warlock.js/core";
+import { listArticles, createArticle } from "./controllers";
+
+router.route("/articles").get(listArticles).post(createArticle);
+```
+
+Available methods: `.get()`, `.post()`, `.put()`, `.delete()`, `.patch()`, `.head()`, `.options()`
+
+## Resource Methods
+
+For resource-based routes with `:id` parameter, use the "One" variants:
+
+```ts title="src/app/products/routes.ts"
+import { router } from "@warlock.js/core";
+import {
+  getProduct,
+  updateProduct,
+  deleteProduct,
+  publishProduct,
+} from "./controllers";
+
+router
+  .route("/products/:id")
+  .getOne(getProduct) // GET /products/:id
+  .updateOne(updateProduct) // PUT /products/:id
+  .deleteOne(deleteProduct) // DELETE /products/:id
+  .postOne(publishProduct) // POST /products/:id
+  .patchOne(patchProduct); // PATCH /products/:id
+```
+
+## RESTful Semantic Aliases
+
+Use semantic method names that match REST terminology:
+
+```ts title="src/app/categories/routes.ts"
+import { router } from "@warlock.js/core";
+import {
+  listCategories,
+  createCategory,
+  getCategory,
+  updateCategory,
+  deleteCategory,
+} from "./controllers";
+
+// Collection routes
+router
+  .route("/categories")
+  .list(listCategories) // GET /categories
+  .create(createCategory); // POST /categories
+
+// Resource routes
+router
+  .route("/categories/:id")
+  .show(getCategory) // GET /categories/:id
+  .update(updateCategory) // PUT /categories/:id
+  .destroy(deleteCategory); // DELETE /categories/:id
+```
+
+| Semantic Method | HTTP Method | Typical Use          |
+| --------------- | ----------- | -------------------- |
+| `.list()`       | GET         | List collection      |
+| `.create()`     | POST        | Create new resource  |
+| `.show()`       | GET         | Show single resource |
+| `.update()`     | PUT         | Full update          |
+| `.destroy()`    | DELETE      | Delete resource      |
+
+## Nested Routes
+
+Create hierarchical routes with `.nest()`:
+
+```ts title="src/app/posts/routes.ts"
+import { router } from "@warlock.js/core";
+import {
+  getPost,
+  listComments,
+  createComment,
+  getComment,
+  deleteComment,
+} from "./controllers";
+
+router
+  .route("/posts/:postId")
+  .show(getPost)
+  .nest("/comments") // Creates /posts/:postId/comments
+  .list(listComments) // GET /posts/:postId/comments
+  .create(createComment) // POST /posts/:postId/comments
+  .nest("/:commentId") // Creates /posts/:postId/comments/:commentId
+  .show(getComment) // GET /posts/:postId/comments/:commentId
+  .destroy(deleteComment); // DELETE /posts/:postId/comments/:commentId
+```
+
+:::tip
+Nested routes automatically inherit the parent path. This keeps your code DRY and the intent clear.
+:::
+
+## CRUD Shorthand
+
+Define all CRUD operations in a single call:
+
+```ts title="src/app/tags/routes.ts"
+import { router } from "@warlock.js/core";
+import {
+  listTags,
+  createTag,
+  getTag,
+  updateTag,
+  deleteTag,
+  patchTag,
+} from "./controllers";
+
+router.route("/tags").crud({
+  list: listTags, // GET /tags
+  create: createTag, // POST /tags
+  show: getTag, // GET /tags/:id
+  update: updateTag, // PUT /tags/:id
+  destroy: deleteTag, // DELETE /tags/:id
+  patch: patchTag, // PATCH /tags/:id
+});
+```
+
+Only include the operations you need:
+
+```ts title="src/app/logs/routes.ts"
+import { router } from "@warlock.js/core";
+import { listLogs, getLog } from "./controllers";
+
+// Read-only resource
+router.route("/logs").crud({
+  list: listLogs,
+  show: getLog,
+});
+```
+
+## Route Options
+
+Pass options as the second argument to any method:
+
+```ts title="src/app/admin/routes.ts"
+import { router } from "@warlock.js/core";
+import { listUsers, createUser } from "./controllers";
+import { adminAuth } from "../middleware/admin-auth";
+
+router
+  .route("/admin/users")
+  .list(listUsers, {
+    name: "admin.users.list",
+    middleware: [adminAuth],
+  })
+  .create(createUser, {
+    name: "admin.users.create",
+    middleware: [adminAuth],
+  });
+```
+
+## Complete Example
+
+Combining all Route Builder features:
+
+```ts title="src/app/blog/routes.ts"
+import { router } from "@warlock.js/core";
+import {
+  listPosts,
+  createPost,
+  getPost,
+  updatePost,
+  deletePost,
+  listComments,
+  createComment,
+  deleteComment,
+  listTags,
+} from "./controllers";
+import { authMiddleware } from "../middleware/auth";
+
+// Public blog posts
+router
+  .route("/blog/posts")
+  .list(listPosts)
+  .create(createPost, { middleware: [authMiddleware] });
+
+router
+  .route("/blog/posts/:postId")
+  .show(getPost)
+  .update(updatePost, { middleware: [authMiddleware] })
+  .destroy(deletePost, { middleware: [authMiddleware] })
+  .nest("/comments")
+  .list(listComments)
+  .create(createComment, { middleware: [authMiddleware] })
+  .nest("/:commentId")
+  .destroy(deleteComment, { middleware: [authMiddleware] });
+
+// Tags with CRUD shorthand
+router.route("/blog/tags").crud({
+  list: listTags,
+});
+```
+
+## Related
+
+- [Routing Basics](./routing-basics) - Core routing concepts
+- [Route Groups](./route-groups) - Grouping routes with shared options
+- [RESTful Controllers](./restful/overview) - Full RESTful controller classes

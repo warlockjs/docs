@@ -1,0 +1,163 @@
+---
+sidebar_position: 2
+title: "RESTful Controllers"
+description: "Configure RESTful controllers for repository-based CRUD operations"
+---
+
+# RESTful Controllers
+
+RESTful controllers in **Warlock.js** wrap a repository and provide standardized CRUD operations. They are highly customizable through properties that control response keys, caching, and internal logic.
+
+## Controller Structure
+
+To create a RESTful controller, extend the base `Restful` class.
+
+```ts title="src/app/categories/controllers/restful-categories.ts"
+import { Restful } from "@warlock.js/core";
+import type { Category } from "../models/category";
+import categoriesRepository from "../repositories/categories-repository";
+
+class RestfulCategories extends Restful<Category> {
+  /**
+   * The repository handles all database operations
+   */
+  protected repository = categoriesRepository;
+
+  /**
+   * Key used in single-record responses
+   */
+  protected recordName = "category";
+
+  /**
+   * Key used in list responses
+   */
+  protected recordsListName = "categories";
+}
+
+const restfulCategories = new RestfulCategories();
+
+export default restfulCategories;
+```
+
+## Required Properties
+
+| Property     | Type                | Description                                                                |
+| ------------ | ------------------- | -------------------------------------------------------------------------- |
+| `repository` | `RepositoryManager` | The repository instance that handles data persistence for this controller. |
+
+## Configuration Properties
+
+### Response Keys
+
+Control the JSON keys returned in your API responses.
+
+| Property          | Type     | Default     | Description                      |
+| ----------------- | -------- | ----------- | -------------------------------- |
+| `recordName`      | `string` | `"record"`  | Response key for single record   |
+| `recordsListName` | `string` | `"records"` | Response key for list of records |
+
+### Caching
+
+RESTful controllers automatically use cached repository methods (`listCached`, `getCached`) if caching is enabled.
+
+| Property | Type      | Default | Description                                                    |
+| -------- | --------- | ------- | -------------------------------------------------------------- |
+| `cache`  | `boolean` | `true`  | Whether to use cached methods for `list` and `get` operations. |
+
+> [!NOTE]
+> Even if `cache` is `true` in the controller, it only takes effect if the repository has `isCacheable = true`.
+
+### Mutation Return Logic
+
+Control what the API returns after a successful `create`, `update`, `patch`, or `delete`.
+
+| Property   | Type     | Default               | Description                                                                   |
+| ---------- | -------- | --------------------- | ----------------------------------------------------------------------------- |
+| `returnOn` | `object` | All set to `"record"` | Set to `"record"` (returns the record) or `"records"` (returns a fresh list). |
+
+Example of returning the full list after a mutation:
+
+```ts
+protected returnOn = {
+  create: "records", // Useful for small lists that need immediate UI updates
+  update: "record",
+  patch: "record",
+  delete: "records",
+};
+```
+
+## Internal Middleware
+
+Directly defined middleware within the controller can be used to perform checks before `list`, `get`, or `delete` operations.
+
+> [!IMPORTANT]
+> Internal middleware in the `Restful` class is currently only supported for `list`, `get`, and `delete` methods. For `create`, `update`, and `patch`, use [Validation Hooks](./validation#custom-validation-function).
+
+```ts title="src/app/products/controllers/restful-products.ts"
+import type { Request, Response } from "@warlock.js/core";
+import { Restful } from "@warlock.js/core";
+import type { Product } from "../models/product";
+import productsRepository from "../repositories/products-repository";
+
+class RestfulProducts extends Restful<Product> {
+  protected repository = productsRepository;
+
+  protected middleware = {
+    list: [this.logListAccess.bind(this)],
+    delete: [this.checkOwnership.bind(this)],
+  };
+
+  protected logListAccess(request: Request, response: Response) {
+    console.log("Products list accessed by:", request.user?.id);
+  }
+
+  protected checkOwnership(
+    request: Request,
+    response: Response,
+    record?: Product,
+  ) {
+    if (record && record.get("createdBy") !== request.user?.id) {
+      return response.forbidden({ error: "You do not own this record" });
+    }
+  }
+}
+```
+
+## CRUD Behavior
+
+### List Operations
+
+The `list` method uses `request.heavy()` to automatically apply filters passed in the query string (e.g., `?status=active&category=123`). Empty query parameters are ignored to avoid unintentional filtering.
+
+### Patch Operations
+
+The `patch` method uses `request.heavyExceptParams()` to ensure that only fields explicitly provided in the request body are updated, preserving other fields.
+
+### Bulk Data Handling
+
+`bulkDelete` expects an `id` array in the request body:
+
+```json
+{
+  "id": [1, 2, 3]
+}
+```
+
+It iterates through the IDs, applying the `delete` [lifecycle hooks](./lifecycle-hooks) and internal middleware to each record individually.
+
+## Custom Finding Logic
+
+Override the `find` method if you need custom logic for retrieving a single record (e.g., including soft-deleted records or adding mandatory joins).
+
+```ts
+protected async find(id: number) {
+  // Custom finding logic
+  return this.repository.findActive(id);
+}
+```
+
+## Related
+
+- [Overview](./overview) — RESTful system introduction
+- [Lifecycle Hooks](./lifecycle-hooks) — Before/after operation hooks
+- [Validation](./validation) — Request validation patterns

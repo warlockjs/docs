@@ -14,13 +14,13 @@ To make any of the incoming functions work, make sure to add in your `.env` file
 BASE_URL=http://localhost:2030
 ```
 
-Then to import it in the [App configurations](./../getting-started/configurations#app-configurations).
+Then to import it in the [App configurations](./../getting-started/env-config).
 
 ## Get url path
 
 To generate a full url for a given path, use the `url` function.
 
-```ts title="src/main.ts"
+```ts title="src/app/main.ts"
 import { url } from "@warlock.js/core";
 
 console.log(url("posts")); // returns http://localhost:2030/posts
@@ -30,7 +30,7 @@ console.log(url("posts")); // returns http://localhost:2030/posts
 
 To generate a full url for a given path, use the `publicUrl` function, it will generate a url with the `public` path.
 
-```ts title="src/main.ts"
+```ts title="src/app/main.ts"
 import { publicUrl } from "@warlock.js/core";
 
 console.log(publicUrl("images")); // returns http://localhost:2030/public/images
@@ -40,7 +40,7 @@ console.log(publicUrl("images")); // returns http://localhost:2030/public/images
 
 To generate a full url for a given path, use the `uploadsUrl` function, it will generate a url with the `uploads` path.
 
-```ts title="src/main.ts"
+```ts title="src/app/main.ts"
 import { uploadsUrl } from "@warlock.js/core";
 
 console.log(uploadsUrl("images")); // returns http://localhost:2030/uploads/images
