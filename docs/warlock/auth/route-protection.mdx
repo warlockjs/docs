@@ -1,0 +1,615 @@
+---
+sidebar_position: 5
+---
+
+# Route Protection
+
+Learn patterns and best practices for protecting routes in your Warlock.js application using authentication middleware and custom guards.
+
+## Protection Levels
+
+### Public Routes
+
+Routes accessible without authentication:
+
+```typescript
+import { router } from "@warlock.js/core";
+
+// No middleware - completely public
+router.post("/login", loginController);
+router.post("/register", registerController);
+router.get("/posts", publicPostsController);
+```
+
+### Protected Routes
+
+Routes requiring authentication:
+
+```typescript
+import { authMiddleware } from "@warlock.js/auth";
+
+// Requires valid access token
+router.get("/profile", profileController).middleware(authMiddleware());
+
+router.put("/profile", updateProfileController).middleware(authMiddleware());
+```
+
+### Role-Based Routes
+
+Routes restricted to specific user types:
+
+```typescript
+// Admin only
+router
+  .get("/admin/dashboard", adminDashboardController)
+  .middleware(authMiddleware("admin"));
+
+// Multiple roles
+router
+  .get("/moderation/reports", reportsController)
+  .middleware(authMiddleware(["admin", "moderator"]));
+```
+
+## Organizational Patterns
+
+### Pattern 1: Separate Route Files
+
+Organize routes by access level in separate files:
+
+```
+src/app/
+├── users/
+│   ├── routes/
+│   │   ├── public.routes.ts      # Public routes
+│   │   ├── auth.routes.ts        # Authenticated routes
+│   │   └── admin.routes.ts       # Admin routes
+│   └── routes.ts                 # Import all
+```
+
+**public.routes.ts:**
+
+```typescript
+import { router } from "@warlock.js/core";
+import { loginController, registerController } from "../controllers";
+
+export function publicRoutes() {
+  router.post("/login", loginController);
+  router.post("/register", registerController);
+  router.post("/forgot-password", forgotPasswordController);
+}
+```
+
+**auth.routes.ts:**
+
+```typescript
+import { router } from "@warlock.js/core";
+import { authMiddleware } from "@warlock.js/auth";
+import { profileController, settingsController } from "../controllers";
+
+export function authRoutes() {
+  router.group(
+    {
+      prefix: "/user",
+      middleware: [authMiddleware()],
+    },
+    () => {
+      router.get("/profile", profileController);
+      router.put("/profile", updateProfileController);
+      router.get("/settings", settingsController);
+    },
+  );
+}
+```
+
+**admin.routes.ts:**
+
+```typescript
+import { router } from "@warlock.js/core";
+import { authMiddleware } from "@warlock.js/auth";
+import { dashboardController, usersController } from "../controllers";
+
+export function adminRoutes() {
+  router.group(
+    {
+      prefix: "/admin",
+      middleware: [authMiddleware("admin")],
+    },
+    () => {
+      router.get("/dashboard", dashboardController);
+      router.get("/users", usersController);
+      router.delete("/users/:id", deleteUserController);
+    },
+  );
+}
+```
+
+**routes.ts:**
+
+```typescript
+import { publicRoutes } from "./routes/public.routes";
+import { authRoutes } from "./routes/auth.routes";
+import { adminRoutes } from "./routes/admin.routes";
+
+publicRoutes();
+authRoutes();
+adminRoutes();
+```
+
+### Pattern 2: Nested Groups
+
+Use nested groups for hierarchical access control:
+
+```typescript
+import { router } from "@warlock.js/core";
+import { authMiddleware } from "@warlock.js/auth";
+
+// API v1
+router.group(
+  {
+    prefix: "/api/v1",
+  },
+  () => {
+    // Public endpoints
+    router.post("/auth/login", loginController);
+    router.post("/auth/register", registerController);
+
+    // Authenticated endpoints
+    router.group(
+      {
+        middleware: [authMiddleware()],
+      },
+      () => {
+        // User endpoints
+        router.get("/profile", profileController);
+        router.get("/orders", ordersController);
+
+        // Admin endpoints
+        router.group(
+          {
+            prefix: "/admin",
+            middleware: [authMiddleware("admin")],
+          },
+          () => {
+            router.get("/dashboard", dashboardController);
+            router.get("/users", usersController);
+            router.get("/reports", reportsController);
+          },
+        );
+      },
+    );
+  },
+);
+```
+
+### Pattern 3: Resource-Based Protection
+
+Protect resources with specific middleware:
+
+```typescript
+import { router } from "@warlock.js/core";
+import { authMiddleware } from "@warlock.js/auth";
+
+// Posts resource
+router.group(
+  {
+    prefix: "/posts",
+  },
+  () => {
+    // Public: List and view
+    router.get("/", listPostsController);
+    router.get("/:id", viewPostController);
+
+    // Protected: Create, update, delete
+    router.post("/", createPostController).middleware(authMiddleware());
+
+    router.put("/:id", updatePostController).middleware(authMiddleware());
+
+    router.delete("/:id", deletePostController).middleware(authMiddleware());
+  },
+);
+```
+
+## Custom Guards
+
+Create custom middleware for advanced protection logic:
+
+### Permission Guard
+
+Check user permissions:
+
+```typescript
+import type { Middleware } from "@warlock.js/core";
+
+export function requirePermission(permission: string): Middleware {
+  return async (request, response) => {
+    const user = request.user;
+
+    if (!user) {
+      return response.unauthorized({
+        error: "Authentication required",
+      });
+    }
+
+    const permissions = user.get("permissions") || [];
+
+    if (!permissions.includes(permission)) {
+      return response.forbidden({
+        error: `Permission '${permission}' required`,
+      });
+    }
+
+    // Permission granted, continue
+  };
+}
+```
+
+**Usage:**
+
+```typescript
+import { authMiddleware } from "@warlock.js/auth";
+import { requirePermission } from "./middleware/require-permission";
+
+router
+  .delete("/posts/:id", deletePostController)
+  .middleware([authMiddleware(), requirePermission("posts.delete")]);
+```
+
+### Role Guard
+
+Check user roles:
+
+```typescript
+import type { Middleware } from "@warlock.js/core";
+
+export function requireRole(roles: string | string[]): Middleware {
+  const allowedRoles = Array.isArray(roles) ? roles : [roles];
+
+  return async (request, response) => {
+    const user = request.user;
+
+    if (!user) {
+      return response.unauthorized({
+        error: "Authentication required",
+      });
+    }
+
+    const userRole = user.get("role");
+
+    if (!allowedRoles.includes(userRole)) {
+      return response.forbidden({
+        error: "Insufficient permissions",
+      });
+    }
+  };
+}
+```
+
+**Usage:**
+
+```typescript
+router
+  .get("/admin/dashboard", dashboardController)
+  .middleware([authMiddleware(), requireRole(["admin", "superadmin"])]);
+```
+
+### Ownership Guard
+
+Verify resource ownership:
+
+```typescript
+import type { Middleware } from "@warlock.js/core";
+import { Post } from "../models/post";
+
+export function requireOwnership(Model: any, paramName = "id"): Middleware {
+  return async (request, response) => {
+    const user = request.user;
+
+    if (!user) {
+      return response.unauthorized({
+        error: "Authentication required",
+      });
+    }
+
+    const resourceId = request.params[paramName];
+    const resource = await Model.find(resourceId);
+
+    if (!resource) {
+      return response.notFound({
+        error: "Resource not found",
+      });
+    }
+
+    if (resource.get("userId") !== user.get("id")) {
+      return response.forbidden({
+        error: "You don't own this resource",
+      });
+    }
+
+    // Store resource in request for controller use
+    request.resource = resource;
+  };
+}
+```
+
+**Usage:**
+
+```typescript
+import { Post } from "./models/post";
+
+router
+  .put("/posts/:id", updatePostController)
+  .middleware([authMiddleware(), requireOwnership(Post)]);
+
+// In controller
+export const updatePostController: RequestHandler = async (
+  request,
+  response,
+) => {
+  const post = request.resource; // Already loaded and verified
+
+  await post.merge(request.only(["title", "content"])).save();
+
+  return response.success({ post });
+};
+```
+
+### Combined Guard
+
+Combine multiple checks:
+
+```typescript
+import type { Middleware } from "@warlock.js/core";
+
+export function requireOwnershipOrRole(
+  Model: any,
+  roles: string[],
+  paramName = "id",
+): Middleware {
+  return async (request, response) => {
+    const user = request.user;
+
+    if (!user) {
+      return response.unauthorized({
+        error: "Authentication required",
+      });
+    }
+
+    const userRole = user.get("role");
+
+    // Allow if user has required role
+    if (roles.includes(userRole)) {
+      return; // Continue
+    }
+
+    // Otherwise, check ownership
+    const resourceId = request.params[paramName];
+    const resource = await Model.find(resourceId);
+
+    if (!resource) {
+      return response.notFound({
+        error: "Resource not found",
+      });
+    }
+
+    if (resource.get("userId") !== user.get("id")) {
+      return response.forbidden({
+        error: "Insufficient permissions",
+      });
+    }
+
+    request.resource = resource;
+  };
+}
+```
+
+**Usage:**
+
+```typescript
+// Allow owner or admin to delete
+router
+  .delete("/posts/:id", deletePostController)
+  .middleware([
+    authMiddleware(),
+    requireOwnershipOrRole(Post, ["admin", "moderator"]),
+  ]);
+```
+
+## Conditional Protection
+
+### Environment-Based
+
+Different protection in different environments:
+
+```typescript
+import { env } from "@warlock.js/core";
+import { authMiddleware } from "@warlock.js/auth";
+
+const middleware = env("NODE_ENV") === "development" ? [] : [authMiddleware()];
+
+router.get("/debug", debugController).middleware(middleware);
+```
+
+### Feature Flags
+
+Protect routes based on feature flags:
+
+```typescript
+import type { Middleware } from "@warlock.js/core";
+import { config } from "@warlock.js/core";
+
+export function requireFeature(feature: string): Middleware {
+  return async (request, response) => {
+    const enabled = config.key(`features.${feature}`);
+
+    if (!enabled) {
+      return response.notFound({
+        error: "Feature not available",
+      });
+    }
+  };
+}
+
+// Usage
+router
+  .get("/beta/feature", betaController)
+  .middleware([requireFeature("beta"), authMiddleware()]);
+```
+
+## Best Practices
+
+### 1. Fail Securely
+
+Default to protected unless explicitly public:
+
+```typescript
+// ❌ Bad: Easy to forget middleware
+router.get("/sensitive-data", sensitiveController);
+
+// ✅ Good: Explicit public routes
+router.get("/public/data", publicController);
+
+// ✅ Good: Protected by default
+router.group(
+  {
+    middleware: [authMiddleware()],
+  },
+  () => {
+    router.get("/data", dataController);
+  },
+);
+```
+
+### 2. Least Privilege
+
+Grant minimum necessary permissions:
+
+```typescript
+// ❌ Bad: Too permissive
+router.delete("/users/:id", deleteUserController).middleware(authMiddleware());
+
+// ✅ Good: Specific role required
+router
+  .delete("/users/:id", deleteUserController)
+  .middleware([authMiddleware("admin"), requirePermission("users.delete")]);
+```
+
+### 3. Consistent Patterns
+
+Use consistent protection patterns across your app:
+
+```typescript
+// Define standard middleware combinations
+const userAuth = [authMiddleware()];
+const adminAuth = [authMiddleware("admin")];
+const ownerOrAdmin = [
+  authMiddleware(),
+  requireOwnershipOrRole(Post, ["admin"]),
+];
+
+// Use consistently
+router.get("/profile", profileController).middleware(userAuth);
+router.get("/admin/dashboard", dashboardController).middleware(adminAuth);
+router.delete("/posts/:id", deletePostController).middleware(ownerOrAdmin);
+```
+
+### 4. Document Protection
+
+Comment protection requirements:
+
+```typescript
+// Public: Anyone can view posts
+router.get("/posts", listPostsController);
+
+// Protected: Authenticated users can create posts
+router.post("/posts", createPostController).middleware(authMiddleware());
+
+// Protected: Only post owner or admin can delete
+router
+  .delete("/posts/:id", deletePostController)
+  .middleware([authMiddleware(), requireOwnershipOrRole(Post, ["admin"])]);
+```
+
+### 5. Test Protection
+
+Verify route protection in tests:
+
+```typescript
+import { test } from "@warlock.js/testing";
+
+test("protected route requires authentication", async () => {
+  const response = await request.get("/profile");
+
+  expect(response.status).toBe(401);
+  expect(response.body.errorCode).toBe("EC001");
+});
+
+test("admin route requires admin role", async () => {
+  const userToken = await createUserToken();
+
+  const response = await request
+    .get("/admin/dashboard")
+    .header("Authorization", `Bearer ${userToken}`);
+
+  expect(response.status).toBe(403);
+});
+```
+
+## Common Patterns
+
+### Multi-Tenant Protection
+
+Ensure users only access their tenant's data:
+
+```typescript
+import type { Middleware } from "@warlock.js/core";
+
+export const requireTenant: Middleware = async (request, response) => {
+  const user = request.user;
+  const tenantId = request.params.tenantId || request.input("tenantId");
+
+  if (user.get("tenantId") !== tenantId) {
+    return response.forbidden({
+      error: "Access denied to this tenant",
+    });
+  }
+};
+
+// Usage
+router.group(
+  {
+    prefix: "/tenants/:tenantId",
+    middleware: [authMiddleware(), requireTenant],
+  },
+  () => {
+    router.get("/data", tenantDataController);
+  },
+);
+```
+
+### Rate Limiting by Auth Status
+
+Different rate limits for authenticated vs unauthenticated:
+
+```typescript
+import type { Middleware } from "@warlock.js/core";
+
+export const rateLimitByAuth: Middleware = async (request, response) => {
+  const user = request.user;
+
+  const limit = user ? 1000 : 100; // Higher limit for authenticated
+
+  // Apply rate limiting logic
+};
+
+router.get("/api/data", dataController).middleware([
+  authMiddleware(), // Optional auth
+  rateLimitByAuth,
+]);
+```
+
+## What's Next?
+
+- [Access Control](./access-control) - Implement RBAC and permissions
+- [Middleware](./middleware) - Learn about auth middleware
+- [Events](./events) - Hook into authentication events
+- [JWT Tokens](./jwt) - Understand token management

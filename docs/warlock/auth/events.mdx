@@ -1,0 +1,633 @@
+---
+sidebar_position: 7
+---
+
+# Events
+
+The authentication system emits events throughout the authentication lifecycle, allowing you to hook into login, logout, token management, and other auth-related actions.
+
+## Event System Overview
+
+Warlock.js auth provides a type-safe event system through `authEvents`:
+
+```typescript
+import { authEvents } from "@warlock.js/auth";
+
+// Subscribe to events
+authEvents.on("login.success", (user, tokenPair, deviceInfo) => {
+  console.log(`User ${user.get("id")} logged in`);
+});
+
+// Emit events (usually done internally)
+authEvents.emit("login.success", user, tokenPair, deviceInfo);
+```
+
+All events are namespaced under `auth.*` and provide full TypeScript autocomplete.
+
+## Available Events
+
+### Login Events
+
+#### `login.success`
+
+Emitted when a user successfully logs in.
+
+**Payload:** `[user: Auth, tokenPair: TokenPair, deviceInfo?: DeviceInfo]`
+
+```typescript
+authEvents.on("login.success", (user, tokenPair, deviceInfo) => {
+  console.log(`User ${user.get("id")} logged in`);
+  console.log(`IP: ${deviceInfo?.ip}`);
+  console.log(`User Agent: ${deviceInfo?.userAgent}`);
+});
+```
+
+**Use cases:**
+
+- Send welcome email
+- Log login activity
+- Track user sessions
+- Send notifications to other devices
+
+#### `login.failed`
+
+Emitted when login attempt fails.
+
+**Payload:** `[credentials: { email?: string; username?: string }, reason: string]`
+
+```typescript
+authEvents.on("login.failed", (credentials, reason) => {
+  console.log(`Failed login attempt for ${credentials.email}: ${reason}`);
+});
+```
+
+**Use cases:**
+
+- Security monitoring
+- Rate limiting
+- Account lockout after multiple failures
+- Alert user of suspicious activity
+
+#### `login.attempt`
+
+Emitted before login validation begins.
+
+**Payload:** `[credentials: { email?: string; username?: string }]`
+
+```typescript
+authEvents.on("login.attempt", (credentials) => {
+  console.log(`Login attempt for ${credentials.email}`);
+});
+```
+
+**Use cases:**
+
+- Pre-login validation
+- Rate limiting
+- Analytics
+
+### Logout Events
+
+#### `logout`
+
+Emitted when a user logs out.
+
+**Payload:** `[user: Auth]`
+
+```typescript
+authEvents.on("logout", (user) => {
+  console.log(`User ${user.get("id")} logged out`);
+});
+```
+
+**Use cases:**
+
+- Clear user cache
+- Log logout activity
+- Send notifications
+
+#### `logout.all`
+
+Emitted when all user sessions are terminated.
+
+**Payload:** `[user: Auth]`
+
+```typescript
+authEvents.on("logout.all", (user) => {
+  console.log(`All sessions terminated for user ${user.get("id")}`);
+});
+```
+
+**Use cases:**
+
+- Security alerts
+- Force disconnect from real-time services
+- Clear all user caches
+
+#### `logout.failsafe`
+
+Emitted when logout occurs without a refresh token (failsafe mode).
+
+**Payload:** `[user: Auth]`
+
+```typescript
+authEvents.on("logout.failsafe", (user) => {
+  console.log(`Failsafe logout for user ${user.get("id")}`);
+});
+```
+
+**Use cases:**
+
+- Track incomplete logout attempts
+- Security monitoring
+
+### Token Events
+
+#### `token.created`
+
+Emitted when new tokens are created.
+
+**Payload:** `[user: Auth, tokenPair: TokenPair]`
+
+```typescript
+authEvents.on("token.created", (user, tokenPair) => {
+  console.log(`New tokens created for user ${user.get("id")}`);
+  console.log(`Expires in: ${tokenPair.expiresIn}`);
+});
+```
+
+**Use cases:**
+
+- Track token generation
+- Analytics
+- Audit logging
+
+#### `token.refreshed`
+
+Emitted when tokens are refreshed.
+
+**Payload:** `[user: Auth, newTokenPair: TokenPair, oldRefreshToken: RefreshToken]`
+
+```typescript
+authEvents.on("token.refreshed", (user, newTokenPair, oldRefreshToken) => {
+  console.log(`Tokens refreshed for user ${user.get("id")}`);
+  console.log(`Old token family: ${oldRefreshToken.get("familyId")}`);
+});
+```
+
+**Use cases:**
+
+- Track token rotation
+- Detect suspicious refresh patterns
+- Analytics
+
+#### `token.revoked`
+
+Emitted when a refresh token is revoked.
+
+**Payload:** `[user: Auth, token: RefreshToken]`
+
+```typescript
+authEvents.on("token.revoked", (user, token) => {
+  console.log(`Token revoked for user ${user.get("id")}`);
+  console.log(`Device: ${token.get("deviceInfo")?.userAgent}`);
+});
+```
+
+**Use cases:**
+
+- Notify user of session termination
+- Security alerts
+- Audit logging
+
+#### `token.expired`
+
+Emitted when an expired token is detected during cleanup.
+
+**Payload:** `[token: RefreshToken]`
+
+```typescript
+authEvents.on("token.expired", (token) => {
+  console.log(`Token expired for user ${token.get("userId")}`);
+});
+```
+
+**Use cases:**
+
+- Cleanup related data
+- Analytics
+- Track token lifetime
+
+#### `token.familyRevoked`
+
+Emitted when an entire token family is revoked (breach detection).
+
+**Payload:** `[familyId: string, tokens: RefreshToken[]]`
+
+```typescript
+authEvents.on("token.familyRevoked", (familyId, tokens) => {
+  console.log(`Security breach detected! Family ${familyId} revoked`);
+  console.log(`Revoked ${tokens.length} tokens`);
+});
+```
+
+**Use cases:**
+
+- **Critical security alerts**
+- Force logout from all devices
+- Notify user immediately
+- Log security incident
+
+### Password Events
+
+#### `password.changed`
+
+Emitted when a user changes their password.
+
+**Payload:** `[user: Auth]`
+
+```typescript
+authEvents.on("password.changed", (user) => {
+  console.log(`Password changed for user ${user.get("id")}`);
+});
+```
+
+**Use cases:**
+
+- Send confirmation email
+- Revoke all sessions (security)
+- Log password change
+
+#### `password.resetRequested`
+
+Emitted when a password reset is requested.
+
+**Payload:** `[user: Auth, resetToken: string]`
+
+```typescript
+authEvents.on("password.resetRequested", (user, resetToken) => {
+  console.log(`Password reset requested for ${user.get("email")}`);
+  // Send reset email with token
+});
+```
+
+**Use cases:**
+
+- Send password reset email
+- Log reset requests
+- Rate limiting
+
+#### `password.reset`
+
+Emitted when a password is successfully reset.
+
+**Payload:** `[user: Auth]`
+
+```typescript
+authEvents.on("password.reset", (user) => {
+  console.log(`Password reset completed for user ${user.get("id")}`);
+});
+```
+
+**Use cases:**
+
+- Send confirmation email
+- Revoke all sessions
+- Log password reset
+
+### Session Events
+
+#### `session.created`
+
+Emitted when a new session (refresh token) is created.
+
+**Payload:** `[user: Auth, refreshToken: RefreshToken, deviceInfo?: DeviceInfo]`
+
+```typescript
+authEvents.on("session.created", (user, refreshToken, deviceInfo) => {
+  console.log(`New session for user ${user.get("id")}`);
+  console.log(`Device: ${deviceInfo?.userAgent}`);
+  console.log(`IP: ${deviceInfo?.ip}`);
+});
+```
+
+**Use cases:**
+
+- Notify user of new device login
+- Track active devices
+- Security monitoring
+
+#### `session.destroyed`
+
+Emitted when a session is destroyed.
+
+**Payload:** `[user: Auth, refreshToken: RefreshToken]`
+
+```typescript
+authEvents.on("session.destroyed", (user, refreshToken) => {
+  console.log(`Session destroyed for user ${user.get("id")}`);
+});
+```
+
+**Use cases:**
+
+- Update active sessions list
+- Cleanup session data
+- Analytics
+
+### Cleanup Events
+
+#### `cleanup.completed`
+
+Emitted when token cleanup completes.
+
+**Payload:** `[expiredCount: number]`
+
+```typescript
+authEvents.on("cleanup.completed", (expiredCount) => {
+  console.log(`Cleaned up ${expiredCount} expired tokens`);
+});
+```
+
+**Use cases:**
+
+- Monitor cleanup efficiency
+- Analytics
+- Alerting if too many expired tokens
+
+## Common Use Cases
+
+### Security Monitoring
+
+```typescript
+import { authEvents } from "@warlock.js/auth";
+import { log } from "@warlock.js/logger";
+
+// Log all authentication events
+authEvents.on("login.success", (user, tokenPair, deviceInfo) => {
+  log.info("security", "login-success", {
+    userId: user.get("id"),
+    ip: deviceInfo?.ip,
+    userAgent: deviceInfo?.userAgent,
+  });
+});
+
+authEvents.on("login.failed", (credentials, reason) => {
+  log.warn("security", "login-failed", {
+    email: credentials.email,
+    reason,
+  });
+});
+
+authEvents.on("token.familyRevoked", (familyId, tokens) => {
+  log.error("security", "breach-detected", {
+    familyId,
+    tokenCount: tokens.length,
+  });
+});
+```
+
+### Email Notifications
+
+```typescript
+import { authEvents } from "@warlock.js/auth";
+import { sendEmail } from "./services/email";
+
+// Welcome email on successful login
+authEvents.on("login.success", async (user, tokenPair, deviceInfo) => {
+  await sendEmail({
+    to: user.get("email"),
+    subject: "Welcome back!",
+    template: "login-success",
+    data: {
+      name: user.get("name"),
+      ip: deviceInfo?.ip,
+      device: deviceInfo?.userAgent,
+    },
+  });
+});
+
+// Alert on new device login
+authEvents.on("session.created", async (user, refreshToken, deviceInfo) => {
+  const sessions = await user.activeSessions();
+
+  if (sessions.length > 1) {
+    await sendEmail({
+      to: user.get("email"),
+      subject: "New device login detected",
+      template: "new-device-login",
+      data: {
+        name: user.get("name"),
+        device: deviceInfo?.userAgent,
+        ip: deviceInfo?.ip,
+      },
+    });
+  }
+});
+
+// Password reset email
+authEvents.on("password.resetRequested", async (user, resetToken) => {
+  await sendEmail({
+    to: user.get("email"),
+    subject: "Password Reset Request",
+    template: "password-reset",
+    data: {
+      name: user.get("name"),
+      resetUrl: `https://example.com/reset-password?token=${resetToken}`,
+    },
+  });
+});
+```
+
+### Analytics
+
+```typescript
+import { authEvents } from "@warlock.js/auth";
+import { analytics } from "./services/analytics";
+
+authEvents.on("login.success", (user, tokenPair, deviceInfo) => {
+  analytics.track("user_login", {
+    userId: user.get("id"),
+    userType: user.userType,
+    ip: deviceInfo?.ip,
+    device: deviceInfo?.userAgent,
+  });
+});
+
+authEvents.on("logout", (user) => {
+  analytics.track("user_logout", {
+    userId: user.get("id"),
+  });
+});
+
+authEvents.on("token.refreshed", (user) => {
+  analytics.track("token_refreshed", {
+    userId: user.get("id"),
+  });
+});
+```
+
+### Rate Limiting
+
+```typescript
+import { authEvents } from "@warlock.js/auth";
+
+const loginAttempts = new Map<string, number>();
+
+authEvents.on("login.failed", (credentials, reason) => {
+  const email = credentials.email || credentials.username;
+  if (!email) return;
+
+  const attempts = loginAttempts.get(email) || 0;
+  loginAttempts.set(email, attempts + 1);
+
+  if (attempts + 1 >= 5) {
+    // Lock account or implement rate limiting
+    console.log(`Account ${email} locked after 5 failed attempts`);
+  }
+});
+
+authEvents.on("login.success", (user) => {
+  const email = user.get("email");
+  loginAttempts.delete(email); // Reset on success
+});
+```
+
+### Session Management
+
+```typescript
+import { authEvents } from "@warlock.js/auth";
+
+// Track active sessions in cache
+authEvents.on("session.created", async (user, refreshToken, deviceInfo) => {
+  await cache.set(`sessions:${user.get("id")}`, {
+    count: (await user.activeSessions()).length,
+    lastDevice: deviceInfo?.userAgent,
+  });
+});
+
+authEvents.on("session.destroyed", async (user) => {
+  await cache.set(`sessions:${user.get("id")}`, {
+    count: (await user.activeSessions()).length,
+  });
+});
+```
+
+### Security Breach Response
+
+```typescript
+import { authEvents } from "@warlock.js/auth";
+import { sendEmail } from "./services/email";
+import { log } from "@warlock.js/logger";
+
+authEvents.on("token.familyRevoked", async (familyId, tokens) => {
+  // Critical security event!
+  log.error("security", "token-reuse-detected", {
+    familyId,
+    tokenCount: tokens.length,
+  });
+
+  // Get user from first token
+  const userId = tokens[0]?.get("userId");
+  if (!userId) return;
+
+  const User = config.key("auth.userType.user");
+  const user = await User.find(userId);
+
+  if (!user) return;
+
+  // Force logout from all devices
+  await user.revokeAllTokens();
+
+  // Send security alert
+  await sendEmail({
+    to: user.get("email"),
+    subject: "Security Alert: Suspicious Activity Detected",
+    template: "security-breach",
+    data: {
+      name: user.get("name"),
+      message:
+        "We detected suspicious activity on your account and have logged you out of all devices.",
+    },
+  });
+});
+```
+
+## Event Subscription
+
+### Subscribe to Events
+
+```typescript
+import { authEvents } from "@warlock.js/auth";
+
+const subscription = authEvents.on(
+  "login.success",
+  (user, tokenPair, deviceInfo) => {
+    // Handle event
+  },
+);
+```
+
+### Unsubscribe from Events
+
+```typescript
+// Unsubscribe specific subscription
+subscription.unsubscribe();
+
+// Unsubscribe from specific event
+authEvents.off("login.success");
+
+// Unsubscribe from all auth events
+authEvents.off();
+```
+
+### One-Time Subscription
+
+```typescript
+import events from "@mongez/events";
+
+events.once("auth.login.success", (user, tokenPair, deviceInfo) => {
+  // This will only run once
+});
+```
+
+## Best Practices
+
+> [!TIP]
+> **Async Event Handlers**
+>
+> Event handlers can be async. The event system will await them, but won't block the main flow.
+
+> [!IMPORTANT]
+> **Error Handling**
+>
+> Always wrap event handlers in try-catch to prevent errors from breaking the auth flow:
+>
+> ```typescript
+> authEvents.on("login.success", async (user) => {
+>   try {
+>     await sendWelcomeEmail(user);
+>   } catch (error) {
+>     log.error("email", "failed-to-send-welcome", error);
+>   }
+> });
+> ```
+
+> [!WARNING]
+> **Performance**
+>
+> Avoid heavy operations in event handlers. Use queues for time-consuming tasks:
+>
+> ```typescript
+> authEvents.on("login.success", async (user) => {
+>   // Queue instead of processing immediately
+>   await queue.add("send-welcome-email", { userId: user.get("id") });
+> });
+> ```
+
+## What's Next?
+
+- [JWT Tokens](./jwt) - Understand token lifecycle
+- [Middleware](./middleware) - Protect routes with authentication
+- [Configuration](./configuration) - Configure authentication behavior
+- [Auth Model](./auth-model) - Extend the Auth base class

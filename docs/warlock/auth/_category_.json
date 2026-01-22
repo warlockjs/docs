@@ -1,8 +1,8 @@
 {
-  "label": "Auth",
+  "label": "Authentication",
   "position": 5,
   "link": {
     "type": "generated-index",
-    "description": "Authentication & Authorization"
+    "description": "JWT-based authentication with access and refresh tokens"
   }
 }

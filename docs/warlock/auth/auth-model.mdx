@@ -1,97 +1,579 @@
 ---
-sidebar_position: 4
+sidebar_position: 8
 ---
 
 # Auth Model
 
-Auth model is an `abstract` class that is used for generating and validating access tokens.
+The `Auth` base class provides the foundation for user authentication in Warlock.js. Extend it to create custom user models with built-in authentication capabilities.
 
-## Extending Auth Model
+## Basic Usage
 
-The primary use case for extending the auth model is to manage access tokens and password.
+### Creating a User Model
 
-## Generate Access Token
-
-The `User` model that extends the `Auth` model can use `generateAccessToken` when the user logs in.
-
-## Verifying user credentials
-
-To verify the user credentials, you can use the `attempt` method from `Auth` model.
-
-This method accepts an object that will be used to fetch the user from the database, the only required key in the object is the `password` that will not be used to fetch the user, but will be used to verify the user password.
-
-## Login Example
-
-Consider the following example:
-
-```ts {7,24} title="src/app/users/controllers/login.ts"
-import { Request, Response } from "@warlock.js/core";
+```typescript
+// app/users/models/user.ts
+import { Auth } from "@warlock.js/auth";
 import { v } from "@warlock.js/seal";
-import { User } from "../models/user";
 
-export default async function login(request: Request, response: Response) {
-  const user: User = request.user;
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  password: v.string().required(),
+  isActive: v.boolean().default(true),
+});
 
-  const token = await user.generateAccessToken();
+export class User extends Auth {
+  /**
+   * Database table name
+   */
+  public static table = "users";
 
-  return response.success({
-    user: {
-      accessToken: token,
-      ...(await user.toJSON()),
-    },
-  });
+  /**
+   * Model schema
+   */
+  public static schema = userSchema;
+
+  /**
+   * User type identifier (required)
+   */
+  public get userType(): string {
+    return "user";
+  }
 }
+```
 
-login.validation = {
-  schema: v.object({
-    email: v.string().required().email(),
-    password: v.string().required(),
-  }),
-  validate: async (request: Request, response: Response) => {
-    // verify the user credentials
-    const user = await User.attempt(request.validated());
+### Required Implementation
 
-    if (!user) {
-      return response.badRequest({
-        error: "Invalid credentials",
-      });
-    }
+The only required implementation is the `userType` getter:
 
-    if (!user.isActive) {
-      return response.badRequest({
-        error: "Your account is not active",
-      });
-    }
+```typescript
+public get userType(): string {
+  return "user"; // Must match config key in auth.userType
+}
+```
 
-    request.user = user;
+This value must match the key in your auth configuration:
+
+```typescript
+// src/config/auth.ts
+const authConfigurations: AuthConfigurations = {
+  userType: {
+    user: User, // Key "user" matches userType getter
   },
+  // ...
 };
 ```
 
-We started the `validate` method by verifying the user credentials using `User.attempt` method, this method will return `null` if the user is not found or the password is incorrect.
+## Available Methods
 
-If the user is found, we check if the user is active, if not, we return an error.
+The `Auth` base class provides these methods:
 
-> This is an optional step based on your application logic.
+### Token Generation
 
-## Removing Access Token
+#### `generateAccessToken(payload?)`
 
-This will be handy in the `logout` request, so we can remove the access token from the database.
+Generate an access token for the user:
 
-```ts {7} title="src/app/users/controllers/logout.ts"
-import { Request, Response } from "@warlock.js/core";
-import { User } from "../models/user";
+```typescript
+const user = await User.find(1);
+const accessToken = await user.generateAccessToken();
 
-export default async function logout(
-  request: Request<User>,
-  response: Response,
-) {
-  const user: User = request.user;
+// With custom payload
+const accessToken = await user.generateAccessToken({
+  role: "admin",
+  permissions: ["read", "write"],
+});
+```
 
-  await user.removeAccessToken();
+#### `generateRefreshToken(deviceInfo?)`
 
-  delete request.user;
+Generate a refresh token:
 
-  return response.success();
+```typescript
+const refreshToken = await user.generateRefreshToken({
+  ip: "192.168.1.1",
+  userAgent: "Mozilla/5.0...",
+  deviceId: "device-123",
+});
+```
+
+#### `createTokenPair(deviceInfo?)`
+
+Generate both access and refresh tokens:
+
+```typescript
+const tokens = await user.createTokenPair({
+  ip: request.ip,
+  userAgent: request.userAgent,
+});
+
+console.log(tokens);
+// {
+//   accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+//   refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+//   expiresIn: "1h"
+// }
+```
+
+#### `accessTokenPayload()`
+
+Get the payload that will be encoded in the access token:
+
+```typescript
+const payload = user.accessTokenPayload();
+console.log(payload);
+// {
+//   id: 1,
+//   userType: "user"
+// }
+```
+
+Override this method to customize the payload:
+
+```typescript
+export class User extends Auth {
+  public accessTokenPayload() {
+    return {
+      ...super.accessTokenPayload(),
+      role: this.get("role"),
+      permissions: this.get("permissions"),
+    };
+  }
 }
 ```
+
+### Token Revocation
+
+#### `removeAccessToken(token)`
+
+Revoke a specific access token:
+
+```typescript
+const user = request.user;
+const token = request.authorizationValue;
+
+await user.removeAccessToken(token);
+```
+
+#### `revokeAllTokens()`
+
+Revoke all tokens (logout from all devices):
+
+```typescript
+await user.revokeAllTokens();
+```
+
+### Session Management
+
+#### `activeSessions()`
+
+Get all active sessions (refresh tokens):
+
+```typescript
+const sessions = await user.activeSessions();
+
+console.log(sessions);
+// [
+//   RefreshToken {
+//     token: "...",
+//     deviceInfo: { ip: "...", userAgent: "..." },
+//     lastUsedAt: Date,
+//     expiresAt: Date,
+//   },
+//   ...
+// ]
+```
+
+### Password Management
+
+#### `confirmPassword(password)`
+
+Verify a password against the stored hash:
+
+```typescript
+const user = await User.find(1);
+const isValid = user.confirmPassword("user-password");
+
+if (isValid) {
+  console.log("Password is correct");
+}
+```
+
+## Static Methods
+
+### `attempt(credentials)`
+
+Attempt to authenticate a user with credentials:
+
+```typescript
+const user = await User.attempt({
+  email: "user@example.com",
+  password: "password123",
+});
+
+if (user) {
+  console.log("Authentication successful");
+} else {
+  console.log("Invalid credentials");
+}
+```
+
+This method:
+
+1. Finds user by email (or username, depending on credentials)
+2. Verifies the password
+3. Returns the user if valid, `null` otherwise
+
+## Multi-User Types
+
+Create different user models for different user types:
+
+### User Model
+
+```typescript
+// app/users/models/user.ts
+import { Auth } from "@warlock.js/auth";
+import { v } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  password: v.string().required(),
+});
+
+export class User extends Auth {
+  public static table = "users";
+  public static schema = userSchema;
+
+  public get userType(): string {
+    return "user";
+  }
+}
+```
+
+### Admin Model
+
+```typescript
+// app/admins/models/admin.ts
+import { Auth } from "@warlock.js/auth";
+import { v } from "@warlock.js/seal";
+
+const adminSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  password: v.string().required(),
+  role: v.string().default("admin"),
+  permissions: v.array(v.string()).default([]),
+});
+
+export class Admin extends Auth {
+  public static table = "admins";
+  public static schema = adminSchema;
+
+  public get userType(): string {
+    return "admin";
+  }
+
+  // Admin-specific methods
+  public hasPermission(permission: string): boolean {
+    const permissions = this.get("permissions") || [];
+    return permissions.includes(permission);
+  }
+}
+```
+
+### Configuration
+
+```typescript
+// src/config/auth.ts
+import { User } from "app/users/models/user";
+import { Admin } from "app/admins/models/admin";
+
+const authConfigurations: AuthConfigurations = {
+  userType: {
+    user: User,
+    admin: Admin,
+  },
+  // ...
+};
+```
+
+### Usage
+
+```typescript
+// Login as user
+const user = await authService.login(User, {
+  email: "user@example.com",
+  password: "password",
+});
+
+// Login as admin
+const admin = await authService.login(Admin, {
+  email: "admin@example.com",
+  password: "password",
+});
+```
+
+## Password Hashing
+
+Passwords are automatically hashed when creating or updating users:
+
+```typescript
+const user = new User({
+  name: "John Doe",
+  email: "john@example.com",
+  password: "plain-password", // Will be hashed automatically
+});
+
+await user.save();
+
+// Password is now hashed
+console.log(user.get("password")); // $2a$12$...
+```
+
+The hashing is handled by `authService.hashPassword()` using bcrypt with the configured salt rounds.
+
+## Custom Methods
+
+Add custom methods to your user models:
+
+```typescript
+export class User extends Auth {
+  public static table = "users";
+  public static schema = userSchema;
+
+  public get userType(): string {
+    return "user";
+  }
+
+  /**
+   * Check if user is active
+   */
+  public isActive(): boolean {
+    return this.get("isActive") === true;
+  }
+
+  /**
+   * Get user's full name
+   */
+  public fullName(): string {
+    return `${this.get("firstName")} ${this.get("lastName")}`;
+  }
+
+  /**
+   * Check if user has verified email
+   */
+  public hasVerifiedEmail(): boolean {
+    return !!this.get("emailVerifiedAt");
+  }
+
+  /**
+   * Get user's profile picture URL
+   */
+  public profilePicture(): string {
+    return this.get("avatar") || "/default-avatar.png";
+  }
+
+  /**
+   * Custom access token payload
+   */
+  public accessTokenPayload() {
+    return {
+      ...super.accessTokenPayload(),
+      isActive: this.isActive(),
+      emailVerified: this.hasVerifiedEmail(),
+    };
+  }
+}
+```
+
+## Advanced Patterns
+
+### Soft Deletes
+
+Implement soft deletes for user accounts:
+
+```typescript
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  password: v.string().required(),
+  deletedAt: v.date().nullable(),
+});
+
+export class User extends Auth {
+  public static table = "users";
+  public static schema = userSchema;
+
+  public get userType(): string {
+    return "user";
+  }
+
+  /**
+   * Soft delete user
+   */
+  public async softDelete(): Promise<void> {
+    await this.merge({ deletedAt: new Date() }).save();
+    await this.revokeAllTokens(); // Logout from all devices
+  }
+
+  /**
+   * Restore soft deleted user
+   */
+  public async restore(): Promise<void> {
+    await this.merge({ deletedAt: null }).save();
+  }
+
+  /**
+   * Check if user is deleted
+   */
+  public isDeleted(): boolean {
+    return !!this.get("deletedAt");
+  }
+}
+```
+
+### Email Verification
+
+Track email verification status:
+
+```typescript
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  password: v.string().required(),
+  emailVerifiedAt: v.date().nullable(),
+  emailVerificationToken: v.string().nullable(),
+});
+
+export class User extends Auth {
+  public static table = "users";
+  public static schema = userSchema;
+
+  public get userType(): string {
+    return "user";
+  }
+
+  /**
+   * Generate email verification token
+   */
+  public async generateEmailVerificationToken(): Promise<string> {
+    const token = Random.string(32);
+    await this.merge({ emailVerificationToken: token }).save();
+    return token;
+  }
+
+  /**
+   * Verify email with token
+   */
+  public async verifyEmail(token: string): Promise<boolean> {
+    if (this.get("emailVerificationToken") !== token) {
+      return false;
+    }
+
+    await this.merge({
+      emailVerifiedAt: new Date(),
+      emailVerificationToken: null,
+    }).save();
+
+    return true;
+  }
+
+  /**
+   * Check if email is verified
+   */
+  public hasVerifiedEmail(): boolean {
+    return !!this.get("emailVerifiedAt");
+  }
+}
+```
+
+### Two-Factor Authentication
+
+Add 2FA support:
+
+```typescript
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  password: v.string().required(),
+  twoFactorSecret: v.string().nullable(),
+  twoFactorEnabled: v.boolean().default(false),
+});
+
+export class User extends Auth {
+  public static table = "users";
+  public static schema = userSchema;
+
+  public get userType(): string {
+    return "user";
+  }
+
+  /**
+   * Enable two-factor authentication
+   */
+  public async enableTwoFactor(secret: string): Promise<void> {
+    await this.merge({
+      twoFactorSecret: secret,
+      twoFactorEnabled: true,
+    }).save();
+  }
+
+  /**
+   * Disable two-factor authentication
+   */
+  public async disableTwoFactor(): Promise<void> {
+    await this.merge({
+      twoFactorSecret: null,
+      twoFactorEnabled: false,
+    }).save();
+  }
+
+  /**
+   * Check if 2FA is enabled
+   */
+  public hasTwoFactorEnabled(): boolean {
+    return this.get("twoFactorEnabled") === true;
+  }
+
+  /**
+   * Verify 2FA code
+   */
+  public verifyTwoFactorCode(code: string): boolean {
+    const secret = this.get("twoFactorSecret");
+    if (!secret) return false;
+
+    // Implement TOTP verification
+    return verifyTOTP(secret, code);
+  }
+}
+```
+
+## Best Practices
+
+> [!TIP]
+> **Keep User Type Simple**
+>
+> The `userType` getter should return a simple string identifier. Don't add complex logic here.
+
+> [!IMPORTANT]
+> **Password Hashing**
+>
+> Never manually hash passwords. The Auth model handles this automatically when you set the password field.
+
+> [!WARNING]
+> **Token Payload Size**
+>
+> Keep the access token payload small. Don't include large objects or arrays. JWTs are sent with every request.
+
+> [!CAUTION]
+> **Sensitive Data**
+>
+> Never include sensitive data (passwords, secrets, etc.) in the access token payload. It's not encrypted, only signed.
+
+## What's Next?
+
+- [JWT Tokens](./jwt) - Learn about token generation and management
+- [Middleware](./middleware) - Protect routes with authentication
+- [Events](./events) - Hook into authentication lifecycle
+- [Configuration](./configuration) - Configure authentication behavior

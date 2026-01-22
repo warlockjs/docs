@@ -1,0 +1,364 @@
+---
+sidebar_position: 2
+---
+
+# Configuration
+
+Configure the authentication system in `src/config/auth.ts`. This file controls JWT settings, user types, token behavior, and password hashing.
+
+## Basic Configuration
+
+```typescript
+// src/config/auth.ts
+import { NO_EXPIRATION, type AuthConfigurations } from "@warlock.js/auth";
+import { env } from "@warlock.js/core";
+import { User } from "app/users/models/user";
+
+const authConfigurations: AuthConfigurations = {
+  userType: {
+    user: User,
+  },
+  jwt: {
+    secret: env("JWT_SECRET"),
+    expiresIn: NO_EXPIRATION,
+    refresh: {
+      enabled: true,
+      secret: env("JWT_REFRESH_SECRET"),
+      expiresIn: "7d",
+    },
+  },
+};
+
+export default authConfigurations;
+```
+
+## User Types
+
+The `userType` configuration maps user type strings to their corresponding model classes. This allows Warlock.js to support multiple user types in the same application.
+
+```typescript
+import { User } from "app/users/models/user";
+import { Admin } from "app/admins/models/admin";
+
+const authConfigurations: AuthConfigurations = {
+  userType: {
+    user: User, // Regular users
+    admin: Admin, // Admin users
+  },
+  // ... rest of config
+};
+```
+
+Each model must extend the `Auth` base class and implement the `userType` getter:
+
+```typescript
+export class User extends Auth {
+  public get userType(): string {
+    return "user";
+  }
+}
+
+export class Admin extends Auth {
+  public get userType(): string {
+    return "admin";
+  }
+}
+```
+
+## JWT Configuration
+
+### Secret Key
+
+The JWT secret is used to sign and verify access tokens. **This must be a strong, random string.**
+
+```typescript
+jwt: {
+  secret: env("JWT_SECRET"), // Required
+}
+```
+
+Generate a secure secret using the CLI:
+
+```bash
+warlock jwt:secret
+```
+
+This will generate a random secret and add it to your `.env` file.
+
+### Algorithm
+
+Specify the signing algorithm. Defaults to `HS256`.
+
+```typescript
+jwt: {
+  secret: env("JWT_SECRET"),
+  algorithm: "HS512", // Optional, default: "HS256"
+}
+```
+
+Supported algorithms: `HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `ES256`, `ES384`, `ES512`.
+
+### Access Token Expiration
+
+Control how long access tokens remain valid. You can use:
+
+- **Duration object** - `{ hours: 1, minutes: 30 }`
+- **String format** - `"1h"`, `"30m"`, `"1d 2h"`
+- **NO_EXPIRATION symbol** - Tokens never expire
+
+```typescript
+import { NO_EXPIRATION } from "@warlock.js/auth";
+
+// Duration object (recommended)
+jwt: {
+  expiresIn: { hours: 1 },
+}
+
+// String format
+jwt: {
+  expiresIn: "1h",
+}
+
+// Multiple units
+jwt: {
+  expiresIn: { days: 1, hours: 12, minutes: 30 },
+}
+
+// String with multiple units
+jwt: {
+  expiresIn: "1d 12h 30m",
+}
+
+// No expiration (use with caution)
+jwt: {
+  expiresIn: NO_EXPIRATION,
+}
+```
+
+> [!WARNING]
+> Using `NO_EXPIRATION` means access tokens never expire. This can be a security risk if tokens are compromised. Consider using short-lived access tokens with refresh tokens instead.
+
+### Duration Format
+
+The duration format supports the following units:
+
+| Unit    | Singular | Plural    | Abbreviation |
+| ------- | -------- | --------- | ------------ |
+| Seconds | `second` | `seconds` | `s`          |
+| Minutes | `minute` | `minutes` | `m`          |
+| Hours   | `hour`   | `hours`   | `h`          |
+| Days    | `day`    | `days`    | `d`          |
+| Weeks   | `week`   | `weeks`   | `w`          |
+
+**Examples:**
+
+```typescript
+// Object format
+{ seconds: 30 }
+{ minutes: 15 }
+{ hours: 2 }
+{ days: 7 }
+{ weeks: 1 }
+{ days: 1, hours: 12, minutes: 30 }
+
+// String format
+"30s"
+"15m"
+"2h"
+"7d"
+"1w"
+"1d 12h 30m"
+```
+
+## Refresh Token Configuration
+
+Refresh tokens allow users to obtain new access tokens without re-authenticating. They are long-lived and stored in the database.
+
+### Enable/Disable
+
+```typescript
+jwt: {
+  refresh: {
+    enabled: true, // Default: true
+  },
+}
+```
+
+When disabled, only access tokens are issued. Users must re-authenticate when tokens expire.
+
+### Refresh Token Secret
+
+Use a separate secret for refresh tokens (recommended for security).
+
+```typescript
+jwt: {
+  refresh: {
+    secret: env("JWT_REFRESH_SECRET"), // Falls back to main secret if not provided
+  },
+}
+```
+
+### Refresh Token Expiration
+
+```typescript
+jwt: {
+  refresh: {
+    expiresIn: "7d", // Default: 7 days
+  },
+}
+```
+
+Supports the same duration formats as access tokens, but **cannot use `NO_EXPIRATION`**.
+
+### Token Rotation
+
+When enabled, using a refresh token to get new access tokens will:
+
+1. Issue a new access token
+2. Issue a new refresh token
+3. Revoke the old refresh token
+
+```typescript
+jwt: {
+  refresh: {
+    rotation: true, // Default: true
+  },
+}
+```
+
+This prevents refresh token reuse attacks. If a revoked token is reused, the entire token family is revoked.
+
+> [!TIP]
+> Keep rotation enabled for production environments. It significantly improves security.
+
+### Maximum Tokens Per User
+
+Limit the number of active refresh tokens per user. When exceeded, the oldest tokens are automatically revoked.
+
+```typescript
+jwt: {
+  refresh: {
+    maxPerUser: 5, // Default: 5
+  },
+}
+```
+
+This prevents unlimited session accumulation and helps manage active sessions.
+
+### Logout Behavior
+
+Control what happens when `authService.logout()` is called without a refresh token:
+
+```typescript
+jwt: {
+  refresh: {
+    logoutWithoutToken: "revoke-all", // Default: "revoke-all"
+  },
+}
+```
+
+**Options:**
+
+- `"revoke-all"` - Revoke all refresh tokens for the user (secure default)
+- `"error"` - Throw an error requiring the refresh token
+
+> [!IMPORTANT]
+> The `"revoke-all"` behavior is more secure as it ensures logout works even if the client doesn't provide the refresh token. However, it logs out all devices.
+
+## Password Configuration
+
+Configure password hashing strength:
+
+```typescript
+const authConfigurations: AuthConfigurations = {
+  // ... other config
+  password: {
+    salt: 12, // Default: 12
+  },
+};
+```
+
+The `salt` value determines the cost factor for bcrypt hashing:
+
+- Higher values = more secure but slower
+- Lower values = faster but less secure
+- Recommended range: 10-14
+
+> [!CAUTION]
+> Changing the salt value will not affect existing passwords. Only new passwords will use the new salt value.
+
+## Complete Example
+
+```typescript
+// src/config/auth.ts
+import { NO_EXPIRATION, type AuthConfigurations } from "@warlock.js/auth";
+import { env } from "@warlock.js/core";
+import { User } from "app/users/models/user";
+import { Admin } from "app/admins/models/admin";
+
+const authConfigurations: AuthConfigurations = {
+  // User type mapping
+  userType: {
+    user: User,
+    admin: Admin,
+  },
+
+  // JWT configuration
+  jwt: {
+    secret: env("JWT_SECRET"),
+    algorithm: "HS256",
+    expiresIn: { hours: 1 },
+
+    // Refresh token configuration
+    refresh: {
+      enabled: true,
+      secret: env("JWT_REFRESH_SECRET"),
+      expiresIn: { days: 7 },
+      rotation: true,
+      maxPerUser: 5,
+      logoutWithoutToken: "revoke-all",
+    },
+  },
+
+  // Password configuration
+  password: {
+    salt: 12,
+  },
+};
+
+export default authConfigurations;
+```
+
+## Environment Variables
+
+Add these to your `.env` file:
+
+```bash
+# Generate using: warlock jwt:secret
+JWT_SECRET=your-super-secret-key-here
+JWT_REFRESH_SECRET=your-refresh-secret-key-here
+```
+
+## CLI Commands
+
+### Generate JWT Secret
+
+```bash
+warlock jwt:secret
+```
+
+Generates a cryptographically secure random string and adds it to your `.env` file.
+
+### Cleanup Expired Tokens
+
+```bash
+warlock auth:cleanup
+```
+
+Removes expired access and refresh tokens from the database. Run this periodically (e.g., via cron job) to keep your database clean.
+
+## What's Next?
+
+- [JWT Tokens](./jwt) - Learn about token generation and validation
+- [Middleware](./middleware) - Protect routes with authentication
+- [Auth Model](./auth-model) - Create custom user models

@@ -7,12 +7,12 @@
 
 ## Overall Progress
 
-| Batch   | Sections                              | Pages | Status              |
-| ------- | ------------------------------------- | ----- | ------------------- |
-| Batch 1 | Getting Started, HTTP, Validation     | 29    | ✅ Complete (29/29) |
-| Batch 2 | Repositories, Database, Auth, Storage | 23    | ⏳ Not Started      |
-| Batch 3 | Cache, Dev Server, Mail, CLI          | 18    | ⏳ Not Started      |
-| Batch 4 | Production, Advanced, Upcoming        | 15    | ⏳ Not Started      |
+| Batch   | Sections                              | Pages | Status                |
+| ------- | ------------------------------------- | ----- | --------------------- |
+| Batch 1 | Getting Started, HTTP, Validation     | 29    | ✅ Complete (29/29)   |
+| Batch 2 | Repositories, Database, Auth, Storage | 25    | 🔄 In Progress (8/25) |
+| Batch 3 | Cache, Dev Server, Mail, CLI          | 18    | ⏳ Not Started        |
+| Batch 4 | Production, Advanced, Upcoming        | 15    | ⏳ Not Started        |
 
 **Total**: ~79 pages
 
@@ -111,18 +111,29 @@
 
 ---
 
-### Agent F: Authentication (6 pages)
+### Agent F: Authentication (8 pages) ✅ Complete
 
 **Task File**: `specs/agent-tasks/batch2-auth.md`
 
-| Page               | Status | Agent Notes |
-| ------------------ | ------ | ----------- |
-| introduction.mdx   | ⬜     |             |
-| configuration.mdx  | ⬜     |             |
-| jwt.mdx            | ⬜     |             |
-| middleware.mdx     | ⬜     |             |
-| guards.mdx         | ⬜     |             |
-| access-control.mdx | ⬜     |             |
+| Page                 | Status | Agent Notes                                                       |
+| -------------------- | ------ | ----------------------------------------------------------------- |
+| introduction.mdx     | ✅     | JWT overview, dual-token flow diagram, quick start, security      |
+| configuration.mdx    | ✅     | Complete auth.ts config, duration formats, CLI commands           |
+| jwt.mdx              | ✅     | Token generation, validation, refresh flow, rotation, revocation  |
+| middleware.mdx       | ✅     | authMiddleware usage, flow diagram, error codes, patterns         |
+| route-protection.mdx | ✅     | Protection patterns, custom guards, best practices (was guards)   |
+| access-control.mdx   | ✅     | 5 RBAC approaches, middleware, controller checks (patterns only)  |
+| events.mdx           | ✅     | 17 auth events, use cases, security monitoring (added)            |
+| auth-model.mdx       | ✅     | Extending Auth class, methods, multi-user types, patterns (added) |
+
+**Notes**:
+
+- Changed `guards.mdx` → `route-protection.mdx` (no guards in source)
+- `access-control.mdx` documents implementation patterns (not built-in)
+- Added `events.mdx` for comprehensive event system (17 events)
+- Added `auth-model.mdx` for Auth base class documentation
+- Total: 8 pages (vs 6 in spec) for complete coverage
+- Deleted 6 old v3 documentation files
 
 ---
 

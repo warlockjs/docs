@@ -26,6 +26,8 @@
 
 ### Auth Package
 
+Check it from Warlock.js workspace:
+
 ```
 @warlock.js/auth/src/
 ├── commands/

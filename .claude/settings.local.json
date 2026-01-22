@@ -5,7 +5,10 @@
       "Bash(bash .specify/scripts/bash/create-new-feature.sh:*)",
       "Bash(bash:*)",
       "Bash(timeout 15 yarn start:*)",
-      "Bash(yarn build:*)"
+      "Bash(yarn build:*)",
+      "Bash(for dir in auth cache cascade context core create-warlock herald logger postman ready scheduler seal vest)",
+      "Bash(do echo \"=== $dir ===\" ls \"D:/xampp/htdocs/mongez/node/warlock.js/$dir/src\")",
+      "Bash(done)"
     ]
   }
 }

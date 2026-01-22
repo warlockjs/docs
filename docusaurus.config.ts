@@ -7,7 +7,7 @@ const config: Config = {
   title: "Warlock.js",
   tagline: "Warlock.js ecosystem documentation",
   favicon: "img/favicon.ico",
-  plugins: [tailwindPlugin],
+  plugins: [tailwindPlugin, "@docusaurus/theme-mermaid"],
 
   // Set the production url of your site here
   url: "https://warlock.js.org",
@@ -22,6 +22,9 @@ const config: Config = {
 
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
+  markdown: {
+    mermaid: true,
+  },
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
