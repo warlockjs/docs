@@ -19,17 +19,38 @@ For each package listed below, perform the following:
 
 ## Packages to Inventory
 
-Process them in this order:
+### Completed
+- [x] `cache` → `./tasks/inventory/cache.md`
+- [x] `context` → `./tasks/inventory/context.md`
+- [x] `logger` → `./tasks/inventory/logger.md`
+- [x] `scheduler` → `./tasks/inventory/scheduler.md`
+- [x] `seal` → `./tasks/inventory/seal.md`
 
-1. `context` (smallest, start here)
-2. `logger`
-3. `scheduler`
-4. `seal`
-5. `cache`
-6. `herald`
-7. `cascade`
-8. `auth`
-9. `core`
+### Remaining (process in this order)
+- [x] `herald` → `./tasks/inventory/herald.md`
+
+- [ ] `cascade`
+- [x] `auth` → `./tasks/inventory/auth.md`
+- [ ] `core`
+- [ ] `create-warlock`
+
+### Special Notes for Large Packages
+
+#### cascade (ORM)
+- Has TWO database drivers: PostgreSQL and MongoDB
+- Document each driver separately
+- Has a model system, query builder, relations (hasMany, belongsTo, etc.)
+- If over token limit, split by: drivers → models → query builder → relations
+
+#### core (Framework)
+- Built on Fastify
+- Has CLI tooling, routing, middleware, modules, request/response
+- Has storage system, mail, uploads, many sub-systems
+- If over token limit, split by subdirectory (each subdirectory = one output file)
+
+#### auth
+- Tightly coupled — depends on cascade, core, logger, seal
+- Document the JWT system, guards, and route protection separately
 
 ## Output Format
 
@@ -82,3 +103,4 @@ src/
 - If `src/` doesn't exist, check for alternative source directories
 - Process ONE package at a time to control token usage
 - If you hit token limits mid-package, save progress and note where you stopped
+- For each file, include a one-line description of its purpose (what it does, not how). Infer this from the file name, exports, and first few lines — do NOT read full implementation.
