@@ -24,7 +24,9 @@
       "Bash(git push *)",
       "Bash(git submodule *)",
       "Bash(npm show *)",
-      "Bash(git -C /home/mentoor/warlock.js/docs submodule status)"
+      "Bash(git -C /home/mentoor/warlock.js/docs submodule status)",
+      "Bash(grep ^- \\\\`static table *)",
+      "Bash(grep *)"
     ]
   },
   "prefersReducedMotion": false
