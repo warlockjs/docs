@@ -1,0 +1,217 @@
+---
+sidebar_position: 8
+---
+
+# 🗃️ Multi-Database
+
+Cascade is designed from the ground up to support more than one database at a time. You can connect to a primary MongoDB store and a secondary PostgreSQL store in the same process, and your models will automatically resolve the right driver without any extra wiring.
+
+---
+
+## 🔌 Registering Multiple Connections
+
+Call `connectToDatabase` once per database. The first call (or any call with `isDefault: true`) becomes the **default** — used by all models that do not specify a source explicitly.
+
+```ts title="src/bootstrap/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+// Primary — MongoDB, becomes the default automatically
+await connectToDatabase({
+  driver: "mongodb",
+  url: "mongodb://localhost:27017",
+  database: "primary_db",
+});
+
+// Secondary — PostgreSQL, explicitly named and non-default
+await connectToDatabase({
+  name: "analytics",
+  isDefault: false,
+  driver: "postgres",
+  host: "localhost",
+  port: 5432,
+  database: "analytics_db",
+  user: "pg_user",
+  password: "pg_pass",
+});
+```
+
+:::tip
+Give every non-default connection a unique `name`. That name is how you retrieve it later via `dataSourceRegistry.get("analytics")`.
+:::
+
+---
+
+## 🧑‍💻 Binding a Model to a Data Source
+
+Set the static `dataSource` property on your model class to pin it to a specific registered source. You can pass either a `string` name or a `DataSource` instance:
+
+```ts title="src/models/analytics-event.model.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class AnalyticsEvent extends Model {
+  // always use the "analytics" PostgreSQL source
+  static dataSource = "analytics";
+
+  static collection = "analytics_events";
+}
+```
+
+All other models that do not override `dataSource` will continue using the default MongoDB source:
+
+```ts title="src/models/user.model.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class User extends Model {
+  // no dataSource override — uses the default MongoDB source
+  static collection = "users";
+}
+```
+
+You can also use the `DataSource` instance directly if you have already retrieved it:
+
+```ts title="src/models/report.model.ts"
+import { Model, dataSourceRegistry } from "@warlock.js/cascade";
+
+const analyticsSource = dataSourceRegistry.get("analytics");
+
+export class Report extends Model {
+  static dataSource = analyticsSource;
+  static collection = "reports";
+}
+```
+
+:::info
+`static dataSource` accepts `string | DataSource`. A string is resolved lazily against `dataSourceRegistry` at query time, so the model file can be loaded before the connection is open.
+:::
+
+---
+
+## 🔍 Retrieving a Registered Source
+
+Use `dataSourceRegistry.get(name)` to access any registered data source anywhere in your application:
+
+```ts title="src/services/analytics.service.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+
+const analyticsSource = dataSourceRegistry.get("analytics");
+
+// Access the underlying driver directly for raw SQL queries
+const driver = analyticsSource.driver;
+const result = await driver.query<{ count: number }>(
+  "SELECT COUNT(*) as count FROM analytics_events WHERE created_at > $1",
+  [new Date("2024-01-01")]
+);
+```
+
+`get()` throws `MissingDataSourceError` if the requested name has not been registered yet.
+
+---
+
+## 🔀 Request-Level Source Switching with `DatabaseDataSourceContext`
+
+Sometimes you cannot bind a model to a fixed source at class-definition time — for example in multi-tenant applications where the target database depends on the incoming request. Use `databaseDataSourceContext` to override the active source for a single async scope:
+
+```ts title="src/middleware/tenant.middleware.ts"
+import { databaseDataSourceContext } from "@warlock.js/cascade";
+
+export async function tenantMiddleware(req, res, next) {
+  const tenantSource = resolveTenantSource(req); // "analytics" | "primary" | ...
+
+  await databaseDataSourceContext.run(async () => {
+    databaseDataSourceContext.setDataSource(tenantSource);
+    await next();
+  });
+}
+```
+
+Within the `run()` callback, every model that calls `Model.getDataSource()` will receive the overridden value. Concurrent requests running outside that scope are completely unaffected — `databaseDataSourceContext` is backed by `AsyncLocalStorage`.
+
+---
+
+## 🌐 Full Example — MongoDB Primary + PostgreSQL Secondary
+
+Here is a self-contained example wiring up both databases and a set of models:
+
+```ts title="src/bootstrap/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+export async function bootstrapDatabases() {
+  // Primary: MongoDB (default)
+  await connectToDatabase({
+    driver: "mongodb",
+    url: "mongodb://localhost:27017",
+    database: "app_db",
+  });
+
+  // Secondary: PostgreSQL (analytics)
+  await connectToDatabase({
+    name: "analytics",
+    isDefault: false,
+    driver: "postgres",
+    host: "localhost",
+    port: 5432,
+    database: "analytics_db",
+    user: "pg_user",
+    password: "pg_pass",
+  });
+}
+```
+
+```ts title="src/models/user.model.ts"
+import { Model } from "@warlock.js/cascade";
+
+// Uses the default MongoDB source
+export class User extends Model {
+  static collection = "users";
+}
+```
+
+```ts title="src/models/page-view.model.ts"
+import { Model } from "@warlock.js/cascade";
+
+// Uses the named PostgreSQL source
+export class PageView extends Model {
+  static dataSource = "analytics";
+  static collection = "page_views";
+}
+```
+
+```ts title="src/handlers/track-page-view.ts"
+import { User } from "../models/user.model";
+import { PageView } from "../models/page-view.model";
+
+export async function trackPageView(userId: string, path: string) {
+  // Reads from MongoDB
+  const user = await User.findById(userId);
+
+  // Writes to PostgreSQL
+  await PageView.create({
+    userId: user.id,
+    path,
+    timestamp: new Date(),
+  });
+}
+```
+
+:::tip
+`connectToDatabase` emits `"connected"` on the registry when the connection opens. You can use `onceConnected` or `dataSourceRegistry.on("connected", ...)` to run post-connection setup (seeding, migrations) for each source independently.
+:::
+
+---
+
+## 📊 Summary — Source Resolution Order
+
+When Cascade resolves which `DataSource` to use for a query, it checks in this order:
+
+1. **`databaseDataSourceContext`** — the per-scope async override (highest priority)
+2. **`static dataSource`** on the Model class — the model-level pinned source
+3. **Default source** — the first registered source or the one marked `isDefault: true`
+
+---
+
+## 🌟 What's Next?
+
+- [💾 Transactions](./transactions)
+- [🗄️ Data Sources](./data-sources)
+- [🔌 Connecting to Database](./connecting-to-database)
+- [🗺️ Roadmap](./roadmap)

@@ -1,0 +1,229 @@
+---
+sidebar_position: 15
+---
+
+# 🆔 Model IDs
+
+Cascade gives every saved document a friendly **numeric `id`** alongside the driver's native primary key (e.g. MongoDB's `_id`). This page covers every knob available for controlling how that ID is generated — from simple auto-increment integers to UUIDs and fully custom generators.
+
+---
+
+## 🔢 Auto-increment Integer IDs
+
+By default, Cascade uses an atomic counter to generate sequential integer IDs. The counter is persisted in a dedicated counter collection so IDs stay unique across concurrent writes.
+
+### Static configuration properties
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `static autoGenerateId` | `boolean` | `true` | Enable or disable ID auto-generation entirely. |
+| `static primaryKey` | `string` | `"id"` | The field name used as the primary key in your documents. |
+| `static initialId` | `number` | `1` | Fixed starting value for the very first generated ID. |
+| `static incrementIdBy` | `number` | `1` | Fixed amount added to the counter on each insert. |
+| `static randomInitialId` | `boolean \| (() => number)` | `false` | Randomise the starting ID. Pass a function to supply your own logic. |
+| `static randomIncrement` | `boolean \| (() => number)` | `false` | Randomise the increment step on every insert. Pass a function for custom logic. |
+
+### Basic auto-increment
+
+```ts title="src/models/invoice.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Invoice extends Model {
+  public static collection = "invoices";
+
+  // IDs start at 100001 and increment by 1 (the defaults)
+  public static initialId = 100001;
+}
+```
+
+### Custom increment step
+
+```ts title="src/models/order.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Order extends Model {
+  public static collection = "orders";
+
+  public static initialId = 1000;
+  public static incrementIdBy = 10; // IDs: 1000, 1010, 1020 …
+}
+```
+
+### Randomised starting point and increment
+
+```ts title="src/models/token.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Token extends Model {
+  public static collection = "tokens";
+
+  // Cascade picks a random starting ID
+  public static randomInitialId = true;
+
+  // And a random step on every insert
+  public static randomIncrement = true;
+}
+```
+
+:::info
+`initialId` and `randomInitialId` are mutually exclusive. When both are set, `randomInitialId` takes precedence and the fixed `initialId` value is ignored.
+:::
+
+### Custom primary key name
+
+The numeric counter ID is stored in the field named by `primaryKey` (default `"id"`). Rename it for any model:
+
+```ts title="src/models/subscription.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Subscription extends Model {
+  public static collection = "subscriptions";
+
+  public static primaryKey = "subscriptionId"; // stored as "subscriptionId"
+}
+```
+
+:::tip
+Keep `primaryKey` consistent across related models. Cascade uses it when building foreign-key conditions for relations, so renaming it on one side requires a matching change on the other.
+:::
+
+---
+
+## 🪪 UUID IDs
+
+For models that must interoperate with external systems — or that you never want to expose a sequential integer to — Cascade supports UUID primary keys.
+
+### `UuidStrategy`
+
+```ts
+type UuidStrategy = "v4" | "v7";
+```
+
+| Value | Description |
+|---|---|
+| `"v4"` | Random UUID (RFC 4122, version 4). |
+| `"v7"` | Time-ordered UUID (draft RFC, version 7). Lexicographically sortable. |
+
+### Configuring a UUID model
+
+```ts title="src/models/session.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Session extends Model {
+  public static collection = "sessions";
+
+  // Switch from integer IDs to UUIDs
+  public static autoGenerateId = false; // disable integer counter
+
+  public static uuidStrategy: "v4" | "v7" = "v4";
+}
+```
+
+### Accessing the UUID
+
+Use the `uuid` getter to read the UUID value from any model instance:
+
+```ts title="src/app.ts"
+const session = await Session.create({ userId: 42 });
+
+console.log(session.uuid); // "550e8400-e29b-41d4-a716-446655440000"
+console.log(session.id);   // same value — id delegates to uuid when configured
+```
+
+:::tip
+Prefer `"v7"` when you need natural sort order (e.g. pagination by creation time) and `"v4"` when pure randomness is more important than sortability.
+:::
+
+---
+
+## 🏭 Custom ID Generators
+
+For advanced scenarios — such as generating IDs from an external service or using a different counter strategy — implement the `IdGeneratorContract` interface.
+
+### `IdGeneratorContract`
+
+```ts
+interface IdGeneratorContract {
+  generateNextId(options: GenerateIdOptions): Promise<number>;
+  getLastId(table: string): Promise<number>;
+  setLastId(table: string, id: number): Promise<void>;
+}
+```
+
+### `GenerateIdOptions`
+
+```ts
+interface GenerateIdOptions {
+  table: string;        // target collection / table name
+  initialId?: number;   // starting value for the first record (default: 1)
+  incrementIdBy?: number; // step between consecutive IDs (default: 1)
+}
+```
+
+### `MongoIdGenerator`
+
+The MongoDB driver ships with `MongoIdGenerator` — a production-ready implementation that uses a MongoDB atomic `findOneAndUpdate` to guarantee uniqueness under concurrent writes.
+
+```ts title="src/bootstrap/database.ts"
+import { MongoIdGenerator } from "@warlock.js/cascade";
+import { mongoDriver } from "./driver";
+
+// MongoIdGenerator uses a dedicated counter collection
+const idGenerator = new MongoIdGenerator(mongoDriver, "id_counters");
+
+// Generate the next ID for the "orders" collection
+const nextId = await idGenerator.generateNextId({
+  table: "orders",
+  initialId: 1,
+  incrementIdBy: 1,
+});
+
+console.log(nextId); // 1 (first call), 2 (second call), …
+```
+
+:::info
+`MongoIdGenerator` stores one counter document per collection in the `counterCollection` (defaults to a Cascade-managed collection). The counter is updated with an atomic `findOneAndUpdate` so concurrent inserts never produce duplicate IDs.
+:::
+
+---
+
+## 🔧 Instance Method: `generateNextId()`
+
+The `generateNextId()` method is called internally by Cascade's write pipeline to assign the next ID before inserting a new document. You rarely need to call it directly, but it is public for advanced use cases.
+
+```ts
+model.generateNextId(): Promise<number | string>
+```
+
+```ts title="src/scripts/seed.ts"
+const invoice = new Invoice();
+const id = await invoice.generateNextId();
+console.log(id); // e.g. 100001
+```
+
+:::warning
+Calling `generateNextId()` increments the persistent counter in the database. Each call consumes one ID even if you never save the model. Reserve direct calls for tooling and seeding scripts.
+:::
+
+---
+
+## 🔗 Instance Accessor: `model.id`
+
+The `id` getter always returns the model's primary-key value, regardless of whether it is a numeric integer or a UUID string:
+
+```ts
+get id(): number | string
+```
+
+```ts
+const user = await User.find(42);
+console.log(user.id); // 42 (number) or "uuid-string" depending on config
+```
+
+---
+
+## 🌟 What's Next?
+
+- [⚡ Atomic Updates](./atomic-updates)
+- [🗂️ Field Accessors](./field-accessors)
+- [⚙️ Model Configuration](./configuration)

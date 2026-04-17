@@ -1,0 +1,299 @@
+---
+sidebar_position: 5
+---
+
+# 🔍 PostgreSQL Query Builder
+
+`PostgresQueryBuilder<T>` extends the base Cascade `QueryBuilder<T>` and adds Postgres-specific operations. Every method available on the standard query builder works here — this page focuses on the extras.
+
+---
+
+## 🚀 Getting a Query Builder
+
+Most of the time you get a query builder through a model's static query API:
+
+```ts title="src/repositories/post.repository.ts"
+import { Post } from "../models/post";
+
+// Standard model query
+const posts = await Post.where("published", true).get();
+```
+
+You can also create one directly from the driver:
+
+```ts
+import { dataSourceRegistry } from "@warlock.js/cascade";
+import type { PostgresDriver } from "@warlock.js/cascade";
+
+const driver = dataSourceRegistry.get().driver as PostgresDriver;
+const qb = driver.queryBuilder<Post>("posts");
+```
+
+---
+
+## 🎲 `random(limit?)`
+
+Fetch `n` randomly ordered rows using `ORDER BY RANDOM()`:
+
+```ts title="src/services/featured.service.ts"
+// 5 random published articles
+const picks = await Article.where("published", true).random(5);
+```
+
+:::info
+`ORDER BY RANDOM()` performs a full table scan before sampling. For large tables, consider a faster approximation strategy such as a WHERE random() < 0.01 pre-filter.
+:::
+
+---
+
+## 🔀 `firstOr(callback)`
+
+Return the first matching row, or call a fallback callback if no row is found:
+
+```ts title="src/repositories/user.repository.ts"
+const user = await User.where("email", email).firstOr(async () => {
+  // Return a guest user object when no record matches
+  return { id: 0, name: "Guest", role: "guest" };
+});
+```
+
+---
+
+## 🌱 `firstOrNew(defaults)`
+
+Return the first matching row, or construct an **unsaved** model instance from `defaults` if nothing is found. The instance is **not** persisted — call `.save()` yourself if you want to insert it:
+
+```ts title="src/services/settings.service.ts"
+const settings = await Settings.where("userId", userId).firstOrNew({
+  userId,
+  theme: "light",
+  notifications: true,
+});
+
+if (!settings.id) {
+  // New (unsaved) instance — persist it now
+  await settings.save();
+}
+```
+
+---
+
+## 🔑 `pluckOne(field)`
+
+Fetch all values for a single column as an array of scalars. An alias for `pluck()` with an explicit name to signal intent:
+
+```ts title="src/repositories/tag.repository.ts"
+// Returns string[]
+const tagNames = await Tag.where("active", true).pluckOne<string>("name");
+
+// Returns number[]
+const userIds = await Order.where("status", "paid").pluckOne<number>("user_id");
+```
+
+---
+
+## 🔎 `explain()`
+
+Run `EXPLAIN ANALYZE` on the compiled query and return the plan output. Useful for diagnosing slow queries without leaving your application code:
+
+```ts title="src/scripts/diagnose.ts"
+const plan = await User
+  .where("role", "admin")
+  .orderBy("created_at", "desc")
+  .explain();
+
+console.log(plan);
+// → [ { "QUERY PLAN": "Index Scan using ..." }, ... ]
+```
+
+:::tip
+Run `explain()` only in development — it executes the query for real and returns timing data. Never leave `explain()` calls in production paths.
+:::
+
+---
+
+## 🎨 `pretty()`
+
+Return the compiled SQL string with bound parameters inlined, formatted for readability. Useful for debugging without hitting the database:
+
+```ts title="src/scripts/debug.ts"
+const sql = User
+  .where("role", "admin")
+  .where("active", true)
+  .orderBy("name")
+  .limit(10)
+  .pretty();
+
+console.log(sql);
+// → SELECT * FROM "users" WHERE "role" = 'admin' AND "active" = true ORDER BY "name" ASC LIMIT 10
+```
+
+---
+
+## 🔗 Aggregates
+
+All standard aggregates are available on `PostgresQueryBuilder`:
+
+```ts
+const count   = await Order.where("status", "paid").count();
+const total   = await Order.where("status", "paid").sum("amount");
+const average = await Order.avg("amount");
+const highest = await Order.max("amount");
+const lowest  = await Order.min("amount");
+```
+
+---
+
+## 📊 `countDistinct(field)`
+
+Count distinct values of a column:
+
+```ts
+const uniqueCountries = await User.where("active", true).countDistinct("country");
+```
+
+---
+
+## 📄 Pagination
+
+### Offset pagination
+
+```ts
+const page = await Post.where("published", true).paginate({
+  page: 2,
+  limit: 20,
+});
+// → { data: Post[], total: number, pages: number, page: number, limit: number }
+```
+
+### Cursor-based pagination
+
+```ts
+const result = await Post.orderBy("id").cursorPaginate({
+  limit: 20,
+  after: lastSeenId,
+});
+// → { data: Post[], next?: cursor, prev?: cursor }
+```
+
+---
+
+## 📦 `chunk(size, callback)`
+
+Process large result sets without loading everything into memory:
+
+```ts title="src/scripts/export.service.ts"
+await User.where("active", true).chunk(500, async (users, page) => {
+  await writeToFile(users, `chunk-${page}.json`);
+});
+```
+
+---
+
+## ➕ `increment` / `decrement`
+
+Atomically increment or decrement a numeric column and return the new value:
+
+```ts
+// Single row
+const newViews = await Post.where("id", postId).increment("views", 1);
+
+// Many rows
+const affected = await Product.where("category", "sale").incrementMany("stock", 10);
+```
+
+---
+
+## 🗑️ Bulk Delete and Update
+
+```ts
+// Delete all matching rows
+const deleted = await Session.where("expiresAt", "<", new Date()).delete();
+
+// Update all matching rows
+const updated = await Post.where("userId", userId).update({ archived: true });
+
+// Remove a field from matching rows
+await Profile.where("userId", userId).unset("tempToken", "resetAt");
+```
+
+---
+
+## 🔁 `joinWith(...relations)`
+
+Load related data via SQL JOINs using pre-defined relation configurations:
+
+```ts title="src/repositories/post.repository.ts"
+const posts = await Post.query()
+  .joinWith("author", "category")
+  .where("published", true)
+  .get();
+
+// posts[0].author and posts[0].category are hydrated
+```
+
+:::info
+`joinWith` looks up the relation definition from the model registry. See the [Relationships](../../relationships/introduction) documentation for how to define relations.
+:::
+
+---
+
+## 🔬 `parse()` — Compile Without Executing
+
+Compile the current query builder state into a `DriverQuery` object (SQL + bindings) without running it against the database:
+
+```ts
+const { sql, bindings } = Post.where("published", true).parse();
+console.log(sql);      // → SELECT * FROM "posts" WHERE "published" = $1
+console.log(bindings); // → [true]
+```
+
+---
+
+## 🔄 `distinctValues(fields?)`
+
+Select `DISTINCT` rows, optionally scoped to specific columns:
+
+```ts
+// DISTINCT on all selected columns
+const distinct = await User.distinctValues().get();
+
+// DISTINCT on specific fields (auto-adds them to SELECT)
+const roles = await User.distinctValues("role").get();
+```
+
+---
+
+## 🧲 `hydrate(callback)`
+
+Attach a custom hydration function that transforms each raw row before it is returned:
+
+```ts title="src/repositories/user.repository.ts"
+const users = await User.query()
+  .hydrate((raw, index) => ({
+    ...raw,
+    fullName: `${raw.first_name} ${raw.last_name}`,
+    index,
+  }))
+  .get();
+```
+
+---
+
+## ⚙️ How `PostgresQueryParser` Works
+
+`PostgresQueryBuilder` delegates SQL generation to `PostgresQueryParser`. Each chained method pushes a `PostgresOperation` onto an internal stack. When `get()`, `first()`, or any terminal method is called, the parser walks the operation stack and emits parameterised SQL:
+
+1. Operations are categorised by `stage` (`select`, `from`, `join`, `where`, `groupBy`, `having`, `orderBy`, `limit`, `offset`).
+2. WHERE clauses are emitted as `$1`, `$2`, … positional bindings (the `pg` driver format).
+3. The full SQL string plus bindings array are passed to `driver.query()`.
+
+You can inspect the compiled output at any point with `parse()` or `pretty()` without executing anything.
+
+---
+
+## 🌟 What's Next?
+
+- [🗄️ Migrations](./migrations)
+- [✨ Postgres-Specific Features](./features)
+- [💾 Transactions](./transactions)

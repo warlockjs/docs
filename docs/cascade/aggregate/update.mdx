@@ -2,38 +2,121 @@
 sidebar_position: 9
 ---
 
-# Data Update
+# ✏️ Updating Data
 
-Update documents using `Aggregate` class.
+Update documents via the QueryBuilder's atomic increment/decrement methods or via Model static helpers.
 
-## Introduction
+:::info
+The legacy `Aggregate` class `update()` and `unset()` methods no longer exist. Bulk updates are performed through `Model.update()`, `Model.updateMany()`, and the QueryBuilder's increment/decrement family.
+:::
 
-`Aggregate` class also provides a way to update documents of collection using the `aggregate` framework.
+## Atomic Increment & Decrement
 
-## Example
+The QueryBuilder provides atomic numeric field updates that work on all matched rows.
 
-```ts
-const totalUpdatedUsers = await aggregate
-  .where("age", ">", 18)
-  .update({ isAdult: true });
+### increment(field, amount?)
+
+Increment a column by `amount` on the **first** matched row (defaults to 1). Returns the new value.
+
+```ts title="src/services/view-counter.service.ts"
+import { Post } from "./post.model";
+
+// Increment by 1
+const newViews = await Post.query()
+  .whereId(99)
+  .increment("views");
+
+// Increment by a custom step
+const newPoints = await Post.query()
+  .whereId(99)
+  .increment("points", 5);
 ```
 
-This will update all users with age greater than 18 and set `isAdult` to `true` and return the number of updated documents.
+### decrement(field, amount?)
 
-## Unset fields
+Decrement a column by `amount` on the **first** matched row. Returns the new value.
 
-We can also unset one field or multiple fields using `unset` method.
+```ts title="src/services/inventory.service.ts"
+import { Product } from "./product.model";
 
-Method Signature:
-
-```ts
-public unset(...fields: string[]): this;
+const remaining = await Product.query()
+  .whereId(7)
+  .decrement("stock", 3);
 ```
 
-Example:
+### incrementMany(field, amount?)
 
-```ts
-const totalUpdatedUsers = await aggregate
-  .where("age", ">", 18)
-  .unset("isAdult");
+Increment a column across **all** matched rows. Returns the number of rows modified.
+
+```ts title="src/jobs/daily-reward.job.ts"
+import { User } from "./user.model";
+
+const count = await User.query()
+  .where("active", true)
+  .incrementMany("points", 10);
+
+console.log(`Awarded 10 points to ${count} users`);
 ```
+
+### decrementMany(field, amount?)
+
+Decrement a column across **all** matched rows. Returns the number of rows modified.
+
+```ts title="src/jobs/expire-tokens.job.ts"
+import { User } from "./user.model";
+
+const count = await User.query()
+  .where("tokenExpiry", "<", new Date())
+  .decrementMany("tokenBudget");
+```
+
+## Model.update() and Model.updateMany()
+
+For updating arbitrary fields (not just numeric increments), use the static Model methods:
+
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+
+// Update a single record by id
+await User.update(42, { role: "admin", verifiedAt: new Date() });
+
+// Bulk-update all matching records
+await User.updateMany(
+  { status: "pending", createdAt: { "<": cutoffDate } },
+  { status: "expired" }
+);
+```
+
+## Model.findAndUpdate()
+
+Find a single record, apply updates, and return the updated model instance:
+
+```ts title="src/services/user.service.ts"
+import { User } from "./user.model";
+
+const user = await User.findAndUpdate(
+  { email: "jane@example.com" },
+  { lastLoginAt: new Date() }
+);
+
+console.log(user?.lastLoginAt);
+```
+
+## QueryBuilder with increment — Combining Filters
+
+All `where*` clauses compose with the increment methods:
+
+```ts title="src/services/vote.service.ts"
+import { Answer } from "./answer.model";
+
+// Upvote only answers from active users that haven't been flagged
+const newScore = await Answer.query()
+  .whereId(answerId)
+  .where("flagged", false)
+  .whereHas("author", (q) => q.where("active", true))
+  .increment("score");
+```
+
+:::tip
+Use `incrementMany` / `decrementMany` for bulk operations and `increment` / `decrement` for single-row atomic updates. Both are safe for concurrent use — the driver translates them to atomic SQL `UPDATE ... SET col = col + ?` or MongoDB `$inc` operations.
+:::

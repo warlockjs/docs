@@ -5,28 +5,97 @@ description: Managing events in Cascade
 
 # Introduction
 
-Events play a crucial role in any application or complex package as they help manage the flow of your application and make your code more readable and maintainable.
+Events play a crucial role in any application or complex package — they help manage the flow of your application and make your code more readable and maintainable.
 
 ## Cascade Events
 
-In **Cascade**, there are various types of events triggered, including Model Events, Aggregate Events, and Query Events. Each event type has its own set of events associated with it.
+In **Cascade**, the primary event system is the **model lifecycle event system**. Every model carries its own `ModelEvents` emitter, and there is also a `globalModelEvents` singleton that receives events from all model instances.
 
-In the following sections, we will explore each event type in detail.
+Query-level hooks (`onFetching`, `onHydrating`, `onFetched`) are available directly on query builder instances and are described in [Query Builder Events](./aggregate-events).
 
-## Important Note About Events
+## The 16 Model Lifecycle Events
 
-It is essential to note that in the Event Driven Architecture concept, you must define an event before triggering it. Therefore, you cannot trigger an event that has not been defined beforehand.
+The `ModelEventName` union covers all 16 lifecycle event names:
 
-## Event Name Structure
+| # | Event name | When it fires |
+|---|---|---|
+| 1 | `creating` | Before a new record is inserted |
+| 2 | `created` | After a new record is inserted |
+| 3 | `updating` | Before an existing record is updated |
+| 4 | `updated` | After an existing record is updated |
+| 5 | `saving` | Before any save (create **or** update) |
+| 6 | `saved` | After any save (create **or** update) |
+| 7 | `deleting` | Before a record is deleted |
+| 8 | `deleted` | After a record is deleted |
+| 9 | `validating` | Before schema validation runs |
+| 10 | `validated` | After schema validation passes |
+| 11 | `fetching` | Before a query is sent to the database |
+| 12 | `hydrating` | During hydration of each result row |
+| 13 | `fetched` | After all query results are hydrated |
+| 14 | `restoring` | Before a soft-deleted record is restored |
+| 15 | `restoring` | Before a soft-deleted record is restored |
+| 16 | `restored` | After a soft-deleted record is restored |
 
-Events are two types: the first one is **before** the operation, the second one is **after** the operation.
+## Event name conventions
 
-All event methods start with the prefix on, followed by the event name, and then the action mode, which can be either before or after.
+Events follow the standard **before / after** naming pattern:
 
-Any `before` event is written in `type` followed by the `ing`, i.e `onCreating`.
+- **Before** an operation → verb in `-ing` form: `creating`, `updating`, `deleting`, …
+- **After** an operation → verb in past tense (`-ed` form): `created`, `updated`, `deleted`, …
 
-Any `after` event is written in `type` followed by the `ed`, i.e `onCreated`.
+## Scope levels
 
-## Event Payload
+Cascade exposes three scopes at which you can listen to model events:
 
-Each event receives an object that contains the entire payload. It's important to note that the payload may vary depending on the specific event being triggered.
+| Scope | API | Scope |
+|---|---|---|
+| **Instance events** | `model.on(event, listener)` | Fires only for that specific model instance |
+| **Class events** | `User.events().onCreated(listener)` | Fires for all `User` instances |
+| **Global events** | `Model.globalEvents().onCreated(listener)` | Fires for every model in the application |
+
+```ts
+import { User } from "./models/user";
+import { Model, globalModelEvents } from "@warlock.js/cascade";
+
+// Instance scope
+const user = new User({ name: "Alice" });
+user.on("saved", async (model) => {
+  console.log("This specific user was saved");
+});
+
+// Class scope
+User.events().onCreated(async (model) => {
+  console.log("A User was created:", model.id);
+});
+
+// Global scope
+Model.globalEvents().onDeleted(async (model) => {
+  console.log("Something was deleted:", model.constructor.name, model.id);
+});
+```
+
+## Registering listeners
+
+Every shorthand method (`onCreating`, `onCreated`, etc.) returns an **unsubscribe function**. Call it to remove the listener.
+
+```ts
+const unsubscribe = User.events().onSaving(async (model) => {
+  // normalize data before every save
+  model.set("email", model.get("email")?.toLowerCase());
+});
+
+// Later, when cleanup is needed:
+unsubscribe();
+```
+
+You can also use the generic `on` / `once` / `off` methods directly:
+
+```ts
+User.events().on("creating", async (model) => { /* ... */ });
+User.events().once("created", async (model) => { /* fires once, then auto-removes */ });
+```
+
+## See also
+
+- [Model Events](./model-events) — full API reference for `ModelEvents`
+- [Query Builder Events](./aggregate-events) — `onFetching`, `onHydrating`, `onFetched`

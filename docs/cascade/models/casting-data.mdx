@@ -13,7 +13,7 @@ Just define the `casts` property in your model:
 import { Model, Casts } from "@warlock.js/cascade";
 
 export class User extends Model {
-  public static collection = "users";
+  public static table = "users";
   protected casts: Casts = {
     name: "string",
     email: "string",
@@ -42,6 +42,10 @@ export class User extends Model {
 
 :::info
 If a value is missing, Cascade uses a sensible default (e.g., `""` for string, `0` for number, `[]` for array, etc.).
+:::
+
+:::warning Driver-specific casts
+The `location` and `localized` cast names may be driver-specific. `location` (geo point) is primarily a MongoDB concept; SQL databases may handle geo data differently. Verify these cast names are supported by your configured driver before using them in production.
 :::
 
 ## 🌍 Geo Locations
@@ -80,25 +84,32 @@ const user = await User.create({
 });
 ```
 
-## 🧩 Built-in Custom Casts
+## 🧩 Embedding Related Models
 
-### Embedding Models (🚀 New & Improved!)
-
-You can now embed another model just by passing the model class directly:
+The recommended way to embed a related model is via `v.embed(Model)` from [@warlock.js/seal](../../validation/schema), used inside your model's `static schema`:
 
 ```ts title="src/models/post.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
 import { Category } from "./category";
 
-protected casts: Casts = {
-  category: Category, // Just pass the model class!
-};
+export class Post extends Model {
+  public static table = "posts";
+
+  public static schema = v.object({
+    title: v.string().required(),
+    category: v.embed(Category), // resolves id → full Category model
+  });
+}
 ```
 
-:::tip Did you know?
-You no longer need to use `castModel(Category)`—just pass the model class directly! This is the new, recommended way. `castModel` is still supported for backward compatibility.
+:::tip Prefer schema-based embedding
+`v.embed(Category)` is the current, recommended approach. It integrates with Cascade's validation pipeline and works with both SQL and MongoDB drivers.
+
+The legacy `castModel(Category)` call is no longer part of the current API—use `v.embed()` instead.
 :::
 
-Pass the category id when creating a post, and Cascade will fetch and embed the category data for you!
+Pass the category `id` when creating a post, and Cascade will fetch and embed the category data for you!
 
 ---
 

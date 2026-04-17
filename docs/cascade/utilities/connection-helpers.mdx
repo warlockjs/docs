@@ -1,0 +1,155 @@
+---
+sidebar_position: 1
+---
+
+# 🔌 Connection Helpers
+
+Cascade exposes a small set of utility functions that make it easy to react to connection state changes, retrieve the active driver, and run transactions — without reaching into the DataSource registry directly.
+
+---
+
+## ⏳ `onceConnected`
+
+Fires a callback immediately if the default DataSource is already connected, or registers it as a one-time listener for the next `"connected"` event.
+
+```ts title="src/utils/once-connected.ts"
+function onceConnected(callback?: () => void | Promise<void>): Promise<void>;
+function onceConnected(dataSource: string | DataSource, callback: () => void | Promise<void>): Promise<void>;
+```
+
+### Basic usage
+
+```ts title="src/app/bootstrap.ts"
+import { onceConnected } from "@warlock.js/cascade";
+
+await onceConnected(async () => {
+  console.log("Database is ready — seeding initial data...");
+  await seedDefaultRoles();
+});
+```
+
+### Targeting a named DataSource
+
+```ts title="src/app/bootstrap.ts"
+import { onceConnected } from "@warlock.js/cascade";
+
+// Fire only when the "analytics" data source connects
+await onceConnected("analytics", () => {
+  console.log("Analytics DB connected");
+});
+```
+
+:::tip
+`onceConnected` is ideal for startup hooks — seed scripts, cache warm-up, or health-check registration — because it is safe to call before or after the database connects.
+:::
+
+:::warning
+Passing a DataSource name or instance **without** a callback throws an `Error`. Always provide the callback as the second argument when targeting a named source.
+:::
+
+---
+
+## 🔌 `onceDisconnected`
+
+Fires a callback when the default (or specified) DataSource emits a `"disconnected"` event. Unlike `onceConnected`, it does **not** fire immediately — it always waits for the next disconnection.
+
+```ts title="src/utils/once-connected.ts"
+function onceDisconnected(callback?: () => void | Promise<void>): Promise<void>;
+function onceDisconnected(dataSource: string | DataSource, callback: () => void | Promise<void>): Promise<void>;
+```
+
+```ts title="src/app/cleanup.ts"
+import { onceDisconnected } from "@warlock.js/cascade";
+
+onceDisconnected(async () => {
+  console.warn("Database disconnected — flushing write-behind cache...");
+  await cache.flush();
+});
+```
+
+---
+
+## 🎯 `getDatabaseDriver`
+
+Returns the typed `DriverContract` from the **default** registered DataSource. Use this anywhere you need direct driver access without going through a model.
+
+```ts title="src/utils/connect-to-database.ts"
+function getDatabaseDriver(): DriverContract;
+```
+
+```ts title="src/health/db-health.ts"
+import { getDatabaseDriver } from "@warlock.js/cascade";
+
+export async function checkDatabaseHealth(): Promise<boolean> {
+  const driver = getDatabaseDriver();
+
+  if (!driver.isConnected) {
+    return false;
+  }
+
+  try {
+    // Run a cheap driver-level ping
+    await driver.query("SELECT 1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+```
+
+:::info
+`getDatabaseDriver()` returns the driver for the **default** DataSource — the first one registered via `connectToDatabase()`. For named sources use `dataSourceRegistry.get("name").driver` directly.
+:::
+
+---
+
+## 🔁 `transaction`
+
+A top-level shorthand that delegates to the default driver's `transaction` method. Wraps your callback in an auto-commit/auto-rollback transaction.
+
+```ts title="src/utils/connect-to-database.ts"
+function transaction<T>(
+  fn: (ctx: TransactionContext) => Promise<T>,
+  options?: object,
+): Promise<T>;
+```
+
+```ts title="src/orders/place-order.ts"
+import { transaction } from "@warlock.js/cascade";
+
+export async function placeOrder(userId: number, items: OrderItem[]) {
+  return transaction(async (ctx) => {
+    const stock = await checkStock(items);
+
+    if (!stock.sufficient) {
+      ctx.rollback("Insufficient stock for one or more items");
+    }
+
+    const order = await Order.create({ userId, status: "pending" });
+    await reserveStock(items, order.id);
+    await notifyWarehouse(order);
+
+    return order;
+  });
+}
+```
+
+:::tip
+`ctx.rollback(reason?)` throws a `TransactionRollbackError` that Cascade catches internally — the transaction is rolled back cleanly and the error is re-thrown so your calling code can handle it.
+:::
+
+### Health check with connection guard
+
+```ts title="src/app/readiness-probe.ts"
+import { onceConnected, getDatabaseDriver } from "@warlock.js/cascade";
+
+let ready = false;
+
+onceConnected(() => {
+  ready = true;
+});
+
+export function isReady() {
+  return ready && getDatabaseDriver().isConnected;
+}
+```

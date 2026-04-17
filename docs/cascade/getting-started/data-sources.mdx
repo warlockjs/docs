@@ -1,0 +1,230 @@
+---
+sidebar_position: 6
+---
+
+# 🗄️ Data Sources
+
+Every database connection in Cascade is wrapped in a **DataSource** — an immutable object that binds a driver to its configuration metadata. A singleton **DataSourceRegistry** stores all registered sources and lets you resolve, switch, and listen to them from anywhere in your application.
+
+---
+
+## 🏗️ `DataSource` — The Immutable Wrapper
+
+When you call `connectToDatabase`, Cascade constructs a `DataSource` internally and registers it. You rarely create one manually, but understanding its shape helps when working with the registry or multi-database setups.
+
+### `DataSourceOptions`
+
+```ts
+type DataSourceOptions = {
+  name?: string;                           // unique identifier (default: "default")
+  driver: DriverContract;                  // bound database driver instance
+  isDefault?: boolean;                     // mark as the app-wide default source
+  defaultDeleteStrategy?: DeleteStrategy;  // fallback delete strategy for models
+  defaultTrashTable?: string;              // fallback trash collection name
+  modelDefaults?: Partial<ModelDefaults>;  // per-source model configuration
+  migrationDefaults?: MigrationDefaults;   // per-source migration settings
+  migrations?: {
+    transactional?: boolean;               // wrap migrations in transactions
+    table?: string;                        // migrations tracking table name
+  };
+};
+```
+
+### `DataSource` Properties
+
+Once constructed, every property is `readonly`:
+
+| Property | Type | Description |
+|---|---|---|
+| `name` | `string` | Unique identifier for this source |
+| `driver` | `DriverContract` | Database driver bound to this source |
+| `isDefault` | `boolean` | Whether this is the default source |
+| `defaultDeleteStrategy` | `DeleteStrategy \| undefined` | Fallback delete strategy for models |
+| `defaultTrashTable` | `string \| undefined` | Fallback trash collection name |
+| `modelDefaults` | `Partial<ModelDefaults> \| undefined` | Default model configuration |
+| `migrationDefaults` | `MigrationDefaults \| undefined` | Migration-level defaults |
+| `migrations` | `{ transactional?, table? } \| undefined` | Migration wrapping configuration |
+| `idGenerator` | `IdGeneratorContract \| undefined` | ID generator from driver (NoSQL only) |
+
+:::info
+`DataSource` is an immutable value object. There are no setters — every property is assigned once in the constructor and never mutated afterwards.
+:::
+
+---
+
+## 🗂️ `dataSourceRegistry` — The Global Registry
+
+`dataSourceRegistry` is the singleton `DataSourceRegistry` that Cascade exports. It is the single source of truth for all active database connections.
+
+```ts
+import { dataSourceRegistry } from "@warlock.js/cascade";
+```
+
+### Registry Methods
+
+#### `register(options: DataSourceOptions): DataSource`
+
+Creates, stores, and returns a new `DataSource`. If this is the first source registered, or if `isDefault: true` is set, it also becomes the default.
+
+```ts title="src/bootstrap/database.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+import { myDriver } from "./drivers/my-driver";
+
+const source = dataSourceRegistry.register({
+  name: "primary",
+  driver: myDriver,
+  isDefault: true,
+});
+```
+
+Side-effects: emits `"registered"` (and `"default-registered"` when applicable); forwards `"connected"` / `"disconnected"` events from the driver.
+
+#### `get(name?: string): DataSource`
+
+Returns a `DataSource` by name, or the default source when called with no arguments.
+
+```ts title="src/services/my-service.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+
+const primary   = dataSourceRegistry.get();           // default source
+const secondary = dataSourceRegistry.get("secondary"); // named source
+```
+
+Throws `MissingDataSourceError` if no source with that name has been registered.
+
+#### `getDefault(): DataSource` (via `get()`)
+
+Calling `get()` with no arguments returns the default source. The first registered source (or the one with `isDefault: true`) is automatically promoted to default.
+
+#### `has(name: string): boolean`
+
+Returns `true` if a source with the given name has been registered.
+
+#### `setDefault(name: string): void`
+
+Promotes an already-registered source to be the new default.
+
+#### `getAllDataSources(): DataSource[]`
+
+Returns an array of every registered `DataSource`.
+
+#### `clear(): void`
+
+Removes all registered sources and clears the default. Useful in tests.
+
+---
+
+## 📡 Registry Events
+
+The registry emits lifecycle events you can subscribe to for observability, seeding, or lazy initialisation.
+
+### `DataSourceRegistryEvent`
+
+```ts
+type DataSourceRegistryEvent =
+  | "registered"          // a new DataSource was registered
+  | "default-registered"  // a source was promoted to default
+  | "connected"           // a driver opened its connection
+  | "disconnected";       // a driver closed its connection
+```
+
+### `DataSourceRegistryListener`
+
+```ts
+type DataSourceRegistryListener = (dataSource: DataSource) => void;
+```
+
+### Subscribing to Events
+
+| Method | Behaviour |
+|---|---|
+| `on(event, listener)` | Persistent subscription |
+| `once(event, listener)` | Fires once, then auto-unsubscribes |
+| `off(event, listener)` | Remove a previously registered listener |
+
+```ts title="src/bootstrap/database.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+
+// Run a seed job as soon as any source connects
+dataSourceRegistry.on("connected", (source) => {
+  console.log(`${source.name} is connected — running seed`);
+});
+
+// React once to the default source being set
+dataSourceRegistry.once("default-registered", (source) => {
+  console.log(`Default source is now: ${source.name}`);
+});
+```
+
+---
+
+## ⚠️ `MissingDataSourceError`
+
+`dataSourceRegistry.get(name)` throws a `MissingDataSourceError` when the requested name has not been registered yet. This is a named error class so you can `catch` it specifically:
+
+```ts title="src/services/my-service.ts"
+import { dataSourceRegistry, MissingDataSourceError } from "@warlock.js/cascade";
+
+try {
+  const source = dataSourceRegistry.get("reports");
+} catch (error) {
+  if (error instanceof MissingDataSourceError) {
+    console.error("The 'reports' data source is not registered.");
+  }
+}
+```
+
+:::warning
+Always register your data sources during app bootstrap (before handling any requests) to avoid `MissingDataSourceError` at runtime.
+:::
+
+---
+
+## 🔀 `DatabaseDataSourceContext` — Per-Async-Scope Switching
+
+`databaseDataSourceContext` is a singleton context (backed by `@warlock.js/context`) that overrides which data source is active within a specific async scope — without affecting other concurrent scopes.
+
+```ts
+import { databaseDataSourceContext } from "@warlock.js/cascade";
+```
+
+### Context Methods
+
+| Method | Signature | Description |
+|---|---|---|
+| `getDataSource()` | `() => DataSourceContextValue \| undefined` | Returns the active override for this scope |
+| `setDataSource(dataSource)` | `(value: string \| DataSource) => void` | Sets the override for this scope |
+
+### Example — Switching Context per Request
+
+A common pattern is to direct a particular HTTP request (or background job) to a specific data source while leaving all other concurrent requests untouched:
+
+```ts title="src/middleware/tenant-db.middleware.ts"
+import { databaseDataSourceContext } from "@warlock.js/cascade";
+
+export async function tenantDatabaseMiddleware(req, res, next) {
+  // resolve which data source this tenant should use
+  const sourceName = req.headers["x-tenant-db"] ?? "primary";
+
+  // run the rest of the request inside a context scope
+  await databaseDataSourceContext.run(async () => {
+    databaseDataSourceContext.setDataSource(sourceName);
+    await next();
+  });
+}
+```
+
+Within the `run()` callback, every model that resolves its data source will pick up the overridden value. Requests outside that scope are completely unaffected.
+
+:::tip
+`databaseDataSourceContext` is powered by Node's `AsyncLocalStorage` under the hood (via `@warlock.js/context`), so it is safe to use in concurrent environments without any locking.
+:::
+
+---
+
+## 🌟 What's Next?
+
+- [💾 Transactions](./transactions)
+- [🗃️ Multi-Database](./multi-database)
+- [🔌 Connecting to Database](./connecting-to-database)
+- [🗺️ Roadmap](./roadmap)

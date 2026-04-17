@@ -2,20 +2,95 @@
 sidebar_position: 5
 ---
 
-# Skip
+# ⏭️ Skip & Limit
 
-Skip documents in the collection.
+Control how many rows are returned and where the result set starts. These methods are the building blocks for manual pagination and sliding-window queries.
 
-## Method Signature
+## skip / offset
 
-```ts
-public skip(value: number): this;
+Skip the first N rows before returning results. `offset` is an alias for `skip`.
+
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+
+// Skip the first 20 rows
+const users = await User.query()
+  .orderBy("createdAt")
+  .skip(20)
+  .get();
+
+// offset is identical to skip
+const users = await User.query()
+  .orderBy("createdAt")
+  .offset(20)
+  .get();
 ```
 
-## Example
+## limit / take
 
-```ts
-const users = await aggregate.skip(10).get();
+Limit the number of rows returned. `take` is an alias for `limit`.
+
+```ts title="src/repositories/post.repo.ts"
+import { Post } from "./post.model";
+
+// Return at most 10 rows
+const posts = await Post.query()
+  .where("published", true)
+  .limit(10)
+  .get();
+
+// take is identical to limit
+const posts = await Post.query()
+  .where("published", true)
+  .take(10)
+  .get();
 ```
 
-It will return all documents in the collection, starting from the `11th` document.
+## Manual Pagination with skip + limit
+
+Combine `skip` and `limit` for classic page/offset pagination:
+
+```ts title="src/controllers/product.controller.ts"
+import { Product } from "./product.model";
+
+function getPage(page: number, perPage: number) {
+  return Product.query()
+    .where("active", true)
+    .orderBy("name")
+    .skip((page - 1) * perPage)
+    .limit(perPage)
+    .get();
+}
+
+const page2 = await getPage(2, 20); // rows 21–40
+```
+
+:::tip
+For production pagination prefer the built-in `paginate()` or `cursorPaginate()` methods — they return total counts and cursor tokens automatically. See [Fetching Documents](./fetching) for details.
+:::
+
+## cursor
+
+Cursor-based skipping — advance to a position identified by an opaque cursor token instead of a numeric offset:
+
+```ts title="src/controllers/feed.controller.ts"
+import { Post } from "./post.model";
+
+const page1 = await Post.query()
+  .orderBy("createdAt", "desc")
+  .cursor()
+  .limit(20)
+  .get();
+
+// Pass the cursor returned from cursorPaginate() to skip to the next page
+const result = await Post.query()
+  .orderBy("createdAt", "desc")
+  .cursorPaginate({ limit: 20, after: lastCursor });
+```
+
+## Method Aliases Summary
+
+| Method | Alias | Description |
+|--------|-------|-------------|
+| `skip(n)` | `offset(n)` | Skip first N rows |
+| `limit(n)` | `take(n)` | Return at most N rows |

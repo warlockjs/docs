@@ -1,0 +1,401 @@
+---
+sidebar_position: 6
+---
+
+# 🗄️ PostgreSQL Migrations
+
+`PostgresMigrationDriver` is the full DDL driver for Postgres. It implements `MigrationDriverContract` and covers tables, columns, indexes (B-tree, GIN, GiST, ivfflat), constraints, foreign keys, and more.
+
+The standard Cascade `Migration` class and `migrationRunner` APIs work identically on Postgres — you write migrations the same way regardless of driver. This page highlights Postgres-specific column types, index strategies, and DDL capabilities.
+
+---
+
+## 🏗️ Writing a Postgres Migration
+
+```ts title="database/migrations/create-posts-table.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export class CreatePostsTable extends Migration {
+  static migrationName = "create_posts_table";
+  static order = 1;
+
+  public tableName = "posts";
+
+  async up() {
+    await this.createTable(() => {
+      this.bigIncrements("id");           // BIGSERIAL PRIMARY KEY
+      this.uuid("public_id").unique();    // UUID column
+      this.string("title", 255);
+      this.text("body");
+      this.jsonb("metadata");             // JSONB column
+      this.boolean("published").default(false);
+      this.timestamp("published_at").nullable();
+      this.timestamps();                  // created_at, updated_at TIMESTAMPTZ
+    });
+  }
+
+  async down() {
+    await this.dropTableIfExists();
+  }
+}
+```
+
+---
+
+## 🏷️ Postgres-Specific Column Types
+
+### Serial / Identity columns
+
+| Helper | SQL type | Description |
+|---|---|---|
+| `increments(col)` | `SERIAL` | Auto-increment 32-bit integer PK |
+| `bigIncrements(col)` | `BIGSERIAL` | Auto-increment 64-bit integer PK |
+| `smallIncrements(col)` | `SMALLSERIAL` | Auto-increment 16-bit integer PK |
+
+```ts
+this.bigIncrements("id");         // → id BIGSERIAL PRIMARY KEY
+```
+
+### UUID
+
+```ts
+this.uuid("public_id").unique();  // → public_id UUID UNIQUE
+```
+
+By default, `PostgresMigrationDriver` generates UUID defaults using `gen_random_uuid()` (requires `pgcrypto` or Postgres 13+). You can inspect the expression via:
+
+```ts
+const expr = migrationDriver.getUuidDefault();
+// → "gen_random_uuid()"
+```
+
+### JSONB
+
+```ts
+this.jsonb("settings");           // → settings JSONB
+this.jsonb("tags").default("[]"); // → tags JSONB DEFAULT '[]'
+```
+
+:::tip
+Prefer `JSONB` over `JSON` for Postgres storage — JSONB is binary-indexed and supports GIN indexing for efficient containment queries.
+:::
+
+### Native arrays
+
+```ts
+this.specificType("permissions", "TEXT[]");   // → permissions TEXT[]
+this.specificType("scores", "INTEGER[]");     // → scores INTEGER[]
+```
+
+### VECTOR (pgvector)
+
+```ts
+this.specificType("embedding", "VECTOR(1536)"); // → embedding VECTOR(1536)
+```
+
+### Text variants
+
+```ts
+this.string("name", 100);   // → name VARCHAR(100)
+this.text("bio");            // → bio TEXT
+this.mediumText("content");  // → content TEXT  (Postgres has no MEDIUMTEXT)
+```
+
+### Timestamps with time zone
+
+```ts
+this.timestamp("occurred_at");       // → occurred_at TIMESTAMPTZ
+this.timestamps();                   // → created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ
+this.timestamp("deleted_at").nullable();
+```
+
+### Numeric / money
+
+```ts
+this.integer("quantity");
+this.bigInteger("view_count");
+this.decimal("price", 10, 2);        // → NUMERIC(10,2)
+this.float("latitude");              // → FLOAT8
+```
+
+### Boolean
+
+```ts
+this.boolean("active").default(true); // → active BOOLEAN DEFAULT true
+```
+
+### Enum via `CHECK` constraint
+
+Postgres supports native `CREATE TYPE … AS ENUM`, but Cascade's migration helpers use a `CHECK` constraint approach for portability:
+
+```ts
+this.string("status", 20)
+  .check("status IN ('draft', 'published', 'archived')");
+```
+
+For a true Postgres `ENUM` type, use a raw DDL statement in your `up()` via `this.raw()`:
+
+```ts
+async up() {
+  // Phase 2 — runs before table creation
+  await this.raw(async (driver) => {
+    await driver.query(
+      `CREATE TYPE post_status AS ENUM ('draft', 'published', 'archived')`
+    );
+  });
+
+  await this.createTable(() => {
+    this.bigIncrements("id");
+    this.specificType("status", "post_status").default("'draft'");
+    this.string("title", 255);
+    this.timestamps();
+  });
+}
+```
+
+---
+
+## 📇 Indexes
+
+### B-tree index (default)
+
+```ts
+await this.createIndex(() => {
+  this.index(["email"]);
+});
+
+// Or with options
+await this.createIndex(() => {
+  this.index(["last_name", "first_name"], { name: "idx_users_full_name" });
+});
+```
+
+### Unique index
+
+```ts
+await this.createUniqueIndex("users", ["email"]);
+await this.createUniqueIndex("users", ["username"], "uniq_users_username");
+```
+
+### Partial index
+
+```ts
+// Only index rows where published = true
+await this.createIndex(() => {
+  this.index(["created_at"], {
+    name: "idx_posts_published_at",
+    partial: "published = true",
+  });
+});
+```
+
+### Concurrent index (avoid table locks)
+
+```ts
+await this.createIndex(() => {
+  this.index(["user_id"], { concurrent: true });
+});
+```
+
+:::warning
+`CONCURRENTLY` cannot run inside a transaction. Cascade's `PostgresMigrationDriver.getDefaultTransactional()` returns `true`, so if you use concurrent indexes, wrap that migration in a non-transactional runner call or use `raw()` to bypass DDL transactionality.
+:::
+
+### Full-text index (GIN)
+
+```ts
+await this.createFullTextIndex("articles", ["title", "body"], {
+  name: "idx_articles_fts",
+  language: "english",
+});
+```
+
+The driver creates a GIN index on a `to_tsvector(language, coalesce(...))` expression.
+
+### Geo / spatial index (GiST)
+
+```ts
+await this.createGeoIndex("locations", "coordinates");
+// → CREATE INDEX ON locations USING GIST (coordinates)
+```
+
+### Vector index (ivfflat)
+
+```ts
+await this.createVectorIndex("documents", "embedding", {
+  lists: 100,
+  distanceFunction: "cosine",
+});
+// → CREATE INDEX ON documents USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)
+```
+
+### TTL index (partial index for expiry)
+
+```ts
+// Mark rows as expired — pair with a background job that DELETEs WHERE expires_at < NOW()
+await this.createTTLIndex("sessions", "expires_at", 3600);
+```
+
+---
+
+## 🔑 Primary Keys and Foreign Keys
+
+### Adding a primary key
+
+```ts
+await this.addPrimaryKey("orders", ["id"]);
+```
+
+### Foreign keys
+
+```ts
+await this.addForeignKey("orders", {
+  name: "fk_orders_user_id",
+  columns: ["user_id"],
+  referencedTable: "users",
+  referencedColumns: ["id"],
+  onDelete: "CASCADE",
+  onUpdate: "NO ACTION",
+});
+
+await this.dropForeignKey("orders", "fk_orders_user_id");
+```
+
+---
+
+## ✅ CHECK Constraints
+
+```ts
+await this.addCheck("products", "chk_price_positive", "price > 0");
+await this.dropCheck("products", "chk_price_positive");
+```
+
+---
+
+## 🔄 Column Modifications
+
+```ts
+// Add a column to an existing table
+await this.addColumn(() => {
+  this.string("avatar_url", 500).nullable();
+});
+
+// Rename a column
+await this.renameColumn("users", "avatar_url", "profile_picture_url");
+
+// Change type or nullability
+await this.modifyColumn(() => {
+  this.integer("score").default(0).notNullable();
+});
+
+// Drop columns
+await this.dropColumn("users", "legacy_field");
+await this.dropColumns("users", ["legacy_a", "legacy_b"]);
+```
+
+---
+
+## 🧩 Schema Introspection with `PostgresBlueprint`
+
+`PostgresBlueprint` wraps `information_schema` and `pg_catalog` for schema introspection without running migrations:
+
+```ts title="src/scripts/inspect.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+import type { PostgresDriver } from "@warlock.js/cascade";
+
+const driver = dataSourceRegistry.get().driver as PostgresDriver;
+const blueprint = driver.blueprint;
+
+const tables   = await blueprint.listTables();
+const columns  = await blueprint.listColumns("users");
+const indexes  = await blueprint.listIndexes("users");
+const exists   = await blueprint.tableExists("orders");
+
+console.log({ tables, columns, indexes, exists });
+```
+
+---
+
+## 🗂️ `PostgresSQLSerializer` — DDL Serialization
+
+`PostgresSQLSerializer` is the Postgres dialect implementation of the abstract `SQLSerializer` class. It converts `PendingOperation` objects queued during your `up()` / `down()` calls into parameterised Postgres DDL strings.
+
+You never instantiate it directly — `PostgresMigrationDriver` manages it internally. Understanding its role is useful when reading runner logs or when you call `migrationRunner.exportSQL()` to inspect the generated SQL before running it.
+
+```ts
+// Export SQL without executing — useful for code review / audit trails
+await migrationRunner.exportSQL({ outputDir: "database/sql" });
+// Writes .up.sql and .down.sql files to database/sql/
+```
+
+---
+
+## 📋 Full Example — Postgres-Specific Table
+
+```ts title="database/migrations/create-documents-table.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export class CreateDocumentsTable extends Migration {
+  static migrationName = "create_documents_table";
+  static order = 10;
+
+  public tableName = "documents";
+
+  async up() {
+    await this.createTable(() => {
+      this.bigIncrements("id");
+      this.uuid("public_id").unique().default("gen_random_uuid()");
+      this.string("title", 500);
+      this.text("content");
+      this.jsonb("metadata").default("{}");
+      this.specificType("tags", "TEXT[]").default("'{}'::TEXT[]");
+      this.specificType("embedding", "VECTOR(1536)").nullable();
+      this.string("status", 20).default("'draft'");
+      this.bigInteger("author_id");
+      this.boolean("published").default(false);
+      this.timestamp("published_at").nullable();
+      this.timestamps();
+    });
+
+    // Full-text search on title + content
+    await this.createFullTextIndex("documents", ["title", "content"], {
+      name: "idx_documents_fts",
+    });
+
+    // pgvector cosine similarity index
+    await this.createVectorIndex("documents", "embedding", {
+      lists: 100,
+      distanceFunction: "cosine",
+    });
+
+    // GIN index on the JSONB metadata column
+    await this.raw(async (driver) => {
+      await driver.query(
+        `CREATE INDEX idx_documents_metadata ON documents USING GIN (metadata)`
+      );
+    });
+
+    // Foreign key to authors table
+    await this.addForeignKey("documents", {
+      name: "fk_documents_author_id",
+      columns: ["author_id"],
+      referencedTable: "authors",
+      referencedColumns: ["id"],
+      onDelete: "CASCADE",
+    });
+  }
+
+  async down() {
+    await this.dropTableIfExists();
+  }
+}
+```
+
+---
+
+## 🌟 What's Next?
+
+- [🐘 Introduction](./introduction)
+- [✨ Postgres-Specific Features](./features)
+- [🔍 Query Builder](./query-builder)
+- [💾 Transactions](./transactions)

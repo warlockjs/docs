@@ -2,42 +2,89 @@
 sidebar_position: 12
 ---
 
-# 📊 Aggregations
+# 📊 Querying & Aggregation
 
-Need powerful data crunching? Cascade lets you use MongoDB's aggregation pipelines right from your models—no sweat! 🧮
+Need powerful data crunching or flexible queries? Cascade gives you a full-featured **QueryBuilder** accessible directly from your models. 🧮
 
-## 🚀 What's Aggregation?
-Aggregation lets you process data records and return computed results—think sums, averages, grouping, and more!
+## 🚀 What's the QueryBuilder?
 
-## 🏗️ How to Use Aggregation
-Just call the `aggregate` method on your model:
+The QueryBuilder is Cascade's cross-driver query API. It supports filtering, ordering, grouping, aggregation, joins, eager loading, and more—all in a fluent, chainable interface.
+
+:::info
+The `Aggregate` class is **no longer exported** from Cascade. All aggregation and advanced querying is done through `Model.query()` or `Model.aggregate()`, both of which return a QueryBuilder.
+:::
+
+## 🏗️ Starting a Query
+
+Use `Model.query()` to get a QueryBuilder for any model:
 
 ```ts title="src/app.ts"
-const results = await Order.aggregate([
-  { $match: { status: "completed" } },
-  { $group: { _id: "$customerId", total: { $sum: "$amount" } } },
-]);
+import { Product } from "./models/product";
+
+// Fetch all active products, ordered by price
+const products = await Product.query()
+  .where("isActive", true)
+  .orderBy("price", "asc")
+  .get();
+```
+
+## 📊 Grouping and Counting
+
+```ts title="src/app.ts"
+// Count products per category
+const counts = await Product.query()
+  .groupBy(["category"])
+  .count();
+```
+
+## ➕ Aggregation Helpers
+
+```ts title="src/app.ts"
+// Sum of all order amounts for completed orders
+const total = await Order.query()
+  .where("status", "completed")
+  .sum("amount");
+
+// Average product price per category
+const averages = await Product.query()
+  .groupBy(["category"])
+  .avg("price");
+```
+
+## 🔀 Using `Model.aggregate()`
+
+`Model.aggregate()` is an alias for `Model.query()` and also returns a QueryBuilder. Use it when you want to make your intent explicit:
+
+```ts title="src/app.ts"
+const results = await Order.aggregate()
+  .where("status", "completed")
+  .groupBy(["customerId"])
+  .sum("amount");
 ```
 
 ## 🧩 Common Use Cases
-- **Sum**: Total up values
-- **Average**: Find the mean
-- **Group**: Organize by fields
-- **Match**: Filter your data
-- **Project**: Shape your output
 
-## 🧙‍♂️ Pro Tip: Use with Models
-You can use aggregation for advanced reporting, analytics, and dashboards—all with your familiar model classes!
+- **Count**: `query().count()`
+- **Sum**: `query().sum("field")`
+- **Average**: `query().avg("field")`
+- **Group**: `query().groupBy(["field"])`
+- **Filter**: `query().where("field", value)`
+- **Order**: `query().orderBy("field", "desc")`
 
 ## ⚠️ Best Practices
-- Use aggregation for heavy data processing, not simple queries.
-- Keep pipelines as short as possible for best performance.
+
+- Use `query()` for all data retrieval—it composes cleanly with scopes, eager loading, and events.
+- Keep aggregations as targeted as possible for best performance.
+- For complex reporting, combine `groupBy` with `where` filters before aggregating.
 
 :::info
-Aggregation is super powerful—combine it with Cascade's models for next-level data magic!
+The QueryBuilder is cross-driver—the same API works with MongoDB and SQL (PostgreSQL, etc.).
 :::
 
 ---
 
 ## 🌟 What's Next?
-- [🧰 Advanced Usage](../advanced/introduction) 
+- [🔍 QueryBuilder: Introduction](../query-builder/introduction)
+- [📐 Grouping & Having](../query-builder/grouping-having)
+- [📊 Aggregates](../query-builder/aggregates)
+- [🧰 Advanced Usage](../advanced/introduction)

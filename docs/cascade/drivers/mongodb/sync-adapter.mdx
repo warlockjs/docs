@@ -1,0 +1,149 @@
+---
+sidebar_position: 5
+---
+
+# 🔄 MongoDB Sync Adapter
+
+`MongoSyncAdapter` is Cascade's MongoDB implementation of `SyncAdapterContract`. It translates the abstract **sync instruction batches** produced by `SyncManager` into concrete `updateMany` calls against MongoDB collections — including support for nested array element updates using positional operators and `arrayFilters`.
+
+---
+
+## 🏗️ Where sync fits in
+
+When you save a model that has sync relationships (e.g., a `User` whose `name` is denormalised into every `Comment` document they wrote), Cascade's `SyncManager` collects a batch of `SyncInstruction` objects describing what needs to change and where. The `SyncAdapter` then executes those instructions against the database.
+
+```
+Model.save()
+     ↓
+SyncManager.collect(instructions)
+     ↓
+MongoSyncAdapter.executeBatch(instructions)
+     ↓
+driver.updateMany(targetTable, filter, updatePayload)
+```
+
+`MongoSyncAdapter` is retrieved internally via `MongoDbDriver.syncAdapter()` which caches and returns the single adapter instance.
+
+---
+
+## 🧩 `SyncInstruction` — what a sync instruction looks like
+
+A `SyncInstruction` is a single update descriptor targeting one collection:
+
+```ts
+type SyncInstruction = {
+  targetTable: string;         // collection to update
+  filter: Record<string, any>; // match condition (e.g., { authorId: 42 })
+  data: Record<string, any>;   // fields to set on matched documents
+  arrayField?: string;         // nested array field to update elements within
+  identifierField?: string;    // field inside array elements used to match the target element
+};
+```
+
+When `arrayField` and `identifierField` are absent the adapter issues a straightforward `$set` update. When they are present the adapter uses positional operators or `arrayFilters` to target specific elements inside a nested array.
+
+---
+
+## 📋 `SyncAdapterContract` interface
+
+```ts
+interface SyncAdapterContract {
+  executeBatch(instructions: SyncInstruction[]): Promise<number>;
+  executeOne(instruction: SyncInstruction): Promise<number>;
+  executeArrayUpdate(instruction: SyncInstruction): Promise<number>;
+}
+```
+
+---
+
+## ⚡ Execution methods
+
+### `executeBatch(instructions)`
+
+Processes a list of sync instructions in sequence. Returns the total number of documents affected across all instructions.
+
+```ts
+const affected = await syncAdapter.executeBatch([
+  { targetTable: "comments", filter: { authorId: 42 }, data: { authorName: "Alice" } },
+  { targetTable: "posts", filter: { authorId: 42 }, data: { authorName: "Alice" } },
+]);
+
+console.log(`Updated ${affected} documents`);
+```
+
+### `executeOne(instruction)`
+
+Executes a single flat (non-array) sync instruction. Issues one `updateMany` call against `targetTable` using the instruction's `filter` and `data` as a `$set` payload.
+
+### `executeArrayUpdate(instruction)`
+
+Handles the more complex case of updating **elements inside a nested array**. Requires both `arrayField` and `identifierField` to be set on the instruction:
+
+```ts
+// Update the `name` of a specific tag inside every article's `tags` array
+await syncAdapter.executeArrayUpdate({
+  targetTable: "articles",
+  filter: { "tags.id": tagId },
+  data: { "tags.$.name": "New Tag Name" },
+  arrayField: "tags",
+  identifierField: "id",
+});
+```
+
+:::info
+`executeArrayUpdate` throws an `Error` if either `arrayField` or `identifierField` is missing from the instruction.
+:::
+
+---
+
+## 🔧 Accessing the sync adapter
+
+You normally never interact with `MongoSyncAdapter` directly — `SyncManager` calls it automatically. However, you can retrieve the cached instance from the driver for testing or manual use:
+
+```ts title="src/utils/sync.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+
+const driver = dataSourceRegistry.get().driver;
+const adapter = driver.syncAdapter(); // returns MongoSyncAdapter (cached)
+```
+
+---
+
+## 🔒 Session awareness
+
+`MongoSyncAdapter` is transaction-aware. When a sync batch is executed inside an active Cascade transaction, `updateMany` calls are automatically forwarded to the active MongoDB `ClientSession`, ensuring the sync updates are part of the same atomic transaction as the model save.
+
+---
+
+## 📝 Example — syncing a denormalised field
+
+```ts title="src/models/user.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { syncWith } from "@warlock.js/cascade";
+
+export class User extends Model {
+  static collection = "users";
+
+  // When name changes, push the new value to all related comments
+  static sync = [
+    syncWith("comments", "authorId", ["name"]),
+  ];
+}
+```
+
+When `user.save()` runs:
+
+1. `SyncManager` detects that `name` changed.
+2. It creates a `SyncInstruction` targeting `"comments"` with `filter: { authorId: user.id }` and `data: { name: "New Name" }`.
+3. `MongoSyncAdapter.executeBatch([instruction])` fires a single `updateMany` against the `comments` collection.
+
+All of this happens automatically — no manual adapter calls required.
+
+---
+
+## 🌟 What's next?
+
+- [🍃 Introduction](./introduction) — driver overview and connection setup
+- [🔎 Query Builder](./query-builder) — aggregation pipeline queries
+- [🗺️ Blueprint](./blueprint) — index and collection introspection
+- [🔢 ID Generator](./id-generator) — auto-increment integer IDs

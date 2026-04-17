@@ -1,0 +1,197 @@
+---
+sidebar_position: 10
+---
+
+# 🛠️ Utilities
+
+The builder provides a set of utility methods for side-effects, conditional branching, cloning, inspection, and extensibility.
+
+## 🔁 `tap(callback)` — Side Effects
+
+Execute a callback for side-effects without interrupting the chain. The builder is passed to the callback and returned unchanged:
+
+```ts title="src/repositories/post.repo.ts"
+const posts = await Post.query()
+  .where("status", "published")
+  .tap((q) => {
+    console.log("Current operations:", q.operations.length);
+  })
+  .orderBy("createdAt", "desc")
+  .get();
+```
+
+:::tip
+`tap` is useful for debugging, logging, or telemetry hooks without breaking the fluent chain.
+:::
+
+---
+
+## 🔀 `when(condition, callback, otherwise?)` — Conditional Builder
+
+Apply modifications only when a condition is truthy. Optionally provide an `otherwise` callback for the falsy branch:
+
+```ts title="src/repositories/post.repo.ts"
+const query = Post.query()
+  .when(filters.status, (q) => {
+    q.where("status", filters.status);
+  })
+  .when(
+    filters.authorId,
+    (q) => q.where("authorId", filters.authorId),
+    (q) => q.where("status", "published") // fallback
+  );
+```
+
+This keeps your query construction clean and avoids if/else branching in calling code.
+
+---
+
+## 🧬 `clone()` — Deep Copy
+
+Create a deep clone of the current builder state. The clone has its own independent `operations` array:
+
+```ts title="src/repositories/analytics.ts"
+const base = Post.query().where("status", "published");
+
+const countQuery = base.clone().count();
+const pageQuery  = base.clone().orderBy("views", "desc").paginate({ page: 1, limit: 10 });
+
+const [total, page] = await Promise.all([countQuery, pageQuery]);
+```
+
+:::info
+Without `clone()`, chaining further methods on `base` would mutate the shared builder. Always clone before forking query paths.
+:::
+
+---
+
+## 🔧 `raw(builder)` — Inject Raw Operations
+
+Merge raw operation records from another builder into this one:
+
+```ts title="src/repositories/advanced.repo.ts"
+const extraConditions = Post.query().where("featured", true);
+
+const results = await Post.query()
+  .where("status", "published")
+  .raw(extraConditions)
+  .get();
+```
+
+---
+
+## 🔌 `extend(extension, ...args)` — Custom Extensions
+
+Call a custom function against the builder, passing extra arguments. Returns `R` (the extension's return type), which may or may not be `this`:
+
+```ts title="src/builders/extensions.ts"
+function applyTenancy(q: QueryBuilderContract<any>, tenantId: string) {
+  return q.where("tenantId", tenantId);
+}
+
+const results = await Post.query()
+  .extend(applyTenancy, currentTenantId)
+  .get();
+```
+
+Use `extend` to package reusable query logic without subclassing the builder.
+
+---
+
+## 🔍 Inspection Methods
+
+### `parse()` → `DriverQuery`
+
+Return the parsed, driver-ready query representation. Useful for debugging what the driver will actually execute:
+
+```ts
+const query = User.query().where("status", "active").orderBy("name");
+const parsed = query.parse();
+console.log(parsed);
+// { table: "users", operations: [...], ... }
+```
+
+The `DriverQuery` type:
+
+```ts
+type DriverQuery = {
+  table: string;
+  operations: Op[];
+  eagerLoadRelations: Map<string, ...>;
+  countRelations: string[];
+  // driver-specific fields
+};
+```
+
+### `pretty()` → `string`
+
+Return a human-readable string representation of the query (SQL string for SQL drivers, pipeline JSON for MongoDB). Great for development debugging:
+
+```ts
+console.log(User.query().where("role", "admin").pretty());
+// SELECT * FROM users WHERE role = 'admin'
+```
+
+### `explain()` → `Promise<unknown>`
+
+Execute the query through the driver's EXPLAIN mechanism and return the query plan. Use this for performance analysis:
+
+```ts title="src/debug/query-plan.ts"
+const plan = await User.query()
+  .where("status", "active")
+  .orderBy("createdAt")
+  .explain();
+
+console.log(plan); // driver-specific explain output
+```
+
+:::warning
+`explain()` is a live database call — use it in development/staging, not in production hot paths.
+:::
+
+---
+
+## 🎯 Scope Methods
+
+### `scope(scopeName, ...args)` — Apply Local Scope
+
+Invoke a named local scope defined on the model:
+
+```ts title="src/models/post.model.ts"
+// Model defines:
+//   static scopes = { published: (q) => q.where("status", "published") }
+
+const posts = await Post.query().scope("published").get();
+const recent = await Post.query().scope("publishedAfter", "2024-01-01").get();
+```
+
+Throws if no local scopes are registered or the named scope is not found.
+
+### `withoutGlobalScope(...names)` — Disable Specific Scopes
+
+Disable specific global scopes for this query only:
+
+```ts title="src/admin/users.ts"
+// Bypasses the default "active only" global scope
+const allUsers = await User.query()
+  .withoutGlobalScope("activeOnly")
+  .get();
+```
+
+### `withoutGlobalScopes()` — Disable All Global Scopes
+
+Remove all pending global scopes for this query:
+
+```ts
+const rawUsers = await User.query().withoutGlobalScopes().get();
+```
+
+---
+
+## 📦 Key Types Reference
+
+| Type | Description |
+|------|-------------|
+| `Op` | `{ readonly type: string; readonly data: unknown }` — a recorded operation |
+| `JoinWithConstraint` | `string \| ((q: QueryBuilder) => void)` — argument accepted by `joinWith()` |
+| `DriverQuery` | Parsed query structure consumed by the active driver |

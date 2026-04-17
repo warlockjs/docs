@@ -1,0 +1,194 @@
+---
+sidebar_position: 4
+---
+
+# 🔧 Custom Transformers
+
+Cascade exposes `useModelTransformer` — a small factory that adapts any model-aware callback into a seal `TransformerCallback`. Use it when you need to write a pre-save value transformer that has access to a Cascade `Model` instance and needs to run inside a seal validation pipeline.
+
+---
+
+## 🏭 `useModelTransformer(callback)`
+
+```ts
+import { useModelTransformer } from "@warlock.js/cascade";
+```
+
+`useModelTransformer` wraps a `ModelTransformCallback` and returns the seal `TransformerCallback` shape expected by seal validators. You can then attach the result to any seal validator using `.transformer(...)`.
+
+### `ModelTransformCallback` type
+
+`ModelTransformCallback` is the callback signature you provide to `useModelTransformer`. The callback receives the resolved `Model` instance and the seal transform options for that field.
+
+```ts
+import type { ModelTransformCallback } from "@warlock.js/cascade";
+```
+
+The callback is invoked during the transformer stage of the seal pipeline, after mutators and rules have already run — meaning by the time your callback executes, the value has already been validated and coerced into a `Model` instance.
+
+---
+
+## ✍️ Writing a Custom Transformer
+
+```ts title="src/validation/author-transformer.ts"
+import { useModelTransformer } from "@warlock.js/cascade";
+
+// Build a transformer that extracts a custom projection from the model
+const authorTransformer = useModelTransformer((model, options) => {
+  return {
+    id:     model.id,
+    name:   model.get("name"),
+    handle: model.get("handle"),
+  };
+});
+```
+
+The returned `authorTransformer` is a standard seal `TransformerCallback` and can be passed directly to `.transformer()` on any seal validator.
+
+```ts title="src/models/post.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+import { authorTransformer } from "../validation/author-transformer";
+import "@warlock.js/cascade/validation/database-seal-plugins";
+import { Author } from "./author.model";
+
+export class Post extends Model {
+  static table = "posts";
+
+  static schema = v.object({
+    title: v.string().required(),
+
+    // v.embed resolves + validates; our custom transformer controls what gets stored
+    author: v.embed(Author).transformer(authorTransformer),
+  });
+}
+```
+
+:::tip
+A custom transformer runs **after** the embed validator's built-in `databaseModelTransformer`. If you chain `.transformer(myTransformer)` onto `v.embed(...)`, your callback receives the already-resolved `Model` instance, not the raw input.
+:::
+
+---
+
+## 🔍 `databaseModelTransformer` — the Built-in Transformer
+
+The built-in transformer used by `v.embed()` and `v.embedMany()` is `databaseModelTransformer`. It is exported from `@warlock.js/cascade` and can be imported and reused directly in custom pipelines.
+
+```ts
+import { databaseModelTransformer } from "@warlock.js/cascade";
+```
+
+### How it works
+
+`databaseModelTransformer` is a seal `TransformerCallback` that reads `context.options.embed` (default: `"embedData"`) and extracts data from the model accordingly:
+
+| Input type | `embed` is a string | `embed` is an array |
+|---|---|---|
+| Single `Model` | Returns `value[embed]` | Returns `value.only(embed)` |
+| Array of `Model`s | Maps each item: `item[embed]` | Maps each item: `item.only(embed)` |
+| Anything else | Passes through unchanged | Passes through unchanged |
+
+This means `databaseModelTransformer` handles both the `v.embed()` and `v.embedMany()` cases with the same function — the array branch is activated automatically when the value is an array.
+
+### Reusing it in a manual pipeline
+
+```ts title="src/validation/custom-embed.ts"
+import { EmbedModelValidator, databaseModelTransformer } from "@warlock.js/cascade";
+import { Address } from "../models/address.model";
+
+// Build the same pipeline that v.embed(Address, { embed: ["city", "zip"] }) would create,
+// but with full control over each step
+const addressValidator = new EmbedModelValidator()
+  .model(Address, "Invalid address")
+  .embed(["city", "zip"]); // this internally registers databaseModelTransformer
+```
+
+:::info
+`EmbedModelValidator.embed()` already registers `databaseModelTransformer` for you. You only need to import `databaseModelTransformer` directly when building a completely custom seal pipeline that does not use `EmbedModelValidator`.
+:::
+
+---
+
+## 🧪 Practical Patterns
+
+### Pattern 1 — custom projection without `v.embed`
+
+If your field is already a `Model` instance by the time the transformer runs (e.g. you populated it programmatically), you can use `useModelTransformer` standalone with a plain `v.object()` or similar validator.
+
+```ts title="src/validation/custom-pipeline.ts"
+import { useModelTransformer } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+import { Tag } from "../models/tag.model";
+
+const tagSummaryTransformer = useModelTransformer((model) => ({
+  id:    model.id,
+  label: model.get("label"),
+  color: model.get("color"),
+}));
+
+// Use as a standalone transformer on any object field
+const tagField = v.object({}).transformer(tagSummaryTransformer);
+```
+
+### Pattern 2 — layering a custom transformer on top of `v.embedMany`
+
+```ts title="src/models/playlist.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+import { useModelTransformer } from "@warlock.js/cascade";
+import "@warlock.js/cascade/validation/database-seal-plugins";
+import { Track } from "./track.model";
+
+// Custom transformer: store only id and duration from each Track
+const trackTransformer = useModelTransformer((model) => ({
+  id:       model.id,
+  duration: model.get("duration"),
+  title:    model.get("title"),
+}));
+
+export class Playlist extends Model {
+  static table = "playlists";
+
+  static schema = v.object({
+    name:   v.string().required(),
+    tracks: v.embedMany(Track).transformer(trackTransformer),
+  });
+}
+```
+
+---
+
+## 📦 API Reference
+
+### `useModelTransformer`
+
+```ts
+function useModelTransformer(
+  callback: ModelTransformCallback
+): TransformerCallback;
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `callback` | `ModelTransformCallback` | Your transform logic — receives the resolved `Model` instance and seal transform options |
+
+Returns a seal `TransformerCallback` ready to be passed to `.transformer()` on any seal validator.
+
+### `ModelTransformCallback`
+
+```ts
+type ModelTransformCallback = (
+  model: Model,
+  options: TransformOptions
+) => unknown;
+```
+
+The return value becomes the stored field value. Return anything serializable to your database column type.
+
+### `databaseModelTransformer`
+
+```ts
+const databaseModelTransformer: TransformerCallback;
+```
+
+The built-in transformer registered by `EmbedModelValidator.embed()`. Reads `context.options.embed` and extracts the corresponding field(s) from the `Model` instance. Handles both single models and arrays automatically.

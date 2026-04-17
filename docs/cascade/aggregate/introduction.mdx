@@ -2,35 +2,74 @@
 sidebar_position: 1
 ---
 
-# Introduction
+# 📊 Aggregation: Introduction
 
-MongoDB has a [powerful Aggregation framework](https://docs.mongodb.com/manual/aggregation/) that allows you to perform complex queries on your data. This package provides a simple way to build and execute these queries.
+Cascade provides a **driver-agnostic aggregation API** that lets you write expressive, chainable queries — the same code works whether your application targets PostgreSQL, MySQL, SQLite, or MongoDB.
 
-## What is Aggregate framework?
+## 🏗️ How It Works
 
-The MongoDB Aggregation Framework is a powerful tool for processing and analyzing data within MongoDB. It provides a set of operators and stages that allow you to perform complex data manipulations and transformations, similar to the capabilities of SQL's GROUP BY and JOIN operations.
+Aggregation in Cascade is **not** a separate pipeline class. It lives directly on the **QueryBuilder**, the same fluent builder you use for ordinary queries. Methods like `groupBy`, `selectAggregate`, `count`, `sum`, `avg`, `min`, `max`, and `distinct` are first-class citizens of the builder.
 
-## How does it work?
+This design means:
 
-The Aggregation framework is a pipeline of stages. Each stage takes the output of the previous stage as input and performs a specific operation on the data. The output of the last stage is the result of the aggregation pipeline.
+- No import of driver-specific syntax
+- Full integration with `where`, `orderBy`, `paginate`, `chunk`, and every other builder method
+- Results are hydrated into model instances when accessed via `Model.aggregate()` or `Model.query()`
 
-## What is a stage?
+## 🚀 Entry Points
 
-A stage is a step in the aggregation pipeline. Each stage takes the output of the previous stage as input and performs a specific operation on the data. The output of the last stage is the result of the aggregation pipeline.
+### Via `Model.query()`
 
-We can say that a stage is an operation over the current state of the documents, which is the result of the previous stage.
+`Model.query()` returns a `QueryBuilderContract<T>` that you can chain with any aggregation method.
 
-## What is a pipeline?
+```ts title="src/repositories/order.repo.ts"
+import { Order } from "./order.model";
 
-A pipeline is a sequence of stages. Each stage takes the output of the previous stage as input and performs a specific operation on the data. The output of the last stage is the result of the aggregation pipeline.
+const totalRevenue = await Order.query()
+  .where("status", "paid")
+  .sum("amount");
+```
 
-## What is a stage operator?
+### Via `Model.aggregate()`
 
-A stage operator is a MongoDB operator that performs a specific operation on the data. For example, the `$match` operator filters documents based on a condition.
+`Model.aggregate()` is an alias that also returns a `QueryBuilderContract<T>`. Results from `get()` are automatically hydrated into model instances.
 
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
 
-## Aggregate vs Find
+const users = await User.aggregate()
+  .where("age", ">", 18)
+  .orderBy("createdAt", "desc")
+  .get();
+```
 
-The find method is used to retrieve documents from a collection based on specified criteria. It returns a cursor that allows you to iterate over the matched documents. The find method is commonly used for simple queries to retrieve documents that match certain conditions. You can specify various query criteria using operators such as `$eq`, `$gt`, `$lt`, `$in`, etc. Additionally, you can chain additional methods like `sort`, `limit`, `skip`, and `projection` to further customize the query.
+## 📦 Key Aggregation Concepts
 
-The aggregation framework is used to perform complex queries on your data. It allows you to perform various operations on the data such as grouping, sorting, filtering, and projecting. The aggregation framework is commonly used for more complex queries that require multiple stages to be executed in order to retrieve the desired result.
+| Concept | API |
+|---------|-----|
+| Group rows | `groupBy(fields)`, `groupBy(fields, aggregates)` |
+| Aggregate expressions | `$agg.count()`, `$agg.sum(field)`, `$agg.avg(field)`, ... |
+| Computed columns | `selectAggregate(field, aggregate, alias)` |
+| Quick scalars | `.count()`, `.sum(field)`, `.avg(field)`, `.min(field)`, `.max(field)` |
+| Distinct values | `.distinct(field)`, `.countDistinct(field)` |
+| Filtering groups | `having(field, value)`, `havingRaw(expression)` |
+
+## 🔗 Section Overview
+
+| Page | What It Covers |
+|------|----------------|
+| [Using Model.aggregate()](./aggregate-manager) | Entry point, hydration, and chaining |
+| [$agg Namespace](./agg) | Aggregate expression factories |
+| [Selecting Columns](./selecting-columns) | `select`, `selectAggregate`, `selectCase`, `selectConcat` |
+| [Filtering](./filtering) | `where`, `orWhere`, `whereIn`, `whereBetween`, and more |
+| [Group By](./group-by) | `groupBy`, `having`, `groupByRaw` |
+| [Fetching](./fetching) | `get`, `first`, `paginate`, `chunk`, `pluck`, `exists` |
+| [Sorting](./sort) | `orderBy`, `orderByDesc`, `latest`, `oldest` |
+| [Skip & Limit](./skip) | `skip`, `offset`, `limit`, `take` |
+| [Advanced](./advanced) | `increment`, `decrement`, `incrementMany`, `decrementMany` |
+| [Model Aggregate](./model-aggregate) | Hydration, relation loading, `Model.aggregate()` |
+| [Joins](./lookup) | `join`, `leftJoin`, `joinWith` |
+
+:::info
+The old MongoDB-specific `Aggregate` class constructor (`new Aggregate("users")`) no longer exists. All aggregation is performed through the QueryBuilder via `Model.query()` or `Model.aggregate()`.
+:::

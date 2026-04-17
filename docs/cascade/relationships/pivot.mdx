@@ -1,0 +1,176 @@
+---
+sidebar_position: 6
+---
+
+# 🔀 Pivot Operations
+
+When two models are linked through a `belongsToMany` relation, all mutations to the intermediate pivot table — attaching, detaching, syncing, and toggling — are handled by the `PivotOperations` class. You obtain an instance via the `createPivotOperations()` factory.
+
+:::info
+Pivot operations only make sense on relations declared with `belongsToMany`. Cascade will throw at construction time if you attempt to create a `PivotOperations` instance for any other relation type.
+:::
+
+---
+
+## 🏗️ Setup
+
+Declare your `belongsToMany` relation as usual, providing the required `pivot` table name in `BelongsToManyOptions`:
+
+```ts title="src/models/user.model.ts"
+import { Model, belongsToMany } from "@warlock.js/cascade";
+import { Role } from "./role.model";
+
+export class User extends Model {
+  static table = "users";
+
+  static relations = {
+    roles: belongsToMany(Role, {
+      pivot:           "user_roles",  // required
+      pivotLocalKey:   "userId",
+      pivotForeignKey: "roleId",
+    }),
+  };
+}
+```
+
+### `BelongsToManyOptions`
+
+```ts
+// from relations/types.ts
+type BelongsToManyOptions = {
+  pivot: string;             // pivot table name — REQUIRED
+  pivotLocalKey?: string;    // pivot column pointing to THIS model (default: "<currentModel>Id")
+  pivotForeignKey?: string;  // pivot column pointing to the related model (default: "<relatedModel>Id")
+  foreignKey?: string;
+  localKey?: string;
+  select?: string[];
+};
+```
+
+---
+
+## 🏭 Obtaining a `PivotOperations` Instance
+
+Use the `createPivotOperations(model, relationName)` factory function. It reads the relation definition from the model class, validates it, and returns a ready-to-use `PivotOperations` instance.
+
+```ts title="src/services/user-roles.service.ts"
+import { createPivotOperations } from "@warlock.js/cascade";
+import { User } from "../models/user.model";
+
+const user = await User.find(1);
+const pivot = createPivotOperations(user, "roles");
+```
+
+:::warning
+`createPivotOperations()` throws an `Error` if the given `relationName` is not defined on the model class, or if the relation is not of type `belongsToMany`.
+:::
+
+---
+
+## 🔧 Operations
+
+### `pivot.attach(ids, pivotData?)`
+
+Inserts new rows into the pivot table. Already-attached IDs are **skipped** — no duplicate rows are created.
+
+```ts
+// Attach roles 1, 2, and 3 to the user
+await pivot.attach([1, 2, 3]);
+```
+
+You can store additional data in the pivot rows via the optional `pivotData` argument:
+
+```ts
+await pivot.attach([1, 2], { assignedAt: new Date(), assignedBy: "admin" });
+```
+
+### `pivot.detach(ids?)`
+
+Deletes rows from the pivot table for the given IDs. Omit `ids` entirely to **detach all** related records.
+
+```ts
+// Detach specific roles
+await pivot.detach([2]);
+
+// Detach every role from this user
+await pivot.detach();
+```
+
+### `pivot.sync(ids, pivotData?)`
+
+Replaces the current set of related IDs with the new set: detaches any ID not in the new list and attaches any ID that is new. This is the canonical "save the full selection" operation.
+
+```ts
+// After sync, the user will have exactly roles 1 and 3
+await pivot.sync([1, 3]);
+
+// With pivot data applied to newly attached rows
+await pivot.sync([1, 3], { updatedAt: new Date() });
+```
+
+:::tip
+`sync()` only issues writes for the diff — IDs already attached and still in the new set are left untouched.
+:::
+
+### `pivot.toggle(ids, pivotData?)`
+
+Attaches IDs that are not yet linked and detaches IDs that are already linked. Useful for checkbox-style UI toggles.
+
+```ts
+// If role 4 is attached it gets detached; if it is detached it gets attached
+await pivot.toggle([4]);
+
+// Toggle multiple at once
+await pivot.toggle([3, 4, 5]);
+```
+
+---
+
+## 📦 Type Reference
+
+| Type | Description |
+|---|---|
+| `PivotIds` | `(number \| string)[]` — array of IDs passed to attach / detach / sync / toggle |
+| `PivotData` | `Record<string, unknown>` — extra key-value data stored in pivot rows alongside the ID columns |
+| `BelongsToManyOptions` | Full options object for `belongsToMany()` — `pivot` is required |
+
+---
+
+## 🧩 Complete Example
+
+```ts title="src/services/user-roles.service.ts"
+import { createPivotOperations } from "@warlock.js/cascade";
+import { User } from "../models/user.model";
+
+async function manageRoles(userId: number) {
+  const user = await User.find(userId);
+  const pivot = createPivotOperations(user, "roles");
+
+  // Assign three roles on first setup
+  await pivot.attach([1, 2, 3]);
+
+  // Remove the editor role
+  await pivot.detach([2]);
+
+  // Replace the entire role set, recording when it changed
+  await pivot.sync([1, 3], { assignedAt: new Date() });
+
+  // Let the user toggle an optional role on/off
+  await pivot.toggle([4]);
+}
+```
+
+---
+
+## ⚙️ How `PivotOperations` Works Internally
+
+`PivotOperations` is constructed with the parent model instance, the relation name, the resolved `RelationDefinition`, and the model class. On construction it validates that the relation is a `belongsToMany` relation with a non-empty `pivot` table name.
+
+Each operation then writes directly to the pivot table via the configured data source driver:
+
+- **`attach`** — calls `driver.insertMany` for the new rows, filtering out IDs that are already present.
+- **`detach`** — calls `driver.deleteMany` scoped to the parent model's ID and the supplied related IDs (or all rows for that parent when `ids` is omitted).
+- **`sync`** — computes the diff, calls `detach` for removed IDs, then `attach` for added IDs.
+- **`toggle`** — fetches currently attached IDs, splits the input into "to attach" and "to detach" groups, then calls the corresponding methods.
+
+All driver errors propagate directly to the caller.

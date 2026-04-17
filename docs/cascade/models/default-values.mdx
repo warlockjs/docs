@@ -6,53 +6,46 @@ sidebar_position: 5
 
 Never worry about missing data! Cascade lets you set default values for your model fields, so your documents are always complete and predictable. 🧩
 
-## 🏷️ Setting Default Values
+## 🏷️ Recommended: Schema Defaults via `static schema`
 
-Just add a `defaults` property to your model:
+The current, recommended way to define defaults is through your model's `static schema` using seal's `.default()` modifier. Defaults are applied **before validation**, ensuring your types are always correct:
 
 ```ts title="src/models/user.ts"
-import { Model, Casts } from "@warlock.js/cascade";
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
 
 export class User extends Model {
-  public static collection = "users";
-  protected defaults = {
-    isActive: true,
-    role: "user",
-    age: 18,
-  };
+  public static table = "users";
+
+  public static schema = v.object({
+    isActive: v.boolean().default(true),
+    role: v.string().default("user"),
+    age: v.number().default(18),
+  });
 }
 ```
 
 ## ⚡ Dynamic Defaults (Functions!)
 
-Need a default that changes? Use a function:
+Need a default that changes at runtime? Use a function:
 
 ```ts title="src/models/user.ts"
-protected defaults = {
-  createdAt: () => new Date(),
-  token: () => Math.random().toString(36).slice(2),
-};
+public static schema = v.object({
+  createdAt: v.date().default(() => new Date()),
+  token: v.string().default(() => Math.random().toString(36).slice(2)),
+});
 ```
 
-The function will be called every time a new model is created!
+The function is called every time a new model is saved!
 
-## 🧙‍♂️ Pro Tip: Defaults + Casting
+## 🧙‍♂️ Pipeline Order
 
-Defaults are applied **before** casting, so your types are always correct:
-
-```ts title="src/models/user.ts"
-protected casts: Casts = {
-  age: "number",
-};
-protected defaults = {
-  age: "21", // Will be cast to number!
-};
-```
+Defaults are applied **before validation runs**, so the values they produce are also validated and cast to the correct types.
 
 ## ⚠️ Gotchas
 
 - Defaults only apply when a value is missing or `undefined`.
-- If you pass `null`, the default is **not** used.
+- If you pass `null`, the default is **not** used (unless the schema explicitly handles `null`).
 
 :::info
 Defaults make your models safer and your code cleaner. Use them for all optional fields!

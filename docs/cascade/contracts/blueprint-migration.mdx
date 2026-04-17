@@ -1,0 +1,262 @@
+---
+sidebar_position: 3
+---
+
+# 🗺️ Blueprint & Migration Contracts
+
+Two contracts power Cascade's schema layer: `DriverBlueprintContract` for read-only schema introspection, and `MigrationDriverContract` for all DDL (Data Definition Language) operations. Together they give migrations full, driver-agnostic control over tables, columns, indexes, and constraints.
+
+---
+
+## 🔍 `DriverBlueprintContract`
+
+A read-only interface for inspecting the live database schema. Accessible via `driver.blueprint`.
+
+```ts title="src/contracts/driver-blueprint.contract.ts"
+interface DriverBlueprintContract {
+  listTables(): Promise<string[]>;
+  listIndexes(table: string): Promise<TableIndexInformation[]>;
+  listColumns(table: string): Promise<string[]>;
+  tableExists(table: string): Promise<boolean>;
+}
+```
+
+```ts title="src/migrations/check-schema.ts"
+import { getDatabaseDriver } from "@warlock.js/cascade";
+
+const driver = getDatabaseDriver();
+const blueprint = driver.blueprint;
+
+const tables = await blueprint.listTables();
+console.log("Tables:", tables);
+
+const exists = await blueprint.tableExists("users");
+if (!exists) {
+  console.warn("users table is missing — run migrations");
+}
+
+const indexes = await blueprint.listIndexes("users");
+console.log("Indexes on users:", indexes);
+```
+
+### `TableIndexInformation`
+
+The shape returned for each index by `listIndexes()`.
+
+```ts title="src/contracts/driver-blueprint.contract.ts"
+interface TableIndexInformation {
+  name: string;
+  columns?: string[];
+  type?: string;
+  unique: boolean;
+  partial: boolean;
+  options: Record<string, any>;
+}
+```
+
+:::info
+`partial` is `true` for partial indexes (e.g. `WHERE deleted_at IS NULL` in PostgreSQL). `options` contains driver-specific metadata such as index storage parameters.
+:::
+
+---
+
+## 🏗️ `MigrationDriverContract`
+
+The DDL contract for all schema operations. Obtained via `driver.migrationDriver()`. Supports SQL and NoSQL drivers, surfacing only operations each backend can fulfil.
+
+```ts title="src/contracts/migration-driver.contract.ts"
+interface MigrationDriverContract {
+  driver: DriverContract;
+
+  // Tables
+  createTable(table: TableBlueprint): Promise<void>;
+  createTableIfNotExists(table: TableBlueprint): Promise<void>;
+  dropTable(table: string): Promise<void>;
+  dropTableIfExists(table: string): Promise<void>;
+  renameTable(from: string, to: string): Promise<void>;
+  truncateTable(table: string): Promise<void>;
+  tableExists(table: string): Promise<boolean>;
+  listTables(): Promise<string[]>;
+
+  // Columns
+  listColumns(table: string): Promise<ColumnDefinition[]>;
+  addColumn(table: string, column: ColumnDefinition): Promise<void>;
+  dropColumn(table: string, column: string): Promise<void>;
+  dropColumns(table: string, columns: string[]): Promise<void>;
+  renameColumn(table: string, from: string, to: string): Promise<void>;
+  modifyColumn(table: string, column: ColumnDefinition): Promise<void>;
+  createTimestampColumns(table: string): Promise<void>;
+
+  // Indexes
+  createIndex(table: string, index: IndexDefinition): Promise<void>;
+  dropIndex(table: string, indexNameOrColumns: string | string[]): Promise<void>;
+  createUniqueIndex(table: string, columns: string[], name?: string): Promise<void>;
+  dropUniqueIndex(table: string, columns: string[]): Promise<void>;
+  createFullTextIndex(table: string, columns: string[], options?: FullTextIndexOptions): Promise<void>;
+  dropFullTextIndex(table: string, name: string): Promise<void>;
+  createGeoIndex(table: string, column: string, options?: GeoIndexOptions): Promise<void>;
+  dropGeoIndex(table: string, column: string): Promise<void>;
+  createVectorIndex(table: string, column: string, options: VectorIndexOptions): Promise<void>;
+  dropVectorIndex(table: string, column: string): Promise<void>;
+  createTTLIndex(table: string, column: string, expireAfterSeconds: number): Promise<void>;
+  dropTTLIndex(table: string, column: string): Promise<void>;
+  listIndexes(table: string): Promise<TableIndexInformation[]>;
+
+  // Foreign keys
+  addForeignKey(table: string, foreignKey: ForeignKeyDefinition): Promise<void>;
+  dropForeignKey(table: string, name: string): Promise<void>;
+
+  // Primary keys
+  addPrimaryKey(table: string, columns: string[]): Promise<void>;
+  dropPrimaryKey(table: string): Promise<void>;
+
+  // Constraints
+  addCheck(table: string, name: string, expression: string): Promise<void>;
+  dropCheck(table: string, name: string): Promise<void>;
+
+  // MongoDB schema validation
+  setSchemaValidation(table: string, schema: object): Promise<void>;   // MongoDB only
+  removeSchemaValidation(table: string): Promise<void>;
+
+  // Migration transactions
+  beginTransaction(): Promise<void>;
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+  supportsTransactions(): boolean;
+  getDefaultTransactional(): boolean;
+
+  // Helpers
+  ensureMigrationsTable(tableName: string): Promise<void>;
+  getUuidDefault(migrationDefaults?: MigrationDefaults): string | undefined;
+  isExtensionAvailable(extension: string): Promise<boolean>;
+  getExtensionDocsUrl(extension: string): string | undefined;
+  raw<T>(callback: (client: unknown) => Promise<T>): Promise<T>;
+}
+```
+
+### `ColumnType`
+
+A union of every column type string that Cascade migrations understand. Drivers map these to their native equivalents.
+
+```ts title="src/contracts/migration-driver.contract.ts"
+type ColumnType =
+  | "string" | "text" | "longText" | "mediumText" | "tinyText"
+  | "integer" | "tinyInteger" | "smallInteger" | "mediumInteger" | "bigInteger"
+  | "unsignedInteger" | "unsignedBigInteger" | "unsignedSmallInteger" | "unsignedTinyInteger"
+  | "float" | "double" | "decimal"
+  | "boolean"
+  | "date" | "dateTime" | "timestamp" | "time" | "year"
+  | "json" | "jsonb"
+  | "uuid" | "objectId"
+  | "binary" | "blob"
+  | "enum" | "set"
+  | "point" | "lineString" | "polygon" | "geometry" | "multiPolygon"
+  | "vector";
+```
+
+### `ColumnDefinition`
+
+The full column specification used by `addColumn()` and `modifyColumn()`.
+
+```ts title="src/contracts/migration-driver.contract.ts"
+interface ColumnDefinition {
+  name: string;
+  type: ColumnType;
+  length?: number;
+  precision?: number;
+  scale?: number;
+  nullable?: boolean;
+  defaultValue?: unknown;
+  onUpdateCurrent?: boolean;     // MySQL ON UPDATE CURRENT_TIMESTAMP
+  primary?: boolean;
+  autoIncrement?: boolean;
+  unsigned?: boolean;
+  unique?: boolean;
+  comment?: string;
+  values?: string[];             // enum / set members
+  dimensions?: number;           // vector column size
+  isRawDefault?: boolean;
+  after?: string;                // MySQL column positioning
+  first?: boolean;               // MySQL column positioning
+  generated?: { expression: string; stored: boolean };
+  checkConstraint?: { expression: string; name: string };
+}
+```
+
+### `IndexDefinition`
+
+```ts title="src/contracts/migration-driver.contract.ts"
+interface IndexDefinition {
+  name?: string;
+  columns: string[];
+  unique?: boolean;
+  type?: string;
+}
+```
+
+### `ForeignKeyDefinition`
+
+```ts title="src/contracts/migration-driver.contract.ts"
+interface ForeignKeyDefinition {
+  name?: string;
+  columns: string[];
+  referencedTable: string;
+  referencedColumns: string[];
+  onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+  onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+}
+```
+
+### Specialised Index Options
+
+```ts title="src/contracts/migration-driver.contract.ts"
+interface FullTextIndexOptions {
+  name?: string;
+  parser?: string;  // e.g. "ngram" for MySQL
+}
+
+interface GeoIndexOptions {
+  name?: string;
+  type?: string;   // e.g. "2dsphere" for MongoDB
+}
+
+interface VectorIndexOptions {
+  name?: string;
+  dimensions: number;
+  metric?: "cosine" | "euclidean" | "dotProduct";
+}
+```
+
+:::tip
+`createVectorIndex` + `VectorIndexOptions` enable AI/embedding search columns. Currently supported by PostgreSQL (pgvector) and MongoDB Atlas Vector Search.
+:::
+
+### `MigrationDriverFactory`
+
+The factory function type used to instantiate a migration driver from a DataSource or a raw DriverContract.
+
+```ts title="src/contracts/migration-driver.contract.ts"
+type MigrationDriverFactory =
+  (source: DataSource | DriverContract) => MigrationDriverContract;
+```
+
+```ts title="src/migrations/runner.ts"
+import { getDatabaseDriver } from "@warlock.js/cascade";
+
+const migrationDriver = getDatabaseDriver().migrationDriver();
+
+await migrationDriver.createTableIfNotExists({
+  name: "posts",
+  columns: [
+    { name: "id", type: "bigInteger", primary: true, autoIncrement: true },
+    { name: "title", type: "string", length: 255, nullable: false },
+    { name: "body", type: "text", nullable: true },
+    { name: "published_at", type: "timestamp", nullable: true },
+  ],
+});
+
+await migrationDriver.createIndex("posts", {
+  name: "idx_posts_published_at",
+  columns: ["published_at"],
+});
+```

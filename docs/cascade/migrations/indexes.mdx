@@ -1,0 +1,287 @@
+---
+sidebar_position: 7
+---
+
+# 🔍 Indexes
+
+Cascade supports the full spectrum of modern index types — from classic B-tree unique and composite indexes through full-text, geospatial, and AI vector indexes. You can declare indexes inline on a column or add them as standalone operations after the table exists.
+
+---
+
+## 🏷️ Inline Index Declaration
+
+The simplest way to add an index is to chain a method directly on the `ColumnBuilder` inside a `createTable` or `addColumn` callback. Every inline index method queues a pending index operation on the migration — it does not create a separate DDL statement you need to write.
+
+### `unique()`
+
+Registers a unique index for the column.
+
+```ts title="src/database/migrations/create_users_table.ts"
+table.string("email", 320).notNullable().unique();
+```
+
+### `index()`
+
+Registers a regular (non-unique) index for faster lookups on the column.
+
+```ts title="src/database/migrations/create_posts_table.ts"
+table.string("slug", 255).notNullable().index();
+```
+
+### `primary()`
+
+Marks the column as the primary key. This creates the primary index on the column.
+
+```ts title="src/database/migrations/create_users_table.ts"
+table.uuid("id").primary();
+```
+
+### `vectorIndex(options?)`
+
+Registers a vector-search index for an AI embedding column. Pass any `VectorIndexOptions` fields except `dimensions` — those are inferred from the column declaration.
+
+```ts title="src/database/migrations/create_embeddings_table.ts"
+table
+  .vector("embedding", { dimensions: 1536 })
+  .vectorIndex({ similarity: "cosine" });
+```
+
+:::info
+All inline index methods (`unique()`, `index()`, `vectorIndex()`) queue a pending index operation alongside the column definition. They do not immediately alter the database.
+:::
+
+---
+
+## 🗃️ Standalone Index via `addIndex`
+
+For more control — composite indexes, full-text indexes, geo indexes, or any scenario where you want to add an index to an existing table — use `this.addIndex(table, columns, options?)`.
+
+```ts title="src/database/migrations/add_indexes_to_posts.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export default class AddIndexesToPosts extends Migration {
+  static migrationName = "AddIndexesToPosts";
+  static createdAt = "2026-01-15T10:00:00.000Z";
+
+  async up() {
+    // Composite index for dashboard queries
+    await this.addIndex("posts", ["status", "created_at"], {
+      name: "idx_posts_status_created",
+    });
+
+    // Full-text index for search
+    await this.addIndex("posts", ["title", "content"], {
+      fullText: true,
+    });
+
+    // Vector index for AI similarity search
+    await this.addIndex("embeddings", ["vector"], {
+      vector: { dimensions: 1536, similarity: "cosine" },
+    });
+  }
+
+  async down() {
+    await this.dropIndex("posts", "idx_posts_status_created");
+    await this.dropIndex("posts", "posts_title_content_fulltext");
+    await this.dropIndex("embeddings", "embeddings_vector_vector");
+  }
+}
+```
+
+---
+
+## 📐 `IndexDefinition` Type
+
+`IndexDefinition` is the options object accepted by `addIndex`. All fields are optional except `columns`.
+
+```ts title="src/contracts/migration-driver.contract.ts"
+interface IndexDefinition {
+  name?: string;                  // explicit index name; auto-generated if omitted
+  unique?: boolean;               // create a unique index
+  fullText?: boolean;             // create a full-text index
+  fullTextOptions?: FullTextIndexOptions;
+  geo?: boolean;                  // create a geospatial index
+  geoOptions?: GeoIndexOptions;
+  vector?: VectorIndexOptions;    // create a vector/AI index
+  columns: string[];              // columns to index (set by addIndex automatically)
+}
+```
+
+:::tip
+You do not need to set `columns` yourself — `addIndex(table, columns, options)` merges the columns array into the definition for you. Only set `columns` if you are constructing an `IndexDefinition` object to pass directly to the driver.
+:::
+
+---
+
+## 📝 `FullTextIndexOptions`
+
+Configures language and weighting for full-text indexes.
+
+```ts title="src/contracts/migration-driver.contract.ts"
+interface FullTextIndexOptions {
+  language?: string;              // e.g. "english", "french"
+  weights?: Record<string, number>; // per-column weight map
+}
+```
+
+```ts title="src/database/migrations/add_search_indexes.ts"
+await this.addIndex("articles", ["title", "body"], {
+  fullText: true,
+  fullTextOptions: {
+    language: "english",
+    weights: { title: 10, body: 1 },
+  },
+});
+```
+
+---
+
+## 🌍 `GeoIndexOptions`
+
+Configures geospatial index type. The available `type` values depend on your database driver.
+
+```ts title="src/contracts/migration-driver.contract.ts"
+interface GeoIndexOptions {
+  type?: "2dsphere" | "2d" | "gist" | "gin";
+}
+```
+
+| Value | Use case |
+|---|---|
+| `"2dsphere"` | MongoDB spherical earth coordinates |
+| `"2d"` | MongoDB flat-plane coordinates |
+| `"gist"` | PostgreSQL GiST (general geometric types) |
+| `"gin"` | PostgreSQL GIN (JSONB, array containment) |
+
+```ts title="src/database/migrations/add_geo_index.ts"
+await this.addIndex("locations", ["coordinates"], {
+  geo: true,
+  geoOptions: { type: "2dsphere" },
+});
+```
+
+---
+
+## 🤖 `VectorIndexOptions`
+
+Configures vector/AI similarity search indexes. `dimensions` is required.
+
+```ts title="src/contracts/migration-driver.contract.ts"
+interface VectorIndexOptions {
+  dimensions: number;                          // embedding vector length
+  similarity?: "cosine" | "euclidean" | "dot"; // distance function
+}
+```
+
+| Similarity | Description |
+|---|---|
+| `"cosine"` | Angle between vectors — good for normalized embeddings |
+| `"euclidean"` | Straight-line distance — good for spatial data |
+| `"dot"` | Dot product — fast, good when vectors are unit-length |
+
+```ts title="src/database/migrations/add_vector_index.ts"
+await this.addIndex("documents", ["embedding"], {
+  vector: { dimensions: 1536, similarity: "cosine" },
+});
+```
+
+:::info
+`VectorIndexOptions` when used inline via `ColumnBuilder.vectorIndex()` does not require `dimensions` — the value is inferred from the column's own `dimensions` option set at column declaration time.
+:::
+
+---
+
+## 🗑️ Dropping Indexes
+
+Use `this.dropIndex(table, name)` to remove a named index.
+
+```ts title="src/database/migrations/drop_index.ts"
+async down() {
+  await this.dropIndex("posts", "idx_posts_status_created");
+}
+```
+
+:::tip
+Set an explicit `name` when creating indexes so `dropIndex` calls in `down()` are predictable and do not depend on auto-generated names.
+:::
+
+---
+
+## 📋 Complete Example
+
+```ts title="src/database/migrations/2026_01_15_add_search_indexes.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export default class AddSearchIndexes extends Migration {
+  static migrationName = "AddSearchIndexes";
+  static createdAt = "2026-01-15T14:00:00.000Z";
+
+  async up() {
+    // Standard composite index for filtering and sorting
+    await this.addIndex("posts", ["status", "published_at"], {
+      name: "idx_posts_status_published",
+    });
+
+    // Full-text index for keyword search
+    await this.addIndex("posts", ["title", "content"], {
+      name: "idx_posts_fulltext",
+      fullText: true,
+    });
+
+    // Geospatial index for location queries
+    await this.addIndex("venues", ["location"], {
+      name: "idx_venues_geo",
+      geo: true,
+      geoOptions: { type: "2dsphere" },
+    });
+
+    // Vector index for semantic similarity search
+    await this.addIndex("embeddings", ["vector"], {
+      name: "idx_embeddings_vector",
+      vector: { dimensions: 1536, similarity: "cosine" },
+    });
+  }
+
+  async down() {
+    await this.dropIndex("posts", "idx_posts_status_published");
+    await this.dropIndex("posts", "idx_posts_fulltext");
+    await this.dropIndex("venues", "idx_venues_geo");
+    await this.dropIndex("embeddings", "idx_embeddings_vector");
+  }
+}
+```
+
+---
+
+## 🧱 Inline Index in `createTable`
+
+You can combine inline and standalone index declarations in the same migration when creating a table. Inline indexes are queued alongside column definitions and executed as part of the table-creation phase.
+
+```ts title="src/database/migrations/create_articles_table.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export default class CreateArticlesTable extends Migration {
+  async up() {
+    await this.createTable("articles", (table) => {
+      table.id();
+      table.string("slug", 255).notNullable().unique();   // unique index inline
+      table.string("title", 255).notNullable().index();   // regular index inline
+      table.text("body").notNullable();
+      table.vector("embedding", { dimensions: 1536 })
+        .nullable()
+        .vectorIndex({ similarity: "cosine" });            // vector index inline
+      table.timestamps();
+    });
+
+    // Composite index added as a standalone operation
+    await this.addIndex("articles", ["created_at", "slug"], {
+      name: "idx_articles_timeline",
+    });
+  }
+
+  async down() {
+    await this.dropIndex("articles", "idx_articles_timeline");
+    await this.dropTable("articles");
+  }
+}
+```

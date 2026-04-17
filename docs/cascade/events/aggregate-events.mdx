@@ -1,35 +1,129 @@
 ---
 sidebar_position: 4
-title: Aggregate Events
+title: Query Builder Events
 ---
 
-## Introduction
+# 🔍 Query Builder Events
 
-Aggregate events are triggered when performing aggregate operations.
+The `QueryBuilder` exposes three lifecycle hooks that let you observe and transform queries as they execute. These hooks are available on **any query builder instance** returned by `Model.query()`, `Model.where(...)`, and similar methods.
 
-## Types of Events
+:::info Aggregate class removed
+The `Aggregate` class and its `Aggregate.events()` method no longer exist. Query-level lifecycle hooks are now part of `QueryBuilderContract` and are registered directly on a query builder instance.
+:::
 
-There are three types of events in the Aggregate:
+## Lifecycle hook overview
 
-1. `fetching`: This event is triggered when calling `get`, `first`, `latest`, `oldest` or `count` methods.
-2. `updating`: This event is triggered when calling `update` method.
-3. `deleting`: This event is triggered when calling `delete` method.
+| Hook | Fires | Returns |
+|---|---|---|
+| `onFetching(callback)` | Before the query is sent to the database | Unsubscribe `() => void` |
+| `onHydrating(callback)` | During result hydration (each raw row) | Unsubscribe `() => void` |
+| `onFetched(callback)` | After all results are hydrated and ready | Unsubscribe `() => void` |
 
-## Accessing Aggregate Events
+All three hooks return an **unsubscribe function** — call it to deregister the listener.
 
-To access the Aggregate events manager, call the `events()` method on the Aggregate class `(not the instance)`.
+## `onFetching(callback)`
 
-```ts title="src/app.ts"
-import { Aggregate } from "@warlock.js/cascade";
+Fires **before** the underlying database query is executed. Use it for logging, timing, or modifying query state.
 
-Aggregate.events()
-  .onFetching((aggregate) => {
-    // do something
-  })
-  .onUpdating((aggregate) => {
-    // do something
-  })
-  .onDeleting((aggregate) => {
-    // do something
-  });
+```ts
+import { User } from "./models/user";
+
+const query = User.query();
+
+const unsubscribe = query.onFetching((q) => {
+  console.log("About to run query on table:", q.table);
+});
+
+const users = await query.where("active", true).get();
+
+// Deregister when no longer needed
+unsubscribe();
 ```
+
+## `onHydrating(callback)`
+
+Fires **during hydration** — once per raw result row as it is converted into a model instance. Use it to transform or decorate individual records.
+
+```ts
+const query = User.query();
+
+query.onHydrating((model) => {
+  // Normalize a field on every hydrated record
+  if (!model.get("displayName")) {
+    model.set("displayName", model.get("name"));
+  }
+});
+
+const users = await query.get();
+```
+
+## `onFetched(callback)`
+
+Fires **after** all results are hydrated and the final array is ready. Use it for post-fetch logging, caching, or analytics.
+
+```ts
+const query = User.query();
+
+const start = Date.now();
+
+query.onFetching(() => {
+  // recorded above
+});
+
+query.onFetched((results) => {
+  const elapsed = Date.now() - start;
+  if (elapsed > 200) {
+    console.warn(`Slow query on "${query.table}": ${elapsed}ms, ${results.length} rows`);
+  }
+});
+
+const users = await query.where("role", "admin").get();
+```
+
+## `hydrate(callback)`
+
+`hydrate()` sets a **custom hydration callback** that completely replaces the default model hydration for this query. It is chainable and returns `this`.
+
+```ts
+const rawRows = await User.query()
+  .hydrate((row) => ({
+    id: row.id,
+    label: `${row.first_name} ${row.last_name}`,
+  }))
+  .get();
+```
+
+:::tip Combining hooks
+You can register multiple hooks of the same type on the same query instance — they all fire in registration order. Each returns its own independent unsubscribe function.
+:::
+
+## Example: logging slow queries globally
+
+```ts
+import { User, Post } from "./models";
+
+function attachSlowQueryLogger(query: ReturnType<typeof User.query>, label: string) {
+  let start: number;
+
+  query.onFetching(() => {
+    start = Date.now();
+  });
+
+  query.onFetched((results) => {
+    const ms = Date.now() - start;
+    if (ms > 300) {
+      console.warn(`[SLOW] ${label}: ${ms}ms — ${results.length} records`);
+    }
+  });
+}
+
+const userQuery = User.query().where("active", true);
+attachSlowQueryLogger(userQuery, "active-users");
+
+const users = await userQuery.get();
+```
+
+## See also
+
+- [Model Events](./model-events) — lifecycle hooks fired on save, create, update, delete, etc.
+- [Query Events](./query-events) — lower-level driver query observation

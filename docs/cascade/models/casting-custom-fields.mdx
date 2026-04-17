@@ -14,7 +14,7 @@ Just use a function in your `casts` property:
 import { Model, Casts } from "@warlock.js/cascade";
 
 export class User extends Model {
-  public static collection = "users";
+  public static table = "users";
   protected casts: Casts = {
     // Custom cast for uppercase names
     name: (value) => (typeof value === "string" ? value.toUpperCase() : value),
@@ -59,6 +59,10 @@ export function encrypted(value, direction) {
 
 :::info
 Custom casts make your models super flexible. Use them for anything the built-in casts can't handle!
+:::
+
+:::tip Prefer schema for complex transformations
+For complex cases—nested objects, conditional logic, cross-field transformations, or embedded model resolution—use the `static schema` approach with `v.embed()` and seal's built-in mutators instead of a raw cast function. See [Validation & Schema](../../validation/schema) for details.
 :::
 
 ---

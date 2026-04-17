@@ -1,0 +1,154 @@
+---
+sidebar_position: 4
+---
+
+# 🗺️ MongoDB Blueprint
+
+`MongoDBBlueprint` is Cascade's MongoDB implementation of the `DriverBlueprintContract` interface. It provides **schema introspection** — a way to inspect the current state of your database's collections and indexes at runtime, without touching any migration files.
+
+---
+
+## 🏗️ What is a blueprint?
+
+A blueprint is a live mirror of your database structure. Unlike migrations (which describe how the structure should evolve), a blueprint answers questions like:
+
+- Which collections exist in the database right now?
+- Which indexes does a given collection have?
+- Does a particular collection exist?
+
+`MongoDBBlueprint` answers these questions by issuing lightweight MongoDB metadata queries against the live `Db` instance.
+
+---
+
+## 🔌 Accessing the blueprint
+
+The blueprint is exposed through the driver's `blueprint` getter. Cascade creates it lazily on first access:
+
+```ts title="src/utils/blueprint.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+
+const driver = dataSourceRegistry.get().driver;
+const blueprint = driver.blueprint; // DriverBlueprintContract
+```
+
+---
+
+## 📋 `DriverBlueprintContract` — available methods
+
+### `listTables(): Promise<string[]>`
+
+Returns the names of all collections in the current database:
+
+```ts
+const collections = await blueprint.listTables();
+// ["users", "orders", "products", "id_counters"]
+```
+
+### `tableExists(table: string): Promise<boolean>`
+
+Checks whether a collection with the given name exists:
+
+```ts
+const exists = await blueprint.tableExists("orders");
+
+if (!exists) {
+  console.warn("orders collection is missing — run migrations");
+}
+```
+
+### `listIndexes(table: string): Promise<TableIndexInformation[]>`
+
+Returns metadata for every index defined on a collection:
+
+```ts
+const indexes = await blueprint.listIndexes("users");
+
+for (const idx of indexes) {
+  console.log(idx.name, idx.columns, idx.unique);
+}
+```
+
+### `listColumns(table: string): Promise<string[]>`
+
+:::warning
+MongoDB is schemaless — collections do not have a fixed column definition. Calling `listColumns` on the MongoDB blueprint always returns an empty array and logs a yellow warning to the console. Use document sampling or schema validation rules if you need to inspect field presence.
+:::
+
+---
+
+## 🧩 `TableIndexInformation` — index metadata shape
+
+Each entry returned by `listIndexes` conforms to:
+
+```ts
+type TableIndexInformation = {
+  name: string;        // index name (e.g., "email_1", "status_-1_createdAt_-1")
+  columns: string[];   // fields included in the index
+  unique: boolean;     // whether the index enforces uniqueness
+  // additional driver-specific fields may be present
+};
+```
+
+---
+
+## 🔎 Usage examples
+
+### Check if an index exists before creating it
+
+```ts title="src/migrations/ensure-indexes.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+
+const blueprint = dataSourceRegistry.get().driver.blueprint;
+
+const indexes = await blueprint.listIndexes("users");
+const hasEmailIndex = indexes.some(idx => idx.columns.includes("email"));
+
+if (!hasEmailIndex) {
+  await dataSourceRegistry.get().driver.migrationDriver().createUniqueIndex(
+    "users",
+    ["email"],
+    "users_email_unique",
+  );
+}
+```
+
+### Audit collections at startup
+
+```ts title="src/bootstrap/audit.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+
+const blueprint = dataSourceRegistry.get().driver.blueprint;
+const requiredCollections = ["users", "orders", "products"];
+
+for (const name of requiredCollections) {
+  const exists = await blueprint.tableExists(name);
+  if (!exists) {
+    throw new Error(`Required collection "${name}" is missing. Run migrations.`);
+  }
+}
+```
+
+### List all indexes across every collection
+
+```ts title="src/utils/index-report.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+
+const blueprint = dataSourceRegistry.get().driver.blueprint;
+const collections = await blueprint.listTables();
+
+for (const collection of collections) {
+  const indexes = await blueprint.listIndexes(collection);
+  console.log(`${collection}: ${indexes.length} index(es)`);
+  for (const idx of indexes) {
+    console.log(`  - ${idx.name} [${idx.columns.join(", ")}]${idx.unique ? " (unique)" : ""}`);
+  }
+}
+```
+
+---
+
+## 🌟 What's next?
+
+- [🔄 Sync Adapter](./sync-adapter) — batch atomic sync updates
+- [🔢 ID Generator](./id-generator) — auto-increment integer IDs
+- [🔎 Query Builder](./query-builder) — aggregation pipeline queries

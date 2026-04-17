@@ -1,0 +1,156 @@
+---
+sidebar_position: 4
+---
+
+# 🔎 Query Builder Contract
+
+`QueryBuilderContract<T>` is the driver-agnostic query layer that every Cascade driver exposes. You rarely interact with it directly when using models — but it becomes essential when you are **implementing a custom driver** or **writing integration tests against a mock adapter**.
+
+:::info
+For day-to-day query usage, see the [Query Builder](../query-builder/) section. This page covers the contract's type signatures for driver authors and power users.
+:::
+
+---
+
+## 📐 When to Use This Contract
+
+- **Custom driver authors** — your driver's `queryBuilder<T>(table)` method must return an object that satisfies this interface.
+- **Testing adapters** — mock the contract to test repository or service classes without a real database.
+- **Type-safe raw queries** — cast `driver.queryBuilder("table")` to the contract to get full IntelliSense.
+
+---
+
+## 🧩 Key Type Signatures
+
+### Pagination
+
+```ts title="src/contracts/query-builder.contract.ts"
+interface PaginationOptions {
+  page: number;
+  limit: number;
+}
+
+interface PaginationResult<T> {
+  data: T[];
+  total: number;
+  pages: number;
+  page: number;
+  limit: number;
+}
+
+interface CursorPaginationOptions {
+  limit: number;
+  cursor?: string;
+  direction?: "next" | "prev";
+}
+
+interface CursorPaginationResult<T> {
+  data: T[];
+  nextCursor: string | null;
+  prevCursor: string | null;
+  hasMore: boolean;
+}
+```
+
+### Filtering
+
+```ts title="src/contracts/query-builder.contract.ts"
+type WhereOperator =
+  | "="  | "!=" | ">"  | ">=" | "<"  | "<="
+  | "like" | "notLike" | "in" | "notIn"
+  | "between" | "notBetween"
+  | "isNull" | "isNotNull";
+
+type WhereObject = Record<string, unknown>;
+
+type WhereCallback<T> = (qb: QueryBuilderContract<T>) => void;
+```
+
+### Ordering and Grouping
+
+```ts title="src/contracts/query-builder.contract.ts"
+type OrderDirection = "asc" | "desc";
+
+type GroupByInput = string | string[];
+
+interface HavingInput {
+  column: string;
+  operator: WhereOperator;
+  value: unknown;
+}
+```
+
+### Joins
+
+```ts title="src/contracts/query-builder.contract.ts"
+interface JoinOptions {
+  table: string;
+  firstColumn: string;
+  operator: string;
+  secondColumn: string;
+  type?: "inner" | "left" | "right" | "cross";
+}
+```
+
+### Chunking
+
+```ts title="src/contracts/query-builder.contract.ts"
+type ChunkCallback<T> = (records: T[], page: number) => Promise<boolean | void>;
+```
+
+Return `false` from the chunk callback to stop iteration early.
+
+### Raw Expressions and Queries
+
+```ts title="src/contracts/query-builder.contract.ts"
+interface RawExpression {
+  sql: string;
+  bindings?: unknown[];
+}
+
+interface DriverQuery {
+  sql: string;
+  bindings: unknown[];
+}
+```
+
+---
+
+## 🛠️ Implementing a Custom Driver
+
+When writing a custom driver, your `queryBuilder<T>(table)` must return an object satisfying `QueryBuilderContract<T>`. The simplest approach is to extend Cascade's built-in `QueryBuilder` base class and override only the execution methods:
+
+```ts title="src/drivers/my-driver/my-query-builder.ts"
+import { QueryBuilderContract, PaginationResult } from "@warlock.js/cascade";
+
+export class MyQueryBuilder<T> implements QueryBuilderContract<T> {
+  constructor(private readonly table: string) {}
+
+  // ... implement all methods
+  async paginate(options: PaginationOptions): Promise<PaginationResult<T>> {
+    // translate internal query state → native driver call → map result
+  }
+
+  // ...
+}
+```
+
+### Testing with a Mock Adapter
+
+```ts title="src/tests/post.repository.test.ts"
+import type { QueryBuilderContract } from "@warlock.js/cascade";
+
+const mockQB = {
+  where: jest.fn().mockReturnThis(),
+  first: jest.fn().mockResolvedValue({ id: 1, title: "Hello" }),
+} as unknown as QueryBuilderContract<Post>;
+
+jest.spyOn(driver, "queryBuilder").mockReturnValue(mockQB);
+
+const post = await postRepository.findByTitle("Hello");
+expect(post?.title).toBe("Hello");
+```
+
+:::tip
+Refer to the [Query Builder](../query-builder/) usage docs for the full method catalogue — filtering, ordering, aggregation, chunking, and more.
+:::

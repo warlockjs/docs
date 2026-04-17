@@ -2,56 +2,192 @@
 sidebar_position: 3
 ---
 
-# Selecting Columns / Projecting
+# 🎯 Selecting Columns
 
-To select/deselect fields, you can use one of three methods: `select`, `deselect` and `project`.
+Control which columns appear in query results. The QueryBuilder provides a rich set of projection methods — from simple field lists to computed expressions, conditional values, and concatenations.
 
-> Any column in MongoDB accepts dot notation selection by default, so feel free to use it.
+## 📋 select
 
-## select method
+Choose which columns to return. Accepts a single field, a list of fields, or an aliased object.
 
-Let's start with `select` method, this method is the most comprehensive and easiest one to use to select or unselect columns.
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
 
-Method signature:
+// Single field
+const users = await User.query().select("name").get();
 
-```ts
-  /**
-   * Select the given columns
-   */
-  public select(columns: string[] | Record<string, 0 | 1 | boolean>): Aggregate;
+// Multiple fields
+const users = await User.query().select(["id", "name", "email"]).get();
 ```
 
-The method accepts one of two types:
+### addSelect
 
-- `array`: an array of strings, each string is a column name that you want to select.
-- `object`: If you want more control to what to select and what not to select use the object instead, this object should have the column name as a key, and the value should be one of the following:
-  - `0`: to exclude the column from the result.
-  - `1`: to include the column in the result.
-  - `true`: to include the column in the result.
-  - `false`: to exclude the column from the result.
-
-## deselect method
-
-Deselect method accepts an array of columns `strings` that you want to exclude from the result.
-
-Method signature:
+Append extra columns to an existing selection without overwriting it:
 
 ```ts
-  /**
-   * Deselect the given columns
-   */
-  public deselect(columns: string[]): Aggregate;
+const users = await User.query()
+  .select(["id", "name"])
+  .addSelect(["email", "role"])
+  .get();
 ```
 
-## project method
-
-This is the native MongoDB method, it accepts an object that has the column name as a key, and the value could be any acceptable value in [MongoDB Project Stage](https://docs.mongodb.com/manual/reference/operator/aggregation/project/).
-
-Method signature:
+### clearSelect / selectAll / selectDefault
 
 ```ts
-  /**
-   * Project the given columns
-   */
-  public project(columns: Record<string, any>): Aggregate;
+// Remove all selections (returns nothing extra)
+builder.clearSelect();
+
+// Select every column (*)
+builder.selectAll();
+
+// Restore the model's default selection
+builder.selectDefault();
 ```
+
+## 🏷️ selectAs
+
+Alias a column under a new name in the result set:
+
+```ts title="src/repositories/product.repo.ts"
+import { Product } from "./product.model";
+
+const products = await Product.query()
+  .selectAs("price", "cost")
+  .get();
+
+// result row: { cost: 29.99 }
+```
+
+## 🔢 selectAggregate
+
+Add a computed aggregate column. Accepts a field, an `$agg` expression, and an alias:
+
+```ts title="src/repositories/order.repo.ts"
+import { Order } from "./order.model";
+import { $agg } from "@warlock.js/cascade";
+
+const rows = await Order.aggregate()
+  .selectAggregate("amount", $agg.sum("amount"), "totalRevenue")
+  .where("status", "paid")
+  .get();
+```
+
+## 🔢 selectCount
+
+Shorthand to add a COUNT column:
+
+```ts
+const rows = await Order.query()
+  .selectCount("id", "orderCount")
+  .get();
+```
+
+## 🔍 selectExists
+
+Add a boolean column that is `true` when a subquery finds at least one row:
+
+```ts
+const rows = await User.query()
+  .selectExists("orders", "hasOrders")
+  .get();
+```
+
+## 🔀 selectCase / selectWhen
+
+Conditional column values using CASE expressions:
+
+```ts title="src/repositories/score.repo.ts"
+import { Score } from "./score.model";
+
+// selectCase: full CASE WHEN list
+const rows = await Score.query()
+  .selectCase(
+    [
+      { when: { value: { ">": 90 } }, then: "excellent" },
+      { when: { value: { ">": 70 } }, then: "good" },
+    ],
+    "average",
+    "grade"
+  )
+  .get();
+
+// selectWhen: single condition shorthand
+const rows = await Score.query()
+  .selectWhen({ value: { ">": 70 } }, "pass", "fail", "result")
+  .get();
+```
+
+## 🔗 selectConcat
+
+Concatenate two or more columns (or literal strings) into a single column:
+
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+
+const users = await User.query()
+  .selectConcat(["firstName", "' '", "lastName"], "fullName")
+  .get();
+
+// result row: { fullName: "Jane Doe" }
+```
+
+## 🛡️ selectCoalesce
+
+Return the first non-null value from a list of columns:
+
+```ts title="src/repositories/contact.repo.ts"
+import { Contact } from "./contact.model";
+
+const contacts = await Contact.query()
+  .selectCoalesce(["mobilePhone", "homePhone", "workPhone"], "phone")
+  .get();
+```
+
+## 🧮 selectRaw
+
+Inject a raw driver expression as a column:
+
+```ts
+const rows = await Order.query()
+  .selectRaw("EXTRACT(YEAR FROM created_at) AS year")
+  .get();
+```
+
+## 📊 selectWindow
+
+Add a window function column (supported by SQL drivers):
+
+```ts
+const rows = await Sale.query()
+  .selectWindow({
+    fn: "ROW_NUMBER",
+    alias: "rowNum",
+    partitionBy: "region",
+    orderBy: "amount DESC",
+  })
+  .get();
+```
+
+## 🚫 deselect
+
+Exclude specific columns from the result:
+
+```ts
+const users = await User.query()
+  .deselect(["password", "refreshToken"])
+  .get();
+```
+
+## 📐 distinctValues
+
+Return only distinct rows by the specified fields:
+
+```ts
+const regions = await Order.query()
+  .distinctValues(["region"])
+  .get();
+```
+
+:::tip
+Combine `selectAggregate` with `groupBy` for grouped summaries, or use it standalone to compute a single value across filtered rows without grouping.
+:::

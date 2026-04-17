@@ -1,0 +1,224 @@
+---
+sidebar_position: 2
+---
+
+# 🧩 Embed Validator
+
+The `embedValidator` seal plugin extends `@warlock.js/seal`'s `v` factory with two new methods — `v.embed()` and `v.embedMany()` — that validate embedded (denormalized) sub-documents against another Cascade model's schema. It handles the full lifecycle: resolving raw IDs or plain objects into real `Model` instances, validating them, and extracting only the fields you want to store.
+
+---
+
+## 🔌 Plugin Registration
+
+The plugin is a standard `SealPlugin` object exported from `@warlock.js/cascade`. The easiest way to activate it is to import the `database-seal-plugins` module as a **side effect**. That module calls `registerPlugin(embedValidator)` automatically on load.
+
+```ts title="src/bootstrap.ts"
+// Side-effect import — registers v.embed and v.embedMany globally
+import "@warlock.js/cascade/validation/database-seal-plugins";
+```
+
+If you prefer to be explicit, you can install the plugin yourself:
+
+```ts title="src/bootstrap.ts"
+import { v } from "@warlock.js/seal";
+import { embedValidator } from "@warlock.js/cascade";
+
+v.use(embedValidator);
+```
+
+:::info
+Either approach is equivalent. Once `embedValidator` is installed, `v.embed` and `v.embedMany` are available everywhere in your application for the lifetime of the process.
+:::
+
+### `DatabaseSealPlugins` type
+
+The `database-seal-plugins` module also exports `DatabaseSealPlugins`, a type alias for the union of all registered plugin types. You can use it when you need a typed reference to the set of Cascade seal plugins.
+
+```ts
+import type { DatabaseSealPlugins } from "@warlock.js/cascade";
+```
+
+---
+
+## 🏭 `v.embed()` and `v.embedMany()`
+
+Both methods are injected into the seal `v` namespace by the plugin. They accept a Model class (or a model name string from the registry) plus an optional `EmbedOptions` bag.
+
+```ts
+type EmbedOptions = {
+  /** Custom error message shown when validation fails */
+  errorMessage?: string;
+  /** Field name(s) to extract from the model for storage */
+  embed?: string | string[];
+};
+```
+
+| Method | Returns | Purpose |
+|---|---|---|
+| `v.embed(model, options?)` | `EmbedModelValidator` | Validates a **single** embedded model |
+| `v.embedMany(model, options?)` | `EmbedModelValidator` | Validates an **array** of embedded models |
+
+### Single embed
+
+```ts title="src/models/order.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+import "@warlock.js/cascade/validation/database-seal-plugins";
+import { Address } from "./address.model";
+
+export class Order extends Model {
+  static table = "orders";
+
+  static schema = v.object({
+    total: v.number().min(0).required(),
+    shippingAddress: v.embed(Address),
+  });
+}
+```
+
+### Many embeds
+
+```ts title="src/models/order.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+import "@warlock.js/cascade/validation/database-seal-plugins";
+import { OrderItem } from "./order-item.model";
+
+export class Order extends Model {
+  static table = "orders";
+
+  static schema = v.object({
+    total: v.number().min(0).required(),
+    items: v.embedMany(OrderItem),
+  });
+}
+```
+
+### Restricting which fields are stored
+
+Use the `embed` option to pick which fields are extracted from the embedded model before writing to the database. This is the primary way to keep denormalized data lean.
+
+```ts title="src/models/post.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+import "@warlock.js/cascade/validation/database-seal-plugins";
+import { Category } from "./category.model";
+import { Tag } from "./tag.model";
+
+export class Post extends Model {
+  static table = "posts";
+
+  static schema = v.object({
+    title: v.string().required(),
+
+    // Only store id and name from the Category model
+    category: v.embed(Category, { embed: ["id", "name"] }),
+
+    // Store all embedData fields for each Tag
+    tags: v.embedMany(Tag),
+  });
+}
+```
+
+:::tip
+Passing a single string to `embed` stores one field; passing an array stores exactly those fields. Omitting `embed` entirely falls back to the model's built-in `embedData` property.
+:::
+
+---
+
+## 🏗️ `EmbedModelValidator` Class Reference
+
+`EmbedModelValidator` is the `BaseValidator` subclass that both `v.embed()` and `v.embedMany()` return. The plugin's factory methods are the normal entry point, but you can instantiate `EmbedModelValidator` directly for advanced use cases.
+
+```ts
+import { EmbedModelValidator } from "@warlock.js/cascade";
+```
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `matchesType(value)` | Returns `true` when `value` is a `Model` instance, a number, or an array of `Model` instances |
+| `model(model, errorMessage?)` | Configures the validator for a **single** embedded model — registers `databaseModelMutator` and `databaseModelRule` |
+| `models(model, errorMessage?)` | Configures the validator for **many** embedded models — registers `databaseModelsMutator`, `arrayRule`, and `databaseModelsRule` |
+| `embed(embed?)` | Registers `databaseModelTransformer` to extract embed data; accepts a field name string or an array of field names |
+
+```ts title="src/validation/custom-embed.ts"
+import { EmbedModelValidator } from "@warlock.js/cascade";
+import { Address } from "../models/address.model";
+
+// Equivalent to v.embed(Address, { embed: ["city", "postalCode"] })
+const addressValidator = new EmbedModelValidator()
+  .model(Address, "Invalid address")
+  .embed(["city", "postalCode"]);
+```
+
+:::info
+Direct instantiation is useful when you need to compose the validator programmatically. In most cases, `v.embed()` and `v.embedMany()` cover everything you need.
+:::
+
+---
+
+## ⚙️ Under the Hood
+
+Each `v.embed()` / `v.embedMany()` call wires together three seal pipeline stages automatically.
+
+### 1. Mutator — resolve to Model instances
+
+`databaseModelMutator` (single) and `databaseModelsMutator` (array) run first. They accept a raw ID, a plain object, or an existing `Model` instance and resolve it to a real model via a database lookup:
+
+- Single: calls `ModelClass.find(value)`
+- Array: calls `ModelClass.query().whereIn(...).get()`
+
+If the model name cannot be found in the registry, an error is thrown at this stage.
+
+### 2. Rule — validate the Model instance
+
+`databaseModelRule` (single) and `databaseModelsRule` (array) verify that the resolved value is actually a `Model` instance (or array of instances). The rule also exposes the model class on `context.attributesList.model` so downstream stages can reference it.
+
+### 3. Transformer — extract embed data for storage
+
+`databaseModelTransformer` runs last. It reads `context.options.embed` (defaulting to `"embedData"`) and returns:
+
+- For a single model: `value[embed]` (string key) or `value.only(embed)` (array of keys)
+- For an array: maps each item the same way
+- For any other value type: passes through unchanged
+
+This three-stage pipeline means the field stored in the database always contains only the chosen subset of data from the embedded model — never the full live model object.
+
+---
+
+## 📦 Full Example
+
+```ts title="src/models/article.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+import "@warlock.js/cascade/validation/database-seal-plugins";
+import { Author } from "./author.model";
+import { Tag } from "./tag.model";
+
+export class Article extends Model {
+  static table = "articles";
+
+  static schema = v.object({
+    title:   v.string().required(),
+    body:    v.string().required(),
+
+    // Store only id, name, and avatar from the Author model
+    author: v.embed(Author, {
+      embed: ["id", "name", "avatar"],
+      errorMessage: "Author not found or invalid",
+    }),
+
+    // Store full embedData for each tag
+    tags: v.embedMany(Tag),
+  });
+}
+```
+
+When `article.save()` is called:
+
+1. Raw `author` value (e.g. an ID integer) is resolved to an `Author` model instance via `Author.find(id)`.
+2. The rule verifies it is a valid `Author` instance.
+3. The transformer extracts `{ id, name, avatar }` and writes that object to the `author` column.
+4. Each item in `tags` goes through the same pipeline as an array.

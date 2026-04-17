@@ -4,63 +4,79 @@ sidebar_position: 11
 
 # 🏷️ Indexing
 
-Make your queries lightning-fast! Cascade makes it super easy to define and manage indexes for your collections. 🚀
+Make your queries lightning-fast! Cascade manages indexes through **migrations**, giving you version-controlled, repeatable schema changes across all environments. 🚀
 
 ## ⚡ Why Indexes?
-Indexes help your database find data faster—think of them as magic bookmarks for your collections!
 
-## 🏗️ Defining Indexes
-Just add a static `indexes` property to your model:
+Indexes help your database find data faster—think of them as magic bookmarks for your tables and collections!
 
-```ts title="src/models/user.ts"
-import { Model } from "@warlock.js/cascade";
+- Query fields you filter or sort on frequently.
+- Enforce uniqueness on columns like `email` or `username`.
+- Speed up range queries and ordering.
 
-export class User extends Model {
-  public static collection = "users";
-  public static indexes = [
-    { key: { email: 1 }, unique: true }, // Unique index on email
-    { key: { createdAt: -1 } }, // Sort by createdAt descending
-  ];
+## 🏗️ Creating Indexes via Migrations
+
+Indexes are created through migrations using `Migration.for(Model)`. This keeps your schema changes versioned and reproducible.
+
+```ts title="src/migrations/add-user-indexes.ts"
+import { Migration } from "@warlock.js/cascade";
+import { User } from "../models/user";
+
+export default class AddUserIndexes extends Migration.for(User) {
+  async up() {
+    // Unique index on email
+    await this.createUniqueIndex("users", ["email"]);
+
+    // Composite index on role + createdAt for sorted role queries
+    await this.createIndex("users", {
+      columns: ["role", "createdAt"],
+    });
+  }
+
+  async down() {
+    await this.dropUniqueIndex("users", ["email"]);
+    await this.dropIndex("users", ["role", "createdAt"]);
+  }
 }
 ```
 
 ## 🧩 Compound Indexes
+
 Combine multiple fields for even more powerful queries:
 
-```ts title="src/models/post.ts"
-public static indexes = [
-  { key: { authorId: 1, createdAt: -1 } },
-];
+```ts title="src/migrations/add-post-indexes.ts"
+await this.createIndex("posts", {
+  columns: ["authorId", "createdAt"],
+});
 ```
 
 ## ⏳ TTL (Time-To-Live) Indexes
-Automatically remove old documents:
 
-```ts title="src/models/session.ts"
-public static indexes = [
-  { key: { expiresAt: 1 }, expireAfterSeconds: 3600 },
-];
+Automatically remove old documents (MongoDB):
+
+```ts title="src/migrations/add-session-ttl.ts"
+await this.createTTLIndex("sessions", "expiresAt", 3600);
 ```
 
-## 🧙‍♂️ Pro Tip: Background Indexes
-Build indexes in the background so your app stays fast:
+## 🔤 Full-Text Indexes
 
-```ts title="src/models/user.ts"
-public static indexes = [
-  { key: { email: 1 }, background: true },
-];
+```ts title="src/migrations/add-fulltext.ts"
+await this.createFullTextIndex("posts", ["title", "body"]);
 ```
 
 ## ⚠️ Best Practices
+
 - Always index fields you query or sort by often.
-- Use unique indexes for emails, usernames, etc.
-- Don't over-index—each index uses memory!
+- Use unique indexes for emails, usernames, and other unique identifiers.
+- Don't over-index—each index uses memory and slows down writes!
+- Manage all indexes through migrations so they are version-controlled.
 
 :::info
-Indexes are managed automatically when you use migrations. No manual database work needed!
+There is no `static indexes` property on the Model class. All index creation must go through migrations for proper version control and cross-environment consistency.
 :::
 
 ---
 
 ## 🌟 What's Next?
-- [🧰 Advanced Usage](../advanced/introduction) 
+- [📦 Writing Migrations](../migrations/writing-migrations)
+- [🧰 Advanced Usage](../advanced/introduction)

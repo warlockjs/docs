@@ -2,183 +2,183 @@
 sidebar_position: 9
 ---
 
-# Fetching Documents
+# 📥 Fetching Documents
 
-Fetching documents using Mongez Aggregate class.
+Execute a built query and retrieve results. The QueryBuilder provides a rich set of terminal methods for every retrieval pattern — arrays, single rows, pagination, streaming, and scalar checks.
 
-## Introduction
+## get()
 
-As we saw, `Aggregate` is a pipeline that hold multiple stages, we saw how to build the pipeline, now let's see how to fetch the documents.
+Return all matching rows as an array. When called via `Model.aggregate()` or `Model.query()`, rows are hydrated into model instances.
 
-## Using get method
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
 
-This is the most common method to fetch documents, it will return an array of documents.
-
-Let's see an example
-
-```ts
-import { Aggregate } from "@warlock.js/cascade";
-
-const users = await new Aggregate("users").where("id", ">", 1500).get();
+const users = await User.aggregate()
+  .where("active", true)
+  .orderBy("name")
+  .get<User>();
 ```
 
-This will return list of documents for the users collection.
-
-If we want to map the date before final return, we can pass a callback to the `get` method.
+The generic type parameter `<Output>` lets you override the inferred return type when the query returns a custom shape (e.g., after `selectAggregate` or `groupBy`):
 
 ```ts
-const users = await new Aggregate("users").get((user) => {
-  user.age = new Date().getFullYear() - user.birthYear;
-  return user;
-});
+type UserSummary = { gender: string; total: number };
+
+const summary = await User.aggregate()
+  .groupBy(["gender"], { total: $agg.count() })
+  .get<UserSummary>();
 ```
 
-## Get first document
+## first()
 
-To fetch only first matched document, we can use `first` method.
+Return the first matching row, or `null` if none found:
 
 ```ts
-const user = await new Aggregate("users").where("id", 1500).first();
+const user = await User.query().where("email", "jane@example.com").first();
+
+if (user) {
+  console.log(user.name);
+}
 ```
 
-If no results found, `null` will be returned.
+## firstOrFail()
 
-## Get last document
-
-Return last matched document.
+Like `first()`, but throws an error if no row is found:
 
 ```ts
-const user = await new Aggregate("users").where("id", 1500).last();
+const user = await User.query().whereId(42).firstOrFail();
+// throws if no user with id=42 exists
 ```
 
-## Pagination
+## last()
 
-Another powerful feature of `Aggregate` is pagination, we can use `paginate` method to paginate the results.
+Return the last row by the default (or specified) sort column:
 
 ```ts
-const results = await new Aggregate("users").paginate(1, 10);
+const lastPost = await Post.query().where("published", true).last();
+
+// By a specific field
+const latestOrder = await Order.query().last("createdAt");
 ```
 
-The first argument is the page number, and the second argument is the limit.
+## count()
 
-The results contains an object with the following structure:
+Return the total number of matching rows:
 
 ```ts
-export type PaginationInfo = {
-  /**
-   * Limit of the query
-   */
-  limit: number;
-  /**
-   * Results of the query
-   */
-  result: number;
-  /**
-   * Current page of the query
-   */
-  page: number;
-  /**
-   * total results of the query
-   */
-  total: number;
-  /**
-   * total pages of the query
-   */
-  pages: number;
-};
-/**
- * The result of the paginate query
- */
-export type PaginationListing<T> = {
-  /**
-   * Results of the query
-   */
-  documents: T[];
-  /**
-   * The pagination results
-   */
-  paginationInfo: PaginationInfo;
-};
+const total = await User.query().where("active", true).count();
+
+console.log(`${total} active users`);
 ```
 
-So basically, it returns `documents` and `paginationInfo` object, the `documents` is an array of documents, and the `paginationInfo` contains the pagination information.
+## exists() / notExists()
 
-## Count documents
-
-To count the number of documents, we can use `count` method.
+Boolean check for presence of at least one matching row:
 
 ```ts
-const count = await new Aggregate("users").count();
+const hasAdmins = await User.query().where("role", "admin").exists();
+const noDeleted = await User.query().whereNotNull("deletedAt").notExists();
 ```
 
-## Chunks
+## pluck()
 
-The chunk concept is to split the documents into multiple chunks, this will reduce the loaded documents in the memory especially if we have a large number of documents.
-
-To use chunks, we can use `chunk` method, it receives the `limit` of documents per chunk and a callback to handle the chunk.
+Retrieve a flat array of values from a single column:
 
 ```ts
-await new Aggregate("users").chunk(100, (users) => {
-  // handle the chunk
-});
+const emails = await User.query().where("active", true).pluck("email");
+// ["alice@example.com", "bob@example.com", ...]
 ```
 
-You can also receive the `pagination information` in the second callback argument:
+## value()
+
+Return the value of a single column from the first matching row, or `null`:
 
 ```ts
-await new Aggregate("users").chunk(100, (users, pagination) => {
-  // handle the chunk
-});
+const name = await User.query().whereId(42).value<string>("name");
 ```
 
-:::danger
-If you want to stop the chunking process, you can return `false` from the callback.
+## distinct()
+
+Return distinct values of a column as an array:
+
+```ts
+const regions = await Order.query().distinct<string>("region");
+// ["north", "south", "east", "west"]
+```
+
+## paginate()
+
+Paginate results with page-number-based pagination. Returns a `PaginationResult<T>`:
+
+```ts title="src/controllers/user.controller.ts"
+import { User } from "./user.model";
+
+const result = await User.query()
+  .where("active", true)
+  .paginate({ page: 1, limit: 20 });
+
+console.log(result.data);       // T[]
+console.log(result.total);      // total matching rows
+console.log(result.pages);      // total pages
+console.log(result.page);       // current page
+console.log(result.limit);      // rows per page
+```
+
+## cursorPaginate()
+
+Cursor-based pagination — ideal for infinite scroll and large datasets:
+
+```ts title="src/controllers/feed.controller.ts"
+import { Post } from "./post.model";
+
+const result = await Post.query()
+  .where("published", true)
+  .orderBy("createdAt", "desc")
+  .cursorPaginate({ limit: 20, after: lastCursor });
+
+console.log(result.data);           // T[]
+console.log(result.nextCursor);     // pass as `after` on next call
+console.log(result.previousCursor); // pass as `before` to go back
+```
+
+## chunk()
+
+Process a large result set in fixed-size batches to avoid loading everything into memory at once:
+
+```ts title="src/jobs/export.job.ts"
+import { Order } from "./order.model";
+
+await Order.query()
+  .where("status", "paid")
+  .chunk(100, async (orders) => {
+    for (const order of orders) {
+      await exportOrder(order);
+    }
+  });
+```
+
+:::warning
+Return `false` from the chunk callback to stop iteration early.
 :::
 
-## Explain
+## countDistinct()
 
-Sometimes we need to know how the query is executed, we can use `explain` method to get the execution plan of the query.
-
-```ts
-const results = await new Aggregate("users").explain();
-```
-
-See [explain](https://www.mongodb.com/docs/manual/reference/method/db.collection.aggregate/#return-information-on-aggregation-pipeline-operation) for more information.
-
-## Get certain field values
-
-To get certain field values, we can use `values` method.
+Count distinct values of a field:
 
 ```ts
-const results = await new Aggregate("users").values("name");
+const uniqueBuyers = await Order.query()
+  .where("status", "paid")
+  .countDistinct("userId");
 ```
 
-This will return all values from all documents for the `name` field.
+## explain()
 
-:::tip
-Please note that the `values` method will return an array of values, not an array of documents.
-:::
-
-:::info
-The returned values may return duplicated values, to get unique values, use `unique` method.
-:::
-
-## Get Unique/Distinct values for a field
-
-To get unique values for a given field, we can use `unique` method.
+Retrieve the driver's query execution plan (useful for performance analysis):
 
 ```ts
-const results = await new Aggregate("users").unique("name");
+const plan = await User.query()
+  .where("active", true)
+  .explain();
+
+console.log(plan);
 ```
-
-> You can use `distinct` method as an alias for `unique` method.
-
-## Get Heavy Unique/Distinct values for a field
-
-In some scenarios, the unique values may contain `null` value, to ensure only a `non-null` values are returned, we can use `uniqueHeavy` method.
-
-```ts
-const results = await new Aggregate("users").uniqueHeavy("name");
-```
-
-> You can use `distinctHeavy` method as an alias for `uniqueHeavy` method.

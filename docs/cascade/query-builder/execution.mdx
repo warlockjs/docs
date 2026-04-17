@@ -1,0 +1,151 @@
+---
+sidebar_position: 9
+---
+
+# ▶️ Execution
+
+All builder chains are lazy — nothing hits the database until you call an execution method. This page covers the full set of terminal methods that run the query and return results.
+
+## 📋 Fetching Records
+
+### `get<Output>()` → `Promise<Output[]>`
+
+Execute the query and return all matching records as an array. The generic `Output` lets you specify the return shape — defaults to `T` (the model type):
+
+```ts title="src/repositories/user.repo.ts"
+const users = await User.query()
+  .where("status", "active")
+  .orderBy("name")
+  .get<UserSummary>();
+// returns UserSummary[]
+```
+
+### `first<Output>()` → `Promise<Output | null>`
+
+Return only the first matching record, or `null` if none found:
+
+```ts title="src/repositories/user.repo.ts"
+const user = await User.query()
+  .where("email", email)
+  .first<User>();
+
+if (!user) {
+  throw new Error("User not found");
+}
+```
+
+### `firstOrFail<Output>()` → `Promise<Output>`
+
+Like `first()` but throws an exception when no record is found. Use this when the record **must** exist:
+
+```ts title="src/controllers/user.controller.ts"
+// Throws ModelNotFoundException if not found
+const user = await User.query()
+  .whereId(req.params.id)
+  .firstOrFail<User>();
+```
+
+:::warning
+`firstOrFail` throws a driver-specific error (e.g., `ModelNotFoundException`). Always wrap in a try-catch or use a global error handler to return the appropriate HTTP response.
+:::
+
+### `last<Output>(field?)` → `Promise<Output | null>`
+
+Return the last record, optionally sorted by a specific field (defaults to the primary key):
+
+```ts
+const latestOrder = await Order.query()
+  .where("customerId", userId)
+  .last<Order>("createdAt");
+```
+
+---
+
+## 🔄 Chunked Processing
+
+### `chunk(size, callback)` → `Promise<void>`
+
+Process large result sets in batches to avoid loading everything into memory at once:
+
+```ts title="src/jobs/export.ts"
+await User.query()
+  .where("status", "active")
+  .chunk(100, async (users) => {
+    for (const user of users) {
+      await sendNewsletter(user);
+    }
+  });
+```
+
+The `ChunkCallback<T>` signature:
+
+```ts
+type ChunkCallback<T> = (records: T[]) => Promise<void> | void;
+```
+
+:::tip
+`chunk` is ideal for background jobs, data exports, and migrations where fetching all records at once would exhaust memory.
+:::
+
+---
+
+## 📄 Pagination
+
+### `paginate(options)` → `Promise<PaginationResult<T>>`
+
+Standard page/limit pagination. Returns records and metadata:
+
+```ts title="src/api/posts.ts"
+const page = await Post.query()
+  .where("status", "published")
+  .orderBy("publishedAt", "desc")
+  .paginate({ page: 2, limit: 20 });
+
+// page.data     → Post[] (20 records)
+// page.meta.total
+// page.meta.page
+// page.meta.limit
+// page.meta.lastPage
+// page.meta.from
+// page.meta.to
+```
+
+### `PaginationOptions`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `page` | `number` | Current page (1-based) |
+| `limit` | `number` | Records per page |
+
+### `PaginationResult<T>`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `data` | `T[]` | Records for the current page |
+| `meta.total` | `number` | Total matching records |
+| `meta.page` | `number` | Current page number |
+| `meta.limit` | `number` | Records per page |
+| `meta.lastPage` | `number` | Total number of pages |
+| `meta.from` | `number` | Index of first record on this page |
+| `meta.to` | `number` | Index of last record on this page |
+
+:::info
+For large datasets, prefer `cursorPaginate()` (see **Ordering & Limits**). Offset-based pagination gets slower as `page` increases because the database must scan and skip rows.
+:::
+
+---
+
+## 🧩 Execution Summary
+
+| Method | Returns | Notes |
+|--------|---------|-------|
+| `get<O>()` | `Promise<O[]>` | All matching records |
+| `first<O>()` | `Promise<O \| null>` | First match or null |
+| `firstOrFail<O>()` | `Promise<O>` | First match or throws |
+| `last<O>(field?)` | `Promise<O \| null>` | Last match or null |
+| `chunk(size, cb)` | `Promise<void>` | Batched iteration |
+| `paginate(opts)` | `Promise<PaginationResult<T>>` | Page + metadata |
+| `cursorPaginate(opts)` | `Promise<CursorPaginationResult<T>>` | Cursor-based pages |
+| `count()` | `Promise<number>` | Record count |
+| `exists()` | `Promise<boolean>` | Has any record |
+| `first` + aggregates | `Promise<scalar>` | See Aggregates page |

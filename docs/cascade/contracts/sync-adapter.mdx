@@ -1,0 +1,135 @@
+---
+sidebar_position: 5
+---
+
+# 🔄 Sync Adapter Contract
+
+When a model is saved, Cascade can propagate denormalization updates to related collections automatically. The `SyncAdapterContract` is the driver-level interface that executes these propagation batches. Each driver ships its own implementation — you only interact with this contract when writing a custom driver or a custom sync strategy.
+
+---
+
+## 📦 `SyncAdapterContract`
+
+```ts title="src/contracts/sync-adapter.contract.ts"
+interface SyncAdapterContract {
+  executeBatch(instructions: SyncInstruction[]): Promise<number>;
+  executeOne(instruction: SyncInstruction): Promise<number>;
+  executeArrayUpdate(instruction: SyncInstruction): Promise<number>;
+}
+```
+
+All three methods return the **number of affected documents** across the target collections.
+
+| Method | When it is called |
+|--------|------------------|
+| `executeBatch` | After a save, applies the full set of sync instructions in one pass |
+| `executeOne` | Applies a single non-array sync instruction |
+| `executeArrayUpdate` | Applies a positional array update when `isArrayUpdate` is `true` |
+
+:::info
+Sync adapters are called automatically by the writer pipeline when `skipSync` is not set. You do not need to invoke them manually in application code.
+:::
+
+---
+
+## 📋 `SyncInstruction`
+
+A single update operation descriptor. The adapter translates this into a native driver write.
+
+```ts title="src/contracts/sync-adapter.contract.ts"
+interface SyncInstruction {
+  targetTable: string;           // collection/table to update
+  targetModel: string;           // model class name of the target
+  filter: Record<string, unknown>;  // document selector
+  update: Record<string, unknown>;  // fields to patch
+  depth: number;                 // depth in the sync chain (0 = direct)
+  chain: string[];               // model names leading to this instruction
+  sourceModel: string;           // originating model class name
+  sourceId: string | number;     // PK of the document that changed
+
+  // Array update fields (only set when isArrayUpdate is true)
+  isArrayUpdate?: boolean;       // requires positional operator
+  arrayField?: string;           // name of the array field
+  identifierField?: string;      // field used to match the array element
+  identifierValue?: string | number; // value of identifierField to match
+}
+```
+
+---
+
+## 🔧 Implementing a Custom Sync Adapter
+
+If you are writing a custom driver, implement `SyncAdapterContract` and return it from `driver.syncAdapter()`:
+
+```ts title="src/drivers/my-driver/my-sync-adapter.ts"
+import { SyncAdapterContract, SyncInstruction } from "@warlock.js/cascade";
+
+export class MySyncAdapter implements SyncAdapterContract {
+  constructor(private readonly client: MyDatabaseClient) {}
+
+  async executeBatch(instructions: SyncInstruction[]): Promise<number> {
+    let affected = 0;
+    for (const instruction of instructions) {
+      affected += await this.executeOne(instruction);
+    }
+    return affected;
+  }
+
+  async executeOne(instruction: SyncInstruction): Promise<number> {
+    const result = await this.client.updateMany(
+      instruction.targetTable,
+      instruction.filter,
+      instruction.update,
+    );
+    return result.modifiedCount;
+  }
+
+  async executeArrayUpdate(instruction: SyncInstruction): Promise<number> {
+    // Use positional operator to patch a specific array element
+    const arrayFilter = {
+      [`${instruction.arrayField}.${instruction.identifierField}`]:
+        instruction.identifierValue,
+    };
+
+    const result = await this.client.updateMany(
+      instruction.targetTable,
+      instruction.filter,
+      instruction.update,
+      { arrayFilters: [arrayFilter] },
+    );
+    return result.modifiedCount;
+  }
+}
+```
+
+:::tip
+For simple drivers that do not support array positional updates, throw `new Error("Array updates are not supported by this driver")` inside `executeArrayUpdate`. Cascade will skip array sync for those relationships.
+:::
+
+---
+
+## 🔗 Accessing the Adapter
+
+```ts title="src/app/debug-sync.ts"
+import { getDatabaseDriver } from "@warlock.js/cascade";
+
+const syncAdapter = getDatabaseDriver().syncAdapter();
+
+// Manually trigger a sync instruction (advanced / debugging only)
+const affected = await syncAdapter.executeOne({
+  targetTable: "posts",
+  targetModel: "Post",
+  filter: { authorId: 42 },
+  update: { authorName: "Alice" },
+  depth: 1,
+  chain: ["User", "Post"],
+  sourceModel: "User",
+  sourceId: 42,
+});
+
+console.log(`Updated ${affected} post(s)`);
+```
+
+:::warning
+Manually calling sync adapter methods bypasses all event hooks and dirty tracking. Only do this in migration scripts or debugging sessions — never in regular application code.
+:::

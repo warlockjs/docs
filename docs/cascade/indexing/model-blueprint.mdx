@@ -4,18 +4,64 @@ sidebar_position: 3
 
 # Model Blueprint
 
-Model Blueprint is an extended class of [Blueprint](./blueprint) that allows you to create indexes on your models.
+:::info Index creation is handled by migrations
+Direct blueprint mutation (creating or dropping indexes) is done via the [migration system](../migrations/indexes). This page covers **read-only** schema introspection for a specific model's backing table.
+:::
 
-Any model has by default its own blueprint, so you can use it to create indexes on your models.
+`Model.blueprint()` as a static helper does not exist in the current API. To inspect indexes or columns for a model's table, access the driver blueprint directly via the data source registry.
 
-## Usage
-
-To get a blueprint for a model, use the static `blueprint` method from the model class.
+## Inspecting a model's indexes
 
 ```ts
-import { User } from "./models/user.ts";
+import { dataSourceRegistry } from "@warlock.js/cascade";
+import { User } from "./models/user";
 
-const userBlueprint = User.blueprint();
+// Retrieve the active driver blueprint
+const blueprint = await dataSourceRegistry.get().driver.blueprint(User.table);
+
+// List all indexes on the "users" table
+const indexes = await blueprint.listIndexes(User.table);
+
+for (const index of indexes) {
+  const kind = index.unique ? "UNIQUE" : "INDEX";
+  const cols = index.columns?.join(", ") ?? "—";
+  console.log(`[${kind}] ${index.name} (${cols})`);
+}
 ```
 
-From this point, all methods located in the [Blueprint Class](./blueprint) are available to use.
+## Checking whether the table exists
+
+```ts
+const exists = await blueprint.tableExists(User.table);
+console.log(`Table "${User.table}" exists:`, exists);
+```
+
+## Listing columns
+
+```ts
+const columns = await blueprint.listColumns(User.table);
+// ["id", "name", "email", "created_at"]
+```
+
+:::tip PostgreSQL vs MongoDB
+For **PostgreSQL**, `listColumns()` returns the real column names ordered by position.
+
+For **MongoDB**, `listColumns()` always returns an empty array and logs a warning — MongoDB is schemaless, so use your model definition as the source of truth.
+:::
+
+## Creating and dropping indexes
+
+Schema mutations (creating or dropping indexes) must be done inside a migration. See [Indexes via Migrations](../migrations/indexes) for details.
+
+```ts
+// Example migration that adds an index on users.email
+import { Migration } from "@warlock.js/cascade";
+import { User } from "../models/user";
+
+export default Migration.for(User).addIndex("email", { unique: true });
+```
+
+## See also
+
+- [`DriverBlueprintContract` and `TableIndexInformation`](./blueprint)
+- [Migrations: Indexes](../migrations/indexes)

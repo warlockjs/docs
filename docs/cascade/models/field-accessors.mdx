@@ -1,0 +1,347 @@
+---
+sidebar_position: 17
+---
+
+# 🗂️ Field Accessors
+
+Every Cascade model instance wraps a plain data object and exposes a rich set of **field accessor** methods for reading, writing, and mutating that data in a clean, type-safe way. This page covers every accessor available on a model instance.
+
+---
+
+## 📖 Reading Fields
+
+### `model.get(field, defaultValue?)`
+
+Read a field from the model's data. Supports **dot-notation** for nested paths.
+
+```ts
+get(field: string, defaultValue?: unknown): any
+```
+
+```ts title="src/handlers/user-handler.ts"
+const user = await User.find(42);
+
+console.log(user.get("name"));               // "Hassan Zohdy"
+console.log(user.get("address.city"));       // "Cairo"
+console.log(user.get("phone", "N/A"));       // "N/A" — field missing, default returned
+```
+
+:::tip
+Always pass a `defaultValue` for optional fields to avoid `undefined` propagating through your application.
+:::
+
+### `model.has(field)`
+
+Return `true` if the field **exists** in the model's data — even when its value is `null` or `undefined`.
+
+```ts
+has(field: string): boolean
+```
+
+```ts title="src/handlers/profile-handler.ts"
+if (user.has("avatar")) {
+  // avatar key is present (even if the value is null)
+  displayAvatar(user.get("avatar"));
+}
+```
+
+### The `MISSING_VALUE` sentinel
+
+`has()` uses a unique `MISSING_VALUE` symbol internally. When `get()` is called with this sentinel as default and the field is absent, `has()` can distinguish a **missing key** from a key explicitly set to `undefined`. This means:
+
+```ts
+user.set("avatar", undefined);
+user.has("avatar"); // true  — key exists, value is just undefined
+
+// vs a field that was never set:
+user.has("phone"); // false — key is completely absent
+```
+
+:::info
+You never need to import or use `MISSING_VALUE` directly — it is an internal implementation detail of `has()`. Just know that `has()` is accurate even for keys with falsy values.
+:::
+
+---
+
+## ✏️ Writing Fields
+
+### `model.set(field, value)`
+
+Set a field on the model's data. Marks the field as dirty so Cascade tracks the change. Supports dot-notation.
+
+```ts
+set(field: string, value: unknown): this
+```
+
+Returns `this` for chaining.
+
+```ts title="src/handlers/update-handler.ts"
+user
+  .set("name", "Hassan Zohdy")
+  .set("address.city", "Cairo")
+  .set("updatedAt", new Date());
+
+await user.save();
+```
+
+### `model.merge(values)`
+
+Deep-merge a plain object into the model's data. Every merged key is marked dirty.
+
+```ts
+merge(values: Record<string, unknown>): this
+```
+
+```ts title="src/handlers/patch-handler.ts"
+user.merge({
+  name: "Hassan",
+  preferences: { theme: "dark", language: "ar" },
+});
+
+await user.save();
+```
+
+### `model.unset(...fields)`
+
+Remove one or more fields from the model's data and record them as deleted in the dirty tracker (so Cascade issues a `$unset` on save).
+
+```ts
+unset(...fields: string[]): this
+```
+
+```ts title="src/handlers/cleanup-handler.ts"
+// Remove a single field
+user.unset("temporaryToken");
+
+// Remove multiple fields at once
+user.unset("resetToken", "resetTokenExpiry", "verificationCode");
+
+await user.save();
+```
+
+---
+
+## 🔢 Numeric Mutations (in-memory)
+
+These methods mutate the in-memory value and mark the field dirty. They do **not** issue a database write — call `save()` afterwards or use the `atomicIncrement` / `atomicDecrement` methods if you need a guaranteed atomic update.
+
+### `model.increment(field, amount?)`
+
+Increment a numeric field by `amount` (default `1`).
+
+```ts
+increment(field: string, amount?: number): this
+```
+
+```ts
+user.increment("loginCount");        // +1
+user.increment("score", 10);         // +10
+```
+
+### `model.decrement(field, amount?)`
+
+Decrement a numeric field by `amount` (default `1`).
+
+```ts
+decrement(field: string, amount?: number): this
+```
+
+```ts
+product.decrement("stock");          // -1
+product.decrement("stock", 3);       // -3
+```
+
+---
+
+## 🎯 Typed Accessors
+
+When you know the expected type of a field, use the typed helpers to get a value that is already cast — no manual coercion needed.
+
+### `model.string(key, defaultValue?)`
+
+Return the field value as a `string`.
+
+```ts
+string(key: string, defaultValue?: string): string
+```
+
+```ts
+const name = user.string("name", "Anonymous");
+```
+
+### `model.number(key, defaultValue?)`
+
+Return the field value as a `number`.
+
+```ts
+number(key: string, defaultValue?: number): number
+```
+
+```ts
+const age = user.number("age", 0);
+```
+
+### `model.boolean(key, defaultValue?)`
+
+Return the field value as a `boolean`.
+
+```ts
+boolean(key: string, defaultValue?: boolean): boolean
+```
+
+```ts
+const isActive = user.boolean("isActive", false);
+```
+
+---
+
+## 🧩 Picking & Projecting
+
+### `model.only(fields)`
+
+Return a plain object containing only the specified fields. Useful for building partial payloads or responses.
+
+```ts
+only(fields: string[]): Record<string, unknown>
+```
+
+```ts title="src/resources/user-resource.ts"
+const publicProfile = user.only(["id", "name", "avatar", "bio"]);
+// { id: 42, name: "Hassan", avatar: "...", bio: "..." }
+```
+
+---
+
+## 📦 Convenience Getters
+
+These getters are shortcuts wired directly to common model fields.
+
+### `model.data`
+
+The raw data object backing the model. All `get`/`set`/`merge` operations read and write here.
+
+```ts
+const raw: TSchema = user.data;
+```
+
+:::warning
+Mutating `model.data` directly bypasses the dirty tracker. Always use `set()`, `merge()`, `unset()`, etc., to ensure changes are recorded and persisted correctly.
+:::
+
+### `model.original`
+
+The original data as it was when the model was first constructed or fetched — untouched by any subsequent `set()` or `merge()` calls.
+
+```ts
+const snapshot = user.original;
+console.log(snapshot.name); // value before any in-memory mutations
+```
+
+### `model.isNew`
+
+`true` when the model has never been saved to the database (i.e. no primary key assigned yet).
+
+```ts
+const user = new User({ name: "Hassan" });
+console.log(user.isNew); // true
+
+await user.save();
+console.log(user.isNew); // false
+```
+
+### `model.isActive`
+
+Shorthand for `model.get("isActive")`. Returns the current value of the `isActive` field as a boolean.
+
+```ts
+get isActive(): boolean
+```
+
+```ts
+if (!user.isActive) {
+  throw new Error("Account is disabled");
+}
+```
+
+### `model.createdAt`
+
+Returns the creation timestamp as a `Date`, or `undefined` if the column has not been written yet.
+
+```ts
+get createdAt(): Date | undefined
+```
+
+```ts
+console.log(user.createdAt?.toISOString()); // "2026-01-15T12:00:00.000Z"
+```
+
+### `model.updatedAt`
+
+Returns the last-update timestamp as a `Date`, or `undefined` if the column is disabled or the model is unsaved.
+
+```ts
+get updatedAt(): Date | undefined
+```
+
+```ts
+console.log(user.updatedAt?.toISOString()); // "2026-04-17T08:30:00.000Z"
+```
+
+### `model.isCreatedBy(user)`
+
+Return `true` when the model's `createdBy.id` matches the given user's `id`. Useful for ownership checks.
+
+```ts
+isCreatedBy(user: { id: number | string }): boolean
+```
+
+```ts title="src/policies/post-policy.ts"
+if (!post.isCreatedBy(currentUser)) {
+  throw new ForbiddenError("You can only edit your own posts");
+}
+```
+
+---
+
+## 🌟 Full Example
+
+```ts title="src/handlers/profile-handler.ts"
+import { User } from "../models/user";
+
+export async function updateProfile(
+  userId: number,
+  body: Record<string, unknown>,
+) {
+  const user = await User.find(userId);
+  if (!user) throw new Error("User not found");
+
+  // Ownership check
+  if (!user.isCreatedBy(currentUser)) throw new ForbiddenError();
+
+  // Read existing value, merge patch
+  const oldName = user.string("name", "");
+  user
+    .merge({ name: body.name, bio: body.bio })
+    .set("updatedAt", new Date());
+
+  // In-memory mutation (no DB write yet)
+  if (body.score) user.increment("score", user.number("bonus", 0));
+
+  // Remove a temporary field
+  user.unset("onboardingToken");
+
+  await user.save();
+
+  // Return a minimal public projection
+  return user.only(["id", "name", "avatar", "bio"]);
+}
+```
+
+---
+
+## 🌟 What's Next?
+
+- [⚡ Atomic Updates](./atomic-updates)
+- [🆔 Model IDs](./ids)
+- [📝 Dirty Tracking](./dirty-tracking)
+- [💾 Saving Models](./saving-models)

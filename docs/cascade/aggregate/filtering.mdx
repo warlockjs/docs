@@ -2,428 +2,246 @@
 sidebar_position: 4
 ---
 
-# Filtering
+# 🔍 Filtering
 
-Perform filtering on your data using the `where` methods.
-
-Mongez Aggregate class provides various methods to filter your data.
+Filter rows with the QueryBuilder's extensive `where*` family of methods. All methods are chainable and compose cleanly with aggregation, grouping, and ordering.
 
 ## where
 
-The `where` method is used to filter documents based on a condition. It could take multiple forms:
+The most versatile filter method. Accepts several call forms:
 
-```ts
-  /**
-   * Add where stage
-   */
-  public where(column: string, value: any): this;
-  public where(column: string, operator: WhereOperator, value: any): this;
-  public where(column: Record<string, any>): this;
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+
+// Equality
+const users = await User.query().where("status", "active").get();
+
+// With operator
+const users = await User.query().where("age", ">", 18).get();
+
+// Object shorthand
+const users = await User.query().where({ status: "active", verified: true }).get();
+
+// Callback (grouped condition)
+const users = await User.query()
+  .where((q) => q.where("role", "admin").orWhere("role", "moderator"))
+  .get();
 ```
 
-Let's have a look at each one of them:
+### Supported Operators
 
-### Simple where stage
+`=`, `!=`, `>`, `>=`, `<`, `<=`, `like`, `notLike`, `in`, `notIn`, `between`, `notBetween`, `startsWith`, `endsWith`, `notStartsWith`, `notEndsWith`
 
-If you just want to filter documents based on a single value equality, you can do this:
+## orWhere
+
+Add an OR condition:
 
 ```ts
-const users = await aggregate.where("id", 10).get();
+const users = await User.query()
+  .where("role", "admin")
+  .orWhere("role", "moderator")
+  .get();
 ```
 
-Just pass the column name and the value you want to filter by.
+All overloads of `where` (equality, operator, object, callback) are also available on `orWhere`.
 
-### Where with operator
+## whereRaw / orWhereRaw
 
-Alternatively, if you want to make more conditions, you can use the operator, here are the available operators:
+Inject a raw driver expression as a condition:
 
 ```ts
-const whereOperators = [
-  "=",
-  "!=",
-  "not",
-  ">",
-  ">=",
-  "<",
-  "<=",
-  "in",
-  "nin",
-  "notIn",
-  "all",
-  "exists",
-  "type",
-  "mod",
-  "regex",
-  "geoIntersects",
-  "geoWithin",
-  "near",
-  "between",
-  "notBetween",
-  "nearSphere",
-  "elemMatch",
-  "size",
-  "like",
-  "notLike",
-  "startsWith",
-  "endsWith",
-];
+const users = await User.query()
+  .whereRaw("LOWER(email) = ?", ["jane@example.com"])
+  .get();
 ```
 
-It could be any of the previous operators, let's take some examples:
+## whereIn / whereNotIn
+
+Match rows where a column value is (or is not) in a list:
 
 ```ts
-const users = await aggregate.where("id", ">", 10).get();
-const users = await aggregate.where("id", "in", [1, 2, 3]).get();
-const users = await aggregate.where("id", "between", [1, 10]).get();
+const users = await User.query().whereIn("role", ["admin", "moderator"]).get();
+const users = await User.query().whereNotIn("status", ["banned", "deleted"]).get();
 ```
 
-### Where with object
-
-Another way to filter documents is to pass an object to the `where` method, this object should have the column name as a key, and the value should be the value you want to filter by.
-
-Method signature:
+## whereNull / whereNotNull
 
 ```ts
-public where(column: Record<string, any>): this;
+const users = await User.query().whereNull("deletedAt").get();
+const users = await User.query().whereNotNull("verifiedAt").get();
 ```
 
-```ts
-const users = await aggregate.where({ id: 10 }).get();
-```
+## whereBetween / whereNotBetween
 
-You can also use the built-in Mongodb operators:
+Filter by an inclusive range:
 
 ```ts
-const users = await aggregate.where({ id: { $gt: 10 } }).get();
-```
-
-:::tip Did you know?
-You can use [$agg utility](./agg) to easily use built-in operators directly.
-:::
-
-## Where null
-
-If you want to filter documents based on a null value, you can use the `whereNull` method:
-
-Method signature:
-
-```ts
-public whereNull(column: string): this;
-```
-
-```ts
-const users = await aggregate.whereNull("id").get();
-```
-
-This will return all users that have `id = null`.
-
-## Where not null
-
-If you want to filter documents based on a not null value, you can use the `whereNotNull` method:
-
-Method signature:
-
-```ts
-public whereNotNull(column: string): this;
-```
-
-```ts
-const users = await aggregate.whereNotNull("id").get();
-```
-
-## Where in
-
-If you want to filter documents based on a list of values, you can use the `whereIn` method:
-
-Method signature:
-
-```ts
-public whereIn(column: string, value: any[]): this;
-```
-
-```ts
-const users = await aggregate.whereIn("id", [1, 2, 3]).get();
-```
-
-If the second argument is a string, then it will be treated as a `column name`.
-
-## Where not in
-
-If you want to filter documents based on a list of values, you can use the `whereNotIn` method:
-
-Method signature:
-
-```ts
-public whereNotIn(column: string, value: any[]): this;
-```
-
-```ts
-const users = await aggregate.whereNotIn("id", [1, 2, 3]).get();
-```
-
-If the second argument is a string, then it will be treated as a `column name`.
-
-## Where between
-
-If you want to filter documents based on a range of values, you can use the `whereBetween` method:
-
-Method signature:
-
-```ts
-public whereBetween(column: string, value: [any, any]): this;
-```
-
-```ts
-const users = await aggregate.whereBetween("id", [1, 10]).get();
+const orders = await Order.query()
+  .whereBetween("amount", [100, 500])
+  .get();
 ```
 
 :::tip
-The second argument is an array of two values, the first value is the `min` value, and the second value is the `max` value and they are both included in the range.
+Both values in the tuple are **inclusive** — `[100, 500]` matches `100`, `250`, and `500`.
 :::
 
-## Where not between
+## whereLike / whereNotLike
 
-If you want to filter documents based on a range of values, you can use the `whereNotBetween` method:
-
-Method signature:
+Pattern-based string filtering. `%` is the wildcard character:
 
 ```ts
-public whereNotBetween(column: string, value: [any, any]): this;
+const users = await User.query().whereLike("name", "%John%").get();
+const users = await User.query().whereNotLike("email", "%@blocked.com").get();
 ```
 
+## whereStartsWith / whereNotStartsWith / whereEndsWith / whereNotEndsWith
+
+Convenience wrappers around LIKE patterns:
+
 ```ts
-const users = await aggregate.whereNotBetween("id", [1, 10]).get();
+const users = await User.query().whereStartsWith("name", "Jo").get();
+const users = await User.query().whereEndsWith("email", "@company.com").get();
 ```
 
-> The second argument is an array of two values, the first value is the `min` value, and the second value is the `max` value and they are both included in the range.
+## whereDate / whereDateBefore / whereDateAfter / whereDateBetween
 
-## Where like
-
-If you want to filter documents based on a string pattern, you can use the `whereLike` method:
-
-Method signature:
+Date-specific filters:
 
 ```ts
-public whereLike(column: string, value: string): this;
+const posts = await Post.query()
+  .whereDateAfter("publishedAt", new Date("2025-01-01"))
+  .get();
+
+const posts = await Post.query()
+  .whereDateBetween("publishedAt", [new Date("2025-01-01"), new Date("2025-12-31")])
+  .get();
 ```
 
+Additional date helpers:
+
 ```ts
-const users = await aggregate.whereLike("name", "John").get();
+builder.whereDate("createdAt", "2025-06-15");       // exact date match
+builder.whereDateEquals("createdAt", "2025-06-15"); // alias for whereDate
+builder.whereDay("createdAt", 15);                  // day of month
+builder.whereMonth("createdAt", 6);                 // month number
+builder.whereYear("createdAt", 2025);               // year
+builder.whereTime("createdAt", "09:00:00");         // time component
 ```
 
-This will return all users that have `name` column that contains `John`.
+## whereColumn / orWhereColumn / whereColumns
 
-> If the second argument is a string, the value will be case-insensitive.
-
-You can also pass a `regex` object:
+Compare two columns:
 
 ```ts
-const users = await aggregate.whereLike("name", /John/i).get();
-```
+const rows = await User.query()
+  .whereColumn("updatedAt", ">", "createdAt")
+  .get();
 
-## Where not like
-
-If you want to filter documents based on a string pattern, you can use the `whereNotLike` method:
-
-Method signature:
-
-```ts
-public whereNotLike(column: string, value: string): this;
-```
-
-```ts
-const users = await aggregate.whereNotLike("name", "John").get();
-```
-
-This will return all users that have `name` column that does not contain `John`.
-
-> If the second argument is a string, the value will be case-insensitive.
-
-## Where starts with
-
-If you want to filter documents based on a string pattern, you can use the `whereStartsWith` method:
-
-Method signature:
-
-```ts
-public whereStartsWith(column: string, value: string): this;
-```
-
-```ts
-const users = await aggregate.whereStartsWith("name", "John").get();
-```
-
-This will return all users that have `name` column that starts with `John`.
-
-> The value will be case-sensitive.
-
-## Where not starts with
-
-Search for documents that a column does not start with a given value.
-
-Method signature:
-
-```ts
-public whereNotStartsWith(column: string, value: string): this;
-```
-
-```ts
-const users = await aggregate.whereNotStartsWith("name", "John").get();
-```
-
-## Where ends with
-
-If you want to filter documents based on a string pattern, you can use the `whereEndsWith` method:
-
-Method signature:
-
-```ts
-public whereEndsWith(column: string, value: string): this;
-```
-
-```ts
-const users = await aggregate.whereEndsWith("name", "John").get();
-```
-
-This will return all users that have `name` column that ends with `John`.
-
-> The value will be case-sensitive.
-
-## Where not ends with
-
-Search for documents that a column does not end with a given value.
-
-Method signature:
-
-```ts
-public whereNotEndsWith(column: string, value: string): this;
-```
-
-```ts
-const users = await aggregate.whereNotEndsWith("name", "John").get();
-```
-
-## Where date between
-
-If you want to filter documents based on a date range, you can use the `whereDateBetween` method:
-
-Method signature:
-
-```ts
-public whereDateBetween(column: string, value: [Date, Date]): this;
-```
-
-```ts
-const users = await aggregate
-  .whereDateBetween("createdAt", [
-    new Date("2020-01-01"),
-    new Date("2020-12-31"),
+// Multiple column comparisons at once
+const rows = await User.query()
+  .whereColumns([
+    ["updatedAt", ">", "createdAt"],
+    ["score", ">=", "minScore"],
   ])
   .get();
 ```
 
-## Where date not between
+## whereBetweenColumns
 
-Filter documents that are not between a date range.
-
-Method signature:
+Check that a column value falls between two other column values:
 
 ```ts
-public whereDateNotBetween(column: string, value: [Date, Date]): this;
-```
-
-```ts
-const users = await aggregate
-  .whereDateNotBetween("createdAt", [
-    new Date("2020-01-01"),
-    new Date("2020-12-31"),
-  ])
+const rows = await Slot.query()
+  .whereBetweenColumns("requestedAt", "startAt", "endAt")
   .get();
 ```
 
-## Where exists
+## whereId / whereIds / whereUuid / whereUlid
 
-This method will filter documents based on the existence of a column.
-
-Method signature:
+Primary-key helpers:
 
 ```ts
-public whereExists(column: string): this;
+await User.query().whereId(42).first();
+await User.query().whereIds([1, 2, 3]).get();
+await User.query().whereUuid("abc-123").first();
 ```
 
-```ts
-const users = await aggregate.whereExists("name").get();
-```
+## whereExists / whereNotExists
 
-## Where not exists
-
-This method will filter documents based on the existence of a column.
-
-Method signature:
+Subquery existence checks:
 
 ```ts
-public whereNotExists(column: string): this;
-```
-
-```ts
-const users = await aggregate.whereNotExists("name").get();
-```
-
-## Where near
-
-This method will filter documents based on the distance between two points.
-
-## Or Where
-
-If we need to filter if any of the conditions is true, we can use `orWhere` method.
-
-```ts
-const users = await aggregate
-  .orWhere({
-    id: 10,
-    name: "John",
-  })
+const usersWithOrders = await User.query()
+  .whereExists((q) => q.from("orders").whereColumn("orders.userId", "users.id"))
   .get();
 ```
 
-This will return all users that have either `id = 10` or `name = John`.
+## whereNot / orWhereNot
 
-You can also use the [$agg utility](./agg) to use built-in operators:
-
-Before:
+Negate a grouped set of conditions:
 
 ```ts
-const users = await aggregate
-  .orWhere({
-    id: { $gt: 10 },
-    name: { $regex: /john/i },
-  })
+const users = await User.query()
+  .whereNot((q) => q.where("role", "guest").where("verified", false))
   .get();
 ```
 
-After:
+## whereIn with Subquery
+
+Pass a subquery builder instead of a value array:
 
 ```ts
-import { $agg } from "@warlock.js/cascade";
+import { Order } from "./order.model";
 
-const users = await aggregate
-  .orWhere({
-    id: $agg.gt(10),
-    name: $agg.like("john"),
-  })
+const users = await User.query()
+  .whereIn("id", Order.query().select("userId").where("status", "paid"))
   .get();
 ```
 
-## Where Columns
+## whereFullText / orWhereFullText / whereSearch
 
-If we need to compare values between two columns or more, we can use `whereColumns` method.
+Full-text search (SQL drivers with FTS support):
 
 ```ts
-const users = await aggregate
-  .whereColumns("maxAddresses", ">", "addressesCount")
+const posts = await Post.query()
+  .whereFullText(["title", "body"], "cascade framework")
   .get();
 ```
 
-This will return all users that have `maxAddresses` column greater than `addressesCount` column.
+## JSON Filters
 
-> The second argument is the operator, it could be any of the [where operators](#where-with-operator) and it is always required.
+```ts
+builder.whereJsonContains("meta->tags", "typescript");
+builder.whereJsonDoesntContain("meta->tags", "deprecated");
+builder.whereJsonContainsKey("settings->notifications");
+builder.whereJsonLength("meta->tags", ">", 2);
+builder.whereJsonIsArray("data->items");
+builder.whereJsonIsObject("config->rules");
+```
+
+## Array Filters
+
+```ts
+builder.whereArrayContains("roles", "admin");
+builder.whereArrayNotContains("roles", "banned");
+builder.whereArrayLength("images", ">", 0);
+builder.whereArrayHasOrEmpty("tags", "featured");
+```
+
+## textSearch
+
+Full driver-level text search (e.g., MongoDB `$text`, Postgres `tsvector`):
+
+```ts
+const results = await Post.query()
+  .textSearch("full stack development", { language: "english" })
+  .get();
+```
+
+## whereSize
+
+Filter by array or collection size:
+
+```ts
+const posts = await Post.query().whereSize("tags", ">", 3).get();
+```

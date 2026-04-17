@@ -1,0 +1,241 @@
+---
+sidebar_position: 4
+---
+
+# ✨ PostgreSQL-Specific Features
+
+The Postgres driver exposes a set of capabilities that go beyond the base Cascade query contract. This page documents JSONB operations, array predicates, pgvector similarity search, NOTIFY/LISTEN, and bulk COPY operations.
+
+---
+
+## 🗃️ JSONB Columns
+
+### `whereArrayContains(field, value, key?)`
+
+Match rows where a JSONB column (or a key inside it) contains a given value:
+
+```ts title="src/repositories/product.repository.ts"
+// Plain JSONB column contains value
+const products = await Product.query()
+  .whereArrayContains("tags", "featured")
+  .get();
+
+// Nested key inside a JSONB column
+const results = await Article.query()
+  .whereArrayContains("metadata", "typescript", "topics")
+  .get();
+```
+
+### `whereArrayNotContains(field, value, key?)`
+
+The inverse — rows where the JSONB field does **not** contain the value:
+
+```ts
+const nonFeatured = await Product.query()
+  .whereArrayNotContains("tags", "featured")
+  .get();
+```
+
+### `whereArrayHasOrEmpty(field, value, key?)`
+
+Match rows where the array contains the value **or** the array is empty/null. Useful for "show everything if no filter is set" patterns:
+
+```ts
+const visible = await Article.query()
+  .whereArrayHasOrEmpty("allowedRoles", userRole)
+  .get();
+```
+
+### `whereArrayNotHaveOrEmpty(field, value, key?)`
+
+Rows where the array does **not** contain the value, or is empty/null:
+
+```ts
+const accessible = await Resource.query()
+  .whereArrayNotHaveOrEmpty("blockedUsers", currentUserId)
+  .get();
+```
+
+:::info
+All four array helpers work on both native Postgres array columns (`text[]`, `int[]`, etc.) and JSONB array values. The optional `key` parameter drills into a specific JSONB key before applying the predicate.
+:::
+
+---
+
+## 🔢 Native Array Columns
+
+The same `whereArrayContains` / `whereArrayNotContains` / `whereArrayHasOrEmpty` helpers work on Postgres native array columns (`text[]`, `integer[]`, etc.). No extra setup is needed — pass the column name and the value to match:
+
+```ts
+// users.permissions is a text[] column
+const canPublish = await User.query()
+  .whereArrayContains("permissions", "publish:articles")
+  .get();
+```
+
+---
+
+## 🤖 pgvector — Similarity Search
+
+`similarTo(column, embedding, alias?)` adds a cosine similarity ordering using the `pgvector` extension. Results are ordered by descending similarity (closest first).
+
+```ts title="src/repositories/document.repository.ts"
+const queryEmbedding: number[] = await embeddingModel.embed("search query");
+
+const similar = await Document.query()
+  .similarTo("embedding", queryEmbedding, "similarity")
+  .limit(10)
+  .get();
+
+// Each row has a `similarity` field (0–1) when alias is provided
+similar.forEach(doc => {
+  console.log(doc.title, doc.similarity);
+});
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `column` | `string` | The `vector` column holding embeddings |
+| `embedding` | `number[]` | Query vector to compare against |
+| `alias` | `string?` | Column alias for the similarity score in the result set |
+
+:::tip Prerequisites
+You must have the `pgvector` extension installed (`CREATE EXTENSION IF NOT EXISTS vector`) and the target column defined as `VECTOR(n)`. See [Migrations](./migrations) for how to create vector columns with `PostgresMigrationDriver`.
+:::
+
+---
+
+## 📢 NOTIFY / LISTEN — `PostgresNotification`
+
+The `PostgresNotification` type describes the payload Postgres delivers via its `NOTIFY` / `LISTEN` mechanism:
+
+```ts
+type PostgresNotification = {
+  readonly channel: string;   // Channel name passed to NOTIFY
+  readonly payload?: string;  // Optional string payload
+  readonly processId: number; // Backend PID that sent the notification
+};
+```
+
+Use the native `pg` client obtained from `driver.pool` to subscribe to notifications:
+
+```ts title="src/services/realtime.service.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+import type { PostgresDriver } from "@warlock.js/cascade";
+import type { PostgresNotification } from "@warlock.js/cascade";
+
+const driver = dataSourceRegistry.get().driver as PostgresDriver;
+
+// Acquire a dedicated client for LISTEN (pool clients return to pool after each query)
+const client = await driver.pool.connect();
+
+await client.query("LISTEN orders_channel");
+
+client.on("notification", (msg: PostgresNotification) => {
+  console.log("Channel:", msg.channel);
+  console.log("Payload:", msg.payload);   // e.g. JSON string
+  console.log("PID:", msg.processId);
+});
+
+// Send a notification from another connection
+await driver.query("SELECT pg_notify('orders_channel', $1)", [
+  JSON.stringify({ orderId: 42, status: "paid" }),
+]);
+```
+
+:::warning
+A client in LISTEN mode must not be returned to the pool. Keep a dedicated client alive for the lifetime of the listener, and release it only when you no longer need notifications.
+:::
+
+---
+
+## 📥 COPY — `PostgresCopyOptions`
+
+`PostgresCopyOptions` describes parameters for bulk `COPY FROM` / `COPY TO` operations:
+
+```ts
+type PostgresCopyOptions = {
+  readonly format?: "text" | "csv" | "binary";
+  readonly delimiter?: string;
+  readonly quote?: string;
+  readonly escape?: string;
+  readonly header?: boolean;
+  readonly null?: string;
+  readonly columns?: string[];
+};
+```
+
+| Field | Description |
+|---|---|
+| `format` | Transfer format: `"text"` (default), `"csv"`, or `"binary"` |
+| `delimiter` | Field separator for text/csv (default `\t` for text, `,` for csv) |
+| `quote` | Quoting character for CSV mode |
+| `escape` | Escape character for CSV mode |
+| `header` | Include a header row in CSV output |
+| `null` | String representation of SQL NULL values |
+| `columns` | Ordered list of column names to include |
+
+COPY operations require using the native `pg` client directly through `driver.pool`:
+
+```ts title="src/scripts/bulk-import.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+import type { PostgresDriver } from "@warlock.js/cascade";
+import { from as copyFrom } from "pg-copy-streams";
+import { createReadStream } from "fs";
+import { pipeline } from "stream/promises";
+
+const driver = dataSourceRegistry.get().driver as PostgresDriver;
+const client = await driver.pool.connect();
+
+try {
+  const copyStream = client.query(
+    copyFrom(`COPY products (name, price, sku) FROM STDIN WITH (FORMAT csv, HEADER true)`)
+  );
+  const fileStream = createReadStream("products.csv");
+  await pipeline(fileStream, copyStream);
+} finally {
+  client.release();
+}
+```
+
+:::tip
+The `pg-copy-streams` package provides readable/writable stream interfaces for `COPY FROM STDIN` and `COPY TO STDOUT`. Install it separately with `npm install pg-copy-streams`.
+:::
+
+---
+
+## 🔄 `PostgresSyncAdapter` — Batch JSONB Updates
+
+When a denormalized JSONB field on many rows needs to be updated to reflect a related record change, use the `SyncAdapter` rather than issuing individual UPDATE queries:
+
+```ts title="src/services/sync.service.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+import type { PostgresDriver } from "@warlock.js/cascade";
+import type { SyncInstruction } from "@warlock.js/cascade";
+
+const driver = dataSourceRegistry.get().driver as PostgresDriver;
+const syncAdapter = driver.syncAdapter();
+
+// Update denormalized author data inside a JSONB posts.author field
+const instructions: SyncInstruction[] = [
+  {
+    table: "posts",
+    filter: { "author.id": authorId },
+    field: "author",
+    data: { id: authorId, name: "Alice Smith", avatar: "https://..." },
+  },
+];
+
+const affectedRows = await syncAdapter.executeBatch(instructions);
+console.log(`Updated ${affectedRows} rows`);
+```
+
+The `PostgresSyncAdapter` uses `jsonb_set` for scalar-field patches and a CTE-based approach for updating elements inside JSONB arrays. Both paths are handled automatically based on the instruction shape.
+
+---
+
+## 🌟 What's Next?
+
+- [🔍 Query Builder](./query-builder)
+- [🗄️ Migrations](./migrations)
+- [🔗 Connection Config](./connection)

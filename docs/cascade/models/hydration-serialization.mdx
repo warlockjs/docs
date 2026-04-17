@@ -1,0 +1,240 @@
+---
+sidebar_position: 18
+---
+
+# 💧 Hydration & Serialization
+
+Cascade provides a complete round-trip between raw data (plain objects, database records, cache payloads) and live model instances. **Hydration** is the inward journey — constructing a model from raw data. **Serialization** is the outward journey — converting a live model back to a plain representation for storage, transport, or display.
+
+---
+
+## 🧊 What is a `ModelSnapshot`?
+
+A `ModelSnapshot` is the portable serialized form of a model **plus** all of its currently loaded relations. It is the data structure that flows through caching layers, Redis sessions, and snapshot tests.
+
+```ts
+type ModelSnapshot = {
+  data: Record<string, any>;
+  relations: Record<string, SerializedRelation>;
+};
+
+type SerializedRelation = null | ModelSnapshot | ModelSnapshot[];
+```
+
+- `data` — the raw field values of the model (what `model.data` holds).
+- `relations` — a map of relation name → serialized relation. Each value is either `null`, a single `ModelSnapshot`, or an array of `ModelSnapshot` objects for to-many relations.
+
+---
+
+## 🏗️ Hydration — plain data → model instances
+
+### `Model.hydrate(data)`
+
+Constructs a model instance from a plain data object. The resulting instance has `isNew` set to `false`, signalling that it came from storage rather than being a freshly created record.
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+const raw = { id: 1, name: "Hasan Zohdy", email: "hasan@example.com" };
+
+const user = User.hydrate(raw);
+
+console.log(user.isNew);        // false
+console.log(user.get("name"));  // "Hasan Zohdy"
+```
+
+:::info
+`Model.hydrate` delegates to the internal `hydrateModel` utility. You do not need to call `new User(raw)` and then manually flip `isNew`. `hydrate` handles that for you.
+:::
+
+---
+
+### `Model.fromSnapshot(snapshot)`
+
+Rebuilds a full model instance — including its loaded relations — from a `ModelSnapshot`. Relations are re-attached via `RelationHydrator.hydrate`, so the resulting instance behaves exactly as it would if the model had been eagerly loaded from the database.
+
+```ts title="src/app.ts"
+import { Post } from "./models/post";
+
+// Retrieve a snapshot previously stored in Redis
+const snapshot: ModelSnapshot = await redis.get("post:42");
+
+const post = Post.fromSnapshot(snapshot);
+
+// Relations are available without an extra DB query
+const author = post.getRelation("author");
+console.log(author?.get("name")); // "Hasan Zohdy"
+```
+
+:::tip When to use `fromSnapshot` vs `hydrate`
+Use `hydrate` when you only have raw field data (no relations). Use `fromSnapshot` when you cached a full model + relation tree and want to restore it without hitting the database.
+:::
+
+---
+
+## 📦 Serialization — model instances → plain data
+
+### `model.toSnapshot()`
+
+Serializes the model **and all currently loaded relations** into a `ModelSnapshot`. This is the counterpart to `fromSnapshot` — call `toSnapshot` before writing to a cache, call `fromSnapshot` when reading back.
+
+```ts title="src/app.ts"
+import { Post } from "./models/post";
+
+const post = await Post.find(42);
+await post.load("author", "tags");
+
+const snapshot = post.toSnapshot();
+
+// Store in Redis with a 1-hour TTL
+await redis.set("post:42", snapshot, { ex: 3600 });
+```
+
+The resulting `snapshot.relations` object will contain a `ModelSnapshot` for `author` and an array of `ModelSnapshot` objects for `tags`.
+
+---
+
+### `model.serialize()`
+
+Serializes the model's raw data via the active data-source driver. The exact output depends on the driver (MongoDB, SQL, etc.) — this is what Cascade uses internally when persisting a model. You rarely call this directly in application code, but it is useful when writing custom persistence adapters.
+
+```ts title="src/app.ts"
+const payload = user.serialize();
+// Driver-specific serialized form — e.g. a BSON document for MongoDB
+```
+
+---
+
+### `model.toJSON()`
+
+Converts the model to a plain JavaScript object suitable for API responses. The output is controlled by the model's `resource` / `resourceColumns` / `toJsonColumns` static properties (see [Resources](./resources.mdx)).
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+const user = await User.find(1);
+const json = user.toJSON();
+
+// { id: 1, name: "Hasan Zohdy", email: "hasan@example.com" }
+// (password excluded if not listed in resource)
+```
+
+`toJSON` is also called automatically when you `JSON.stringify` a model instance or include it in an Express/Fastify response body.
+
+:::info
+`model.toJSON()` delegates to the internal `modelToJSON` utility. Loaded relations are merged into the output recursively, so their `toJSON` representations are included automatically.
+:::
+
+---
+
+### `model.clone()`
+
+Creates an immutable deep clone of the model. The cloned instance's data is frozen (via `deepFreezeObject`) and its dirty tracker is reset, so no changes can accidentally leak back to the original.
+
+```ts title="src/app.ts"
+const user = await User.find(1);
+const snapshot = user.clone();
+
+// Safe to pass around — mutations on `user` do not affect `snapshot`
+user.set("name", "New Name");
+
+console.log(snapshot.get("name")); // "Hasan Zohdy" — unchanged
+```
+
+:::warning
+Because the clone's data is frozen, calling `set()`, `merge()`, or any other mutation method on the clone will throw a `TypeError` at runtime. Clones are read-only by design.
+:::
+
+---
+
+### `model.deepFreeze(obj)`
+
+Recursively applies `Object.freeze` to every nested object within `obj`. Returns the same reference (frozen in place). Used internally by `clone()`.
+
+```ts title="src/app.ts"
+const config = user.deepFreeze({ settings: { theme: "dark" } });
+
+config.settings.theme = "light"; // TypeError in strict mode — object is frozen
+```
+
+---
+
+### `model.replaceData(data)`
+
+Replaces **all** of the model's field data with the provided object and resets the dirty tracker so that the new data becomes the new baseline. Useful when you receive a freshly updated document from the database and want to sync the in-memory instance without constructing a new one.
+
+```ts title="src/app.ts"
+const user = await User.find(1);
+
+// Imagine we received updated data from an external event
+const updatedPayload = { id: 1, name: "Updated Name", email: "new@example.com" };
+
+user.replaceData(updatedPayload);
+
+console.log(user.hasChanges); // false — new data is the baseline
+console.log(user.get("name")); // "Updated Name"
+```
+
+---
+
+## 🔄 Full round-trip example — Redis caching
+
+```ts title="src/services/post-cache.ts"
+import { Post } from "../models/post";
+import type { ModelSnapshot } from "@warlock.js/cascade";
+import { redis } from "../redis";
+
+export async function getCachedPost(id: number): Promise<Post> {
+  const cached = await redis.get(`post:${id}`);
+
+  if (cached) {
+    // Restore the full model + relations without hitting the database
+    return Post.fromSnapshot(cached as ModelSnapshot);
+  }
+
+  const post = await Post.find(id);
+  await post.load("author", "tags", "comments");
+
+  // Persist snapshot for 10 minutes
+  await redis.set(`post:${id}`, post.toSnapshot(), { ex: 600 });
+
+  return post;
+}
+```
+
+---
+
+## 🧪 Snapshot testing
+
+`toSnapshot` and `fromSnapshot` are also useful in tests — serialize a model state before an operation, run the operation, then compare the new snapshot to assert exactly what changed.
+
+```ts title="tests/post.test.ts"
+import { Post } from "../models/post";
+
+test("publishing a post sets publishedAt", async () => {
+  const post = await Post.find(1);
+  const before = post.toSnapshot();
+
+  await post.publish();
+
+  const after = post.toSnapshot();
+
+  expect(before.data.publishedAt).toBeUndefined();
+  expect(after.data.publishedAt).toBeDefined();
+});
+```
+
+---
+
+## 📌 API reference summary
+
+| Method | Type | Description |
+|---|---|---|
+| `Model.hydrate(data)` | static | Build model from raw data; sets `isNew = false` |
+| `Model.fromSnapshot(snapshot)` | static | Rebuild model + relations from a `ModelSnapshot` |
+| `model.toSnapshot()` | instance | Serialize model + loaded relations to `ModelSnapshot` |
+| `model.serialize()` | instance | Driver-level serialization of model data |
+| `model.toJSON()` | instance | Plain object for API output, respects resource config |
+| `model.clone()` | instance | Immutable deep clone with frozen data |
+| `model.deepFreeze(obj)` | instance | Recursively freeze an object in place |
+| `model.replaceData(data)` | instance | Replace all data and reset dirty baseline |

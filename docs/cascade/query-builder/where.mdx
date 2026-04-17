@@ -1,0 +1,352 @@
+---
+sidebar_position: 2
+---
+
+# 🔎 Where Clauses
+
+The builder provides an extensive set of `where` methods covering every filtering scenario — from simple equality checks to JSON path queries, array operations, and full-text search.
+
+## 🧩 `WhereOperator` Union Type
+
+All comparison-based methods accept a `WhereOperator`:
+
+```ts
+type WhereOperator =
+  | "="
+  | "!="
+  | "<"
+  | "<="
+  | ">"
+  | ">="
+  | "like"
+  | "not like"
+  | "in"
+  | "not in"
+  | "between"
+  | "not between"
+  | "is null"
+  | "is not null";
+```
+
+---
+
+## ✅ Basic Where Methods
+
+### `where(field, value)` / `where(field, op, value)` / `where(obj)` / `where(cb)`
+
+The core AND where clause. Overloaded for maximum flexibility:
+
+```ts title="src/repositories/user.repo.ts"
+// Simple equality
+User.query().where("status", "active");
+
+// With operator
+User.query().where("age", ">=", 18);
+
+// Object shorthand (AND all keys)
+User.query().where({ status: "active", role: "admin" });
+
+// Callback for grouped conditions
+User.query().where((q) => {
+  q.where("role", "admin").orWhere("role", "superadmin");
+});
+```
+
+### `orWhere(...)`
+
+Identical overloads to `where`, but joins with OR:
+
+```ts
+User.query()
+  .where("status", "active")
+  .orWhere("status", "pending");
+```
+
+### `whereIn(field, values)` / `whereNotIn(field, values)`
+
+```ts
+User.query().whereIn("role", ["admin", "moderator"]);
+User.query().whereNotIn("status", ["banned", "deleted"]);
+```
+
+### `whereNull(field)` / `whereNotNull(field)`
+
+```ts
+Post.query().whereNull("deletedAt");
+Post.query().whereNotNull("publishedAt");
+```
+
+### `whereBetween(field, range)` / `whereNotBetween(field, range)`
+
+```ts
+Order.query().whereBetween("total", [100, 500]);
+Order.query().whereNotBetween("createdAt", [start, end]);
+```
+
+### `whereNot(callback)` / `orWhereNot(callback)`
+
+Wrap a group in a `NOT (...)` block:
+
+```ts
+Post.query().whereNot((q) => {
+  q.where("status", "draft").where("author", "bot");
+});
+```
+
+---
+
+## 🔤 Like / Pattern Methods
+
+### `whereLike(field, pattern)` / `whereNotLike(field, pattern)`
+
+```ts
+User.query().whereLike("email", "%@example.com");
+User.query().whereNotLike("username", "test%");
+```
+
+### `whereStartsWith(field, value)` / `whereNotStartsWith(field, value)`
+
+```ts
+Product.query().whereStartsWith("sku", "ELEC-");
+```
+
+### `whereEndsWith(field, value)` / `whereNotEndsWith(field, value)`
+
+```ts
+File.query().whereEndsWith("path", ".pdf");
+```
+
+---
+
+## 🗂️ Raw Where
+
+### `whereRaw(expression, bindings?)` / `orWhereRaw(expression, bindings?)`
+
+Inject a raw SQL/driver expression. Use sparingly — breaks driver abstraction:
+
+```ts
+User.query().whereRaw("LOWER(email) = ?", ["admin@example.com"]);
+User.query().orWhereRaw("score > (SELECT AVG(score) FROM users)");
+```
+
+:::warning
+`whereRaw` bypasses driver-agnostic parsing. If you need to support multiple drivers, prefer the typed where methods.
+:::
+
+---
+
+## 📊 Column Comparisons
+
+### `whereColumn(first, operator, second)` / `orWhereColumn(...)`
+
+Compare two columns in the same table:
+
+```ts
+Order.query().whereColumn("deliveredAt", ">", "placedAt");
+```
+
+### `whereColumns(comparisons)`
+
+Multiple column comparisons at once:
+
+```ts
+Audit.query().whereColumns([
+  ["updatedAt", ">", "createdAt"],
+  ["approvedAt", ">=", "submittedAt"],
+]);
+```
+
+### `whereBetweenColumns(field, lowerColumn, upperColumn)`
+
+Check that a field falls between two other columns:
+
+```ts
+Event.query().whereBetweenColumns("eventDate", "startDate", "endDate");
+```
+
+---
+
+## 📅 Date / Time Methods
+
+### `whereDate(field, value)` / `whereDateEquals(field, value)`
+
+Filter by the date portion of a datetime field:
+
+```ts
+Post.query().whereDate("publishedAt", "2024-01-15");
+Post.query().whereDateEquals("createdAt", new Date());
+```
+
+### `whereDateBefore(field, value)` / `whereDateAfter(field, value)`
+
+```ts
+Order.query().whereDateBefore("shippedAt", "2024-06-01");
+Report.query().whereDateAfter("generatedAt", lastMonth);
+```
+
+### `whereDateBetween(field, range)` / `whereDateNotBetween(field, range)`
+
+```ts
+Sale.query().whereDateBetween("saleDate", ["2024-01-01", "2024-12-31"]);
+```
+
+### `whereTime(field, value)` / `whereDay(field, value)` / `whereMonth(field, value)` / `whereYear(field, value)`
+
+Filter by specific time components:
+
+```ts
+Appointment.query().whereTime("scheduledAt", "09:00");
+Order.query().whereDay("createdAt", 15);       // 15th of any month
+Report.query().whereMonth("reportDate", 3);    // March
+Archive.query().whereYear("archivedAt", 2023);
+```
+
+---
+
+## 🔵 JSON Methods
+
+### `whereJsonContains(path, value)` / `whereJsonDoesntContain(path, value)`
+
+Check if a JSON column contains a value:
+
+```ts
+User.query().whereJsonContains("preferences->notifications", "email");
+User.query().whereJsonDoesntContain("tags", "archived");
+```
+
+### `whereJsonContainsKey(path)`
+
+Check for the existence of a JSON key:
+
+```ts
+Product.query().whereJsonContainsKey("metadata->sku");
+```
+
+### `whereJsonLength(path, operator, value)`
+
+```ts
+User.query().whereJsonLength("permissions", ">", 0);
+```
+
+### `whereJsonIsArray(path)` / `whereJsonIsObject(path)`
+
+```ts
+Config.query().whereJsonIsArray("settings->roles");
+Config.query().whereJsonIsObject("settings->theme");
+```
+
+---
+
+## 📋 Array Methods
+
+### `whereArrayContains(field, value, key?)` / `whereArrayNotContains(field, value, key?)`
+
+```ts
+Post.query().whereArrayContains("tags", "typescript");
+User.query().whereArrayNotContains("blockedIds", targetUserId);
+```
+
+### `whereArrayHasOrEmpty(field, value, key?)` / `whereArrayNotHaveOrEmpty(field, value, key?)`
+
+Matches if the array contains the value **or** is empty:
+
+```ts
+Notification.query().whereArrayHasOrEmpty("recipientIds", currentUserId);
+```
+
+### `whereArrayLength(field, operator, value)`
+
+Filter by array size:
+
+```ts
+Post.query().whereArrayLength("images", ">", 0);
+Cart.query().whereArrayLength("items", ">=", 1);
+```
+
+### `whereSize(field, size)` / `whereSize(field, operator, size)`
+
+Alias/companion to array length with operator overload:
+
+```ts
+Album.query().whereSize("photos", ">=", 10);
+```
+
+---
+
+## 🆔 ID Helpers
+
+### `whereId(value)` / `whereIds(values)`
+
+Target the model's primary key field automatically:
+
+```ts
+User.query().whereId(42);
+User.query().whereIds([1, 2, 3]);
+```
+
+### `whereUuid(value)` / `whereUlid(value)`
+
+For UUID or ULID primary keys:
+
+```ts
+Session.query().whereUuid("01909c52-3e4b-7b3a-...");
+Event.query().whereUlid("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+```
+
+---
+
+## 📝 Text / Search Methods
+
+### `whereFullText(fields, query)` / `orWhereFullText(fields, query)`
+
+Full-text search across one or more fields (requires full-text index):
+
+```ts
+Article.query().whereFullText(["title", "body"], "cascade query builder");
+```
+
+### `whereSearch(field, query)`
+
+Single-field search:
+
+```ts
+Product.query().whereSearch("name", "wireless headphones");
+```
+
+### `textSearch(query, filters?)`
+
+Cross-field search with optional additional filters:
+
+```ts
+Post.query().textSearch("open source", { status: "published" });
+```
+
+---
+
+## 🔍 Subquery Existence
+
+### `whereExists(callback)` / `whereExists(field)`
+
+Check if a subquery returns any rows, or if a field is non-null:
+
+```ts
+// Subquery form
+User.query().whereExists((sub) => {
+  sub.from("orders").whereColumn("orders.userId", "=", "users.id");
+});
+
+// Field form — equivalent to whereNotNull
+User.query().whereExists("emailVerifiedAt");
+```
+
+### `whereNotExists(callback)` / `whereNotExists(field)`
+
+```ts
+User.query().whereNotExists((sub) => {
+  sub.from("bans").whereColumn("bans.userId", "=", "users.id");
+});
+```
+
+:::tip
+Use `whereExists` with a subquery for correlated sub-selects. Use the field form as a readable alias for `whereNotNull`.
+:::

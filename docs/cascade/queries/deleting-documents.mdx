@@ -2,44 +2,107 @@
 sidebar_position: 4
 ---
 
-# Deleting Documents
+# 🗑️ Deleting Documents
 
-We can delete a single document using `deleteOne` method and multiple documents using `delete` method.
+Cascade provides a layered deletion API: instance-level `destroy()` for model-aware removal (with events and soft-delete support), and static class methods for bulk and filtered deletes.
 
-## Delete one document
+## 💥 Instance Destroy
 
-To delete a single document, use the `deleteOne` method:
+Call `destroy()` on a model instance to delete that specific record:
 
-```ts title="src/app.ts"
-import { query } from "@warlock.js/cascade";
+```ts title="src/users/user.service.ts"
+const user = await User.find(42);
 
-const result = await query.deleteOne("users", {
-  _id: "60b9b0b0b0b0b0b0b0b0b0b0",
-});
+if (user) {
+  await user.destroy();
+}
 ```
 
-## Delete multiple documents
+`destroy()` respects the model's configured `deleteStrategy`:
 
-To delete multiple documents, use the `delete` method:
+- **Hard delete** (default) — removes the document from the collection permanently.
+- **Soft delete** — sets a `deletedAt` timestamp and keeps the row in the collection.
 
-```ts title="src/app.ts"
-import { query } from "@warlock.js/cascade";
+:::info
+Instance `destroy()` emits `deleting` and `deleted` events, so any listeners (audit logs, cache invalidation, etc.) are triggered automatically.
+:::
 
-const result = await query.delete("users");
+## 🗑️ Bulk Delete by Filter
+
+Delete all records that match a filter:
+
+```ts title="src/users/user.service.ts"
+import { User } from "./user.model";
+
+// Delete all inactive users
+await User.delete({ isActive: false });
 ```
 
-This will delete the entire collection documents, but will not delete the collection itself.
+Omit the filter to delete every record in the collection:
 
-To delete certain documents, pass the filter object as the second argument:
-
-```ts title="src/app.ts"
-import { query } from "@warlock.js/cascade";
-
-const result = await query.delete("users", {
-  age: {
-    $gt: 18,
-  },
-});
+```ts title="src/users/user.service.ts"
+// ⚠️ Deletes all documents in the users collection
+await User.delete();
 ```
 
-It will delete all users with age greater than 18.
+:::warning
+Calling `User.delete()` without a filter wipes the entire collection. The collection itself is preserved (indexes remain), but all documents are gone.
+:::
+
+## 🎯 Delete One by Filter
+
+Delete only the **first** record matching a filter:
+
+```ts title="src/users/user.service.ts"
+await User.deleteOne({ email: "alice@example.com" });
+```
+
+## 🔄 Find, Delete, and Return — findOneAndDelete
+
+Delete the first matching record **and** return the deleted document:
+
+```ts title="src/users/user.service.ts"
+const deleted = await User.findOneAndDelete(
+  { email: "alice@example.com" }
+);
+// Returns the User instance as it was before deletion, or null
+```
+
+Pass an options object as the second argument for driver-level control (e.g. projection, sort):
+
+```ts title="src/users/user.service.ts"
+const deleted = await User.findOneAndDelete(
+  { isActive: false },
+  { sort: { createdAt: 1 } } // delete the oldest inactive user
+);
+```
+
+:::tip
+`findOneAndDelete` is useful when you need to process the record (e.g. send a confirmation email, push to an audit queue) at the same time as deleting it, without a separate `find` round-trip.
+:::
+
+## 🌸 Soft Delete & Trash
+
+If your model uses a soft-delete strategy, records are **not** physically removed. They are flagged with `deletedAt` and hidden from normal queries by a global scope.
+
+See the [Soft Delete guide](../models/soft-delete) for:
+
+- Configuring `deleteStrategy: "soft"` on a model
+- Querying the trash with `User.onlyTrashed()` / `User.withTrashed()`
+- Restoring records with `user.restore()`
+- Permanently removing trashed records with `user.forceDelete()`
+
+## 🧙‍♂️ Pro Tips
+
+- Prefer `instance.destroy()` inside service/domain code — events fire, soft-delete is respected.
+- Use `User.delete(filter)` for batch cleanup jobs where event overhead isn't needed.
+- `findOneAndDelete` is the safest atomic "pop" operation when you need the data before it's gone.
+- Never call `User.delete()` without a filter in production code — add a lint rule or guard if needed.
+
+---
+
+## 🌟 What's Next?
+
+- [📋 Listing Documents](./listing-documents)
+- [💾 Saving Documents](./saving-documents)
+- [🌸 Soft Delete](../models/soft-delete)

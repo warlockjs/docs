@@ -1,0 +1,293 @@
+---
+sidebar_position: 19
+---
+
+# 🏭 Defining Models & the Registry
+
+Cascade gives you two ways to produce a model class: write a class manually that extends `Model`, or use the `defineModel` factory for a fully typed model in a few lines. On top of that, every model can be registered in a global registry so that other parts of the application can look it up by name — without creating circular import chains.
+
+---
+
+## 🔧 `defineModel(options)` — declarative model factory
+
+`defineModel` is a function that creates and returns a typed `Model` subclass from a plain options object. You get all the type safety of a manually written class with a fraction of the boilerplate.
+
+### `DefineModelOptions` shape
+
+| Property | Type | Description |
+|---|---|---|
+| `table` | `string` | Collection / table name in the database |
+| `name` | `string` (optional) | Registry name; if provided the model is auto-registered |
+| `schema` | `ObjectValidator` | `@warlock.js/seal` schema for validation and typing |
+| `deleteStrategy` | `DeleteStrategy` | `"hard"` or `"soft"` — how `destroy()` behaves |
+| `strictMode` | `StrictMode` | `"strip"`, `"ignore"`, or `"throw"` for unknown fields |
+| `autoGenerateId` | `boolean` | Whether Cascade auto-generates the primary key |
+| `randomIncrement` | `boolean \| (() => number)` | Randomize ID increment step |
+| `initialId` | `number` | Starting value for the auto-increment ID sequence |
+| `properties` | `object` (optional) | Instance property descriptors to add to the class |
+| `statics` | `object` (optional) | Static property descriptors to add to the class |
+
+### Basic usage
+
+```ts title="src/models/product.ts"
+import { defineModel } from "@warlock.js/cascade";
+import { object, string, number } from "@warlock.js/seal";
+
+export const Product = defineModel({
+  table: "products",
+  schema: object({
+    name: string().required(),
+    price: number().min(0),
+    stock: number().int().min(0),
+  }),
+});
+```
+
+That is all you need. `Product` is a fully functional Cascade model — you can call `Product.find()`, `Product.create()`, `product.save()`, etc.
+
+### With all options
+
+```ts title="src/models/order.ts"
+import { defineModel } from "@warlock.js/cascade";
+import { object, string, number } from "@warlock.js/seal";
+
+export const Order = defineModel({
+  table: "orders",
+  name: "Order",          // auto-registers in the global registry
+  deleteStrategy: "soft",
+  strictMode: "strip",
+  autoGenerateId: true,
+  initialId: 1000,
+  schema: object({
+    userId: number().required(),
+    total: number().min(0),
+    status: string().oneOf(["pending", "paid", "shipped", "cancelled"]),
+  }),
+  statics: {
+    // Add a custom static query helper
+    pending: {
+      get() {
+        return this.where("status", "pending");
+      },
+    },
+  },
+});
+```
+
+---
+
+## 🏷️ `ModelType<T>` — extract the schema type
+
+`ModelType` is a TypeScript type helper that extracts the inferred schema type from a `defineModel` return value. Use it wherever you need the plain data shape rather than the full model class.
+
+```ts title="src/models/product.ts"
+import { defineModel, ModelType } from "@warlock.js/cascade";
+import { object, string, number } from "@warlock.js/seal";
+
+export const Product = defineModel({
+  table: "products",
+  schema: object({
+    name: string().required(),
+    price: number().min(0),
+  }),
+});
+
+// Extract the schema type for use in service functions, DTOs, etc.
+export type ProductData = ModelType<typeof Product>;
+// { name: string; price: number }
+```
+
+```ts title="src/services/product-service.ts"
+import { Product, ProductData } from "../models/product";
+
+export async function createProduct(data: ProductData): Promise<Product> {
+  return Product.create(data);
+}
+```
+
+:::tip
+`ModelType` is purely a TypeScript type — it has zero runtime cost. Think of it as the equivalent of writing `InstanceType<typeof Product>["data"]` without the verbosity.
+:::
+
+---
+
+## 📋 The Model Registry
+
+The global model registry is a `Map<string, ChildModel>` that lets you look up a model class by name at runtime. This is especially useful in generic relation resolvers, event handlers, and plugin systems where importing the model class directly would create a circular dependency.
+
+### `RegisterModel` decorator
+
+The `@RegisterModel()` class decorator is the idiomatic way to register a model. Apply it to any model class (including those created with `defineModel` if you prefer a class syntax) and Cascade will add it to the registry when the module is first imported.
+
+```ts title="src/models/user.ts"
+import { Model, RegisterModel } from "@warlock.js/cascade";
+
+@RegisterModel()
+export class User extends Model {
+  static table = "users";
+}
+```
+
+You can also supply a custom name:
+
+```ts title="src/models/user.ts"
+@RegisterModel({ name: "AppUser" })
+export class User extends Model {
+  static table = "users";
+}
+```
+
+:::warning Overwrite warning
+If you register two models under the same name, Cascade will log a warning. The second registration **overwrites** the first. Make sure your registry names are unique across the application.
+:::
+
+#### `RegisterModelOptions`
+
+| Property | Type | Description |
+|---|---|---|
+| `name` | `string` (optional) | Custom registry key; defaults to the class name |
+
+---
+
+### `registerModelInRegistry(name, model)`
+
+Manually registers a model class in the global registry. Use this when you cannot use the decorator (e.g. models created with `defineModel` where you did not supply a `name` option, or in test setup).
+
+```ts title="src/bootstrap.ts"
+import { registerModelInRegistry } from "@warlock.js/cascade";
+import { Product } from "./models/product";
+
+registerModelInRegistry("Product", Product);
+```
+
+---
+
+### `getModelFromRegistry(name)`
+
+Retrieves a model class by its registry name. Returns `undefined` if no model is registered under that name.
+
+```ts title="src/app.ts"
+import { getModelFromRegistry } from "@warlock.js/cascade";
+
+const UserModel = getModelFromRegistry("User");
+
+if (UserModel) {
+  const user = await UserModel.find(1);
+  console.log(user?.get("name"));
+}
+```
+
+---
+
+### `getAllModelsFromRegistry()`
+
+Returns a **new `Map` copy** of the entire registry. Useful for introspection, migrations tooling, or admin dashboards that need to enumerate all known models.
+
+```ts title="src/admin/registry-inspector.ts"
+import { getAllModelsFromRegistry } from "@warlock.js/cascade";
+
+const models = getAllModelsFromRegistry();
+
+for (const [name, ModelClass] of models) {
+  console.log(`${name} → table: ${ModelClass.table}`);
+}
+```
+
+---
+
+### `resolveModelClass(model)`
+
+Converts a model reference (either a string name or a class itself) to a `ChildModel` class. This is the utility used internally by Cascade relation definitions so that you can specify relations by name string or by direct class reference interchangeably.
+
+```ts title="src/relations/resolver.ts"
+import { resolveModelClass } from "@warlock.js/cascade";
+
+// From a string name
+const UserModel = resolveModelClass("User");
+
+// From a class reference (returned as-is)
+import { Post } from "../models/post";
+const PostModel = resolveModelClass(Post); // same as Post
+```
+
+:::info
+`resolveModelClass` throws if you pass a string that is not present in the registry. Make sure all models you reference by name are imported (and therefore registered) before calling this function.
+:::
+
+---
+
+### Registry cleanup utilities
+
+These are primarily useful in tests or multi-tenant scenarios where you want to wipe the registry between test runs.
+
+#### `removeModelFromRegistery(name)`
+
+Deletes a single model from the registry.
+
+```ts title="tests/setup.ts"
+import { removeModelFromRegistery } from "@warlock.js/cascade";
+
+afterEach(() => {
+  removeModelFromRegistery("TemporaryModel");
+});
+```
+
+#### `cleanupModelsRegistery()`
+
+Clears **all** models from the registry.
+
+```ts title="tests/setup.ts"
+import { cleanupModelsRegistery } from "@warlock.js/cascade";
+
+afterAll(() => {
+  cleanupModelsRegistery();
+});
+```
+
+:::warning
+Note the typo in the function name (`Registery` vs `Registry`) — this matches the actual exported identifier in the source code. Both `removeModelFromRegistery` and `cleanupModelsRegistery` are spelled with the extra `e`.
+:::
+
+---
+
+## 🔍 Runtime lookup example
+
+A practical pattern is to store a model name as a string in another document (e.g. a polymorphic relation) and resolve the class at runtime:
+
+```ts title="src/services/activity-logger.ts"
+import { getModelFromRegistry } from "@warlock.js/cascade";
+
+export async function loadActivityTarget(activity: {
+  targetType: string;
+  targetId: number;
+}) {
+  const ModelClass = getModelFromRegistry(activity.targetType);
+
+  if (!ModelClass) {
+    throw new Error(`Unknown model type: ${activity.targetType}`);
+  }
+
+  return ModelClass.find(activity.targetId);
+}
+
+// Usage:
+// activity = { targetType: "Post", targetId: 42 }
+// → resolves to Post.find(42)
+```
+
+---
+
+## 📌 API reference summary
+
+| Export | Kind | Description |
+|---|---|---|
+| `defineModel(options)` | function | Create a typed `Model` subclass from an options object |
+| `ModelType<T>` | type | Extract inferred schema type from a `defineModel` return value |
+| `@RegisterModel(options?)` | decorator | Register a model class in the global registry |
+| `RegisterModelOptions` | type | Options for the `@RegisterModel` decorator |
+| `registerModelInRegistry(name, model)` | function | Manually add a model to the registry |
+| `getModelFromRegistry(name)` | function | Look up a model class by name |
+| `getAllModelsFromRegistry()` | function | Get a `Map` copy of the full registry |
+| `resolveModelClass(model)` | function | Convert a string name or class reference to a `ChildModel` |
+| `removeModelFromRegistery(name)` | function | Remove one model from the registry |
+| `cleanupModelsRegistery()` | function | Clear the entire registry |

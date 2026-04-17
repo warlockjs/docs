@@ -1,0 +1,174 @@
+---
+sidebar_position: 2
+---
+
+# ✍️ Writer, Remover & Restorer Contracts
+
+These three contracts define the full lifecycle of model persistence in Cascade. Each orchestrates its own pipeline: validation, event emission, driver execution, and sync propagation. Custom implementations of any of these can be swapped in via the DataSource configuration.
+
+---
+
+## 📝 `WriterContract`
+
+Orchestrates the full save pipeline — validation, ID generation, event emission, and the underlying `insert` or `update` call.
+
+```ts title="src/contracts/database-writer.contract.ts"
+interface WriterContract {
+  save(options?: WriterOptions): Promise<WriterResult>;
+}
+```
+
+The writer resolves automatically whether the model is new (insert) or existing (update), emitting `validating → saving → created|updated → saved` events along the way.
+
+### `WriterOptions`
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `skipValidation` | `boolean` | `false` | Skip schema validation before saving |
+| `skipEvents` | `boolean` | `false` | Suppress all lifecycle events |
+| `skipSync` | `boolean` | `false` | Suppress post-save denormalization sync |
+| `replace` | `boolean` | `false` | Replace the full document instead of patching only dirty fields |
+
+```ts title="src/products/import.ts"
+import { Product } from "./product.model";
+
+// Bulk import — skip validation and events for speed
+const product = await Product.create(rawData);
+await product.writer.save({ skipValidation: true, skipEvents: true });
+```
+
+:::tip
+Use `replace: true` when you want the saved state to exactly match `model.data` — useful after a full document fetch and re-assignment.
+:::
+
+### `WriterResult`
+
+```ts title="src/contracts/database-writer.contract.ts"
+interface WriterResult {
+  success: boolean;
+  document: Record<string, unknown>;  // saved document with all generated fields
+  isNew: boolean;                      // true = insert, false = update
+  modifiedCount?: number;              // undefined for inserts
+}
+```
+
+### `BuildUpdateOperationsResult`
+
+An internal alias for `UpdateOperations`. Returned by the writer's internal `buildUpdateOperations` helper — useful when implementing a custom writer that manually constructs the atomic patch.
+
+```ts title="src/contracts/database-writer.contract.ts"
+type BuildUpdateOperationsResult = UpdateOperations;
+```
+
+---
+
+## 🗑️ `RemoverContract`
+
+Orchestrates the full deletion pipeline — strategy resolution, event emission, and driver execution.
+
+```ts title="src/contracts/database-remover.contract.ts"
+interface RemoverContract {
+  destroy(options?: RemoverOptions): Promise<RemoverResult>;
+}
+```
+
+Emits `deleting → deleted` events (unless `skipEvents` is set). The actual driver call depends on the resolved `DeleteStrategy`.
+
+### `RemoverOptions`
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `strategy` | `DeleteStrategy` | `undefined` | Override the model/datasource default delete strategy |
+| `skipEvents` | `boolean` | `false` | Suppress `deleting`/`deleted` lifecycle events |
+| `skipSync` | `boolean` | `false` | Suppress post-delete sync propagation |
+
+```ts title="src/admin/purge-user.ts"
+// Hard delete regardless of model default
+await user.remover.destroy({ strategy: "permanent", skipSync: false });
+```
+
+:::warning
+Calling `destroy()` on a new (never-saved) model throws an error. Always check `model.isNew` before calling destroy in dynamic contexts.
+:::
+
+### `RemoverResult`
+
+```ts title="src/contracts/database-remover.contract.ts"
+interface RemoverResult {
+  success: boolean;
+  deletedCount: number;                         // 0 on failure, 1 on success
+  strategy: DeleteStrategy;
+  trashRecord?: Record<string, unknown>;         // populated when strategy is "trash"
+}
+```
+
+```ts title="src/orders/cancel-order.ts"
+const result = await order.remover.destroy({ strategy: "trash" });
+
+if (result.trashRecord) {
+  console.log("Moved to trash:", result.trashRecord);
+}
+```
+
+---
+
+## ♻️ `RestorerContract`
+
+Orchestrates the full restoration pipeline for soft-deleted or trashed models — ID conflict resolution, event emission, and driver execution.
+
+```ts title="src/contracts/database-restorer.contract.ts"
+interface RestorerContract {
+  restore(id: string | number, options?: RestorerOptions): Promise<RestorerResult>;
+  restoreAll(options?: RestorerOptions): Promise<RestorerResult>;
+}
+```
+
+- `restore(id)` — restores a single record by its primary key
+- `restoreAll()` — restores every soft-deleted / trashed record in the collection
+
+Both emit `restoring → restored` events per record.
+
+### `RestorerOptions`
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `strategy` | `"trash" \| "soft"` | `undefined` | Override detected delete strategy |
+| `onIdConflict` | `"fail" \| "assignNew"` | `"assignNew"` | What to do when a restored ID already exists in the live table |
+| `skipEvents` | `boolean` | `false` | Suppress restore lifecycle events |
+
+```ts title="src/admin/restore-record.ts"
+const result = await Post.restorer.restore(42, {
+  onIdConflict: "assignNew",
+});
+
+if (result.restoredRecord) {
+  console.log("Restored post:", result.restoredRecord.id);
+}
+```
+
+:::info
+`onIdConflict: "fail"` throws immediately when a primary key collision is detected. Use `"assignNew"` (default) to let Cascade assign a fresh ID to the restored document.
+:::
+
+### `RestorerResult`
+
+```ts title="src/contracts/database-restorer.contract.ts"
+interface RestorerResult {
+  success: boolean;
+  restoredCount: number;
+  strategy: "trash" | "soft";
+  restoredRecord?: Model;                                      // single restore
+  restoredRecords?: Model[];                                   // restoreAll
+  conflicts?: Array<{ id: string | number; reason: string }>; // ID conflicts during restoreAll
+}
+```
+
+```ts title="src/admin/bulk-restore.ts"
+const result = await Post.restorer.restoreAll({ onIdConflict: "assignNew" });
+
+console.log(`Restored ${result.restoredCount} posts`);
+
+if (result.conflicts?.length) {
+  console.warn("Conflicts (auto-assigned new IDs):", result.conflicts);
+}
+```

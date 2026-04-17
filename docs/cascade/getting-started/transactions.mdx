@@ -1,0 +1,205 @@
+---
+sidebar_position: 7
+---
+
+# 💾 Transactions
+
+Cascade gives you a clean, driver-agnostic API for database transactions. Whether you are on MongoDB (replica set required) or PostgreSQL, the same patterns apply.
+
+---
+
+## ⚡ `transaction()` — The Quick Way
+
+For the majority of use-cases, the top-level `transaction` helper is all you need. It wraps the default driver's transaction method, automatically commits on success, and rolls back on any thrown error.
+
+```ts title="src/services/order.service.ts"
+import { transaction } from "@warlock.js/cascade";
+
+await transaction(async (ctx) => {
+  await Order.create({ userId: 1, total: 99.99 });
+  await Inventory.decrementStock({ productId: 42, qty: 1 });
+});
+```
+
+`transaction` delegates to the default registered `DataSource`'s driver. If you need to run a transaction against a specific (non-default) source, call `driver.transaction()` directly via `dataSourceRegistry.get("name").driver.transaction(fn, options)`.
+
+---
+
+## 🛡️ `TransactionContext` — Explicit Rollback
+
+The callback receives a `TransactionContext` argument (`ctx` in the example above). Use it to perform an **explicit, intentional rollback** at any point in your business logic — without throwing a raw `Error`:
+
+```ts title="src/services/payment.service.ts"
+import { transaction } from "@warlock.js/cascade";
+
+await transaction(async (ctx) => {
+  const wallet = await Wallet.findOne({ userId: 1 });
+
+  if (wallet.balance < 50) {
+    // rolls back cleanly; throws TransactionRollbackError internally
+    ctx.rollback("Insufficient funds");
+  }
+
+  await wallet.deduct(50);
+  await Payment.create({ amount: 50 });
+});
+```
+
+### `TransactionContext` API
+
+| Method | Signature | Description |
+|---|---|---|
+| `rollback` | `(reason?: string) => never` | Aborts the transaction by throwing `TransactionRollbackError` |
+
+:::info
+`ctx.rollback()` always throws — it is typed as `never`. Code after it will never run. Cascade catches `TransactionRollbackError` internally and triggers the database rollback.
+:::
+
+---
+
+## 🔧 `DriverTransactionContract` — Manual Transactions
+
+When you need fine-grained control (e.g. spanning multiple await points across different functions), use `driver.beginTransaction()` to obtain a `DriverTransactionContract` and commit or roll back manually:
+
+```ts title="src/services/bulk-import.service.ts"
+import { getDatabaseDriver } from "@warlock.js/cascade";
+
+const driver = getDatabaseDriver();
+const tx = await driver.beginTransaction();
+
+try {
+  await processChunk(tx.context, chunkA);
+  await processChunk(tx.context, chunkB);
+  await tx.commit();
+} catch (error) {
+  await tx.rollback();
+  throw error;
+}
+```
+
+### `DriverTransactionContract` API
+
+| Member | Type | Description |
+|---|---|---|
+| `context` | `TContext` | Driver-specific session/connection (e.g. a `pg` client or MongoDB session) |
+| `commit()` | `() => Promise<void>` | Commits the transaction |
+| `rollback()` | `() => Promise<void>` | Rolls back the transaction |
+
+:::warning
+Manual transactions require you to handle cleanup yourself. Prefer `transaction(fn)` unless you have a specific need for manual lifecycle control.
+:::
+
+---
+
+## 🧵 `databaseTransactionContext` — Session Tracking
+
+`databaseTransactionContext` is a per-async-scope singleton that tracks the active transaction session. Cascade's drivers use it internally to pipe operations through the same connection when a transaction is open.
+
+```ts
+import { databaseTransactionContext } from "@warlock.js/cascade";
+```
+
+### Context API
+
+| Method | Signature | Description |
+|---|---|---|
+| `getSession<T>()` | `() => T \| undefined` | Returns the current session cast to `T` |
+| `hasActiveTransaction()` | `() => boolean` | `true` when a session is currently active |
+| `setSession(session)` | `(session: unknown) => void` | Writes the session into the current scope |
+| `exit()` | `() => void` | Clears the entire context store |
+
+You rarely need to interact with this directly — `transaction()` and `beginTransaction()` manage it automatically. It is primarily useful for advanced patterns such as passing a session to lower-level service functions:
+
+```ts title="src/repositories/order.repository.ts"
+import { databaseTransactionContext } from "@warlock.js/cascade";
+
+export function getCurrentSession<T>() {
+  return databaseTransactionContext.getSession<T>();
+}
+```
+
+---
+
+## 🐘 PostgreSQL Isolation Levels
+
+PostgreSQL supports four transaction isolation levels, exposed as the `PostgresIsolationLevel` union:
+
+```ts
+type PostgresIsolationLevel =
+  | "read uncommitted"
+  | "read committed"   // PostgreSQL default
+  | "repeatable read"
+  | "serializable";
+```
+
+### `PostgresTransactionOptions`
+
+Pass options as the second argument to `transaction()` (or `driver.transaction()`):
+
+```ts
+type PostgresTransactionOptions = {
+  isolationLevel?: PostgresIsolationLevel;
+  readOnly?: boolean;
+  deferrable?: boolean;
+};
+```
+
+| Option | Description |
+|---|---|
+| `isolationLevel` | Set the isolation level for this transaction |
+| `readOnly` | Mark the transaction as read-only |
+| `deferrable` | Defer constraint checking to commit time (`SERIALIZABLE` + `READ ONLY` only) |
+
+### Example — Serializable Transaction
+
+```ts title="src/services/ledger.service.ts"
+import { transaction } from "@warlock.js/cascade";
+import type { PostgresTransactionOptions } from "@warlock.js/cascade";
+
+const options: PostgresTransactionOptions = {
+  isolationLevel: "serializable",
+};
+
+await transaction(async (ctx) => {
+  const balance = await Ledger.sum("amount", { accountId: 7 });
+
+  if (balance < requiredAmount) {
+    ctx.rollback("Balance too low for serializable check");
+  }
+
+  await Ledger.create({ accountId: 7, amount: -requiredAmount });
+}, options);
+```
+
+:::tip
+`"read committed"` is PostgreSQL's default isolation level and is sufficient for most OLTP workloads. Only reach for `"serializable"` when you need strict anomaly prevention (e.g. financial ledgers, inventory reservation).
+:::
+
+---
+
+## 🔄 Nested-Safe Pattern
+
+Cascade's `transaction()` wrapper is **not** automatically nested-safe (i.e. it does not use savepoints). If you call `transaction()` inside another `transaction()` you will start a second, independent transaction. Use `databaseTransactionContext.hasActiveTransaction()` to guard against this:
+
+```ts title="src/services/safe-transfer.service.ts"
+import { transaction, databaseTransactionContext } from "@warlock.js/cascade";
+
+async function transferFunds(from: number, to: number, amount: number) {
+  if (databaseTransactionContext.hasActiveTransaction()) {
+    // already inside a transaction — execute without wrapping
+    await _doTransfer(from, to, amount);
+  } else {
+    await transaction(async () => {
+      await _doTransfer(from, to, amount);
+    });
+  }
+}
+```
+
+---
+
+## 🌟 What's Next?
+
+- [🗃️ Multi-Database](./multi-database)
+- [🗄️ Data Sources](./data-sources)
+- [🗺️ Roadmap](./roadmap)

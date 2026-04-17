@@ -1,0 +1,136 @@
+---
+sidebar_position: 7
+---
+
+# 📊 Grouping & Having
+
+Group results by one or more fields and filter those groups with `HAVING` clauses for powerful aggregation queries.
+
+## 🗂️ `GroupByInput` Type
+
+The `groupBy` method accepts a `GroupByInput` payload:
+
+```ts
+type GroupByInput = {
+  fields: string | string[];
+  aggregates?: AggregateExpression[];
+};
+```
+
+---
+
+## 📋 Group By
+
+### `groupBy(fields)` / `groupBy(fields, aggregates)`
+
+Group results by one or more columns:
+
+```ts title="src/analytics/revenue.ts"
+import { $agg } from "@warlock.js/cascade";
+
+// Simple group by
+Order.query()
+  .select(["status"])
+  .selectAggregate("total", $agg.sum("total"), "revenue")
+  .groupBy(["status"]);
+```
+
+Group with explicit aggregate expressions (used by the driver to build the aggregation pipeline):
+
+```ts title="src/analytics/monthly.ts"
+Order.query()
+  .select(["month"])
+  .groupBy(["month"], [
+    $agg.sum("total"),
+    $agg.count(),
+    $agg.avg("total"),
+  ]);
+```
+
+:::info
+For MongoDB, `groupBy` translates into a `$group` aggregation stage. The aggregate expressions in the second argument map to `$sum`, `$avg`, `$min`, `$max`, etc.
+:::
+
+### `groupByRaw(expression, bindings?)`
+
+Raw GROUP BY for driver-specific syntax:
+
+```ts
+Order.query()
+  .groupByRaw("DATE_TRUNC('month', created_at)")
+  .selectRaw("DATE_TRUNC('month', created_at) as month, COUNT(*) as count");
+```
+
+:::warning
+`groupByRaw` ties your code to a specific SQL dialect. Prefer the typed `groupBy` where possible.
+:::
+
+---
+
+## 🔍 Having
+
+`HAVING` filters aggregated results — it works like `WHERE` but operates after grouping.
+
+### `HavingInput` Type
+
+```ts
+type HavingInput = {
+  field: string;
+  operator?: WhereOperator;
+  value: unknown;
+};
+```
+
+### `having(field, value)` — simple equality
+
+```ts title="src/analytics/popular.ts"
+Post.query()
+  .select(["authorId"])
+  .selectAggregate("id", $agg.count(), "postCount")
+  .groupBy(["authorId"])
+  .having("postCount", 10);
+```
+
+### `having(field, operator, value)` — with comparison
+
+```ts
+Order.query()
+  .select(["customerId"])
+  .selectAggregate("total", $agg.sum("total"), "revenue")
+  .groupBy(["customerId"])
+  .having("revenue", ">", 1000);
+```
+
+### `havingRaw(expression, bindings?)`
+
+Inject a raw HAVING clause:
+
+```ts
+Order.query()
+  .groupBy(["customerId"])
+  .havingRaw("SUM(total) > ?", [500]);
+```
+
+---
+
+## 🧩 Full Example
+
+```ts title="src/analytics/top-authors.ts"
+import { $agg } from "@warlock.js/cascade";
+
+const topAuthors = await Post.query()
+  .select(["authorId"])
+  .with("author")
+  .selectAggregate("id", $agg.count(), "postCount")
+  .selectAggregate("views", $agg.sum("views"), "totalViews")
+  .where("status", "published")
+  .groupBy(["authorId"])
+  .having("postCount", ">=", 5)
+  .orderBy("totalViews", "desc")
+  .limit(10)
+  .get<AuthorStats>();
+```
+
+:::tip
+When using `groupBy`, always include the grouped fields in your `select` — most SQL engines require this. The exception is aggregate-only queries (e.g., `SELECT COUNT(*)`).
+:::

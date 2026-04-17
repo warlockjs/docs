@@ -1,0 +1,234 @@
+---
+sidebar_position: 1
+---
+
+# 🔌 Driver Contract
+
+`DriverContract` is the primary interface that the entire Cascade model layer calls into. Every database driver — MongoDB, PostgreSQL, or any custom adapter — must implement this interface. Understanding it helps when writing custom drivers, unit-testing persistence logic, or extending Cascade with a new backend.
+
+---
+
+## 🎯 `DriverContract`
+
+The unified interface consumed by the model layer. All driver implementations returned by `connectToDatabase` satisfy this contract.
+
+```ts title="src/contracts/database-driver.contract.ts"
+interface DriverContract {
+  readonly name: DatabaseDriver;
+  readonly blueprint: DriverBlueprintContract;
+  readonly modelDefaults?: Partial<ModelDefaults>;
+  readonly isConnected: boolean;
+
+  // Lifecycle
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  getClient<Client>(): Client;
+
+  // Serialization
+  serialize(data: Record<string, unknown>): Record<string, unknown>;
+  deserialize(data: Record<string, unknown>): Record<string, unknown>;
+  getDirtyTracker(data: Record<string, unknown>): DatabaseDirtyTracker;
+
+  // Events
+  on(event: DriverEvent, listener: DriverEventListener): void;
+
+  // Write
+  insert(table: string, document: Record<string, unknown>, options?: object): Promise<InsertResult>;
+  insertMany(table: string, documents: Record<string, unknown>[], options?: object): Promise<InsertResult[]>;
+  update(table: string, filter: Record<string, unknown>, update: UpdateOperations, options?: object): Promise<UpdateResult>;
+  updateMany(table: string, filter: Record<string, unknown>, update: UpdateOperations, options?: object): Promise<UpdateResult>;
+  replace<T>(table: string, filter: Record<string, unknown>, document: Record<string, unknown>, options?: object): Promise<T | null>;
+  findOneAndUpdate<T>(table: string, filter: Record<string, unknown>, update: UpdateOperations, options?: object): Promise<T | null>;
+  upsert<T>(table: string, filter: Record<string, unknown>, document: Record<string, unknown>, options?: object): Promise<T>;
+
+  // Read
+  queryBuilder<T>(table: string): QueryBuilderContract<T>;
+
+  // Delete
+  findOneAndDelete<T>(table: string, filter: Record<string, unknown>, options?: object): Promise<T | null>;
+  delete(table: string, filter?: Record<string, unknown>, options?: object): Promise<number>;
+  deleteMany(table: string, filter?: Record<string, unknown>, options?: object): Promise<number>;
+  truncateTable(table: string, options?: object): Promise<number>;
+
+  // Atomic
+  atomic(table: string, filter: Record<string, unknown>, operations: UpdateOperations, options?: object): Promise<UpdateResult>;
+
+  // Transactions
+  beginTransaction(options?: object): Promise<DriverTransactionContract>;
+  transaction<T>(fn: (ctx: TransactionContext) => Promise<T>, options?: object): Promise<T>;
+
+  // Sub-interfaces
+  syncAdapter(): SyncAdapterContract;
+  migrationDriver(): MigrationDriverContract;
+  getSQLSerializer(): SQLSerializer;
+
+  // Raw
+  query<T>(sql: string, params?: unknown[]): Promise<any>;
+
+  // Database management
+  createDatabase(name: string, options?: CreateDatabaseOptions): Promise<boolean>;
+  dropDatabase(name: string, options?: DropDatabaseOptions): Promise<boolean>;
+  databaseExists(name: string): Promise<boolean>;
+  listDatabases(): Promise<string[]>;
+
+  // Table management
+  dropTable(name: string): Promise<void>;
+  dropTableIfExists(name: string): Promise<void>;
+  dropAllTables(): Promise<void>;
+}
+```
+
+:::warning
+`dropAllTables()` destroys the entire schema with no recovery path. Never call it in a production context outside of an explicit migration reset.
+:::
+
+---
+
+## 📅 `DriverEvent` and `DriverEventListener`
+
+`DriverEvent` is a union type of driver lifecycle event names. Use `driver.on(event, listener)` to hook into connection state changes.
+
+```ts title="src/contracts/database-driver.contract.ts"
+type DriverEvent = "connected" | "disconnected" | "error" | "reconnecting";
+
+type DriverEventListener = (...args: unknown[]) => void;
+```
+
+```ts title="src/app/bootstrap.ts"
+import { getDatabaseDriver } from "@warlock.js/cascade";
+
+const driver = getDatabaseDriver();
+
+driver.on("disconnected", () => {
+  console.warn("Database connection lost — retrying...");
+});
+
+driver.on("error", (err) => {
+  console.error("Driver error:", err);
+});
+```
+
+---
+
+## 💳 `DriverTransactionContract`
+
+Returned by `driver.beginTransaction()`. Gives you manual control over commit and rollback when you need to manage transaction boundaries yourself.
+
+```ts title="src/contracts/database-driver.contract.ts"
+interface DriverTransactionContract<TContext = unknown> {
+  context: TContext;           // driver-specific session or connection
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+}
+```
+
+```ts title="src/orders/place-order.ts"
+const tx = await driver.beginTransaction();
+
+try {
+  await driver.insert("orders", orderData);
+  await driver.update("inventory", { sku }, { $dec: { stock: 1 } });
+  await tx.commit();
+} catch (err) {
+  await tx.rollback();
+  throw err;
+}
+```
+
+:::tip
+Prefer the callback-based `driver.transaction(fn)` over manual begin/commit/rollback — it auto-commits on success and auto-rolls-back on any thrown error.
+:::
+
+---
+
+## 🔁 `TransactionContext`
+
+Passed as an argument to the callback inside `driver.transaction(fn)`. Provides explicit, named rollback within a callback-style transaction.
+
+```ts title="src/contracts/database-driver.contract.ts"
+interface TransactionContext {
+  rollback(reason?: string): never;  // throws TransactionRollbackError
+}
+```
+
+```ts title="src/payments/charge.ts"
+import { transaction } from "@warlock.js/cascade";
+
+await transaction(async (ctx) => {
+  const wallet = await driver.queryBuilder("wallets").where("userId", userId).first();
+
+  if (!wallet || wallet.balance < amount) {
+    ctx.rollback("Insufficient balance");
+  }
+
+  await driver.update("wallets", { userId }, { $dec: { balance: amount } });
+});
+```
+
+---
+
+## 📋 `InsertResult` and `UpdateResult`
+
+Lightweight result shapes returned after write operations.
+
+```ts title="src/contracts/database-driver.contract.ts"
+interface InsertResult {
+  document: Record<string, unknown>;  // the inserted document with generated fields
+}
+
+interface UpdateResult {
+  modifiedCount: number;
+}
+```
+
+---
+
+## ⚙️ `UpdateOperations`
+
+Cross-driver atomic update operations. All fields are optional — include only the operators you need.
+
+```ts title="src/contracts/database-driver.contract.ts"
+interface UpdateOperations {
+  $set?:      Record<string, unknown>;         // set field values
+  $unset?:    Record<string, 1 | true>;        // remove fields
+  $inc?:      Record<string, number>;          // increment a numeric field
+  $dec?:      Record<string, number>;          // decrement a numeric field
+  $push?:     Record<string, unknown>;         // append to array (NoSQL only)
+  $pull?:     Record<string, unknown>;         // remove from array (NoSQL only)
+}
+```
+
+:::info
+`$push` and `$pull` are NoSQL-only operators. SQL drivers translate `$set`, `$unset`, `$inc`, and `$dec` to equivalent `SET` clauses.
+:::
+
+```ts title="src/products/restock.ts"
+await driver.atomic("products", { sku: "ABC-1" }, {
+  $inc:  { stock: 50 },
+  $set:  { updatedAt: new Date() },
+});
+```
+
+---
+
+## 🗄️ `CreateDatabaseOptions` and `DropDatabaseOptions`
+
+Options accepted by `driver.createDatabase()` and `driver.dropDatabase()`.
+
+```ts title="src/contracts/database-driver.contract.ts"
+interface CreateDatabaseOptions {
+  ifNotExists?: boolean;
+  charset?: string;
+  collation?: string;
+}
+
+interface DropDatabaseOptions {
+  ifExists?: boolean;
+}
+```
+
+```ts title="src/migrations/seed-env.ts"
+await driver.createDatabase("app_test", { ifNotExists: true });
+// ... run migrations ...
+await driver.dropDatabase("app_test", { ifExists: true });
+```

@@ -1,0 +1,139 @@
+---
+sidebar_position: 4
+---
+
+# 🔗 Joins
+
+The builder supports the full spectrum of SQL join types through a consistent API. For MongoDB, each join translates to a `$lookup` aggregation stage.
+
+## 📋 `JoinOptions` Shape
+
+All join methods accept either positional arguments or a `JoinOptions` object:
+
+```ts
+type JoinOptions = {
+  table: string;
+  localField: string;
+  foreignField: string;
+  type?: "inner" | "left" | "right" | "full" | "cross";
+  alias?: string;
+  // additional driver-specific fields
+};
+```
+
+---
+
+## 🔵 Standard Joins
+
+### `join(table, localField, foreignField)` — INNER JOIN
+
+The default join type. Returns only matching rows from both tables:
+
+```ts title="src/repositories/post.repo.ts"
+Post.query()
+  .join("users", "posts.authorId", "users.id")
+  .select(["posts.id", "posts.title", "users.name as authorName"]);
+```
+
+### `leftJoin(table, localField, foreignField)`
+
+Returns all rows from the left table, with nulls for non-matching right rows:
+
+```ts
+User.query()
+  .leftJoin("orders", "users.id", "orders.userId")
+  .select(["users.id", "users.name", "orders.total"]);
+```
+
+### `rightJoin(table, localField, foreignField)`
+
+Returns all rows from the right table:
+
+```ts
+Order.query()
+  .rightJoin("products", "orders.productId", "products.id")
+  .select(["products.name", "orders.quantity"]);
+```
+
+### `innerJoin(table, localField, foreignField)`
+
+Explicit inner join (same as `join`):
+
+```ts
+Post.query().innerJoin("categories", "posts.categoryId", "categories.id");
+```
+
+### `fullJoin(table, localField, foreignField)`
+
+Full outer join — all rows from both tables:
+
+```ts
+User.query().fullJoin("profiles", "users.id", "profiles.userId");
+```
+
+### `crossJoin(table)`
+
+Cartesian product — no join condition:
+
+```ts
+Size.query().crossJoin("colors");
+```
+
+---
+
+## 🗂️ Raw Join
+
+### `joinRaw(expression, bindings?)`
+
+Inject a raw join clause when none of the typed methods fit:
+
+```ts title="src/legacy/migration.ts"
+Post.query().joinRaw(
+  "LEFT JOIN tags ON tags.id = ANY(posts.tagIds)"
+);
+```
+
+:::warning
+`joinRaw` bypasses the driver-agnostic layer. Use only when absolutely necessary and only with SQL drivers.
+:::
+
+---
+
+## 🧩 Relation-Based Joins
+
+### `joinWith(...relations)`
+
+Join using relation names defined on the model's `static relations` object. Cascade resolves the table name, local key, and foreign key automatically:
+
+```ts title="src/repositories/post.repo.ts"
+Post.query()
+  .joinWith("author", "category")
+  .select(["posts.*", "users.name as authorName"]);
+```
+
+You can also pass a callback as a `JoinWithConstraint` to apply additional conditions on the joined table:
+
+```ts
+Post.query().joinWith(
+  "author",
+  (q) => q.where("users.status", "active")
+);
+```
+
+:::info
+`joinWith` performs a **JOIN** at the database level (a single query). This is more efficient than `with()` for simple flat projections, but `with()` is better for hydrating nested model instances.
+:::
+
+:::tip
+MongoDB drivers translate `joinWith` (and all join types) into `$lookup` stages in an aggregation pipeline.
+:::
+
+---
+
+## 🆚 `join` vs `joinWith` vs `with`
+
+| Method | Mechanism | Use case |
+|--------|-----------|----------|
+| `join` / `leftJoin` etc. | SQL JOIN / `$lookup` | Flat projections, custom ON conditions |
+| `joinWith("relation")` | SQL JOIN using model relation meta | Relation joins without writing ON manually |
+| `with("relation")` | Separate query per relation | Full nested model hydration |

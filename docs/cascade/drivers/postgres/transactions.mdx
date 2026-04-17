@@ -1,0 +1,231 @@
+---
+sidebar_position: 3
+---
+
+# 💾 PostgreSQL Transactions
+
+Cascade's transaction API is driver-agnostic — the same `transaction()` helper works on both MongoDB and PostgreSQL. The Postgres driver adds isolation-level control and a `deferrable` flag on top of the base API.
+
+---
+
+## ⚡ `transaction()` — The Quick Way
+
+Wrap your work in `transaction()` for automatic commit on success and rollback on error:
+
+```ts title="src/services/order.service.ts"
+import { transaction } from "@warlock.js/cascade";
+
+await transaction(async (ctx) => {
+  const order = await Order.create({ userId: 1, total: 149.99 });
+  await Inventory.decrementStock({ productId: 7, qty: 2 });
+  await Payment.create({ orderId: order.id, amount: 149.99 });
+});
+```
+
+If any line throws, the entire transaction is rolled back automatically.
+
+---
+
+## 🔒 `PostgresTransactionOptions` — Isolation Control
+
+Pass a `PostgresTransactionOptions` object as the second argument to `transaction()` to customise the Postgres session:
+
+```ts
+type PostgresTransactionOptions = {
+  readonly isolationLevel?: PostgresIsolationLevel;
+  readonly readOnly?: boolean;
+  readonly deferrable?: boolean;
+};
+```
+
+| Option | Type | Description |
+|---|---|---|
+| `isolationLevel` | `PostgresIsolationLevel?` | Postgres isolation level for this transaction |
+| `readOnly` | `boolean?` | Mark the transaction as read-only (no INSERT/UPDATE/DELETE allowed) |
+| `deferrable` | `boolean?` | Defer constraint checking to commit time (`SERIALIZABLE` + `READ ONLY` transactions only) |
+
+---
+
+## 🎚️ `PostgresIsolationLevel`
+
+Postgres supports four isolation levels, exposed as a union type:
+
+```ts
+type PostgresIsolationLevel =
+  | "read uncommitted"   // treated as READ COMMITTED in Postgres
+  | "read committed"     // Postgres default
+  | "repeatable read"
+  | "serializable";
+```
+
+| Level | Postgres Behaviour |
+|---|---|
+| `"read uncommitted"` | Postgres silently upgrades this to `"read committed"` |
+| `"read committed"` | Default — each statement sees the latest committed snapshot |
+| `"repeatable read"` | All reads in the transaction see the same snapshot |
+| `"serializable"` | Strongest — prevents all anomalies; may cause serialization failures |
+
+:::tip
+`"read committed"` is PostgreSQL's default and covers the vast majority of OLTP workloads. Only use `"serializable"` when you need strict anomaly prevention, such as financial ledgers or inventory reservation — and be prepared to retry on `ERROR 40001` (serialization failure).
+:::
+
+---
+
+## 📝 Isolation Level Examples
+
+### Read-committed (default — no option needed)
+
+```ts title="src/services/user.service.ts"
+import { transaction } from "@warlock.js/cascade";
+
+await transaction(async () => {
+  await User.create({ name: "Bob", email: "bob@example.com" });
+  await Profile.create({ userId: 1, bio: "Hello!" });
+});
+```
+
+### Repeatable Read
+
+```ts title="src/services/report.service.ts"
+import { transaction } from "@warlock.js/cascade";
+import type { PostgresTransactionOptions } from "@warlock.js/cascade";
+
+const opts: PostgresTransactionOptions = {
+  isolationLevel: "repeatable read",
+};
+
+await transaction(async () => {
+  const totalOrders = await Order.count();
+  const totalRevenue = await Order.sum("total");
+  // Both aggregates see the same snapshot — no phantom reads
+  await Report.create({ orders: totalOrders, revenue: totalRevenue });
+}, opts);
+```
+
+### Serializable
+
+```ts title="src/services/ledger.service.ts"
+import { transaction } from "@warlock.js/cascade";
+import type { PostgresTransactionOptions } from "@warlock.js/cascade";
+
+await transaction(async (ctx) => {
+  const balance = await Ledger.where("accountId", 7).sum("amount");
+
+  if (balance < requiredAmount) {
+    ctx.rollback("Insufficient balance");
+  }
+
+  await Ledger.create({ accountId: 7, amount: -requiredAmount });
+}, { isolationLevel: "serializable" });
+```
+
+### Read-only with deferrable
+
+```ts title="src/services/snapshot.service.ts"
+import { transaction } from "@warlock.js/cascade";
+
+await transaction(async () => {
+  // No writes allowed inside this transaction
+  const snapshot = await Ledger.orderBy("id").get();
+  await exportToS3(snapshot);
+}, {
+  isolationLevel: "serializable",
+  readOnly: true,
+  deferrable: true,
+});
+```
+
+:::info
+`deferrable: true` is only meaningful for `SERIALIZABLE READ ONLY` transactions. It tells Postgres to defer constraint checking until commit, which allows the transaction to acquire a consistent snapshot without blocking.
+:::
+
+---
+
+## 🛡️ Explicit Rollback with `TransactionContext`
+
+The callback receives a `TransactionContext` (`ctx`). Call `ctx.rollback()` to intentionally abort the transaction without throwing a raw `Error`:
+
+```ts title="src/services/payment.service.ts"
+import { transaction } from "@warlock.js/cascade";
+
+await transaction(async (ctx) => {
+  const wallet = await Wallet.findOne({ userId: 1 });
+
+  if (!wallet || wallet.balance < 50) {
+    ctx.rollback("Insufficient funds");
+    // ctx.rollback() is typed `never` — code below this line never runs
+  }
+
+  await wallet.save({ balance: wallet.balance - 50 });
+  await Payment.create({ amount: 50, walletId: wallet.id });
+});
+```
+
+---
+
+## 🔧 `beginTransaction()` — Manual Lifecycle
+
+For advanced scenarios where the transaction must span multiple async boundaries, call `driver.beginTransaction()` to obtain a `DriverTransactionContract<PgPoolClient>`:
+
+```ts title="src/services/bulk-import.service.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+import type { PostgresDriver, PostgresTransactionOptions } from "@warlock.js/cascade";
+
+const driver = dataSourceRegistry.get().driver as PostgresDriver;
+
+const opts: PostgresTransactionOptions = {
+  isolationLevel: "repeatable read",
+};
+
+const tx = await driver.beginTransaction(opts);
+
+try {
+  await processChunk(tx.context, chunkA);
+  await processChunk(tx.context, chunkB);
+  await tx.commit();
+} catch (error) {
+  await tx.rollback();
+  throw error;
+}
+```
+
+### `DriverTransactionContract` API
+
+| Member | Type | Description |
+|---|---|---|
+| `context` | `PgPoolClient` | The underlying `pg` client for this transaction |
+| `commit()` | `() => Promise<void>` | Commits the transaction and releases the client |
+| `rollback()` | `() => Promise<void>` | Rolls back and releases the client |
+
+:::warning
+With manual transactions you are responsible for always calling `commit()` or `rollback()`. Forgetting to release the client will exhaust your connection pool. Prefer `transaction(fn)` unless you have a specific need for manual lifecycle control.
+:::
+
+---
+
+## 🔄 Nested-Safe Pattern
+
+Cascade's `transaction()` is not automatically savepoint-aware. Guard against double-wrapping with `databaseTransactionContext`:
+
+```ts title="src/services/transfer.service.ts"
+import { transaction, databaseTransactionContext } from "@warlock.js/cascade";
+
+async function transferFunds(from: number, to: number, amount: number) {
+  if (databaseTransactionContext.hasActiveTransaction()) {
+    // Already inside a transaction — do not wrap again
+    await _doTransfer(from, to, amount);
+  } else {
+    await transaction(async () => {
+      await _doTransfer(from, to, amount);
+    });
+  }
+}
+```
+
+---
+
+## 🌟 What's Next?
+
+- [✨ Postgres-Specific Features](./features)
+- [🔍 Query Builder](./query-builder)
+- [🗄️ Migrations](./migrations)

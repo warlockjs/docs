@@ -2,131 +2,133 @@
 sidebar_position: 3
 ---
 
-# Saving Documents
+# 💾 Saving Documents
 
-When saying `saving`, it means `creating`, `updating` or `replacing` documents, let's see how to do that.
+"Saving" covers everything from inserting a brand-new record to atomically replacing an existing one. Cascade exposes these operations as Model static methods so events, timestamps, and casting are handled for you automatically.
 
-## Create new document
+## ✨ Create a Single Document
 
-To create a new document, use the `create` method:
+```ts title="src/users/user.service.ts"
+import { User } from "./user.model";
 
-```ts title="src/app.ts"
-import { query } from "@warlock.js/cascade";
-
-const user = await query.create("users", {
-  name: "John Doe",
+const user = await User.create({
+  name: "Alice",
+  email: "alice@example.com",
   isActive: true,
 });
+// Returns a fully-hydrated User instance
 ```
 
-This will create a new document in the `users` collection, and return the created document.
-
-## Create multiple documents
-
-To create multiple documents, use the `createMany` method:
-
-```ts title="src/app.ts"
-import { query } from "@warlock.js/cascade";
-
-const users = await query.createMany("users", [
-  {
-    name: "John Doe",
-    isActive: true,
-  },
-  {
-    name: "Jane Doe",
-    isActive: false,
-  },
-]);
-```
-
-This will create two documents in the `users` collection, and return the created documents with `_id` field with each document.
-
-## Update document
-
-To update a document, use the `update` method:
-
-```ts title="src/app.ts"
-import { query } from "@warlock.js/cascade";
-
-const user = await query.update(
-  "users",
-  {
-    id: 5123123,
-  },
-  {
-    isActive: false,
-  }
-);
-```
-
-This will update the document with the given `id` and return the updated document.
-
-## Update multiple documents
-
-To update multiple documents, use the `updateMany` method:
-
-```json title="documents.json"
-[
-  { "_id": 1, "name": "John", "age": 25 },
-  { "_id": 2, "name": "Alice", "age": 30 },
-  { "_id": 3, "name": "Bob", "age": 35 },
-  { "_id": 4, "name": "Emily", "age": 28 }
-]
-```
-
-```ts title="src/app.ts"
-import { query } from "@warlock.js/cascade";
-
-const users = await query.updateMany(
-  "users",
-  { age: { $gt: 25 } }, // Filter: Users with age greater than 25
-  { $set: { age: 40 } } // Update: Set the age to 40
-);
-```
-
-This will update all users with age greater than 25, and set their age to 40.
-
-## Replace document
-
-To replace a document, use the `replace` method:
-
-```ts title="src/app.ts"
-import { query } from "@warlock.js/cascade";
-
-const user = await query.replace(
-  "users",
-  {
-    id: 5123123,
-  },
-  {
-    name: "John Doe",
-    isActive: false,
-  }
-);
-```
-
-:::warning Warning
-Please be aware that this will replace the whole document with the given data, and will remove any other fields that are not included in the given data.
+:::info
+`create` emits `saving` and `saved` events, applies `createdAt`/`updatedAt` timestamps, and runs all casters defined on the model.
 :::
 
-## Upsert document
+## 📦 Bulk Create
 
-To upsert a document, use the `upsert` method:
+Insert multiple records in parallel with `createMany`:
 
-```ts title="src/app.ts"
-import { query } from "@warlock.js/cascade";
+```ts title="src/users/user.service.ts"
+const users = await User.createMany([
+  { name: "Alice", email: "alice@example.com" },
+  { name: "Bob",   email: "bob@example.com"   },
+]);
+// Returns User[]
+```
 
-const user = await query.upsert(
-  "users",
-  {
-    id: 5123123,
-  },
-  {
-    name: "John Doe",
-    isActive: false,
-  }
+:::tip
+`createMany` fires create operations concurrently — order in the returned array matches the order of the input array.
+:::
+
+## 🔍 Find or Create
+
+Return an existing record that matches the filter, or create a new one if none is found:
+
+```ts title="src/users/user.service.ts"
+const user = await User.findOrCreate(
+  { email: "alice@example.com" },   // filter
+  { name: "Alice", isActive: true } // data used only when creating
 );
 ```
 
-This will update the document with the given `id` if it exists, otherwise it will create a new document with the given data.
+The second argument is merged with the filter when a new record is created, so you never have to repeat the filter fields.
+
+## 🔄 Upsert
+
+Update the first record matching the filter, or insert a new one if no match exists:
+
+```ts title="src/users/user.service.ts"
+const user = await User.upsert(
+  { email: "alice@example.com" },   // filter / lookup
+  { name: "Alice", isActive: true } // data to write
+);
+```
+
+:::info
+`upsert` emits `saving`/`saved` events and injects `createdAt`/`updatedAt` timestamps in both the insert and update paths.
+:::
+
+## ✏️ Update by ID
+
+```ts title="src/users/user.service.ts"
+const updated = await User.update(42, { name: "Alicia" });
+// Returns the updated User instance
+```
+
+`update` is a shorthand that delegates to `updateById` internally.
+
+## ⚛️ Atomic Update by Filter — findAndUpdate
+
+Update **all** records matching the filter and return them:
+
+```ts title="src/users/user.service.ts"
+const archived = await User.findAndUpdate(
+  { isActive: false },
+  { $set: { archived: true } }
+);
+// Returns User[]
+```
+
+:::tip
+Use MongoDB update operators (`$set`, `$inc`, `$push`, …) in the second argument for atomic field-level updates.
+:::
+
+## ⚛️ Atomic Update — findOneAndUpdate
+
+Update the **first** matching record and return it:
+
+```ts title="src/users/user.service.ts"
+const user = await User.findOneAndUpdate(
+  { email: "alice@example.com" },
+  { $set: { lastLoginAt: new Date() } }
+);
+// Returns User | null
+```
+
+## 🔀 Replace a Document
+
+Replace an entire document (all fields) with a new one:
+
+```ts title="src/users/user.service.ts"
+const user = await User.findAndReplace(
+  { email: "alice@example.com" },
+  { name: "Alice Wonderland", email: "alice@example.com", isActive: true }
+);
+```
+
+:::warning
+`findAndReplace` replaces the **entire** document. Any fields present in the database but absent from the replacement object will be removed. Prefer `findOneAndUpdate` with `$set` when you only want to change specific fields.
+:::
+
+## 🧙‍♂️ Pro Tips
+
+- Use `create` for business logic paths — events, casting, and timestamps are fully applied.
+- Use `upsert` when the same record might be created by concurrent processes (e.g. webhook handlers, background jobs).
+- `findOrCreate` is ideal for seeding or idempotent setup scripts.
+- Atomic methods (`findAndUpdate`, `findOneAndUpdate`) are safe for concurrent writes because they execute as a single MongoDB operation.
+
+---
+
+## 🌟 What's Next?
+
+- [🗑️ Deleting Documents](./deleting-documents)
+- [📋 Listing Documents](./listing-documents)

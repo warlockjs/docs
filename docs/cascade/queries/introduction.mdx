@@ -2,36 +2,73 @@
 sidebar_position: 1
 ---
 
-# 🔍 Query Manager: Direct Database Power!
+# 🔍 Querying in Cascade
 
-Sometimes you want to work with raw collections—no models, no frills, just pure MongoDB power. That's where Cascade's **Query manager** shines! 🚀
+Cascade gives you two complementary axes for querying your database: **Model static methods** for everyday CRUD and **QueryBuilder** for fluent, composable queries. Together they cover everything from a simple `find` to a multi-step aggregation pipeline.
 
-## 🧰 What is the Query Manager?
-- A direct, flexible way to run queries on any collection
-- Perfect for scripts, migrations, admin tools, or when you don't need a full model
-- Gives you access to all the CRUD operations, filtering, aggregation, and more
+## 🗂️ Two Ways to Query
 
-## 🏗️ Basic Usage
-Import the `query` instance and go:
+| Approach | Best for |
+|---|---|
+| **Model statics** (`User.all()`, `User.find(id)`, …) | Straightforward reads, writes, and deletes with full model hydration, events, and scopes |
+| **QueryBuilder** (`User.query().where(…).get()`) | Complex filters, ordering, eager loading, pagination via a fluent chainable API |
 
-```ts title="src/app.ts"
-import { query } from "@warlock.js/cascade";
+Both approaches return fully-hydrated model instances (or `null` / arrays thereof), so casting, relationships, and events work automatically.
 
-const users = await query.list("users");
+## 🏗️ Model.query() — the entry point
+
+Every model exposes a static `query()` factory that returns a `QueryBuilderContract` scoped to that model's collection:
+
+```ts title="src/users/user.model.ts"
+import { User } from "./user.model";
+
+// Returns a QueryBuilderContract<User>
+const qb = User.query();
+
+// Chain filters, ordering, and execute
+const admins = await qb.where("role", "admin").orderBy("name").get();
 ```
 
-You can filter, sort, count, aggregate, and more—just pass the collection name and your options!
+:::info
+`Model.query()` automatically applies global scopes, soft-delete guards, and triggers `fetching`/`fetched` events — the same as any other read path.
+:::
 
-## 🤔 When to Use Query Manager vs Models?
-- **Use Models** for business logic, events, casting, and relationships
-- **Use Query Manager** for quick scripts, admin dashboards, migrations, or when you want full control
+## ⚡ Static Shorthand Methods
 
-## 🧙‍♂️ Pro Tip
-You can mix and match! Use models for most of your app, and drop down to the Query manager for power-user tasks.
+For the most common patterns you don't need to build a query at all:
 
----
+```ts title="src/app.ts"
+import { User } from "./user.model";
+
+// Read
+const all     = await User.all();
+const active  = await User.all({ isActive: true });
+const user    = await User.find(42);
+const first   = await User.first({ role: "admin" });
+const count   = await User.count({ isActive: true });
+const page    = await User.paginate({ page: 1, limit: 20 });
+
+// Write
+const created = await User.create({ name: "Alice" });
+const updated = await User.update(42, { name: "Alicia" });
+
+// Delete
+await User.delete({ isActive: false });
+```
+
+:::tip
+Static shorthands are thin wrappers around the same internal query infrastructure — they're just more ergonomic for simple operations.
+:::
+
+## 🤔 When to use which?
+
+- **Model statics** — your default choice for business logic, service methods, and controllers
+- **QueryBuilder** — reach for it when you need `orderBy`, `limit`, `skip`, eager `with()`, or any filter that doesn't map to a plain object
+- **Raw driver** — only for migrations, admin scripts, or operations that have no model equivalent
 
 ## 🌟 What's Next?
+
 - [📋 Listing Documents](./listing-documents)
 - [💾 Saving Documents](./saving-documents)
 - [🗑️ Deleting Documents](./deleting-documents)
+- [🔧 Query Builder](../query-builder/introduction) — full QueryBuilder API reference

@@ -1,0 +1,114 @@
+---
+sidebar_position: 2
+---
+
+# 📅 Date Helpers
+
+Cascade ships a small date validation utility that guards against the kinds of invalid date values that JavaScript's `Date` constructor silently accepts. Use it before persisting any user-provided date input.
+
+---
+
+## 🛡️ `isValidDateValue`
+
+Returns `true` for:
+- Valid **numeric timestamps** (milliseconds since Unix epoch)
+- Strict **ISO 8601** date and datetime strings
+
+Returns `false` for anything else — including partial dates that JavaScript's `Date` constructor would happily auto-correct (e.g. `"2024-02-30"`).
+
+```ts title="src/utils/is-valid-date-value.ts"
+function isValidDateValue(value: unknown): boolean;
+```
+
+### Examples
+
+```ts title="src/users/update-profile.ts"
+import { isValidDateValue } from "@warlock.js/cascade";
+
+const input = req.body.birthDate;
+
+if (!isValidDateValue(input)) {
+  throw new ValidationError("birthDate must be a valid timestamp or ISO 8601 string");
+}
+
+// Safe to persist
+await user.save({ birthDate: input });
+```
+
+```ts
+// ✅ Valid — numeric timestamp
+isValidDateValue(1713398400000);     // true
+
+// ✅ Valid — ISO 8601 date
+isValidDateValue("2024-04-17");      // true
+
+// ✅ Valid — ISO 8601 datetime with time zone
+isValidDateValue("2024-04-17T10:30:00Z");   // true
+isValidDateValue("2024-04-17T10:30:00+02:00"); // true
+
+// ❌ Invalid — out-of-range date that JS would auto-correct
+isValidDateValue("2024-02-30");     // false
+
+// ❌ Invalid — arbitrary string
+isValidDateValue("next Tuesday");   // false
+
+// ❌ Invalid — null / undefined
+isValidDateValue(null);             // false
+isValidDateValue(undefined);        // false
+```
+
+---
+
+## 🔤 `isoRegex`
+
+The compiled regular expression used internally by `isValidDateValue` to validate ISO 8601 strings.
+
+```ts title="src/utils/is-valid-date-value.ts"
+const isoRegex: RegExp;
+```
+
+It matches the full ISO 8601 format: an optional date part (`YYYY-MM-DD`) and an optional time part (`THH:MM:SS`) with an optional timezone offset or `Z`.
+
+You can import `isoRegex` directly if you need to validate ISO strings in a custom validator or schema definition:
+
+```ts title="src/validation/custom-date-rule.ts"
+import { isoRegex } from "@warlock.js/cascade";
+
+function isIsoDateString(value: unknown): value is string {
+  return typeof value === "string" && isoRegex.test(value);
+}
+```
+
+---
+
+## 💡 When and Why
+
+JavaScript's `Date` is notoriously permissive:
+
+```ts
+new Date("2024-02-30"); // → valid Date object in most environments!
+new Date("next Tuesday"); // → Invalid Date
+```
+
+The first case is the dangerous one — a date that does not exist on the calendar is silently coerced to `2024-03-01`. If that value is stored in the database it becomes a silent data integrity bug.
+
+`isValidDateValue` catches both cases:
+
+```ts title="src/bookings/create-booking.ts"
+import { isValidDateValue } from "@warlock.js/cascade";
+
+function parseBookingDate(raw: unknown): Date {
+  if (!isValidDateValue(raw)) {
+    throw new Error(`Invalid booking date: ${raw}`);
+  }
+  return new Date(raw as string | number);
+}
+```
+
+:::tip
+Combine `isValidDateValue` with your model's `@cast("date")` decorator to get both strict validation at the boundary and automatic deserialization within the model layer.
+:::
+
+:::info
+Numeric `0` (the Unix epoch) is considered a valid timestamp. If your schema treats `0` as "no date set", add an explicit `value !== 0` check before calling `isValidDateValue`.
+:::

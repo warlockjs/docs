@@ -1,0 +1,210 @@
+---
+sidebar_position: 8
+---
+
+# 📊 Aggregates
+
+Cascade provides two aggregate layers: **terminal aggregate methods** that execute and return a single scalar value, and **`$agg` expression factories** used inside `selectAggregate` and `groupBy`.
+
+---
+
+## 🏁 Terminal Aggregate Methods
+
+These methods **execute the query immediately** and return a `Promise` with a scalar result.
+
+### `count()` → `Promise<number>`
+
+Count matching records:
+
+```ts title="src/repositories/user.repo.ts"
+const total = await User.query().where("status", "active").count();
+```
+
+### `sum(field)` → `Promise<number>`
+
+```ts
+const revenue = await Order.query().where("status", "paid").sum("total");
+```
+
+### `avg(field)` → `Promise<number>`
+
+```ts
+const averageScore = await Review.query().avg("rating");
+```
+
+### `min(field)` / `max(field)` → `Promise<number>`
+
+```ts
+const cheapest = await Product.query().where("inStock", true).min("price");
+const mostExpensive = await Product.query().max("price");
+```
+
+### `distinct(field)` → `Promise<T[]>`
+
+Return all unique values for a field:
+
+```ts
+const roles = await User.query().distinct<string>("role");
+// ["admin", "editor", "viewer"]
+```
+
+### `countDistinct(field)` → `Promise<number>`
+
+Count unique values:
+
+```ts
+const uniqueCountries = await User.query().countDistinct("country");
+```
+
+### `pluck(field)` → `Promise<unknown[]>`
+
+Extract a flat array of a single field's values:
+
+```ts
+const ids = await User.query().where("status", "active").pluck("id");
+// [1, 2, 3, ...]
+```
+
+### `value(field)` → `Promise<T | null>`
+
+Retrieve a single field from the first matching record:
+
+```ts
+const email = await User.query().whereId(42).value<string>("email");
+```
+
+### `exists()` / `notExists()` → `Promise<boolean>`
+
+Check for record existence without fetching data:
+
+```ts
+const hasAdmin = await User.query().where("role", "admin").exists();
+const isEmpty = await Cart.query().whereId(cartId).notExists();
+```
+
+---
+
+## ➕ Mutation Aggregates
+
+These increment/decrement a numeric field and return the new/updated value.
+
+### `increment(field, amount?)` → `Promise<number>`
+
+Increments the field by `amount` (default `1`) on the **first** matched record. Returns the new value:
+
+```ts title="src/features/voting.ts"
+const newCount = await Post.query().whereId(postId).increment("votes");
+const newScore = await Game.query().whereId(gameId).increment("score", 10);
+```
+
+### `decrement(field, amount?)` → `Promise<number>`
+
+```ts
+const remaining = await Ticket.query().whereId(ticketId).decrement("quantity");
+```
+
+### `incrementMany(field, amount?)` → `Promise<number>`
+
+Increments the field across **all** matched records. Returns the count of modified records:
+
+```ts
+const modified = await Post.query()
+  .where("status", "published")
+  .incrementMany("viewCount");
+```
+
+### `decrementMany(field, amount?)` → `Promise<number>`
+
+```ts
+await Product.query()
+  .whereIn("id", soldProductIds)
+  .decrementMany("stockCount");
+```
+
+---
+
+## 🧮 `$agg` Expression Namespace
+
+The `$agg` object provides factory functions that create `AggregateExpression` objects. These are used inside `selectAggregate`, `groupBy`, and `selectCase` — they are **not** terminal (they don't execute a query).
+
+```ts
+import { $agg } from "@warlock.js/cascade";
+```
+
+| Method | Description |
+|--------|-------------|
+| `$agg.count()` | COUNT(*) — no field required |
+| `$agg.sum(field)` | SUM of a field |
+| `$agg.avg(field)` | AVG of a field |
+| `$agg.min(field)` | MIN of a field |
+| `$agg.max(field)` | MAX of a field |
+| `$agg.distinct(field)` | DISTINCT values |
+| `$agg.floor(field)` | FLOOR of a field |
+| `$agg.first(field)` | First value in a group |
+| `$agg.last(field)` | Last value in a group |
+
+### Example: Inline aggregate columns
+
+```ts title="src/analytics/summary.ts"
+const summaries = await Order.query()
+  .select(["customerId"])
+  .selectAggregate("id", $agg.count(), "orderCount")
+  .selectAggregate("total", $agg.sum("total"), "revenue")
+  .selectAggregate("total", $agg.avg("total"), "avgOrderValue")
+  .groupBy(["customerId"])
+  .having("orderCount", ">", 0)
+  .get<CustomerSummary>();
+```
+
+### `AggregateExpression` Shape
+
+```ts
+type AggregateExpression = {
+  __agg: AggregateFunction;
+  __field?: string;
+};
+
+type AggregateFunction =
+  | "count"
+  | "sum"
+  | "avg"
+  | "min"
+  | "max"
+  | "distinct"
+  | "floor"
+  | "first"
+  | "last";
+```
+
+### `isAggregateExpression(value)`
+
+Type-guard to check if a value is an `AggregateExpression`:
+
+```ts
+import { isAggregateExpression, $agg } from "@warlock.js/cascade";
+
+isAggregateExpression($agg.sum("total")); // true
+isAggregateExpression("total");           // false
+```
+
+---
+
+## 🔍 Vector Search
+
+### `similarTo(column, embedding, alias?)`
+
+Perform cosine similarity search using **PostgreSQL pgvector**. Returns a ranked similarity score column:
+
+```ts title="src/features/semantic-search.ts"
+const embedding = await generateEmbedding(userQuery);
+
+const results = await Document.query()
+  .similarTo("contentEmbedding", embedding, "similarity")
+  .orderBy("similarity", "desc")
+  .limit(10)
+  .get<DocumentWithSimilarity>();
+```
+
+:::warning
+`similarTo` requires the **pgvector** PostgreSQL extension. It is not supported by other drivers.
+:::

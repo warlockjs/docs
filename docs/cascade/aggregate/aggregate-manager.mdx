@@ -2,20 +2,100 @@
 sidebar_position: 2
 ---
 
-# Aggregate Class
+# 🔧 Using Model.aggregate()
 
-We had a quick overview over the [MongoDB Aggregate Framework](https://docs.mongodb.com/manual/aggregation/), now let's see how we can use it in our application.
+`Model.aggregate()` is the primary entry point for aggregation queries in Cascade. It returns a fully featured `QueryBuilderContract<T>` pre-scoped to the model's table and global scopes.
 
-## Create a new Aggregate
+## 📖 Basic Usage
 
-Let's start by creating a new Aggregate instance:
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
 
-```ts
-import { Aggregate } from "@warlock.js/cascade";
-
-const aggregate = new Aggregate("users"); // pass the collection name
-
-const usersList = await aggregate.where("id", ">=", 10).get();
+const users = await User.aggregate()
+  .where("age", ">", 18)
+  .orderBy("createdAt", "desc")
+  .get();
 ```
 
-Consider using the `aggregate` class as a query builder, it will help you build your query in a more readable way.
+Results from `.get()` are **automatically hydrated** into `User` model instances, giving you access to all model methods and computed properties.
+
+## ⚡ Difference from `Model.query()`
+
+Both `Model.aggregate()` and `Model.query()` return a `QueryBuilderContract<T>`. The distinction is semantic — `aggregate()` signals intent that aggregation operations (groupBy, sum, avg, etc.) will be used, while `query()` is the general-purpose entry point. Functionally they are identical.
+
+```ts title="src/repositories/product.repo.ts"
+import { Product } from "./product.model";
+
+// These are equivalent
+const q1 = Product.query();
+const q2 = Product.aggregate();
+```
+
+## 🧩 Chaining Aggregation Methods
+
+Because `aggregate()` returns a QueryBuilder, every method is available — filtering, ordering, grouping, pagination, and execution:
+
+```ts title="src/repositories/order.repo.ts"
+import { Order } from "./order.model";
+import { $agg } from "@warlock.js/cascade";
+
+const summary = await Order.aggregate()
+  .where("status", "paid")
+  .groupBy(["region"], {
+    total: $agg.count(),
+    revenue: $agg.sum("amount"),
+    avgOrder: $agg.avg("amount"),
+  })
+  .orderBy("revenue", "desc")
+  .get();
+```
+
+## 🔁 Hydration Callback
+
+Use the `hydrate` method to transform raw rows before they are returned:
+
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+
+const users = await User.aggregate()
+  .where("age", ">", 18)
+  .hydrate((row) => {
+    row.fullName = `${row.firstName} ${row.lastName}`;
+    return row;
+  })
+  .get();
+```
+
+## 🔗 Loading Relations
+
+Relations are loaded with `with()` — they compose cleanly with aggregation:
+
+```ts title="src/repositories/post.repo.ts"
+import { Post } from "./post.model";
+
+const posts = await Post.aggregate()
+  .where("published", true)
+  .with("author", "tags")
+  .orderBy("publishedAt", "desc")
+  .paginate({ page: 1, limit: 20 });
+```
+
+## 📊 Quick Scalar Results
+
+`aggregate()` is not limited to returning documents. Use terminal scalar methods to pull a single computed value:
+
+```ts title="src/services/stats.ts"
+import { Order } from "./order.model";
+
+const totalRevenue = await Order.aggregate()
+  .where("status", "paid")
+  .sum("amount");
+
+const userCount = await Order.aggregate()
+  .where("status", "paid")
+  .countDistinct("userId");
+```
+
+:::tip
+All scalar terminal methods (`count`, `sum`, `avg`, `min`, `max`, `distinct`, `countDistinct`) skip hydration and return plain values directly.
+:::

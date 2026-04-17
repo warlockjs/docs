@@ -1,0 +1,171 @@
+---
+sidebar_position: 6
+---
+
+# 🔢 Ordering & Limits
+
+Control the sort order and result window of your queries with a clean set of ordering and pagination primitives.
+
+## 📊 Ordering
+
+### `orderBy(field, direction?)` / `orderBy(fields[])`
+
+Sort by a single field (default direction is `"asc"`):
+
+```ts title="src/repositories/post.repo.ts"
+Post.query().orderBy("publishedAt", "desc");
+Post.query().orderBy("title"); // defaults to asc
+```
+
+Sort by multiple fields at once:
+
+```ts
+User.query().orderBy([
+  { field: "lastName", direction: "asc" },
+  { field: "firstName", direction: "asc" },
+]);
+```
+
+### `orderByDesc(field)`
+
+Shorthand for `orderBy(field, "desc")`:
+
+```ts
+Order.query().orderByDesc("createdAt");
+```
+
+### `orderByRaw(expression, bindings?)`
+
+Raw ORDER BY clause for driver-specific expressions:
+
+```ts
+User.query().orderByRaw("FIELD(status, 'active', 'pending', 'inactive')");
+```
+
+### `orderByRandom(limit?)`
+
+Return a random sample. Optionally limit the result count:
+
+```ts title="src/features/discovery.ts"
+// Pick 5 random posts
+const featured = await Post.query()
+  .where("status", "published")
+  .orderByRandom(5)
+  .get();
+```
+
+### `latest(column?)` — returns `Promise<T[]>` directly
+
+Convenience method: sorts by `createdAt DESC` (or a custom column) and immediately executes the query:
+
+```ts
+// No .get() needed — latest() is terminal
+const recentPosts = await Post.query().latest();
+const recentByDate = await Post.query().latest("publishedAt");
+```
+
+:::tip
+`latest()` is the one ordering helper that **executes the query**. All other `orderBy*` methods return `this` for further chaining.
+:::
+
+### `oldest(column?)` — returns `this`
+
+Applies `ORDER BY column ASC` (default `createdAt`). Unlike `latest`, this returns the builder for further chaining:
+
+```ts
+User.query().oldest().limit(10).get();
+User.query().oldest("joinedAt");
+```
+
+---
+
+## ✂️ Limits & Offsets
+
+### `limit(value)`
+
+Maximum number of records to return:
+
+```ts
+Post.query().limit(20);
+```
+
+### `skip(value)` / `offset(value)`
+
+Both are equivalent — skip N records before returning results:
+
+```ts
+Post.query().limit(10).skip(20);  // page 3, 10 per page
+Post.query().limit(10).offset(20);
+```
+
+### `take(value)`
+
+Alias for `limit`. Use whichever reads more naturally in context:
+
+```ts
+Post.query().take(5).orderByRandom();
+```
+
+:::info
+`limit`, `skip`, `offset`, and `take` all record separate operations. Drivers resolve them to the appropriate SQL (`LIMIT`/`OFFSET`) or MongoDB (`$limit`/`$skip`) stages.
+:::
+
+---
+
+## ⏩ Cursor Pagination
+
+Cursor pagination is more efficient than offset pagination for large datasets — it uses a position marker rather than skipping rows.
+
+### `cursor(after?, before?)`
+
+Set cursor boundaries manually:
+
+```ts title="src/api/feed.ts"
+Post.query()
+  .orderBy("id")
+  .cursor(lastSeenId)
+  .limit(20)
+  .get();
+```
+
+### `cursorPaginate(options)` — `CursorPaginationOptions`
+
+Full cursor pagination with metadata:
+
+```ts title="src/api/feed.ts"
+const page = await Post.query()
+  .orderBy("createdAt", "desc")
+  .cursorPaginate({
+    limit: 20,
+    after: req.query.after,
+    before: req.query.before,
+  });
+
+// page.data       → Post[]
+// page.meta.hasNextPage
+// page.meta.hasPrevPage
+// page.meta.startCursor
+// page.meta.endCursor
+```
+
+### `CursorPaginationOptions`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `limit` | `number` | Records per page |
+| `after` | `string?` | Forward cursor (from previous `endCursor`) |
+| `before` | `string?` | Backward cursor (from previous `startCursor`) |
+
+### `CursorPaginationResult<T>`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `data` | `T[]` | Records for this page |
+| `meta.hasNextPage` | `boolean` | More records ahead |
+| `meta.hasPrevPage` | `boolean` | More records behind |
+| `meta.startCursor` | `string` | Cursor for the first item |
+| `meta.endCursor` | `string` | Cursor for the last item |
+
+:::tip
+Always pair cursor pagination with a stable, monotonic `orderBy` (like `id` or `createdAt`) to ensure consistent results across pages.
+:::

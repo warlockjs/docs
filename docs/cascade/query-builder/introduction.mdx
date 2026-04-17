@@ -1,0 +1,101 @@
+---
+sidebar_position: 1
+---
+
+# 🔍 Query Builder: Introduction
+
+The **Query Builder** is the heart of Cascade's database interaction layer. It provides a fluent, chainable API that is completely **driver-agnostic** — the same code works across PostgreSQL, MySQL, SQLite, and MongoDB backends.
+
+## 🏗️ Driver-Agnostic Design
+
+`QueryBuilderContract<T>` is an interface, not a concrete class. Every method you call **records an operation** into an internal `Op[]` list. When you finally await the query, the active driver's parser reads that list and converts it to the native query language (SQL `SELECT`, MongoDB aggregation pipeline, etc.).
+
+This means:
+
+- Your application code never imports driver-specific SQL
+- You can swap drivers without touching query logic
+- Operations can be inspected, cloned, and composed before execution
+
+## 🚀 Getting a Builder
+
+### `Model.query()`
+
+The most common entry point. Returns a `QueryBuilderContract<T>` pre-scoped to the model's table and global scopes.
+
+```ts title="src/models/user.model.ts"
+import { User } from "./user.model";
+
+const builder = User.query();
+// builder is QueryBuilderContract<User>
+```
+
+### `Model.newQueryBuilder()`
+
+Returns a fresh builder with no scopes applied — useful when you want a completely clean slate.
+
+```ts title="src/scripts/admin.ts"
+const raw = User.newQueryBuilder();
+```
+
+### `Model.where(field, value)` shorthand
+
+A shorthand that creates a builder and immediately applies one `where` clause:
+
+```ts title="src/repositories/user.repo.ts"
+const activeUsers = await User.where("status", "active").get();
+```
+
+## ⚙️ Operation-Recording Model
+
+Internally, every builder method calls `addOperation(type, data)` which appends to the `operations: Op[]` array:
+
+```ts
+type Op = {
+  readonly type: string;
+  readonly data: unknown;
+};
+```
+
+Drivers receive the operation list via `parse()` and translate each `Op` to native syntax. This separation is what makes the builder driver-agnostic.
+
+## ⏳ Thenable Builder (Awaitable)
+
+The builder is **thenable** — it implements `then()` so you can `await` it directly. When awaited, it runs `get()` internally and resolves with `T[]`.
+
+```ts title="src/controllers/users.ts"
+// Explicit execution
+const users = await User.query().where("role", "admin").get();
+
+// Implicit execution via await
+const users = await User.query().where("role", "admin");
+```
+
+:::tip
+Prefer explicit `.get()`, `.first()`, or `.paginate()` calls — they make intent obvious and allow TypeScript to infer the correct return type.
+:::
+
+## 🔗 Fluent Chaining
+
+Every mutating method returns `this`, enabling unlimited chaining:
+
+```ts title="src/repositories/post.repo.ts"
+const results = await Post.query()
+  .where("status", "published")
+  .where("publishedAt", "<=", new Date())
+  .orderBy("publishedAt", "desc")
+  .limit(10)
+  .get<PostSummary>();
+```
+
+## 📦 Key Types
+
+| Type | Description |
+|------|-------------|
+| `QueryBuilderContract<T>` | Full fluent builder interface |
+| `Op` | A single recorded operation `{ type, data }` |
+| `DriverQuery` | The parsed representation returned by `parse()` |
+| `JoinWithConstraint` | Argument accepted by `joinWith()` — string or callback |
+
+:::info
+The concrete implementation is `QueryBuilder<T>` in `query-builder/query-builder.ts`. You never need to import or instantiate it directly — always access it through `Model.query()`.
+:::

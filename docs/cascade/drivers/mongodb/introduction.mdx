@@ -1,0 +1,188 @@
+---
+sidebar_position: 1
+---
+
+# 🍃 MongoDB Driver
+
+Cascade's MongoDB driver gives you a fully-featured, document-oriented database backend behind the same unified API you use for every other driver — models, query builder, migrations, transactions, and sync — all without writing a line of raw MongoDB query code.
+
+---
+
+## 📦 Installing the peer dependency
+
+The MongoDB driver is an optional peer dependency. Install the official `mongodb` Node.js driver alongside `@warlock.js/cascade`:
+
+```bash
+npm install mongodb
+```
+
+:::tip
+Cascade lazy-loads the `mongodb` module at connection time. If the module is missing, `connectToDatabase` will throw a descriptive error rather than crashing on import.
+:::
+
+---
+
+## 🔌 Connecting
+
+Call `connectToDatabase` with `driver: "mongodb"` and your connection details:
+
+```ts title="src/bootstrap/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase({
+  driver: "mongodb",
+  host: "localhost",
+  port: 27017,
+  database: "my-app",
+  username: "admin",
+  password: "secret",
+  dbAuth: "admin", // optional — auth source database
+});
+```
+
+You can also provide a connection URL directly:
+
+```ts title="src/bootstrap/database.ts"
+await connectToDatabase({
+  driver: "mongodb",
+  url: "mongodb://admin:secret@localhost:27017/my-app?authSource=admin",
+  database: "my-app",
+});
+```
+
+:::info
+`connectToDatabase` is async — always `await` it before running any queries so the connection pool is ready.
+:::
+
+---
+
+## ⚙️ `MongoDriverOptions` — driver-level settings
+
+Beyond the standard connection fields, you can pass a second options object to tune MongoDB-specific behaviour:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `autoGenerateId` | `boolean` | `false` | Enable numeric auto-increment IDs backed by a counters collection |
+| `counterCollection` | `string` | `"counters"` | Name of the collection used to store ID sequences |
+| `transactionOptions` | `TransactionOptions` | `{}` | Default MongoDB transaction options applied to every transaction |
+
+```ts title="src/bootstrap/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase(
+  {
+    driver: "mongodb",
+    host: "localhost",
+    port: 27017,
+    database: "my-app",
+  },
+  {
+    autoGenerateId: true,
+    counterCollection: "id_counters",
+    transactionOptions: {
+      readPreference: "primary",
+      readConcern: { level: "local" },
+      writeConcern: { w: "majority" },
+    },
+  },
+);
+```
+
+---
+
+## 🏗️ `MongoDbDriver` — what it does
+
+`MongoDbDriver` is the class that Cascade registers under the `"mongodb"` driver key. You will rarely instantiate it yourself — `connectToDatabase` does that — but knowing what it exposes helps when you need to go lower-level.
+
+### Core operations
+
+| Method | Description |
+|---|---|
+| `insert(table, document)` | Insert a single document |
+| `insertMany(table, documents)` | Bulk-insert an array of documents |
+| `update(table, filter, update)` | Update a single matching document |
+| `updateMany(table, filter, update)` | Update every matching document |
+| `upsert(table, filter, document)` | Insert or update a document |
+| `replace(table, filter, document)` | Replace a document in-place |
+| `findOneAndUpdate(table, filter, update)` | Atomically find, update, and return |
+| `findOneAndDelete(table, filter)` | Atomically find, delete, and return |
+| `delete(table, filter)` | Delete a single matching document |
+| `deleteMany(table, filter)` | Delete all matching documents |
+| `truncateTable(table)` | Remove every document in a collection |
+
+### Database management
+
+| Method | Description |
+|---|---|
+| `createDatabase(name)` | Create a new database |
+| `dropDatabase(name)` | Drop an existing database |
+| `databaseExists(name)` | Check whether a database exists |
+| `listDatabases()` | List all user databases |
+| `dropTable(name)` | Drop a collection (throws if missing) |
+| `dropTableIfExists(name)` | Drop a collection only if it exists |
+| `dropAllTables()` | Drop every collection in the current database |
+
+### Serialization
+
+`MongoDbDriver` automatically serializes values before writes and deserializes them after reads:
+
+- **`serialize(data)`** — converts JavaScript values to MongoDB-safe storage representations
+- **`deserialize(data)`** — reinflates `ObjectId` instances, `Date` strings, and other MongoDB native types back to their JavaScript equivalents
+
+### Lifecycle events
+
+```ts title="src/bootstrap/database.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+
+const source = dataSourceRegistry.get();
+
+source.driver.on("connected", () => console.log("MongoDB connected"));
+source.driver.on("disconnected", () => console.log("MongoDB disconnected"));
+```
+
+---
+
+## 🔍 `isMongoDBDriverLoaded()` — runtime availability check
+
+Before attempting a connection you can probe whether the `mongodb` package is installed in the current environment:
+
+```ts
+import { isMongoDBDriverLoaded } from "@warlock.js/cascade";
+
+if (!isMongoDBDriverLoaded()) {
+  console.warn("mongodb package is not installed — skipping DB setup");
+} else {
+  await connectToDatabase({ driver: "mongodb", /* ... */ });
+}
+```
+
+This is particularly useful in multi-driver projects or during testing where the package may be optional.
+
+---
+
+## 🗂️ Document-oriented vs relational
+
+Cascade presents a unified abstraction over both document and relational databases. Here is how the concepts map:
+
+| Cascade concept | MongoDB equivalent |
+|---|---|
+| Table | Collection |
+| Row / Record | Document (BSON object) |
+| Column | Field |
+| Primary key | `_id` field |
+| Foreign key | Reference field (no DB-level constraint) |
+| Schema migration | Index creation / schema validation |
+| Transaction | Multi-document session transaction |
+
+:::info
+MongoDB is schemaless at the storage level, so DDL operations like `addColumn`, `modifyColumn`, `addForeignKey`, and `addPrimaryKey` are no-ops in Cascade's MongoDB migration driver. Cascade instead uses schema validation rules (`setSchemaValidation`) when you need to enforce document structure.
+:::
+
+---
+
+## 🌟 What's next?
+
+- [🔎 Query Builder](./query-builder) — how every query becomes an aggregation pipeline
+- [🔢 ID Generator](./id-generator) — auto-increment numeric IDs
+- [🗺️ Blueprint](./blueprint) — index introspection
+- [🔄 Sync Adapter](./sync-adapter) — batch atomic sync updates

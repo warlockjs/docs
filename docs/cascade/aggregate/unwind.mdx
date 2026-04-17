@@ -2,27 +2,73 @@
 sidebar_position: 7
 ---
 
-# Unwind
+# 🔄 Array Expansion (was: Unwind)
 
-Unpack an array field from the input documents to output a document for each element.
+:::info
+The `unwind` method was a MongoDB-specific pipeline stage available in the legacy `Aggregate` class. It no longer exists in the current Cascade API.
 
-This is extremely useful specially if you're working with a column that have a list of values or when using `group` stage.
+If you need to work with array-valued columns in the new API, use the approaches below depending on your use case.
+:::
 
-## Method Signature
+## What `unwind` Did
 
-```ts
-public unwind(column: string, {
-    includeArrayIndex?: string,
-    preserveNullAndEmptyArrays?: boolean
-}): this;
-```
-
-## Example
+In MongoDB, `$unwind` deconstructs an array field so that each element becomes a separate document. This was commonly used before a `$lookup` or `$group` stage:
 
 ```ts
-const users = await aggregate.unwind("hobbies").get();
+// Old API — no longer works
+const aggregate = new Aggregate("users");
+await aggregate.unwind("hobbies").get();
 ```
 
-Read more about [unwind](https://docs.mongodb.com/manual/reference/operator/aggregation/unwind/).
+## Alternatives in the New API
 
-By default `preserveNullAndEmptyArrays` is set to `false` this will trim the result to only documents that have the `hobbies` field.
+### Filtering on array contents
+
+Use the `whereArrayContains` or `whereSize` methods to filter rows by array fields without exploding them:
+
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+
+// Users who have "music" as one of their hobbies
+const users = await User.query()
+  .whereArrayContains("hobbies", "music")
+  .get();
+
+// Users who have at least one hobby
+const users = await User.query()
+  .whereArrayLength("hobbies", ">", 0)
+  .get();
+```
+
+### Loading related data (replaces lookup + unwind)
+
+The pattern of `$lookup` + `$unwind` was commonly used to join a related collection and get a single object instead of an array. In the new API, use relation loading:
+
+```ts title="src/repositories/post.repo.ts"
+import { Post } from "./post.model";
+
+// Load each post with its single author (relation defined on the model)
+const posts = await Post.query()
+  .with("author")
+  .get();
+```
+
+See the [Joins](./lookup) page for `join`, `leftJoin`, and `joinWith` when you need explicit table joins rather than model relations.
+
+### Driver-specific unwind (MongoDB)
+
+If you are writing a MongoDB-specific driver query and truly need `$unwind`, use `raw()` to inject a native pipeline stage:
+
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+
+const users = await User.query()
+  .raw((pipeline) => {
+    pipeline.push({ $unwind: "$hobbies" });
+  })
+  .get();
+```
+
+:::warning
+Using `raw()` ties your code to the MongoDB driver. Consider whether a relation or array filter achieves the same goal in a driver-agnostic way.
+:::

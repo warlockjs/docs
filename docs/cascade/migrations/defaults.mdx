@@ -1,0 +1,243 @@
+---
+sidebar_position: 9
+---
+
+# ⚙️ Defaults
+
+Cascade separates configuration into two layers: **migration defaults** that control DDL schema generation, and **model defaults** that control runtime query and document behaviour. Both are set once at connection time and apply automatically across the entire application.
+
+---
+
+## 🏗️ `MigrationDefaults` — Schema-Level Defaults
+
+`MigrationDefaults` is the type that controls how the migration system generates primary keys and other DDL conventions. It is passed to `connectToDatabase` under the `migration` key and stored on each `DataSource`.
+
+```ts title="src/types.ts"
+interface MigrationDefaults {
+  uuidStrategy?: UuidStrategy;  // UUID generation strategy for PK columns
+  // … additional DDL-level defaults
+}
+```
+
+### `UuidStrategy`
+
+Controls which UUID version is used when generating primary key values.
+
+```ts title="src/types.ts"
+type UuidStrategy = "v4" | "v7";
+```
+
+| Value | Description |
+|---|---|
+| `"v4"` | Random UUID (RFC 4122). High entropy, no ordering. The default for most databases. |
+| `"v7"` | Time-ordered UUID (draft RFC). Monotonically increasing — index-friendly and sortable. Preferred for high-write tables. |
+
+:::tip
+Prefer `"v7"` when your primary key is a UUID and you care about insert performance. Time-ordered UUIDs cluster well in B-tree indexes and avoid index fragmentation.
+:::
+
+```ts title="src/database/connection.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase({
+  driver: "postgres",
+  host: "localhost",
+  database: "my_app",
+  migration: {
+    uuidStrategy: "v7",
+  },
+});
+```
+
+---
+
+## 🎛️ `ModelDefaults` — Runtime Model Defaults
+
+`ModelDefaults` is the runtime counterpart to `MigrationDefaults`. It configures how models behave at query time: which column names to expect, how to handle deletes, UUID generation strategy, strict-mode policy, and more.
+
+```ts title="src/types.ts"
+interface ModelDefaults {
+  // Primary key
+  primaryKey?: string;            // default "id"
+  uuidStrategy?: UuidStrategy;    // "v4" | "v7"
+
+  // Timestamps
+  createdAt?: string;             // column name, default "created_at"
+  updatedAt?: string;             // column name, default "updated_at"
+  withTimestamps?: boolean;       // whether models track timestamps
+
+  // Soft delete
+  deleteStrategy?: DeleteStrategy; // "trash" | "permanent" | "soft"
+  deletedAt?: string;             // column name for soft deletes, default "deleted_at"
+
+  // Naming
+  namingConvention?: NamingConvention; // "camelCase" | "snake_case"
+
+  // Strict mode
+  strictMode?: StrictMode;        // "strip" | "fail" | "allow"
+}
+```
+
+### Key Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `primaryKey` | `string` | `"id"` | The column name used as the primary key across all models |
+| `uuidStrategy` | `UuidStrategy` | `"v4"` | UUID version for generated primary keys |
+| `createdAt` | `string` | `"created_at"` | Column name for creation timestamp |
+| `updatedAt` | `string` | `"updated_at"` | Column name for last-updated timestamp |
+| `withTimestamps` | `boolean` | `true` | Whether to automatically manage timestamp columns |
+| `deleteStrategy` | `DeleteStrategy` | `"permanent"` | How `delete()` behaves by default |
+| `deletedAt` | `string` | `"deleted_at"` | Column name for soft-delete timestamp |
+| `namingConvention` | `NamingConvention` | `"snake_case"` | Column naming convention on the database side |
+| `strictMode` | `StrictMode` | `"strip"` | How unknown fields are handled on write |
+
+---
+
+## 🔌 `ModelDefaultConfig` — Passing Defaults to `connectToDatabase`
+
+`ModelDefaultConfig` is a `Partial<ModelDefaults>` type alias. You pass it to `connectToDatabase` to set application-wide model behaviour. Every model that does not override a property individually will inherit these defaults.
+
+```ts title="src/types.ts"
+type ModelDefaultConfig = Partial<ModelDefaults>;
+```
+
+---
+
+## 🛠️ Configuring Defaults at Connection Time
+
+Pass `ModelDefaultConfig` directly in the `connectToDatabase` options object alongside driver and migration settings.
+
+```ts title="src/database/connection.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase({
+  driver: "postgres",
+  host: process.env.DB_HOST ?? "localhost",
+  port: Number(process.env.DB_PORT ?? 5432),
+  database: process.env.DB_NAME ?? "my_app",
+  username: process.env.DB_USER,
+  password: process.env.DB_PASS,
+
+  // Migration-level defaults
+  migration: {
+    uuidStrategy: "v7",
+  },
+
+  // Model-level defaults applied to every model at runtime
+  primaryKey: "id",
+  uuidStrategy: "v7",
+  createdAt: "created_at",
+  updatedAt: "updated_at",
+  withTimestamps: true,
+  deleteStrategy: "soft",
+  deletedAt: "deleted_at",
+  namingConvention: "snake_case",
+  strictMode: "strip",
+});
+```
+
+:::info
+The model-level options (`primaryKey`, `uuidStrategy`, `createdAt`, etc.) are accepted as top-level keys on the `connectToDatabase` options object — not nested under a `model` key. They map directly to `ModelDefaultConfig`.
+:::
+
+---
+
+## 📦 Type Imports
+
+All types are exported directly from `@warlock.js/cascade`:
+
+```ts title="src/database/connection.ts"
+import type {
+  MigrationDefaults,
+  ModelDefaults,
+  ModelDefaultConfig,
+  UuidStrategy,
+  DeleteStrategy,
+  NamingConvention,
+  StrictMode,
+} from "@warlock.js/cascade";
+```
+
+---
+
+## 🌍 Common Configuration Patterns
+
+### SaaS App — Soft Deletes by Default
+
+```ts title="src/database/connection.ts"
+await connectToDatabase({
+  driver: "postgres",
+  database: "saas_app",
+  // All models use soft delete unless overridden
+  deleteStrategy: "soft",
+  deletedAt: "deleted_at",
+  uuidStrategy: "v7",
+  migration: { uuidStrategy: "v7" },
+});
+```
+
+### MongoDB App — camelCase Columns
+
+```ts title="src/database/connection.ts"
+await connectToDatabase({
+  driver: "mongodb",
+  url: process.env.MONGO_URL,
+  database: "my_mongo_app",
+  namingConvention: "camelCase",
+  deleteStrategy: "soft",
+});
+```
+
+### Strict Validation — Fail on Unknown Fields
+
+```ts title="src/database/connection.ts"
+await connectToDatabase({
+  driver: "postgres",
+  database: "strict_app",
+  strictMode: "fail", // throw if an unknown field is written to a model
+});
+```
+
+:::warning
+Setting `strictMode: "fail"` will throw an error at runtime whenever your application attempts to write an unrecognized field to a model. Make sure all field names are declared on your model classes before enabling this in production.
+:::
+
+---
+
+## 📋 Full Reference
+
+### `DeleteStrategy`
+
+```ts title="src/types.ts"
+type DeleteStrategy = "trash" | "permanent" | "soft";
+```
+
+| Value | Behavior |
+|---|---|
+| `"permanent"` | Hard delete — removes the row from the database |
+| `"soft"` | Sets `deletedAt` to the current timestamp; row stays in the table |
+| `"trash"` | Moves the record to a separate trash collection/table (driver-specific) |
+
+### `NamingConvention`
+
+```ts title="src/types.ts"
+type NamingConvention = "camelCase" | "snake_case";
+```
+
+| Value | Example column name |
+|---|---|
+| `"snake_case"` | `created_at`, `user_id` |
+| `"camelCase"` | `createdAt`, `userId` |
+
+### `StrictMode`
+
+```ts title="src/types.ts"
+type StrictMode = "strip" | "fail" | "allow";
+```
+
+| Value | Behavior |
+|---|---|
+| `"strip"` | Silently remove unknown fields before writing |
+| `"fail"` | Throw an error when an unknown field is encountered |
+| `"allow"` | Pass unknown fields through to the database unchanged |

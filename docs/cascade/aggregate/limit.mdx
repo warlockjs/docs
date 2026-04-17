@@ -2,20 +2,65 @@
 sidebar_position: 6
 ---
 
-# Limit
+# 📏 Limit
 
-Limit the number of documents returned from the collection.
+Restrict the number of rows returned by a query.
 
-## Method Signature
+:::info
+`limit` and its alias `take` are documented together with `skip` and `offset` on the [Skip & Limit](./skip) page. This page covers cursor-based limiting and the relationship between `limit` and pagination helpers.
+:::
 
-```ts
-public limit(value: number): this;
+## limit / take
+
+Return at most N rows:
+
+```ts title="src/repositories/post.repo.ts"
+import { Post } from "./post.model";
+
+const latest = await Post.query()
+  .where("published", true)
+  .orderBy("publishedAt", "desc")
+  .limit(5)
+  .get();
 ```
 
-## Example
+`take` is a semantic alias — both methods are identical:
 
 ```ts
-const users = await aggregate.limit(10).get();
+const latest = await Post.query()
+  .where("published", true)
+  .orderBy("publishedAt", "desc")
+  .take(5)
+  .get();
 ```
 
-It will return the first `10` documents from documents.
+## Limit with Cursor Pagination
+
+When you need cursor-based "load more" behaviour, use `cursorPaginate` instead of a raw `limit`. It returns the next/previous cursor tokens automatically:
+
+```ts title="src/controllers/feed.controller.ts"
+import { Post } from "./post.model";
+
+const result = await Post.query()
+  .where("published", true)
+  .orderBy("createdAt", "desc")
+  .cursorPaginate({ limit: 20, after: cursor });
+
+const posts      = result.data;
+const nextCursor = result.nextCursor;
+```
+
+See [Fetching Documents](./fetching) for the full `paginate` and `cursorPaginate` API.
+
+## Limit with orderByRandom
+
+`orderByRandom` requires a limit — it samples N rows at random from the matching result set:
+
+```ts title="src/repositories/product.repo.ts"
+import { Product } from "./product.model";
+
+const featured = await Product.query()
+  .where("active", true)
+  .orderByRandom(6)
+  .get();
+```

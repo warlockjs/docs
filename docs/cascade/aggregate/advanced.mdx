@@ -2,120 +2,167 @@
 sidebar_position: 9
 ---
 
-# Advanced Usage
+# ⚙️ Advanced Aggregation
 
-Aggregate class is also shipped with more useful methods to help you use queries easily.
+Beyond `groupBy`, the QueryBuilder exposes quick scalar aggregation methods and atomic increment/decrement operations.
 
-## Min
+## 📊 Scalar Aggregation Methods
 
-To get minimum value of a field, we can use `min` method.
+These terminal methods execute immediately and return a single computed value — no `.get()` needed.
 
-Method Signature:
+### count()
 
-```ts
-public min(field: string): number;
+Count all rows matching the current filters:
+
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+
+const total = await User.query().where("active", true).count();
+// => 1248
 ```
 
-Example:
+### sum(field)
 
-```ts
-const minAge = await aggregate.min("age");
+Sum a numeric column across all matching rows:
+
+```ts title="src/repositories/order.repo.ts"
+import { Order } from "./order.model";
+
+const revenue = await Order.query()
+  .where("status", "paid")
+  .sum("amount");
+// => 48250.75
 ```
 
-This will return the minimum age of all users.
+### avg(field)
 
-## Get Max value
+Compute the arithmetic mean of a numeric column:
 
-To get maximum value of a field, we can use `max` method.
+```ts title="src/repositories/review.repo.ts"
+import { Review } from "./review.model";
 
-Method Signature:
-
-```ts
-public max(field: string): number;
+const avgRating = await Review.query()
+  .where("productId", 42)
+  .avg("rating");
+// => 4.3
 ```
 
-Example:
+### min(field)
 
-```ts
-const maxAge = await aggregate.max("age");
+Return the minimum value of a column:
+
+```ts title="src/repositories/product.repo.ts"
+import { Product } from "./product.model";
+
+const cheapest = await Product.query()
+  .where("active", true)
+  .min("price");
+// => 4.99
 ```
 
-## Get Average value
+### max(field)
 
-To get average value of a field, we can use `avg` method.
+Return the maximum value of a column:
 
-Method Signature:
+```ts title="src/repositories/product.repo.ts"
+import { Product } from "./product.model";
 
-```ts
-public avg(field: string): number;
+const mostExpensive = await Product.query()
+  .where("active", true)
+  .max("price");
+// => 2499.00
 ```
 
-Example:
+### distinct(field)
 
-```ts
-const avgAge = await aggregate.avg("age");
+Return an array of distinct values for a column:
+
+```ts title="src/repositories/order.repo.ts"
+import { Order } from "./order.model";
+
+const regions = await Order.query().distinct<string>("region");
+// => ["north", "south", "east", "west"]
 ```
 
-> `average` is an alias for `avg` method.
+### countDistinct(field)
 
-## Get Sum value
+Count the number of unique values of a column:
 
-To get sum value of a field, we can use `sum` method.
+```ts title="src/repositories/order.repo.ts"
+import { Order } from "./order.model";
 
-Method Signature:
-
-```ts
-public sum(field: string): number;
+const uniqueBuyers = await Order.query()
+  .where("status", "paid")
+  .countDistinct("userId");
+// => 382
 ```
 
-Example:
+## 🔢 Increment & Decrement
 
-```ts
-const totalSalaries = await aggregate.sum("salary");
+Atomically update a numeric column on all rows matching the current filters.
+
+### increment(field, amount?)
+
+Increase a column by `amount` (defaults to 1). Returns the **new value** of the column on the first matched row.
+
+```ts title="src/services/vote.service.ts"
+import { Post } from "./post.model";
+
+// Increment by 1
+const newCount = await Post.query().whereId(99).increment("views");
+
+// Increment by a custom amount
+const newPoints = await Post.query().whereId(99).increment("points", 5);
 ```
 
-We can also use filters with it as well by using `where` method:
+### decrement(field, amount?)
 
-```ts
-const totalSalaries = await aggregate.where("age", ">", 20).sum("salary");
+Decrease a column by `amount` (defaults to 1). Returns the **new value**.
+
+```ts title="src/services/inventory.service.ts"
+import { Product } from "./product.model";
+
+const remaining = await Product.query()
+  .whereId(7)
+  .decrement("stock", 3);
 ```
 
-## Get distinct values
+### incrementMany(field, amount?)
 
-To get distinct values of a field, we can use `distinct` method.
+Increment a column across **all** matched rows. Returns the number of rows modified.
 
-Method Signature:
+```ts title="src/jobs/daily-bonus.job.ts"
+import { User } from "./user.model";
 
-```ts
-public distinct(field: string): any[];
+const modified = await User.query()
+  .where("active", true)
+  .incrementMany("dailyPoints", 10);
+
+console.log(`Awarded bonus to ${modified} users`);
 ```
 
-Example:
+### decrementMany(field, amount?)
 
-```ts
-const distinctAges = await aggregate.distinct("age");
+Decrement a column across **all** matched rows. Returns the number of rows modified.
+
+```ts title="src/jobs/expire-credits.job.ts"
+import { User } from "./user.model";
+
+const modified = await User.query()
+  .where("creditsExpireAt", "<", new Date())
+  .decrementMany("credits");
 ```
 
-It will return an array of values.
+## 🔎 Combining Scalar Aggregates with Filters
 
-> Please note that if the field has a null value, it will be returned as well.
+All scalar methods respect every `where*` clause added before them:
 
-You can also use `unique` method as an alias to it.
+```ts title="src/services/analytics.service.ts"
+import { Sale } from "./sale.model";
 
-## Get Distinct Heavy Values
-
-This method is similar to `distinct` method, but it will return the distinct values without the `null` values.
-
-Method Signature:
-
-```ts
-public distinctHeavy(field: string): any[];
+const [total, avg, max] = await Promise.all([
+  Sale.query().where("year", 2025).where("region", "north").count(),
+  Sale.query().where("year", 2025).where("region", "north").avg("amount"),
+  Sale.query().where("year", 2025).where("region", "north").max("amount"),
+]);
 ```
-
-Example:
-
-```ts
-const distinctAges = await aggregate.distinctHeavy("age");
-```
-
-> `uniqueHeavy` is an alias for `distinctHeavy` method.

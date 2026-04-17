@@ -46,9 +46,51 @@ console.log(user.data); // outputs all data
 :::
 
 ## 📝 What Happens Under the Hood?
-- Cascade auto-generates an `id` (number) and `_id` (ObjectId) for you.
+- Cascade auto-generates a primary key `id` for you.
+  - **SQL databases**: `id` is an auto-increment integer.
+  - **MongoDB**: `id` is a Cascade-managed numeric ID; MongoDB also stores an `_id` ObjectId internally.
 - Default values and type casting are applied automatically.
 - Any model events (like `onCreating`, `onCreated`) will run.
+
+## 🪄 Creating Many Records at Once
+
+Use `createMany` to insert an array of records in a single call:
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+const users = await User.createMany([
+  { name: "Alice", email: "alice@example.com" },
+  { name: "Bob", email: "bob@example.com" },
+]);
+```
+
+All records are created concurrently and the resulting model instances are returned as an array.
+
+## 🔍 Find or Create
+
+Use `findOrCreate` to fetch an existing record that matches a filter, or create it if it does not exist:
+
+```ts title="src/app.ts"
+// Returns the existing user or creates a new one with the provided data
+const user = await User.findOrCreate(
+  { email: "alice@example.com" },         // filter
+  { name: "Alice", isActive: true },      // data used only on creation
+);
+```
+
+## 🔄 Upsert
+
+Use `upsert` to update a record that matches the filter, or insert it if none exists:
+
+```ts title="src/app.ts"
+const user = await User.upsert(
+  { email: "alice@example.com" },         // filter
+  { name: "Alice", isActive: true },      // full data to write
+);
+```
+
+`upsert` emits `saving`/`saved` events and injects `createdAt`/`updatedAt` timestamps automatically.
 
 ## 🧙‍♂️ Pro Tip: Use Model Methods
 You can add your own methods to models for custom logic before/after saving. Models are just classes—make them as smart as you want!

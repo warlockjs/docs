@@ -1,0 +1,261 @@
+---
+sidebar_position: 20
+---
+
+# 🗃️ Resources & JSON Serialization
+
+When a model is serialized to JSON — for an API response, a WebSocket message, or any other consumer — Cascade needs to know **which fields to expose**. The resource configuration controls exactly that. It also powers the embedded document system, which lets you store a compact snapshot of a related model inside another document.
+
+---
+
+## 🎛️ Resource configuration
+
+### `static resource`
+
+An explicit allowlist of field names to include in the `toJSON()` output. Only the listed fields will appear in the serialized plain object.
+
+```ts title="src/models/user.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class User extends Model {
+  static table = "users";
+
+  // Only expose these fields — password is intentionally omitted
+  static resource = ["id", "name", "email", "createdAt"];
+}
+```
+
+### `static resourceColumns`
+
+An alias for `resource`. Both properties are recognized and behave identically. Use whichever reads more naturally in your codebase.
+
+```ts title="src/models/user.ts"
+export class User extends Model {
+  static table = "users";
+
+  static resourceColumns = ["id", "name", "email", "createdAt"];
+}
+```
+
+### `static toJsonColumns`
+
+A further alias for the same concept. Again, fully equivalent to `resource` and `resourceColumns`.
+
+```ts title="src/models/post.ts"
+export class Post extends Model {
+  static table = "posts";
+
+  static toJsonColumns = ["id", "title", "body", "publishedAt"];
+}
+```
+
+:::info Priority and fallback
+Cascade checks for `resource`, `resourceColumns`, and `toJsonColumns` in that order. As soon as one is found, its list is used. If **none** are configured, `toJSON()` returns all fields present in `model.data` — nothing is filtered out.
+:::
+
+---
+
+## 📤 `model.toJSON()`
+
+Serializes the model to a plain JavaScript object. The output respects the resource configuration above.
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+const user = await User.find(1);
+const json = user.toJSON();
+
+console.log(json);
+// { id: 1, name: "Hasan Zohdy", email: "hasan@example.com", createdAt: "..." }
+// "password" is absent because it is not in `resource`
+```
+
+### Loaded relations are included automatically
+
+If any relations have been loaded onto the model (via `model.load()` or eager loading), their `toJSON()` representations are merged into the output recursively.
+
+```ts title="src/app.ts"
+const post = await Post.with("author", "tags").first();
+const json = post.toJSON();
+
+// {
+//   id: 42,
+//   title: "Hello world",
+//   author: { id: 1, name: "Hasan Zohdy" },   ← author.toJSON()
+//   tags: [{ id: 3, label: "typescript" }],    ← tag[].toJSON()
+// }
+```
+
+`toJSON` delegates to the internal `modelToJSON` utility, which handles the recursive merging.
+
+---
+
+## 🧩 Embedded documents
+
+Embedded documents let you **denormalize** a compact snapshot of a related model directly inside a parent document's storage record. This avoids the need for a join when you only need a few fields from the related model.
+
+### `static embed`
+
+An array of field names from the model that should be included in the embedded snapshot.
+
+```ts title="src/models/user.ts"
+export class User extends Model {
+  static table = "users";
+
+  // When a User is embedded inside another document, include only these fields
+  static embed = ["id", "name", "avatarUrl"];
+}
+```
+
+### `get embedData`
+
+Returns the embedded data object — a plain record containing only the fields listed in `static embed`. Store this inside another model's document instead of a full relation reference.
+
+```ts title="src/models/post.ts"
+export class Post extends Model {
+  static table = "posts";
+
+  async setAuthor(user: User) {
+    // Store a compact snapshot of the author inside the post document
+    this.set("author", user.embedData);
+  }
+}
+```
+
+```ts title="src/app.ts"
+const user = await User.find(1);
+const post = new Post({ title: "Hello world" });
+
+await post.setAuthor(user);
+// post.data.author === { id: 1, name: "Hasan Zohdy", avatarUrl: "..." }
+
+await post.save();
+```
+
+### `get embedParent`
+
+Returns a minimal parent reference object. This is a slimmed-down form of `embedData` intended for child→parent back-references — typically only `id` and the minimal identifying fields.
+
+### `get embedMinimal`
+
+The most compact embedded form. Returns only the absolute minimum fields needed to identify the model (usually just `id` and a display label). Use this when storage size is a concern and the consumer only needs to display a reference, not full details.
+
+:::tip Choosing between `embedData`, `embedParent`, and `embedMinimal`
+- **`embedData`** — use when the embedding model needs a readable snapshot (e.g. a post storing its author's name and avatar).
+- **`embedParent`** — use for child-to-parent back-references where the child knows who owns it.
+- **`embedMinimal`** — use in lists or arrays of references where each item only needs enough data to render a link or label.
+:::
+
+---
+
+## 🛠️ Practical examples
+
+### User model — excluding sensitive fields
+
+```ts title="src/models/user.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class User extends Model {
+  static table = "users";
+
+  // API consumers see only these fields
+  static resource = ["id", "name", "email", "role", "createdAt"];
+
+  // Embedded snapshots include only display-relevant fields
+  static embed = ["id", "name", "avatarUrl"];
+}
+```
+
+```ts title="src/controllers/user-controller.ts"
+import { User } from "../models/user";
+
+export async function showUser(req, res) {
+  const user = await User.find(req.params.id);
+
+  // toJSON() automatically filters to `resource` fields
+  // — password, salt, tokens never leave the server
+  res.json(user.toJSON());
+}
+```
+
+### Blog post with embedded author and tags
+
+```ts title="src/models/post.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Post extends Model {
+  static table = "posts";
+
+  static resource = ["id", "title", "body", "author", "tags", "publishedAt"];
+
+  // author is stored as an embedded snapshot (not a join)
+  // tags is stored as an array of embedded snapshots
+}
+```
+
+```ts title="src/models/tag.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Tag extends Model {
+  static table = "tags";
+
+  static embed = ["id", "label", "slug"];
+}
+```
+
+```ts title="src/services/publish-post.ts"
+import { Post } from "../models/post";
+import { User } from "../models/user";
+import { Tag } from "../models/tag";
+
+export async function publishPost(
+  authorId: number,
+  tagIds: number[],
+  data: { title: string; body: string }
+) {
+  const author = await User.find(authorId);
+  const tags = await Tag.where("id", "in", tagIds).all();
+
+  const post = await Post.create({
+    ...data,
+    author: author.embedData,             // { id, name, avatarUrl }
+    tags: tags.map(t => t.embedData),     // [{ id, label, slug }, ...]
+    publishedAt: new Date(),
+  });
+
+  return post;
+}
+```
+
+The stored document looks like:
+
+```json
+{
+  "id": 42,
+  "title": "Hello world",
+  "body": "...",
+  "author": { "id": 1, "name": "Hasan Zohdy", "avatarUrl": "/avatars/1.png" },
+  "tags": [
+    { "id": 3, "label": "TypeScript", "slug": "typescript" },
+    { "id": 7, "label": "Cascade ORM", "slug": "cascade-orm" }
+  ],
+  "publishedAt": "2026-04-17T15:00:00.000Z"
+}
+```
+
+And `post.toJSON()` returns exactly those fields because `resource` is set.
+
+---
+
+## 📌 API reference summary
+
+| Property / Method | Kind | Description |
+|---|---|---|
+| `static resource` | static field | Allowlist of field names for `toJSON()` output |
+| `static resourceColumns` | static field | Alias for `resource` |
+| `static toJsonColumns` | static field | Alias for `resource` |
+| `model.toJSON()` | instance method | Serialize to plain object respecting resource config; includes loaded relations |
+| `static embed` | static field | Fields to include in embedded document snapshots |
+| `get embedData` | instance getter | Returns embedded data object (fields from `static embed`) |
+| `get embedParent` | instance getter | Minimal parent reference for child→parent back-references |
+| `get embedMinimal` | instance getter | Most compact embedded form for lists and labels |

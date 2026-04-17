@@ -8,17 +8,37 @@ Ready to level up? Cascade's advanced features let you go beyond the basics and 
 
 ## 🧩 What's in Advanced?
 
-- Auto-incrementing IDs
-- Custom strategies and power tools
-- And more!
+- Auto-incrementing IDs and custom ID strategies
+- Writing your own database driver
+- Understanding sync internals
+- Authoring validation plugins
+
+## 🌟 Topics
+
+### 🔢 Auto-Increment IDs
+
+Cascade supports sequential, auto-incrementing integer IDs for models — useful when you need predictable, human-readable primary keys instead of UUIDs or ULIDs.
+
+See [Auto-Increment IDs](./auto-increment) and [Model IDs](../models/ids) for the full reference including `initialId`, `incrementIdBy`, `randomInitialId`, and `randomIncrement` options.
+
+### 🔌 Writing a Driver
+
+Cascade's query layer is driver-agnostic. You can implement `DriverContract` to connect Cascade to any database backend. A custom driver must handle query compilation, execution, and blueprint introspection.
+
+:::info
+Driver authoring documentation is coming soon. In the meantime, refer to the MongoDB and PostgreSQL driver source as reference implementations.
+:::
+
+### 🔄 Sync Internals
+
+`Model.sync()` and `Model.syncMany()` keep denormalized data consistent across collections or tables when a source model changes. Understanding sync internals helps you build reliable embedded-data architectures.
+
+### 🧩 Validation Plugin Authoring
+
+Cascade integrates with `@warlock.js/seal` for schema validation. You can author custom field validators and validation plugins that plug directly into the model lifecycle via the `schema` static property.
+
+---
 
 ## 🧙‍♂️ Pro Tip
 
 Don't be afraid to explore! Advanced features are here to make your life easier and your apps more powerful.
-
----
-
-## 🌟 What's Next?
-
-- [🔢 Auto-Increment IDs](./auto-increment)
-- [🧠 MasterMind: Auto-Increment ID Manager](./master-mind)

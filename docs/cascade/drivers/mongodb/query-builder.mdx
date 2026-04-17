@@ -1,0 +1,248 @@
+---
+sidebar_position: 2
+---
+
+# 🔎 MongoDB Query Builder
+
+`MongoQueryBuilder` is the MongoDB-specific implementation of Cascade's `QueryBuilderContract`. Every fluent query you write — `where`, `select`, `orderBy`, `join`, and more — is compiled behind the scenes into a MongoDB **aggregation pipeline** and executed via `db.collection.aggregate()`.
+
+---
+
+## 🏗️ Architecture overview
+
+```
+Your fluent query
+       ↓
+  MongoQueryBuilder  (extends QueryBuilder, implements QueryBuilderContract)
+       ↓
+  Operation[]        (stage + data descriptors)
+       ↓
+  MongoQueryParser   (compiles operations → pipeline stages)
+       ↓
+  MongoDB aggregation pipeline
+```
+
+`MongoQueryBuilder` records every fluent call as an `Operation` object and defers the actual pipeline assembly until you call a terminal method such as `get()`, `first()`, `count()`, or `paginate()`.
+
+---
+
+## 🧩 Core types
+
+### `PipelineStage`
+
+A union of supported MongoDB aggregation stage name literals:
+
+```ts
+type PipelineStage =
+  | "$match"
+  | "$project"
+  | "$sort"
+  | "$skip"
+  | "$limit"
+  | "$group"
+  | "$lookup"
+  | "$unwind"
+  | "$addFields"
+  | "$replaceRoot"
+  | "$count"
+  | "$facet"
+  | "$bucket"
+  | "$bucketAuto"
+  | "$sortByCount"
+  | "$out"
+  | "$merge"
+  | "$vectorSearch"
+  /* … and more */;
+```
+
+### `Operation`
+
+Each fluent call appends an `Operation` to the builder's internal list:
+
+```ts
+type Operation = {
+  stage: PipelineStage; // which aggregation stage this belongs to
+  mergeable: boolean;   // whether it can be merged with a same-stage operation
+  type: string;         // discriminator used by the parser
+  data: any;            // payload for that stage
+};
+```
+
+---
+
+## 🛠️ `MongoQueryParser` — operation compiler
+
+`MongoQueryParser` takes the flat `Operation[]` list and compiles it into a ready-to-execute MongoDB aggregation pipeline array. It is created internally by `MongoQueryBuilder.getParser()` and is not normally used directly.
+
+**`MongoQueryParserOptions`** controls parser behaviour (e.g., whether global scopes are applied, soft-delete handling, scope exclusions) and is passed automatically from the builder.
+
+---
+
+## 🔧 `MongoQueryOperations` — stage helper
+
+`MongoQueryOperations` is the low-level helper that appends pipeline stage descriptors to the `operations` array. You can access the lazy-initialised instance via the `operationsHelper` getter if you are extending `MongoQueryBuilder`:
+
+```ts
+// internal pattern — you generally don't call this directly
+this.operationsHelper.addMatchStage({ status: "active" });
+```
+
+---
+
+## 📝 Querying — quick reference
+
+```ts title="src/users/queries.ts"
+import { User } from "./user.model";
+
+// Filter → $match
+const admins = await User.query()
+  .where("role", "admin")
+  .where("active", true)
+  .get();
+
+// Project → $project
+const names = await User.query()
+  .select("name", "email")
+  .get();
+
+// Sort → $sort
+const recent = await User.query()
+  .orderBy("createdAt", "desc")
+  .get();
+
+// Paginate
+const page = await User.query()
+  .where("active", true)
+  .paginate({ page: 1, limit: 20 });
+
+// Count → $count
+const total = await User.query().where("role", "admin").count();
+
+// Aggregates
+const totalRevenue = await Order.query().sum("amount");
+const avgAge = await User.query().avg("age");
+```
+
+---
+
+## 🔗 Joins — `$lookup`
+
+All join variants compile to MongoDB `$lookup` stages:
+
+```ts title="src/orders/queries.ts"
+// Simple $lookup
+const orders = await Order.query()
+  .join("users", "userId", "_id")
+  .get();
+
+// Left join (same result in MongoDB — all $lookups are left-outer by default)
+const orders = await Order.query()
+  .leftJoin("users", "userId", "_id")
+  .get();
+
+// Inner join — adds a $match stage filtering out unmatched documents
+const orders = await Order.query()
+  .innerJoin("users", "userId", "_id")
+  .get();
+```
+
+:::info
+MongoDB has no native right join or full join. Cascade emulates these with additional `$lookup` + `$match` + `$addFields` stages.
+:::
+
+---
+
+## 📊 Group by — `$group`
+
+```ts title="src/reports/queries.ts"
+const byCountry = await User.query()
+  .groupBy(["country"], [
+    { field: "count", aggregate: "count", alias: "total" },
+    { field: "age", aggregate: "avg", alias: "avgAge" },
+  ])
+  .get();
+```
+
+---
+
+## ⚡ Cursor-based pagination
+
+```ts title="src/feed/queries.ts"
+const result = await Post.query()
+  .orderBy("createdAt", "desc")
+  .cursorPaginate({ limit: 10, after: lastCursor });
+
+// result.data       — documents
+// result.nextCursor — pass as `after` for the next page
+// result.hasMore    — whether more pages exist
+```
+
+---
+
+## 🧮 Atomic mutations
+
+```ts title="src/inventory/queries.ts"
+// Increment a single document's field
+await Product.query().where("_id", id).increment("stock", 5);
+
+// Decrement across many documents
+await Product.query().where("category", "seasonal").decrementMany("stock", 1);
+
+// Unset fields
+await User.query().where("role", "guest").unset("tempToken", "resetAt");
+```
+
+---
+
+## 🔍 Vector similarity search — `similarTo()`
+
+`MongoQueryBuilder` exposes `similarTo` for **MongoDB Atlas Vector Search**. It appends a `$vectorSearch` stage followed by a `$addFields` stage that injects the similarity score:
+
+```ts title="src/search/semantic-search.ts"
+const embedding = await getEmbedding("What is machine learning?");
+
+const results = await Article.query()
+  .similarTo("contentEmbedding", embedding, "score")
+  .limit(10)
+  .get();
+
+// Each result has a `score` field with the cosine similarity value
+```
+
+```ts
+// Signature
+similarTo(
+  column: string,   // the vector field on the document
+  embedding: number[], // query vector
+  alias?: string,   // field name for the score, defaults to "score"
+): this
+```
+
+:::warning
+`similarTo` requires an Atlas Vector Search index on the target collection. It will fail on self-hosted MongoDB instances that do not have Atlas search enabled.
+:::
+
+---
+
+## 🛠️ Debugging — `parse()`, `pretty()`, `explain()`
+
+```ts title="src/debug/pipeline.ts"
+const qb = User.query().where("active", true).orderBy("name").limit(10);
+
+// Inspect the compiled pipeline
+console.log(qb.parse());
+
+// Pretty-printed pipeline string
+console.log(qb.pretty());
+
+// Full MongoDB execution plan
+const plan = await qb.explain();
+```
+
+---
+
+## 🌟 What's next?
+
+- [🔢 ID Generator](./id-generator) — atomic auto-increment IDs
+- [🗺️ Blueprint](./blueprint) — index introspection
+- [🔄 Sync Adapter](./sync-adapter) — batch atomic sync updates

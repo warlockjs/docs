@@ -1,0 +1,243 @@
+---
+sidebar_position: 3
+---
+
+# 📐 Select & Projection
+
+The builder provides fine-grained control over which columns are returned, including aliases, aggregates, subqueries, JSON paths, conditional expressions, and window functions.
+
+## 🎯 Basic Select
+
+### `select(fields)` / `addSelect(fields)`
+
+Specify which columns to return. Accepts a string, array, or spread:
+
+```ts title="src/repositories/user.repo.ts"
+User.query().select(["id", "name", "email"]);
+User.query().select("id", "name", "email");
+
+// Add to an existing selection
+User.query().select("id").addSelect(["name", "createdAt"]);
+```
+
+### `selectAs(field, alias)`
+
+Return a column under a different name:
+
+```ts
+User.query().selectAs("firstName", "first").selectAs("lastName", "last");
+```
+
+### `clearSelect()` / `selectAll()` / `selectDefault()`
+
+```ts
+// Remove all select operations added so far
+User.query().select("id").clearSelect(); // no columns specified → driver selects all
+
+// Explicitly select * (wildcard)
+User.query().selectAll();
+
+// Revert to the model's default column set
+User.query().selectDefault();
+```
+
+### `deselect(fields)`
+
+Remove specific fields from the current selection:
+
+```ts
+User.query().selectAll().deselect(["password", "secret"]);
+```
+
+### `distinctValues(fields?)`
+
+Add `DISTINCT` to the query, optionally on specific fields:
+
+```ts
+Post.query().distinctValues(["authorId"]);
+```
+
+---
+
+## ⚡ Raw Select
+
+### `selectRaw(expression, bindings?)`
+
+Inject a single raw expression:
+
+```ts title="src/analytics/reports.ts"
+Order.query().selectRaw("SUM(total) as revenue");
+Order.query().selectRaw("DATE_TRUNC('month', created_at) as month");
+```
+
+### `selectRawMany(definitions)`
+
+Inject multiple raw expressions at once:
+
+```ts
+Order.query().selectRawMany([
+  { expression: "SUM(total)", alias: "revenue" },
+  { expression: "COUNT(*)", alias: "orderCount" },
+]);
+```
+
+:::warning
+Raw expressions tie your code to a specific SQL dialect. Where possible prefer the typed helpers below.
+:::
+
+---
+
+## 📥 Subquery Select
+
+### `selectSub(expression, alias)`
+
+Use another query builder as a subquery column:
+
+```ts title="src/repositories/user.repo.ts"
+User.query().selectSub(
+  Order.query().selectRaw("COUNT(*)").whereColumn("orders.userId", "=", "users.id"),
+  "orderCount"
+);
+```
+
+### `addSelectSub(expression, alias)`
+
+Same as `selectSub` but appends without replacing previous selections:
+
+```ts
+User.query()
+  .select(["id", "name"])
+  .addSelectSub(latestOrderSub, "latestOrderId");
+```
+
+---
+
+## 🔢 Aggregate Columns
+
+### `selectAggregate(field, aggregate, alias)`
+
+Add an aggregate expression as a named column:
+
+```ts title="src/analytics/dashboard.ts"
+import { $agg } from "@warlock.js/cascade";
+
+Post.query().selectAggregate("views", $agg.sum("views"), "totalViews");
+Post.query().selectAggregate("id", $agg.count(), "postCount");
+```
+
+### `selectExists(field, alias)`
+
+Return a boolean column indicating whether a field is non-null:
+
+```ts
+User.query().selectExists("emailVerifiedAt", "isVerified");
+```
+
+### `selectCount(field, alias)`
+
+Count a column inline:
+
+```ts
+Post.query().select("id").selectCount("comments", "commentCount");
+```
+
+---
+
+## 🔀 Conditional Expressions
+
+### `selectCase(cases, otherwise, alias)`
+
+SQL `CASE WHEN ... THEN ... ELSE ... END`:
+
+```ts title="src/reports/status.ts"
+User.query().selectCase(
+  [
+    { when: { status: "active" }, then: "Active" },
+    { when: { status: "suspended" }, then: "Suspended" },
+  ],
+  "Unknown",
+  "statusLabel"
+);
+```
+
+### `selectWhen(condition, thenValue, elseValue, alias)`
+
+Simplified single-condition CASE:
+
+```ts
+Order.query().selectWhen(
+  { paymentStatus: "paid" },
+  "Paid",
+  "Unpaid",
+  "paymentLabel"
+);
+```
+
+---
+
+## 🗂️ JSON Projection
+
+### `selectJson(path, alias?)`
+
+Extract a JSON path as a column:
+
+```ts title="src/repositories/config.repo.ts"
+Config.query().selectJson("settings->theme->color", "themeColor");
+```
+
+### `selectJsonRaw(path, expression, alias)`
+
+Extract a JSON path using a raw expression:
+
+```ts
+Config.query().selectJsonRaw("settings", "settings->'$.notifications'", "notifSettings");
+```
+
+### `deselectJson(path)`
+
+Remove a JSON path from the projection:
+
+```ts
+User.query().deselectJson("profile->sensitiveData");
+```
+
+---
+
+## 🔗 Composite Columns
+
+### `selectConcat(fields, alias)`
+
+Concatenate multiple fields into one column:
+
+```ts title="src/repositories/user.repo.ts"
+User.query().selectConcat(["firstName", "' '", "lastName"], "fullName");
+```
+
+### `selectCoalesce(fields, alias)`
+
+Return the first non-null value from a list of fields:
+
+```ts
+User.query().selectCoalesce(["displayName", "username", "email"], "label");
+```
+
+---
+
+## 🪟 Window Functions
+
+### `selectWindow(spec)`
+
+Add a window function column (PostgreSQL / SQL engines):
+
+```ts title="src/analytics/rankings.ts"
+Order.query().selectWindow({
+  expression: "ROW_NUMBER()",
+  partitionBy: "customerId",
+  orderBy: { field: "createdAt", direction: "desc" },
+  alias: "rowNum",
+});
+```
+
+:::info
+Window functions require a SQL-compatible driver. MongoDB does not support them natively.
+:::

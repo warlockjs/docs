@@ -1,0 +1,262 @@
+---
+sidebar_position: 6
+---
+
+# 🔗 Foreign Keys
+
+Foreign key constraints enforce referential integrity between tables at the database level. Cascade gives you two complementary ways to define them: inline on a `ColumnBuilder` chain, or as a standalone constraint via `ForeignKeyBuilder`. Both approaches produce the same underlying `ForeignKeyDefinition` and are first-class citizens in the migration queue.
+
+---
+
+## 🔧 Inline FK on `ColumnBuilder`
+
+The most common pattern is to declare the foreign key directly on the column that holds the reference. Every `ColumnBuilder` instance exposes `.references()` to start the chain.
+
+### `references(tableOrModel)`
+
+Declares a foreign key relationship starting from the current column. Accepts a table name string or an object with a `table` property (for example, a model class).
+
+```ts title="src/database/migrations/create_posts_table.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export default class CreatePostsTable extends Migration {
+  async up() {
+    await this.createTable("posts", (table) => {
+      table.id();
+      table.integer("user_id").unsigned().notNullable()
+        .references("users");
+      table.string("title", 255).notNullable();
+      table.timestamps();
+    });
+  }
+
+  async down() {
+    await this.dropTable("posts");
+  }
+}
+```
+
+You can also pass a model class directly if the model exposes a static `table` property:
+
+```ts title="src/database/migrations/create_posts_table.ts"
+import { User } from "../models/user";
+
+table.integer("user_id").unsigned().references(User);
+```
+
+---
+
+### `.on(column)`
+
+Sets the referenced column on the foreign table. When omitted, most drivers default to `id`.
+
+```ts title="src/database/migrations/create_posts_table.ts"
+table.integer("user_id").unsigned().notNullable()
+  .references("users")
+  .on("id");
+```
+
+---
+
+### `.onDelete(action)`
+
+Sets the `ON DELETE` referential action. Accepted values:
+
+| Action | Behavior |
+|---|---|
+| `"CASCADE"` | Delete child rows when the parent is deleted |
+| `"SET NULL"` | Set the FK column to `NULL` when the parent is deleted |
+| `"RESTRICT"` | Prevent deletion of the parent if children exist |
+| `"NO ACTION"` | Database default (similar to `RESTRICT` on most engines) |
+
+```ts title="src/database/migrations/create_posts_table.ts"
+table.integer("user_id").unsigned().notNullable()
+  .references("users").on("id")
+  .onDelete("CASCADE");
+```
+
+---
+
+### `.onUpdate(action)`
+
+Sets the `ON UPDATE` referential action. Accepts the same four values as `onDelete`.
+
+```ts title="src/database/migrations/create_comments_table.ts"
+table.integer("post_id").unsigned().notNullable()
+  .references("posts").on("id")
+  .onUpdate("CASCADE");
+```
+
+---
+
+### `.cascadeAll()`
+
+Shorthand that sets both `ON DELETE CASCADE` and `ON UPDATE CASCADE` in one call. This is the idiomatic pattern for tight parent-child relationships.
+
+```ts title="src/database/migrations/create_comments_table.ts"
+table.integer("post_id").unsigned().notNullable()
+  .references("posts").on("id")
+  .cascadeAll();
+```
+
+:::tip
+Use `cascadeAll()` when a child record has no independent meaning without its parent — for example, `comments` on a `post`, or `order_items` on an `order`.
+:::
+
+---
+
+## 🏗️ Full Inline Example
+
+```ts title="src/database/migrations/create_posts_table.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export default class CreatePostsTable extends Migration {
+  static migrationName = "CreatePostsTable";
+  static createdAt = "2026-01-15T10:00:00.000Z";
+
+  async up() {
+    await this.createTable("posts", (table) => {
+      table.id();
+
+      // Author — hard delete cascades to posts
+      table.integer("user_id").unsigned().notNullable()
+        .references("id").on("users")
+        .onDelete("CASCADE");
+
+      // Category — nullable; if category is deleted, set NULL
+      table.integer("category_id").unsigned().nullable()
+        .references("id").on("categories")
+        .onDelete("SET NULL")
+        .onUpdate("CASCADE");
+
+      table.string("title", 255).notNullable();
+      table.text("body").notNullable();
+      table.timestamps();
+    });
+  }
+
+  async down() {
+    await this.dropTable("posts");
+  }
+}
+```
+
+---
+
+## 🧩 Standalone: `ForeignKeyBuilder`
+
+`ForeignKeyBuilder` is used when adding a foreign key constraint to an existing table — outside a `createTable` callback — via `this.addForeignKey()`. It exposes the same fluent methods as the inline column chain, plus an optional `.name()` method for setting an explicit constraint name.
+
+### `ForeignKeyBuilder` methods
+
+| Method | Description |
+|---|---|
+| `name(name)` | Optional explicit constraint name; must be called before `.references()` |
+| `references(table, column?)` | Sets the referenced table and column; registers the FK on the migration |
+| `onDelete(action)` | Sets the `ON DELETE` action |
+| `onUpdate(action)` | Sets the `ON UPDATE` action |
+| `cascadeAll()` | Shorthand for `CASCADE` on both delete and update |
+
+:::warning
+`.name()` must be called **before** `.references()`. Calling it after `.references()` has no effect because `.references()` immediately registers the FK definition on the migration.
+:::
+
+```ts title="src/database/migrations/add_user_fk_to_posts.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export default class AddUserFkToPosts extends Migration {
+  static migrationName = "AddUserFkToPosts";
+  static createdAt = "2026-01-15T11:00:00.000Z";
+
+  async up() {
+    await this.addForeignKey("posts", (fk) => {
+      fk.name("fk_posts_user")
+        .references("users", "id")
+        .onDelete("CASCADE")
+        .onUpdate("CASCADE");
+    });
+  }
+
+  async down() {
+    await this.dropForeignKey("posts", "fk_posts_user");
+  }
+}
+```
+
+---
+
+## 📐 `ForeignKeyDefinition` Type
+
+`ForeignKeyDefinition` is the serialized shape that both builders produce. It is what the migration driver receives when executing the constraint.
+
+```ts title="src/contracts/migration-driver.contract.ts"
+interface ForeignKeyDefinition {
+  column: string;           // local column holding the FK value
+  references: string;       // referenced column on the foreign table
+  on: string;               // referenced table name
+  onDelete?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+  onUpdate?: "CASCADE" | "SET NULL" | "RESTRICT" | "NO ACTION";
+  name?: string;            // optional explicit constraint name
+}
+```
+
+:::info
+You never construct `ForeignKeyDefinition` objects directly. They are built internally by `ColumnBuilder` and `ForeignKeyBuilder` and passed to the driver.
+:::
+
+---
+
+## 🔄 Dropping Foreign Keys
+
+Use `this.dropForeignKey(table, constraintName)` to remove a constraint. Most drivers auto-generate constraint names from the pattern `<table>_<column>_foreign` when no explicit name is provided.
+
+```ts title="src/database/migrations/drop_category_fk.ts"
+async down() {
+  // Auto-generated name
+  await this.dropForeignKey("posts", "posts_category_id_foreign");
+
+  // Explicit name you set with .name()
+  await this.dropForeignKey("posts", "fk_posts_user");
+}
+```
+
+:::tip
+Set explicit constraint names with `.name()` on `ForeignKeyBuilder` when you need predictable names for `dropForeignKey` calls in `down()` migrations.
+:::
+
+---
+
+## 📋 Complete Round-Trip Example
+
+```ts title="src/database/migrations/2026_01_15_create_comments_table.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export default class CreateCommentsTable extends Migration {
+  static migrationName = "CreateCommentsTable";
+  static createdAt = "2026-01-15T12:00:00.000Z";
+
+  async up() {
+    await this.createTable("comments", (table) => {
+      table.id();
+
+      // Inline FK — cascade deletes from post
+      table.integer("post_id").unsigned().notNullable()
+        .references("id").on("posts")
+        .cascadeAll();
+
+      // Inline FK — set null when author is deleted
+      table.integer("author_id").unsigned().nullable()
+        .references("id").on("users")
+        .onDelete("SET NULL")
+        .onUpdate("CASCADE");
+
+      table.text("body").notNullable();
+      table.timestamps();
+    });
+  }
+
+  async down() {
+    await this.dropTable("comments");
+  }
+}
+```

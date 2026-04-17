@@ -1,0 +1,190 @@
+---
+sidebar_position: 1
+---
+
+# 🐘 PostgreSQL Driver — Introduction
+
+Cascade ships a first-class PostgreSQL driver backed by the `pg` package (node-postgres). All of the standard Cascade model, query-builder, migration, and transaction APIs work identically on Postgres — with a set of Postgres-specific extras on top (JSONB, arrays, pgvector, NOTIFY/LISTEN, and more).
+
+---
+
+## 📦 Install the Peer Dependency
+
+The Postgres driver requires `pg` as a peer dependency. Install it alongside `@warlock.js/cascade`:
+
+```bash
+npm install pg
+npm install --save-dev @types/pg
+```
+
+:::warning
+Cascade dynamically imports `pg` at connection time. If the package is missing, `driver.connect()` will throw with a clear message asking you to install it.
+:::
+
+---
+
+## 🔌 Connecting to PostgreSQL
+
+Use `connectToDatabase` with `driver: "postgres"` to establish a connection pool:
+
+```ts title="src/bootstrap/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase({
+  driver: "postgres",
+  host: "localhost",
+  port: 5432,
+  database: "my_app",
+  user: "postgres",
+  password: "secret",
+});
+```
+
+:::tip
+`connectToDatabase` is async — always `await` it before running queries so the connection pool is ready.
+:::
+
+---
+
+## 🏗️ `PostgresConnectionConfig` — Type Overview
+
+`connectToDatabase` accepts a `PostgresConnectionConfig` object (plus the standard Cascade `driver`, `name`, and `isDefault` fields):
+
+| Field | Type | Description |
+|---|---|---|
+| `host` | `string?` | Hostname or IP of the Postgres server |
+| `port` | `number?` | Port number (default: `5432`) |
+| `database` | `string` | **Required.** Database name |
+| `user` | `string?` | Database user |
+| `password` | `string?` | Database password |
+| `connectionString` | `string?` | Full DSN — supersedes individual host/port/user/password fields |
+| `ssl` | `boolean \| object?` | Enable TLS, or pass `{ rejectUnauthorized, ca, cert, key }` for custom certs |
+| `logging` | `boolean?` | Log every SQL statement to the console |
+
+---
+
+## 🏊 `PostgresPoolConfig` — Pool Settings
+
+`PostgresPoolConfig` extends `PostgresConnectionConfig` with connection-pool tuning options:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `max` | `number?` | `10` | Maximum pool size |
+| `min` | `number?` | `0` | Minimum idle clients |
+| `idleTimeoutMillis` | `number?` | `10 000` | Evict idle clients after this many ms |
+| `connectionTimeoutMillis` | `number?` | `0` | Timeout for acquiring a client (0 = unlimited) |
+| `maxUses` | `number?` | — | Retire a client after this many queries |
+| `application_name` | `string?` | — | Show in `pg_stat_activity` |
+
+```ts title="src/bootstrap/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase({
+  driver: "postgres",
+  host: "db.example.com",
+  port: 5432,
+  database: "my_app",
+  user: "app_user",
+  password: process.env.DB_PASSWORD,
+  max: 20,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  application_name: "my-api",
+});
+```
+
+---
+
+## 🏛️ `PostgresDriver` — Class Overview
+
+`PostgresDriver` implements the Cascade `DriverContract` and is created automatically by `connectToDatabase`. You do not normally instantiate it yourself, but you can retrieve it via `dataSourceRegistry`:
+
+```ts
+import { dataSourceRegistry } from "@warlock.js/cascade";
+import type { PostgresDriver } from "@warlock.js/cascade";
+
+const driver = dataSourceRegistry.get().driver as PostgresDriver;
+
+// Check connection status
+console.log(driver.isConnected); // → true | false
+
+// Access the underlying pg Pool directly (advanced)
+const pool = driver.pool;
+
+// Execute a raw parameterised query
+const result = await driver.query<{ id: number }>(
+  "SELECT id FROM users WHERE email = $1",
+  ["alice@example.com"],
+);
+console.log(result.rows);
+```
+
+### Key driver properties
+
+| Property / Method | Description |
+|---|---|
+| `driver.name` | Always `"postgres"` |
+| `driver.isConnected` | `true` when the pool is active |
+| `driver.pool` | The native `pg.Pool` instance (throws when not connected) |
+| `driver.blueprint` | `PostgresBlueprint` for schema introspection |
+| `driver.connect()` | Open the connection pool |
+| `driver.disconnect()` | Close the pool gracefully |
+| `driver.query(sql, params?)` | Execute raw parameterised SQL |
+| `driver.queryBuilder(table)` | Create a `PostgresQueryBuilder` for a table |
+| `driver.transaction(fn, opts?)` | Run a callback inside a transaction |
+| `driver.beginTransaction(opts?)` | Obtain a manual `DriverTransactionContract` |
+| `driver.migrationDriver()` | `PostgresMigrationDriver` for DDL operations |
+| `driver.syncAdapter()` | `PostgresSyncAdapter` for batch JSONB sync |
+
+---
+
+## 🧩 Basic Model Usage
+
+Once connected, models behave exactly like any other Cascade model. Just define your class and let Cascade handle the rest:
+
+```ts title="src/models/user.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class User extends Model {
+  static tableName = "users";
+
+  get name(): string {
+    return this.get("name");
+  }
+
+  get email(): string {
+    return this.get("email");
+  }
+}
+```
+
+```ts title="src/services/user.service.ts"
+// Create
+const user = await User.create({ name: "Alice", email: "alice@example.com" });
+
+// Find
+const found = await User.find(user.id);
+
+// Query
+const admins = await User.where("role", "admin").get();
+
+// Update
+await user.save({ name: "Alice Smith" });
+
+// Delete
+await user.destroy();
+```
+
+:::info
+Cascade's `ModelDefaults` for the Postgres driver automatically set `createdAt` and `updatedAt` to `Date` objects and `id` to the auto-incremented primary key returned from the `INSERT`.
+:::
+
+---
+
+## 🌟 What's Next?
+
+- [🔗 Connection Config](./connection)
+- [💾 Transactions](./transactions)
+- [✨ Postgres-Specific Features](./features)
+- [🔍 Query Builder](./query-builder)
+- [🗄️ Migrations](./migrations)

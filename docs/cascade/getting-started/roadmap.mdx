@@ -4,34 +4,69 @@ sidebar_position: 2
 
 # 🗺️ Roadmap
 
-Welcome to your Cascade adventure! Here's your guided path to MongoDB mastery, whether you're new or a seasoned dev. 🌟
+Welcome to your Cascade adventure! Here's your guided path through a multi-driver ORM that works with MongoDB, PostgreSQL, and more. 🌟
 
 ## 🏷️ Key Terminology
 
-- 🗂️ **Collection**: Like a table in SQL—a group of documents.
-- 📄 **Document**: A single record (like a row in SQL), usually a JSON object.
-- 🏷️ **Field**: A property of a document (like a column in SQL).
-- 🔍 **Query**: A request to the database to do something.
-- 🧑‍💻 **Model**: A class that manages a collection's documents.
-- 🏗️ **Schema**: The blueprint for a collection—defines fields and types.
-- 🧩 **Aggregate**: A pipeline of stages to process documents.
-- 🛠️ **CRUD**: Create, Read, Update, Delete—core database actions.
+- 🗂️ **Collection / Table**: A group of records — called a *collection* in MongoDB, a *table* in SQL.
+- 📄 **Document / Row**: A single record managed by a Model.
+- 🏷️ **Field / Column**: A property of a record.
+- 🔍 **Query**: A request to the database to read or mutate data.
+- 🧑‍💻 **Model**: A class that manages a collection or table's records.
+- 🏗️ **Schema**: The blueprint for a table — defines fields and types (SQL drivers).
+- 🧩 **Aggregate**: A pipeline of stages to process documents (MongoDB).
+- 🛠️ **CRUD**: Create, Read, Update, Delete — core database actions.
 - 📖 **Pagination**: Splitting results into pages for easier browsing.
-- 🕵️‍♂️ **Explain**: Get info about how a query runs (for debugging/optimizing).
-- 🔄 **Upsert**: Update if exists, otherwise insert a new document.
+- 🔄 **Upsert**: Update if the record exists, insert otherwise.
+- 🗄️ **Data Source**: A named, immutable binding of a driver to its configuration.
+- 🔌 **Driver**: The engine that talks to a specific database (MongoDB, PostgreSQL…).
+- 🌀 **Scope / Context**: An async-local override that changes which data source or transaction is active for a specific request or background job.
+- 📦 **Migration**: A versioned schema change applied to a SQL database.
+- 🔗 **Relation**: A declared link between two models (belongs-to, has-many, etc.).
+- ✅ **Validation**: Field-level rules enforced before writes.
+- 🔄 **Sync**: A mechanism to keep model schema in sync with the database schema.
 
 ## 🏁 Your Journey
 
 1. 🛠️ [Installation](./installation)
-2. 🔌 [Connecting to Database](./connecting-to-database)
-3. 📝 [Basic CRUD Operations](../queries/introduction)
-4. 🧑‍💻 [Understanding Models](../models/introduction)
-5. 🧩 [Aggregate Framework](../aggregate/introduction)
-6. 🚀 [Advanced Concepts](../advanced/introduction)
+2. 🔌 [Drivers](./drivers)
+3. 🔗 [Connecting to Database](./connecting-to-database)
+4. 🗄️ [Data Sources](./data-sources)
+5. 💾 [Transactions](./transactions)
+6. 🗃️ [Multi-Database](./multi-database)
+7. 📝 [Basic CRUD Operations](../queries/introduction)
+8. 🧑‍💻 [Understanding Models](../models/introduction)
+9. 🧩 [Aggregate Framework](../aggregate/introduction)
+10. 🚀 [Advanced Concepts](../advanced/introduction)
 
 :::info
-Cascade is part of the Warlock.js full-stack framework, so you can use it with Auth, Cache, and more!
+Cascade is part of the Warlock.js full-stack framework, so you can use it alongside Auth, Cache, Logger, and more. It works with MongoDB and PostgreSQL today — MySQL support is on the way.
 :::
+
+---
+
+## 🚀 Feature Coverage
+
+| Area | Status |
+|---|:---:|
+| MongoDB driver | ✅ |
+| PostgreSQL driver | ✅ |
+| MySQL driver | 🚧 Planned |
+| Data sources & registry | ✅ |
+| Multi-database connections | ✅ |
+| Async-scoped context switching | ✅ |
+| Transactions (basic) | ✅ |
+| PostgreSQL isolation levels | ✅ |
+| Query builder | ✅ |
+| Schema migrations | ✅ |
+| Model sync | ✅ |
+| Relations | ✅ |
+| Validation | ✅ |
+| Raw SQL queries (PostgreSQL) | ✅ |
+| Aggregation pipeline (MongoDB) | ✅ |
+| Auto-increment IDs (MongoDB) | ✅ |
+| Connection pooling (PostgreSQL) | ✅ |
+| Pagination | ✅ |
 
 ---
 
@@ -39,4 +74,5 @@ Cascade is part of the Warlock.js full-stack framework, so you can use it with A
 
 - [🚀 Back to Introduction](./introduction)
 - [🛠️ Installation](./installation)
-- [🔌 Connecting to Database](./connecting-to-database)
+- [🔌 Drivers](./drivers)
+- [🔗 Connecting to Database](./connecting-to-database)

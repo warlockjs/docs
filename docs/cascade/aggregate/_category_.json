@@ -3,6 +3,6 @@
   "position": 4,
   "link": {
     "type": "generated-index",
-    "description": "A powerful aggregate framework management tool"
+    "description": "Driver-agnostic aggregation via the QueryBuilder: groupBy, $agg expressions, scalar aggregates, filtering, sorting, pagination, joins, and model hydration."
   }
 }

@@ -1,0 +1,225 @@
+---
+sidebar_position: 2
+---
+
+# 🔗 PostgreSQL Connection Config
+
+This page covers every field of `PostgresConnectionConfig` and `PostgresPoolConfig`, environment-variable best practices, and how to register multiple named Postgres connections in a single application.
+
+---
+
+## 📋 `PostgresConnectionConfig` — Full Reference
+
+```ts
+type PostgresConnectionConfig = {
+  readonly host?: string;
+  readonly port?: number;
+  readonly database: string;                     // required
+  readonly user?: string;
+  readonly password?: string;
+  readonly connectionString?: string;
+  readonly ssl?: boolean | {
+    rejectUnauthorized?: boolean;
+    ca?: string;
+    cert?: string;
+    key?: string;
+  };
+  readonly logging?: boolean;
+};
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `database` | ✅ | Name of the Postgres database to connect to |
+| `host` | — | Hostname or IP (default: `localhost`) |
+| `port` | — | Port number (default: `5432`) |
+| `user` | — | Database user name |
+| `password` | — | Database user password |
+| `connectionString` | — | Full DSN (`postgres://user:pass@host:port/db`) — supersedes the individual fields above |
+| `ssl` | — | `true` enables TLS with default settings; pass an object for custom certificates |
+| `logging` | — | `true` logs every executed SQL statement to the console |
+
+:::tip Using a connection string
+When `connectionString` is set it takes precedence over `host`, `port`, `user`, and `password`. You still need to set `database` so that Cascade can identify the data source correctly.
+:::
+
+---
+
+## 🏊 `PostgresPoolConfig` — Full Reference
+
+`PostgresPoolConfig` extends `PostgresConnectionConfig` with `pg`-pool sizing options:
+
+```ts
+type PostgresPoolConfig = PostgresConnectionConfig & {
+  readonly max?: number;
+  readonly min?: number;
+  readonly idleTimeoutMillis?: number;
+  readonly connectionTimeoutMillis?: number;
+  readonly maxUses?: number;
+  readonly application_name?: string;
+};
+```
+
+| Field | Default | Description |
+|---|---|---|
+| `max` | `10` | Maximum number of clients in the pool |
+| `min` | `0` | Minimum number of idle clients kept alive |
+| `idleTimeoutMillis` | `10 000` | Evict idle clients after this many milliseconds |
+| `connectionTimeoutMillis` | `0` | Time to wait for a free client (0 = unlimited) |
+| `maxUses` | — | Retire a client after this many queries (prevents connection staleness) |
+| `application_name` | — | Label visible in `pg_stat_activity.application_name` |
+
+:::info
+For most web API workloads a pool of `max: 10–20` is sufficient. Monitor `pg_stat_activity` to tune the right value for your traffic pattern.
+:::
+
+---
+
+## 🌿 Environment Variable Best Practices
+
+Never hard-code credentials in source files. Store them in environment variables and load them at startup:
+
+```bash title=".env"
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=my_app
+DB_USER=app_user
+DB_PASSWORD=super_secret
+DB_POOL_MAX=20
+```
+
+```ts title="src/bootstrap/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase({
+  driver: "postgres",
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT ?? 5432),
+  database: process.env.DB_NAME!,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  max: Number(process.env.DB_POOL_MAX ?? 10),
+  application_name: "my-api",
+  logging: process.env.NODE_ENV === "development",
+});
+```
+
+:::warning
+Add `.env` to your `.gitignore`. Use a secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.) in production environments.
+:::
+
+---
+
+## 🔐 SSL / TLS Configuration
+
+### Simple SSL (trust server certificate)
+
+```ts title="src/bootstrap/database.ts"
+await connectToDatabase({
+  driver: "postgres",
+  host: "db.example.com",
+  database: "prod_db",
+  user: "app_user",
+  password: process.env.DB_PASSWORD,
+  ssl: true,
+});
+```
+
+### Custom certificate (mutual TLS)
+
+```ts title="src/bootstrap/database.ts"
+import { readFileSync } from "fs";
+
+await connectToDatabase({
+  driver: "postgres",
+  host: "secure-db.example.com",
+  database: "prod_db",
+  user: "app_user",
+  password: process.env.DB_PASSWORD,
+  ssl: {
+    rejectUnauthorized: true,
+    ca: readFileSync("certs/server-ca.pem").toString(),
+    cert: readFileSync("certs/client-cert.pem").toString(),
+    key: readFileSync("certs/client-key.pem").toString(),
+  },
+});
+```
+
+---
+
+## 🔌 Connection String
+
+If your infrastructure already provides a Postgres DSN (common with managed databases like Supabase, Neon, or RDS), use `connectionString`:
+
+```ts title="src/bootstrap/database.ts"
+await connectToDatabase({
+  driver: "postgres",
+  database: "my_app",           // still required for Cascade bookkeeping
+  connectionString: process.env.DATABASE_URL,
+  // pool settings still apply
+  max: 10,
+  idleTimeoutMillis: 30_000,
+});
+```
+
+---
+
+## 🗂️ Multiple Named Postgres Connections
+
+You can register as many named Postgres (or mixed-driver) connections as you like. The first registration, or one with `isDefault: true`, becomes the default source used by all models.
+
+```ts title="src/bootstrap/database.ts"
+import { connectToDatabase, dataSourceRegistry } from "@warlock.js/cascade";
+
+// Primary OLTP database (default)
+await connectToDatabase({
+  driver: "postgres",
+  database: "app_db",
+  host: process.env.PRIMARY_DB_HOST,
+  user: process.env.PRIMARY_DB_USER,
+  password: process.env.PRIMARY_DB_PASS,
+  max: 20,
+});
+
+// Analytics read-replica (named "analytics")
+await connectToDatabase({
+  name: "analytics",
+  isDefault: false,
+  driver: "postgres",
+  database: "analytics_db",
+  host: process.env.ANALYTICS_DB_HOST,
+  user: process.env.ANALYTICS_DB_USER,
+  password: process.env.ANALYTICS_DB_PASS,
+  max: 5,
+  logging: false,
+});
+
+// Retrieve the analytics driver directly
+const analyticsDriver = dataSourceRegistry.get("analytics").driver;
+const qb = analyticsDriver.queryBuilder("events");
+const recent = await qb.where("occurred_at", ">", new Date(Date.now() - 86_400_000)).get();
+```
+
+### Binding a model to a specific data source
+
+```ts title="src/models/event.ts"
+import { Model, dataSourceRegistry } from "@warlock.js/cascade";
+
+export class Event extends Model {
+  static tableName = "events";
+  // Always use the "analytics" connection for this model
+  static dataSource = dataSourceRegistry.get("analytics");
+}
+```
+
+:::tip
+Models inherit the default data source unless `static dataSource` is set. Using a named source per model is the recommended pattern for read-replica routing.
+:::
+
+---
+
+## 🌟 What's Next?
+
+- [💾 Transactions](./transactions)
+- [✨ Postgres-Specific Features](./features)
+- [🗄️ Migrations](./migrations)

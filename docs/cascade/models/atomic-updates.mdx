@@ -1,0 +1,287 @@
+---
+sidebar_position: 16
+---
+
+# ⚡ Atomic Updates
+
+Cascade exposes a set of **atomic** operations that bypass the full save pipeline and write directly to the database in a single round-trip. These are the right tool when you need to increment a counter, toggle a flag, or push to an array without reading the document first.
+
+---
+
+## 🧩 `UpdateOperations` Shape
+
+All atomic methods ultimately accept or produce an `UpdateOperations` object — a cross-driver type that maps to the standard MongoDB update operators (and their SQL equivalents where supported):
+
+```ts
+interface UpdateOperations {
+  $set?:      Record<string, unknown>;    // set field to value
+  $unset?:    Record<string, 1 | true>;   // remove field
+  $inc?:      Record<string, number>;     // add to numeric field
+  $dec?:      Record<string, number>;     // subtract from numeric field
+  $push?:     Record<string, unknown>;    // append to array (NoSQL only)
+  $pull?:     Record<string, unknown>;    // remove from array (NoSQL only)
+}
+```
+
+:::info
+`$push` and `$pull` are NoSQL-only operators. SQL drivers silently ignore them.
+:::
+
+---
+
+## 🔧 Instance Methods
+
+These methods run atomic database operations **against the current model instance** without triggering the full `save()` pipeline (no validation, no lifecycle events, no dirty tracking).
+
+### `model.atomicUpdate(operations)`
+
+Run a raw `UpdateOperations` object against this document:
+
+```ts
+atomicUpdate(operations: UpdateOperations): Promise<number>
+```
+
+Returns the number of modified documents (typically `1`).
+
+```ts title="src/handlers/post-handler.ts"
+const post = await Post.find(id);
+
+await post.atomicUpdate({
+  $set:   { status: "published", publishedAt: new Date() },
+  $unset: { draft: true },
+  $inc:   { version: 1 },
+});
+```
+
+:::tip
+Use `atomicUpdate` when you need to combine several operators in a single database call. For simple increments or decrements, prefer the dedicated helpers below.
+:::
+
+### `model.atomicIncrement(field, amount?)`
+
+Atomically increment a numeric field and return the new value:
+
+```ts
+atomicIncrement(field: string, amount?: number): Promise<number>
+```
+
+- `amount` defaults to `1`.
+- Simultaneously updates the in-memory model data.
+
+```ts title="src/handlers/vote-handler.ts"
+const post = await Post.find(id);
+
+const newCount = await post.atomicIncrement("votes");
+console.log(newCount); // previous value + 1
+
+// Increment by a custom amount
+await post.atomicIncrement("views", 5);
+```
+
+### `model.atomicDecrement(field, amount?)`
+
+Atomically decrement a numeric field and return the new value:
+
+```ts
+atomicDecrement(field: string, amount?: number): Promise<number>
+```
+
+- `amount` defaults to `1`.
+
+```ts title="src/handlers/stock-handler.ts"
+const product = await Product.find(id);
+
+const remaining = await product.atomicDecrement("stock");
+if (remaining < 0) {
+  // handle out-of-stock
+}
+```
+
+---
+
+## 🏗️ Static Methods
+
+Static atomic methods operate on **the collection** rather than a single instance. They all bypass `save()` and return updated model instances (or `null`) directly.
+
+### `Model.increase(field, amount?)`
+
+Increment a numeric field across all documents (or a filtered subset via a preceding query):
+
+```ts
+static increase(field: string, amount?: number): Promise<void>
+```
+
+```ts title="src/scripts/reset-counters.ts"
+// Increment every product's restockCount by 1
+await Product.increase("restockCount");
+
+// Increment by a custom step
+await Product.increase("restockCount", 5);
+```
+
+### `Model.decrease(field, amount?)`
+
+Decrement a numeric field across matched documents:
+
+```ts
+static decrease(field: string, amount?: number): Promise<void>
+```
+
+```ts title="src/scripts/deduct-credits.ts"
+await Account.decrease("credits", 10);
+```
+
+### `Model.atomic(filter, operations)`
+
+Run raw `UpdateOperations` against all documents matching `filter`:
+
+```ts
+static atomic(
+  filter: Record<string, unknown>,
+  operations: UpdateOperations,
+): Promise<void>
+```
+
+```ts title="src/scripts/bulk-publish.ts"
+// Publish all drafts written before today
+await Post.atomic(
+  { status: "draft", createdAt: { $lt: new Date() } },
+  {
+    $set:  { status: "published", publishedAt: new Date() },
+    $inc:  { version: 1 },
+  },
+);
+```
+
+### `Model.update(id, data)`
+
+Update a single document by its primary key and return the updated model instance:
+
+```ts
+static update(id: number | string, data: Record<string, unknown>): Promise<TModel>
+```
+
+```ts title="src/handlers/user-handler.ts"
+const user = await User.update(42, {
+  name: "Hassan Zohdy",
+  updatedAt: new Date(),
+});
+
+console.log(user.get("name")); // "Hassan Zohdy"
+```
+
+### `Model.findAndUpdate(filter, update)`
+
+Atomically update **all** documents matching `filter` and return the updated models:
+
+```ts
+static findAndUpdate(
+  filter: Record<string, unknown>,
+  update: UpdateOperations,
+): Promise<TModel[]>
+```
+
+```ts title="src/scripts/activate-users.ts"
+const activated = await User.findAndUpdate(
+  { status: "pending", verifiedAt: { $exists: true } },
+  { $set: { status: "active" } },
+);
+
+console.log(`Activated ${activated.length} users`);
+```
+
+### `Model.findOneAndUpdate(filter, update)`
+
+Atomically update the **first** document matching `filter` and return it:
+
+```ts
+static findOneAndUpdate(
+  filter: Record<string, unknown>,
+  update: UpdateOperations,
+): Promise<TModel | null>
+```
+
+```ts title="src/handlers/claim-handler.ts"
+const task = await Task.findOneAndUpdate(
+  { status: "queued" },
+  { $set: { status: "processing", claimedAt: new Date() } },
+);
+
+if (!task) {
+  console.log("No tasks in queue");
+}
+```
+
+:::tip
+`findOneAndUpdate` is ideal for claiming work-queue items. The atomic guarantee ensures that two competing workers cannot claim the same task.
+:::
+
+### `Model.findAndReplace(filter, document)`
+
+Replace the **first** document matching `filter` with `document` entirely and return the replaced model:
+
+```ts
+static findAndReplace(
+  filter: Record<string, unknown>,
+  document: Record<string, unknown>,
+): Promise<TModel | null>
+```
+
+```ts title="src/handlers/template-handler.ts"
+const replaced = await Template.findAndReplace(
+  { slug: "welcome-email" },
+  { slug: "welcome-email", subject: "Welcome!", body: "<p>Hi!</p>" },
+);
+```
+
+:::warning
+`findAndReplace` performs a **full document replacement**, not a partial update. Any fields not included in the replacement document will be removed.
+:::
+
+### `Model.findOneAndDelete(filter, options?)`
+
+Delete the **first** document matching `filter` and return the deleted model:
+
+```ts
+static findOneAndDelete(
+  filter: Record<string, unknown>,
+  options?: Record<string, unknown>,
+): Promise<TModel | null>
+```
+
+```ts title="src/handlers/dequeue-handler.ts"
+const job = await Job.findOneAndDelete({ status: "done" });
+
+if (job) {
+  console.log(`Removed completed job ${job.id}`);
+}
+```
+
+---
+
+## 🔄 Combining Atomic Patterns
+
+A common pattern is to increment a counter atomically and act on the result without loading the full document first:
+
+```ts title="src/handlers/rate-limit-handler.ts"
+const endpoint = await RateLimit.findOneAndUpdate(
+  { userId, path: "/api/send" },
+  { $inc: { requests: 1 } },
+);
+
+if (!endpoint) {
+  // First request — create the rate-limit record
+  await RateLimit.create({ userId, path: "/api/send", requests: 1 });
+} else if (endpoint.get("requests") > 100) {
+  throw new Error("Rate limit exceeded");
+}
+```
+
+---
+
+## 🌟 What's Next?
+
+- [🗂️ Field Accessors](./field-accessors)
+- [🆔 Model IDs](./ids)
+- [📝 Dirty Tracking](./dirty-tracking)
+- [💾 Saving Models](./saving-models)

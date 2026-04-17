@@ -2,18 +2,95 @@
 sidebar_position: 9
 ---
 
-# Delete Documents
+# 🗑️ Deleting Data
 
-Delete Documents using `Aggregate` class.
+Delete records using Model static helpers. All delete operations are performed through the `Model` class — not the QueryBuilder directly.
 
-## Introduction
+:::info
+The legacy `Aggregate` class `delete()` method no longer exists. Deletion is now handled by `Model.delete()`, `Model.deleteOne()`, and `Model.findOneAndDelete()`.
+:::
 
-`Aggregate` class also provides a way to delete documents of collection using the `aggregate` framework.
+## Model.delete(filter)
 
-## Example
+Delete **all** records matching the given filter. Returns the number of deleted records.
 
-```ts
-const totalDeletedUsers = await aggregate.where("age", ">", 18).delete();
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+
+// Delete all inactive users
+const count = await User.delete({ active: false });
+
+console.log(`${count} inactive users removed`);
 ```
 
-This will delete all users with age greater than 18 and return the number of deleted documents.
+```ts
+// Delete users who haven't logged in since a cutoff date
+const count = await User.delete({ lastLoginAt: { "<": cutoffDate } });
+```
+
+## Model.deleteOne(filter)
+
+Delete the **first** record matching the filter. Returns the number of deleted records (0 or 1).
+
+```ts title="src/services/session.service.ts"
+import { Session } from "./session.model";
+
+// Delete a specific session by token
+const deleted = await Session.deleteOne({ token: expiredToken });
+
+if (deleted) {
+  console.log("Session removed");
+}
+```
+
+## Model.findOneAndDelete(filter)
+
+Find a record, delete it, and return the deleted model instance (or `null` if not found):
+
+```ts title="src/services/invitation.service.ts"
+import { Invitation } from "./invitation.model";
+
+// Consume a one-time invitation token
+const invitation = await Invitation.findOneAndDelete({ token: reqToken });
+
+if (!invitation) {
+  throw new Error("Invalid or already-used invitation token");
+}
+
+// invitation is a hydrated Invitation instance
+await createUser({ email: invitation.email, role: invitation.role });
+```
+
+## Combining Filters
+
+The filter argument accepts any field/value map. Use nested operators for advanced conditions:
+
+```ts title="src/jobs/cleanup.job.ts"
+import { Log } from "./log.model";
+
+// Delete logs older than 90 days
+const count = await Log.delete({
+  createdAt: { "<": ninetyDaysAgo },
+  level: { "in": ["debug", "info"] },
+});
+
+console.log(`Pruned ${count} old log entries`);
+```
+
+## Soft Deletes
+
+If your model uses the `SoftDelete` mixin, calling `Model.delete()` sets the `deletedAt` timestamp instead of removing the row. Rows with a `deletedAt` value are automatically excluded from all queries by the global scope.
+
+```ts title="src/repositories/post.repo.ts"
+import { Post } from "./post.model";
+
+// Soft-delete all draft posts older than 30 days
+await Post.delete({ status: "draft", updatedAt: { "<": thirtyDaysAgo } });
+
+// Force a hard delete, bypassing soft-delete
+await Post.forceDelete({ status: "draft", updatedAt: { "<": thirtyDaysAgo } });
+```
+
+:::warning
+`Model.delete()` and `Model.deleteOne()` do not trigger Cascade model events on individual records when deleting many rows at once. If you need events to fire on each deleted model, fetch the records first and call `.delete()` on each instance.
+:::

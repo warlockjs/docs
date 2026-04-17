@@ -2,84 +2,188 @@
 sidebar_position: 11
 ---
 
-# Model Aggregate
+# 🏗️ Model Aggregate
 
-Combine Models with Aggregate Class.
+Combine the QueryBuilder with your Model for hydrated, relation-aware aggregation queries.
 
 ## Introduction
 
-We previously saw how `Aggregate` class work, also we had a pretty good look at the `Model` class as well, now let's see how we can combine them together.
+Every `Model` in Cascade exposes two equivalent entry points for aggregation:
 
-## Model Aggregate Class
+| Method | Returns | When to Use |
+|--------|---------|-------------|
+| `Model.query()` | `QueryBuilderContract<T>` | General-purpose queries |
+| `Model.aggregate()` | `QueryBuilderContract<T>` | Signals aggregation intent (semantic alias) |
 
-Each model by default has an `aggregate` method which returns an instance of `ModelAggregate` class, this class extends the `Aggregate` class and adds some useful methods to to, also it manipulates it to match the model nature and behavior.
+Both return the same `QueryBuilderContract<T>` pre-scoped to the model's table and global scopes.
 
-## Example of usage
+## Basic Example
 
-Let's say we have a `User` model, and we want to get the average age of all users.
-
-```ts title="src/models/user.ts"
+```ts title="src/models/user.model.ts"
 import { Model } from "@warlock.js/cascade";
 
 export class User extends Model {
-  /**
-   * {@inheritDoc}
-   */
   public static collection = "users";
 }
 ```
 
-Now let's use the `aggregate` method to get the average age of all users.
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+import { $agg } from "@warlock.js/cascade";
 
-```ts title="src/index.ts"
-import { User } from "./models/user";
-
-const users = await User.aggregate().where("age", ">", 18).get();
-
-console.log(users);
-```
-
-Unlike the base `Aggregate` class, the `ModelAggregate`'s `get` method returns an array of models instead of plain objects, so we can use the model methods on the returned documents.
-
-If yoy want to override the returned model, pass the first argument with a callback to the `get` method.
-
-```ts
+// All users over 18
 const users = await User.aggregate()
   .where("age", ">", 18)
-  .get((user) => {
-    return {
-      ...user,
-      fullName: `${user.firstName} ${user.lastName}`,
-    };
-  });
+  .orderBy("name")
+  .get();
+
+// Group users by gender and count
+const summary = await User.aggregate()
+  .groupBy(["gender"], {
+    total: $agg.count(),
+    avgAge: $agg.avg("age"),
+  })
+  .get();
 ```
 
-This would return an array of objects with the `fullName` property, but not an instance of `User` model.
+Results from `.get()` are automatically **hydrated into `User` model instances** — you get full access to model methods and computed properties on every returned row.
 
-## Return first model
+## Model.query()
 
-To return the first model, we can use the `first` method.
+Identical to `aggregate()`. Prefer `query()` for non-aggregation operations:
+
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+
+// Simple find — use query()
+const admins = await User.query().where("role", "admin").get();
+
+// Aggregation — use aggregate() to signal intent
+const stats = await User.aggregate().groupBy(["role"], { total: $agg.count() }).get();
+```
+
+## Hydration Callback
+
+Override the hydration step with `.hydrate()` to reshape each row before it is returned:
+
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+
+const users = await User.aggregate()
+  .where("age", ">", 18)
+  .hydrate((row) => {
+    row.fullName = `${row.firstName} ${row.lastName}`;
+    return row;
+  })
+  .get();
+```
+
+When a `hydrate` callback is provided, rows are passed through it instead of the default model hydration. This means the returned objects will **not** be `User` instances — they will be plain objects (or whatever the callback returns).
+
+## Loading Relations
+
+Use `.with()` to eager-load relations alongside aggregated data:
+
+```ts title="src/repositories/post.repo.ts"
+import { Post } from "./post.model";
+
+const posts = await Post.aggregate()
+  .where("published", true)
+  .with("author", "tags")
+  .orderBy("publishedAt", "desc")
+  .paginate({ page: 1, limit: 20 });
+```
+
+You can also pass a callback to constrain a relation:
 
 ```ts
-const user = await User.aggregate().where("age", ">", 18).first();
+const posts = await Post.aggregate()
+  .where("published", true)
+  .with("comments", (q) => q.where("approved", true).orderBy("createdAt"))
+  .get();
+```
+
+## Counting Relations
+
+Add a relation count column without loading the relation itself:
+
+```ts title="src/repositories/post.repo.ts"
+import { Post } from "./post.model";
+
+const posts = await Post.aggregate()
+  .withCount("comments")
+  .withCount("likes")
+  .where("published", true)
+  .get();
+
+// Each post has commentsCount and likesCount properties
+```
+
+## Scopes
+
+Global scopes are applied automatically. Use `withoutGlobalScope` to bypass one:
+
+```ts
+const allUsers = await User.aggregate()
+  .withoutGlobalScope("activeOnly")
+  .get();
+```
+
+Apply a local scope:
+
+```ts
+const vip = await User.aggregate()
+  .scope("vip")
+  .get();
+```
+
+## Lifecycle Hooks
+
+Subscribe to query events on a per-builder basis:
+
+```ts title="src/repositories/user.repo.ts"
+import { User } from "./user.model";
+
+const builder = User.aggregate()
+  .where("active", true)
+  .onFetching(() => console.log("About to fetch…"))
+  .onHydrating(() => console.log("Hydrating rows…"))
+  .onFetched(() => console.log("Done."));
+
+const users = await builder.get();
 ```
 
 ## Pagination
 
-Pagination works exactly like normal `Aggregate.paginate` method but the returned documents are instances of the model.
+`paginate` and `cursorPaginate` work on `Model.aggregate()` exactly as they do on `Model.query()`:
 
-```ts
-const { documents: users, paginationInfo } = await User.aggregate()
-  .where("age", ">", 18)
-  .paginate(1, 10);
+```ts title="src/controllers/user.controller.ts"
+import { User } from "./user.model";
+
+const result = await User.aggregate()
+  .where("active", true)
+  .paginate({ page: 2, limit: 25 });
+
+const users = result.data;   // User[] (hydrated)
+const total = result.total;
 ```
 
 ## Chunk
 
-Chunk method is also available, it works exactly like the `Aggregate.chunk` method but the returned documents are instances of the model.
+Process large result sets in batches without loading everything into memory:
 
-```ts
-await User.aggregate().where("age", ">", 18).chunk(10, (users) => {
-  console.log(users);
-});
+```ts title="src/jobs/export.job.ts"
+import { User } from "./user.model";
+
+await User.aggregate()
+  .where("active", true)
+  .chunk(100, async (users) => {
+    for (const user of users) {
+      await sendNewsletter(user);
+    }
+  });
 ```
+
+:::tip
+Return `false` from the `chunk` callback to stop processing early.
+:::

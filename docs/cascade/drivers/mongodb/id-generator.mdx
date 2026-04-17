@@ -1,0 +1,183 @@
+---
+sidebar_position: 3
+---
+
+# 🔢 MongoDB ID Generator
+
+By default MongoDB uses `ObjectId` as the `_id` for every document. Cascade's `MongoIdGenerator` adds **atomic auto-increment integer IDs** on top of that — useful when you need sequential, human-readable primary keys that never repeat, even under concurrent inserts.
+
+---
+
+## 🏗️ How it works
+
+`MongoIdGenerator` maintains a separate **counters collection** (default name: `"counters"`). Each entry in that collection tracks the last-issued ID for one table. When a new ID is needed the generator performs an atomic `findOneAndUpdate` with `$inc` on the counter document, guaranteeing no two concurrent operations receive the same value.
+
+```
+Insert request for "orders"
+         ↓
+findOneAndUpdate({ table: "orders" }, { $inc: { lastId: 1 } }, { upsert: true })
+         ↓
+returns new counter value → used as the document's integer _id
+```
+
+:::tip
+Because the counter update is a single atomic MongoDB operation, this approach is safe for concurrent inserts across multiple application instances with no additional locking.
+:::
+
+---
+
+## ⚙️ Enabling auto-increment
+
+Pass `autoGenerateId: true` in the driver options when connecting:
+
+```ts title="src/bootstrap/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase(
+  {
+    driver: "mongodb",
+    host: "localhost",
+    port: 27017,
+    database: "my-app",
+  },
+  {
+    autoGenerateId: true,
+    counterCollection: "id_counters", // optional, defaults to "counters"
+  },
+);
+```
+
+Once enabled, every model insert will automatically receive an integer `id` instead of (or in addition to) the MongoDB `_id` ObjectId.
+
+---
+
+## 📋 `IdGeneratorContract` interface
+
+`MongoIdGenerator` implements the `IdGeneratorContract` interface:
+
+```ts
+interface IdGeneratorContract {
+  generateNextId(options: GenerateIdOptions): Promise<number>;
+  getLastId(table: string): Promise<number>;
+  setLastId(table: string, id: number): Promise<void>;
+}
+```
+
+---
+
+## 🧩 `GenerateIdOptions`
+
+```ts
+type GenerateIdOptions = {
+  table: string;        // collection name to generate an ID for
+  initialId?: number;   // starting value when creating the counter for the first time
+  incrementBy?: number; // step size per generation (defaults to 1)
+};
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `table` | Yes | The collection whose counter should be incremented |
+| `initialId` | No | Value used for the very first document in a table (defaults to `1`) |
+| `incrementBy` | No | How much to increment per call (defaults to `1`) |
+
+---
+
+## 🏛️ `MongoIdGenerator` API
+
+### `generateNextId(options)`
+
+Atomically increments and returns the next integer ID for the given table. This is the primary method called internally on every model insert.
+
+```ts
+const generator = driver.getIdGenerator();
+
+const nextId = await generator.generateNextId({
+  table: "orders",
+  initialId: 1000, // first order gets id 1000
+  incrementBy: 1,
+});
+```
+
+### `getLastId(table)`
+
+Reads the current counter value without incrementing it. Useful for inspection or seeding:
+
+```ts
+const lastOrderId = await generator.getLastId("orders");
+console.log(`Last issued order ID: ${lastOrderId}`);
+```
+
+### `setLastId(table, id)`
+
+Overrides the counter to a specific value. Use this when migrating data that already has integer IDs and you need to seed the counter above the highest existing value:
+
+```ts
+// After importing legacy data with IDs up to 50 000
+await generator.setLastId("orders", 50000);
+```
+
+---
+
+## 🔧 Accessing the generator from the driver
+
+```ts title="src/utils/id-utils.ts"
+import { dataSourceRegistry } from "@warlock.js/cascade";
+
+const driver = dataSourceRegistry.get().driver;
+const generator = driver.getIdGenerator();
+
+if (generator) {
+  const nextId = await generator.generateNextId({ table: "invoices" });
+}
+```
+
+`getIdGenerator()` returns `undefined` when `autoGenerateId` is not enabled.
+
+---
+
+## 🌱 Per-model seeding
+
+You can seed the starting ID and increment step at the model level using model configuration:
+
+```ts title="src/models/order.model.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Order extends Model {
+  static collection = "orders";
+
+  // Start IDs at 1000 and increment by 1
+  static initialId = 1000;
+  static incrementIdBy = 1;
+}
+```
+
+These values are forwarded to `GenerateIdOptions` by the internal `generateModelNextId` helper that Cascade calls before each insert.
+
+---
+
+## 🗃️ Counter collection layout
+
+The counters collection stores one document per table:
+
+```json
+{
+  "_id": ObjectId("..."),
+  "table": "orders",
+  "lastId": 42
+}
+```
+
+A unique index on `table` is created automatically the first time a counter is upserted.
+
+:::warning
+Do not manually modify the counters collection while the application is running — doing so can cause duplicate ID collisions.
+:::
+
+---
+
+## 🌟 What's next?
+
+- [🗺️ Blueprint](./blueprint) — list and inspect collection indexes
+- [🔄 Sync Adapter](./sync-adapter) — batch atomic sync updates
+- [🔎 Query Builder](./query-builder) — aggregation pipeline queries

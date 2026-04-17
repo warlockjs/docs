@@ -4,85 +4,134 @@ sidebar_position: 2
 
 # 📋 Listing Documents
 
-Need to fetch data fast? The Query manager gives you a toolbox of ways to list, filter, and analyze your documents—no models required! 🧰✨
+Cascade's Model static methods give you a rich set of read operations — from fetching all records to paginating, counting, and eager-loading relationships — without writing a single query by hand.
 
-## 🗂️ List All Documents
+## 🗂️ Fetch All Documents
 
-```ts title="src/app.ts"
-import { query } from "@warlock.js/cascade";
+```ts title="src/users/user.service.ts"
+import { User } from "./user.model";
 
-const users = await query.list("users");
+const users = await User.all();
 ```
 
-## 🔍 Filter Results
+Pass a filter to narrow results:
 
-Pass a filter object as the second argument:
-
-```ts title="src/app.ts"
-const activeUsers = await query.list("users", { isActive: true });
+```ts title="src/users/user.service.ts"
+const activeUsers = await User.all({ isActive: true });
 ```
 
-## 🥇 Get the First or Last Document
+## 🔑 Find by Primary Key
 
-```ts title="src/app.ts"
-const firstUser = await query.first("users", { isActive: true });
-const lastUser = await query.last("users", { isActive: true });
-```
-
-## 🕒 Get the Latest Documents
-
-```ts title="src/app.ts"
-const latestUsers = await query.latest("users", { isActive: true });
+```ts title="src/users/user.service.ts"
+const user = await User.find(42);
+// Returns User | null
 ```
 
 :::tip
-`latest` returns documents sorted by `id` in descending order.
+`find` uses the model's configured primary key (defaults to `id`). It returns `null` when the record doesn't exist — no exception thrown.
 :::
 
-## 🏷️ Get Distinct Values
+## 🥇 First Matching Record
 
-```ts title="src/app.ts"
-const emails = await query.distinct("users", "email");
-// With filter:
-const activeEmails = await query.distinct("users", "email", { isActive: true });
+```ts title="src/users/user.service.ts"
+const admin = await User.first({ role: "admin" });
+// Returns User | null
+```
+
+Omit the filter to get the very first record in the collection:
+
+```ts title="src/users/user.service.ts"
+const first = await User.first();
+```
+
+## 🏁 Last Matching Record
+
+```ts title="src/users/user.service.ts"
+const last = await User.last({ isActive: true });
+```
+
+## 🕒 Latest Records
+
+`latest()` returns records sorted by the primary key in descending order — the most recently inserted documents come first:
+
+```ts title="src/users/user.service.ts"
+const recentUsers = await User.latest();
 ```
 
 ## 🔢 Count Documents
 
-```ts title="src/app.ts"
-const count = await query.count("users");
-const activeCount = await query.count("users", { isActive: true });
+```ts title="src/users/user.service.ts"
+const total  = await User.count();
+const active = await User.count({ isActive: true });
 ```
 
-## 🧠 Explain a Query
+## 📄 Paginate
 
-See how MongoDB will execute your query:
-
-```ts title="src/app.ts"
-const plan = await query.explain("users", { isActive: true });
-console.log(plan);
+```ts title="src/users/user.service.ts"
+const result = await User.paginate({ page: 1, limit: 20 });
+// result: PaginationResult<User>
+// result.data      — array of User instances
+// result.total     — total matching count
+// result.pages     — total page count
+// result.page      — current page
+// result.limit     — page size
 ```
 
-## 🧮 Aggregate Data
+:::info
+`paginate` applies the same global scopes and soft-delete guards as every other read method.
+:::
 
-Run powerful aggregation pipelines:
+## 🔧 Fluent QueryBuilder
 
-```ts title="src/app.ts"
-const pipeline = [
-  { $match: { isActive: true } },
-  { $group: { _id: "$country", count: { $sum: 1 } } },
-];
-const result = await query.aggregate("users", pipeline);
+When you need ordering, `skip`, or more complex filters, drop into the `QueryBuilderContract` via `Model.query()`:
+
+```ts title="src/users/user.service.ts"
+const admins = await User.query()
+  .where("role", "admin")
+  .orderBy("name")
+  .get();
 ```
+
+Limit and offset:
+
+```ts title="src/users/user.service.ts"
+const page2 = await User.query()
+  .where("isActive", true)
+  .orderBy("createdAt", "desc")
+  .skip(20)
+  .limit(10)
+  .get();
+```
+
+## 🤝 Eager Loading
+
+Load relationships inline using `with()` on the query builder:
+
+```ts title="src/users/user.service.ts"
+const users = await User.with("posts").where("isActive", true).get();
+// Each User instance has .posts already populated
+```
+
+Chain multiple relations:
+
+```ts title="src/users/user.service.ts"
+const users = await User.with("posts", "profile").get();
+```
+
+:::tip
+`with()` uses Cascade's `RelationLoader` under the hood, so it batches relation queries rather than issuing N+1 queries.
+:::
 
 ## 🧙‍♂️ Pro Tips
-- Use filters for fast, targeted queries
-- Use `distinct` to get unique values for reporting
-- Use `aggregate` for advanced analytics and dashboards
-- Use `explain` to optimize your queries
+
+- Prefer `User.find(id)` over a manual `where("id", id).first()` — it's shorter and semantically clearer.
+- Use `User.count()` before a heavy `all()` to decide whether to paginate.
+- `User.latest()` is a convenient shorthand; use `.orderBy("createdAt", "desc")` on the query builder if you need a different timestamp field.
+- See the [Query Builder docs](../query-builder/introduction) for the full filter, ordering, and aggregation API.
 
 ---
 
 ## 🌟 What's Next?
+
 - [💾 Saving Documents](./saving-documents)
 - [🗑️ Deleting Documents](./deleting-documents)

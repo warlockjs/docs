@@ -1,0 +1,265 @@
+---
+sidebar_position: 5
+---
+
+# ⚡ Eager Loading
+
+Cascade's eager loading system lets you pre-fetch related models in **separate, batched queries** so you never trigger N+1 problems. You can load relations at query time with `with()`, count them with `withCount()`, or filter by their existence with `has()` and `whereHas()`.
+
+:::info
+All eager loading methods are chainable and are available on every model's query builder — they work equally well with `get()`, `first()`, `paginate()`, and any other execution method.
+:::
+
+---
+
+## 🔄 `Model.with()` — Separate-Query Eager Loading
+
+### Load a single relation
+
+Pass a relation name as a string. Cascade issues one extra query for that relation and maps the results onto each returned model.
+
+```ts title="src/controllers/posts.controller.ts"
+const users = await User.with("posts").get();
+
+for (const user of users) {
+  const posts = user.getRelation<Post[]>("posts");
+  console.log(posts);
+}
+```
+
+### Load multiple relations at once
+
+Pass an array of relation names to load them all in one builder call.
+
+```ts title="src/controllers/users.controller.ts"
+const users = await User.with(["posts", "profile"]).get();
+```
+
+### Constrain a relation with a callback
+
+Pass an object where each value is a `RelationConstraintCallback`. The callback receives a `QueryBuilderContract` and lets you filter, sort, or project the related records.
+
+```ts title="src/controllers/users.controller.ts"
+import type { RelationConstraintCallback } from "@warlock.js/cascade";
+
+const users = await User.with({
+  posts: (q) => q.where("isPublished", true),
+}).get();
+```
+
+You can mix constrained and unconstrained relations in the same call:
+
+```ts
+const users = await User.with({
+  posts: (q) => q.where("isPublished", true).orderBy("createdAt", "desc"),
+  profile: true,  // load without any extra constraints
+}).get();
+```
+
+:::tip
+The constraint callback is typed as `RelationConstraintCallback`:
+
+```ts
+// from relations/types.ts
+type RelationConstraintCallback = (query: QueryBuilderContract) => void;
+```
+
+It is purely for filtering — you do **not** need to return the query.
+:::
+
+---
+
+## 🏃 Loading Relations on an Existing Instance
+
+If you already hold a model instance, call `instance.load(...relationNames)` instead of re-fetching from the database. It issues the minimum required queries and mutates the instance in place.
+
+```ts title="src/services/user.service.ts"
+const user = await User.find(1);
+
+// Load a single relation
+await user.load("posts");
+
+// Load multiple at once
+await user.load("posts", "profile");
+
+// Chain further operations after loading
+const posts = user.getRelation<Post[]>("posts");
+```
+
+### `model.isLoaded(relationName)`
+
+Check whether a relation has already been populated on the instance before issuing an unnecessary query.
+
+```ts
+if (!user.isLoaded("posts")) {
+  await user.load("posts");
+}
+```
+
+### `model.getRelation(relationName)`
+
+Retrieve the already-loaded relation data from the instance. Returns `LoadedRelationResult`:
+
+```ts
+// from relations/types.ts
+type LoadedRelationResult = Model | Model[] | null;
+```
+
+```ts
+const profile = user.getRelation<Profile>("profile");   // Model | null
+const posts   = user.getRelation<Post[]>("posts");       // Model[]
+```
+
+---
+
+## 🗺️ Type Reference for Eager Loading
+
+| Type | Description |
+|---|---|
+| `RelationConstraintCallback` | `(query: QueryBuilderContract) => void` — the filter callback passed to `with()` |
+| `RelationConstraints` | `Record<string, RelationConstraintCallback \| boolean>` — the object shape accepted by `with({})` |
+| `LoadedRelationResult` | `Model \| Model[] \| null` — what `getRelation()` returns |
+| `LoadedRelationsMap` | `Map<string, LoadedRelationResult>` — the internal Map stored on each instance |
+
+---
+
+## 🔢 `withCount()` — Count Relations Without Loading
+
+`withCount()` adds a `<relationName>Count` numeric field to every returned model **without** loading the actual related records. This is ideal for displaying counts in list views.
+
+```ts title="src/controllers/users.controller.ts"
+const users = await User.withCount("posts").get();
+
+for (const user of users) {
+  console.log(user.postsCount); // number injected by Cascade
+}
+```
+
+### Count multiple relations at once
+
+`withCount()` is variadic — pass as many relation names as you need:
+
+```ts
+const users = await User.withCount("posts", "comments", "likes").get();
+
+// Each user now has postsCount, commentsCount, likesCount
+```
+
+:::info
+`withCount()` and `with()` can be combined freely. Counts are resolved independently from the eager-loaded records.
+:::
+
+---
+
+## 🔍 Existence Filtering
+
+These methods filter the query results based on whether a relation has matching records — without loading those records onto the parent model.
+
+### `has(relation)` — Only parents that have related records
+
+```ts
+// Only users who have at least one post
+const users = await User.has("posts").get();
+```
+
+### `has(relation, operator, count)` — With a count threshold
+
+```ts
+// Only users with at least 5 posts
+const users = await User.has("posts", ">=", 5).get();
+
+// Only users with exactly 0 posts (same as doesntHave)
+const users = await User.has("posts", "=", 0).get();
+```
+
+### `whereHas(relation, callback)` — Has records matching a constraint
+
+```ts
+// Only users who have at least one published post
+const users = await User.whereHas("posts", (q) => {
+  q.where("isPublished", true);
+}).get();
+```
+
+### `orWhereHas(relation, callback)` — Or-variant
+
+Appended as an `OR` clause to the current query:
+
+```ts
+const users = await User
+  .where("isAdmin", true)
+  .orWhereHas("posts", (q) => q.where("isPublished", true))
+  .get();
+```
+
+### `doesntHave(relation)` — Only parents without related records
+
+```ts
+// Users who have written no posts at all
+const users = await User.doesntHave("posts").get();
+```
+
+### `whereDoesntHave(relation, callback)` — Doesn't have records matching a constraint
+
+```ts
+// Users who have no published posts (may still have draft posts)
+const users = await User.whereDoesntHave("posts", (q) => {
+  q.where("isPublished", true);
+}).get();
+```
+
+---
+
+## 🔗 Nested Eager Loading
+
+Cascade supports dot-notation to load relations of relations in a single call:
+
+```ts
+// Load posts and each post's tags
+const users = await User.with("posts.tags").get();
+
+// Combine nested and top-level
+const users = await User.with(["profile", "posts.tags"]).get();
+```
+
+Constraints can also be applied at the nested level:
+
+```ts
+const users = await User.with({
+  "posts.tags": (q) => q.where("isActive", true),
+}).get();
+```
+
+---
+
+## 🔩 Internals (Brief)
+
+### `RelationLoader`
+
+`RelationLoader` is the internal engine behind `with()`. When `get()` detects eager-load constraints it creates a `RelationLoader` for the returned model array, dispatches the appropriate batch query for each relation type (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`), and mutates each model's `loadedRelations` Map in place. You do not need to use `RelationLoader` directly.
+
+### `RelationHydrator`
+
+`RelationHydrator` is used during model restoration (e.g. from a cache or snapshot). Its single static method `RelationHydrator.hydrate(model, relationDefs, relationsSnapshot)` re-attaches serialized relation data from a plain `ModelSnapshot` object back onto a live model instance, populating both `loadedRelations` and direct properties. Again, this is an internal detail — Cascade handles it automatically.
+
+---
+
+## 🧩 Complete Example
+
+```ts title="src/controllers/blog.controller.ts"
+import { User } from "../models/user.model";
+import { Post } from "../models/post.model";
+
+// Eager-load published posts and count all comments
+const authors = await User
+  .with({ posts: (q) => q.where("isPublished", true).orderBy("createdAt", "desc") })
+  .withCount("comments")
+  .has("posts")
+  .get();
+
+for (const author of authors) {
+  const posts = author.getRelation<Post[]>("posts");
+  console.log(`${author.name} — ${author.commentsCount} comments`);
+  console.log(posts.map((p) => p.title));
+}
+```

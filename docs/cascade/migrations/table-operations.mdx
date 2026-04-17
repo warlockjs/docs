@@ -1,0 +1,372 @@
+---
+sidebar_position: 3
+---
+
+# 🗂️ Table Operations
+
+The `Migration` base class exposes a full fluent DDL API that covers every table-level operation you need: creating, dropping, renaming, and inspecting tables; adding and altering columns; managing indexes and foreign keys; and escaping to raw SQL when nothing else fits. Every operation is queued as a `PendingOperation` and flushed in one pass when the migration runs.
+
+---
+
+## 📋 `OperationType` and `PendingOperation`
+
+Internally, every DDL call produces a `PendingOperation` that is collected before execution.
+
+```ts title="src/migration/migration.ts"
+// Union of every DDL/DML operation a migration can queue
+type OperationType =
+  | "createTable"
+  | "dropTable"
+  | "dropTableIfExists"
+  | "renameTable"
+  | "truncateTable"
+  | "addColumn"
+  | "dropColumn"
+  | "renameColumn"
+  | "modifyColumn"
+  | "addIndex"
+  | "dropIndex"
+  | "addForeignKey"
+  | "dropForeignKey"
+  | "execute"
+  // … and more
+
+// Queued operation with its opaque payload
+interface PendingOperation {
+  type: OperationType;
+  data: any;
+}
+```
+
+:::info
+You never construct `PendingOperation` objects yourself. They are created by the fluent methods on `Migration` and flushed automatically by the runner.
+:::
+
+---
+
+## 🏗️ Table DDL
+
+### `createTable(tableName, callback)`
+
+Creates a new table. The callback receives a `ColumnBuilder` scope where you declare every column, index, and foreign key for the table.
+
+```ts title="src/database/migrations/create_users_table.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export default class CreateUsersTable extends Migration {
+  async up() {
+    await this.createTable("users", (table) => {
+      table.id();
+      table.string("name", 255).notNullable();
+      table.string("email", 320).notNullable().unique();
+      table.timestamps();
+    });
+  }
+
+  async down() {
+    await this.dropTable("users");
+  }
+}
+```
+
+---
+
+### `dropTable(tableName)`
+
+Drops an existing table unconditionally. Throws a driver error if the table does not exist.
+
+```ts title="src/database/migrations/create_users_table.ts"
+async down() {
+  await this.dropTable("users");
+}
+```
+
+---
+
+### `dropTableIfExists(tableName)`
+
+Safe variant of `dropTable`. Silently skips the operation if the table is not present — useful when a migration might be partially applied.
+
+```ts title="src/database/migrations/safe_drop.ts"
+async down() {
+  await this.dropTableIfExists("temp_imports");
+}
+```
+
+:::tip
+Prefer `dropTableIfExists` in `down()` implementations to make rollbacks idempotent.
+:::
+
+---
+
+### `renameTable(from, to)`
+
+Renames a table without touching its data or structure.
+
+```ts title="src/database/migrations/rename_items.ts"
+async up() {
+  await this.renameTable("items", "products");
+}
+
+async down() {
+  await this.renameTable("products", "items");
+}
+```
+
+---
+
+### `hasTable(tableName)`
+
+Checks whether a table exists. Returns `Promise<boolean>`. Use it for conditional migrations that should only run once or only in certain environments.
+
+```ts title="src/database/migrations/conditional_create.ts"
+async up() {
+  if (!(await this.hasTable("audit_logs"))) {
+    await this.createTable("audit_logs", (table) => {
+      table.id();
+      table.string("action", 128).notNullable();
+      table.timestamps();
+    });
+  }
+}
+```
+
+:::info
+`hasTable` reads from the live database and is not queued as a pending operation. It executes immediately when called.
+:::
+
+---
+
+### `truncateTable(tableName)`
+
+Removes all rows from a table while keeping its structure intact. This is a destructive, non-transactional operation on most engines.
+
+```ts title="src/database/migrations/seed_reset.ts"
+async up() {
+  await this.truncateTable("cache_entries");
+}
+```
+
+:::warning
+`truncateTable` cannot be rolled back. Use it only in seeder or maintenance migrations that you are comfortable re-running.
+:::
+
+---
+
+## 🧱 Column Operations
+
+### `addColumn(table, column, callback)`
+
+Adds one or more columns to an existing table. The callback receives the same `ColumnBuilder` scope as `createTable`.
+
+```ts title="src/database/migrations/add_avatar_to_users.ts"
+async up() {
+  await this.addColumn("users", (col) => {
+    col.string("avatar_url", 512).nullable();
+    col.string("phone", 20).nullable();
+  });
+}
+
+async down() {
+  await this.dropColumn("users", "avatar_url");
+  await this.dropColumn("users", "phone");
+}
+```
+
+---
+
+### `dropColumn(table, column)`
+
+Drops a single named column from a table.
+
+```ts title="src/database/migrations/drop_legacy_column.ts"
+async up() {
+  await this.dropColumn("users", "legacy_token");
+}
+
+async down() {
+  await this.addColumn("users", (col) => {
+    col.string("legacy_token", 64).nullable();
+  });
+}
+```
+
+---
+
+### `renameColumn(table, from, to)`
+
+Renames an existing column. The column type and constraints are preserved.
+
+```ts title="src/database/migrations/rename_column.ts"
+async up() {
+  await this.renameColumn("users", "full_name", "display_name");
+}
+
+async down() {
+  await this.renameColumn("users", "display_name", "full_name");
+}
+```
+
+---
+
+### `hasColumn(table, column)`
+
+Checks whether a column exists in a table. Returns `Promise<boolean>`. Like `hasTable`, it executes immediately and is not queued.
+
+```ts title="src/database/migrations/conditional_add.ts"
+async up() {
+  if (!(await this.hasColumn("users", "verified_at"))) {
+    await this.addColumn("users", (col) => {
+      col.timestamp("verified_at").nullable();
+    });
+  }
+}
+```
+
+---
+
+## 🔑 Index Operations
+
+### `addIndex(table, columns, options?)`
+
+Creates an index on one or more columns. Pass column names as an array and optionally provide an `IndexDefinition` to control name, uniqueness, or specialized index types.
+
+```ts title="src/database/migrations/add_status_index.ts"
+async up() {
+  await this.addIndex("orders", ["status", "created_at"], {
+    name: "idx_orders_status_created",
+  });
+}
+
+async down() {
+  await this.dropIndex("orders", "idx_orders_status_created");
+}
+```
+
+---
+
+### `dropIndex(table, name)`
+
+Drops a named index from a table.
+
+```ts title="src/database/migrations/drop_index.ts"
+async down() {
+  await this.dropIndex("orders", "idx_orders_status_created");
+}
+```
+
+---
+
+## 🔗 Foreign Key Operations
+
+### `addForeignKey(table, column, references, on, options?)`
+
+Adds a foreign key constraint to an existing table. Accepts the local column, the referenced column, the referenced table, and optional actions.
+
+```ts title="src/database/migrations/add_user_fk.ts"
+async up() {
+  await this.addForeignKey("posts", (fk) => {
+    fk.references("users", "id")
+      .onDelete("CASCADE")
+      .onUpdate("CASCADE");
+  });
+}
+
+async down() {
+  await this.dropForeignKey("posts", "posts_user_id_foreign");
+}
+```
+
+---
+
+### `dropForeignKey(table, name)`
+
+Drops a named foreign key constraint.
+
+```ts title="src/database/migrations/drop_fk.ts"
+async down() {
+  await this.dropForeignKey("posts", "posts_user_id_foreign");
+}
+```
+
+---
+
+## 🛠️ Raw SQL
+
+### `execute(sql)`
+
+Runs a raw SQL string directly through the driver, bypassing the pending-operation queue. Use this for statements that have no first-class migration API equivalent.
+
+```ts title="src/database/migrations/enable_extension.ts"
+async up() {
+  await this.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+}
+
+async down() {
+  await this.execute('DROP EXTENSION IF EXISTS "uuid-ossp"');
+}
+```
+
+:::warning
+`execute()` is also listed on the `Migration` class as a method that flushes the pending queue. When you call it with a SQL string argument it runs that SQL; when called with no arguments it flushes queued operations. Prefer the fluent DDL API for structured operations so the driver can serialize them correctly.
+:::
+
+---
+
+### `toSQL()`
+
+Serializes all queued `PendingOperation` objects into SQL strings and returns them **without executing** anything. The internal queue is cleared after this call.
+
+```ts title="src/database/migrations/preview_sql.ts"
+const migration = new CreateUsersTable();
+await migration.up();                     // queues operations
+const statements = migration.toSQL();     // returns string[], clears queue
+
+for (const sql of statements) {
+  console.log(sql);
+}
+```
+
+:::info
+After calling `toSQL()`, the pending queue is empty. Calling `execute()` without re-running `up()` is a no-op.
+:::
+
+---
+
+## 📋 Complete Migration Example
+
+```ts title="src/database/migrations/2026_01_15_create_orders_table.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export default class CreateOrdersTable extends Migration {
+  static migrationName = "CreateOrdersTable";
+  static createdAt = "2026-01-15T09:00:00.000Z";
+
+  async up() {
+    // Create the primary table
+    await this.createTable("orders", (table) => {
+      table.id();
+      table.string("reference", 32).notNullable().unique();
+      table.decimal("total", 10, 2).default(0);
+      table.string("status", 32).defaultString("pending");
+      table.timestamps();
+    });
+
+    // Add a composite index for dashboard queries
+    await this.addIndex("orders", ["status", "created_at"], {
+      name: "idx_orders_status_created",
+    });
+
+    // Link orders to users with cascade delete
+    await this.addForeignKey("orders", (fk) => {
+      fk.references("users", "id").onDelete("CASCADE");
+    });
+  }
+
+  async down() {
+    await this.dropForeignKey("orders", "orders_user_id_foreign");
+    await this.dropIndex("orders", "idx_orders_status_created");
+    await this.dropTable("orders");
+  }
+}
+```

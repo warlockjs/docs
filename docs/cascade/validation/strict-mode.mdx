@@ -1,0 +1,229 @@
+---
+sidebar_position: 3
+---
+
+# 🔒 Strict Mode
+
+`StrictMode` controls how Cascade handles fields that appear in an incoming document but are **not declared in the model's schema**. It is set once per model class via a static property and applies to every write that goes through the `DatabaseWriter`.
+
+---
+
+## 📐 The `StrictMode` Union
+
+```ts
+type StrictMode = "strip" | "fail" | "allow";
+```
+
+| Value | Behaviour |
+|---|---|
+| `"strip"` | Unknown fields are silently removed before the write *(default)* |
+| `"fail"` | Unknown fields cause a `DatabaseWriterValidationError` to be thrown — the write is aborted |
+| `"allow"` | Unknown fields pass through to the database unchanged |
+
+---
+
+## 🛠️ Setting `strictMode` on a Model
+
+Declare `static strictMode` on your model class. Because it is a static property it applies to all instances of that model.
+
+### `"strip"` — silently prune unknown fields (default)
+
+This is the default when `strictMode` is not set. Unknown fields are discarded before the document reaches the database, so the stored row always matches the declared schema exactly.
+
+```ts title="src/models/product.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+
+export class Product extends Model {
+  static table = "products";
+
+  // "strip" is the default — no need to declare it explicitly
+  static strictMode = "strip" as const;
+
+  static schema = v.object({
+    name:  v.string().required(),
+    price: v.number().min(0).required(),
+    stock: v.number().int().min(0).default(0),
+  });
+}
+```
+
+:::info
+With `"strip"`, unknown fields are silently discarded. You never need to handle an error — the document written to the database always matches the schema exactly.
+:::
+
+### `"fail"` — reject payloads with unknown fields
+
+Use `"fail"` when you want strict input hygiene. Any field not declared in the schema causes `save()` to throw a `DatabaseWriterValidationError`.
+
+```ts title="src/models/user.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+
+export class User extends Model {
+  static table = "users";
+
+  static strictMode = "fail" as const;
+
+  static schema = v.object({
+    email:    v.string().email().required(),
+    password: v.string().min(8).required(),
+    role:     v.string().in(["admin", "member"]).default("member"),
+  });
+}
+```
+
+```ts title="src/controllers/user.controller.ts"
+import { DatabaseWriterValidationError } from "@warlock.js/cascade";
+import { User } from "../models/user.model";
+
+async function createUser(payload: Record<string, unknown>) {
+  const user = new User(payload);
+
+  try {
+    await user.save();
+  } catch (err) {
+    if (err instanceof DatabaseWriterValidationError) {
+      // err.errors contains the structured per-field error list
+      console.error(err.errors);
+    }
+    throw err;
+  }
+}
+```
+
+:::warning
+`"fail"` is strict: even a single unknown field in the payload aborts the entire write and throws `DatabaseWriterValidationError`. Make sure your clients send only the fields your schema declares.
+:::
+
+### `"allow"` — pass unknown fields through unchanged
+
+Use `"allow"` for schema-less or append-only documents where you intentionally want to store arbitrary extra data alongside declared fields.
+
+```ts title="src/models/event-log.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+
+export class EventLog extends Model {
+  static table = "event_logs";
+
+  // Accept any payload — useful for event sourcing or audit logs
+  static strictMode = "allow" as const;
+
+  static schema = v.object({
+    type:      v.string().required(),
+    occurredAt: v.date().required(),
+  });
+}
+```
+
+---
+
+## ❌ `DatabaseWriterValidationError`
+
+When strict mode is `"fail"` and the payload contains unknown fields — or when schema validation itself fails — Cascade throws a `DatabaseWriterValidationError`. This is a custom `Error` subclass that carries a full structured report from seal.
+
+```ts
+import { DatabaseWriterValidationError } from "@warlock.js/cascade";
+```
+
+### Class shape
+
+```ts
+class DatabaseWriterValidationError extends Error {
+  /** Array of per-field seal validation errors */
+  readonly errors: ValidationResult["errors"];
+
+  constructor(message: string, errors: ValidationResult["errors"]);
+
+  /** Filter errors to those belonging to a specific field path */
+  getFieldErrors(fieldPath: string): ValidationResult["errors"];
+
+  /** Check whether a specific field path has any errors */
+  hasFieldError(fieldPath: string): boolean;
+
+  /** Colored terminal-formatted error summary */
+  toString(): string;
+}
+```
+
+### Inspecting validation errors
+
+`errors` is an array of per-field error objects structured exactly as seal returns them. Use `getFieldErrors` and `hasFieldError` to work with individual fields without looping the full array.
+
+```ts title="src/controllers/user.controller.ts"
+import { DatabaseWriterValidationError } from "@warlock.js/cascade";
+import { User } from "../models/user.model";
+
+async function updateUser(id: number, data: Record<string, unknown>) {
+  const user = await User.find(id);
+  user.merge(data);
+
+  try {
+    await user.save();
+  } catch (err) {
+    if (err instanceof DatabaseWriterValidationError) {
+      // All errors
+      console.log(err.errors);
+
+      // Check a specific field
+      if (err.hasFieldError("email")) {
+        const emailErrors = err.getFieldErrors("email");
+        console.log("Email problems:", emailErrors);
+      }
+
+      // Colored terminal summary (also triggered by console.log in Node.js)
+      console.log(err.toString());
+    }
+
+    throw err;
+  }
+}
+```
+
+:::tip
+`DatabaseWriterValidationError` implements the Node.js `nodejs.util.inspect.custom` symbol. Passing the error to `console.log` in a terminal automatically prints a color-coded, field-by-field breakdown — handy during development.
+:::
+
+---
+
+## 🔄 Comparison at a Glance
+
+```ts title="src/models/examples.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+
+// Prune silently — safe default for most models
+export class Post extends Model {
+  static table = "posts";
+  static schema = v.object({ title: v.string().required() });
+  // strictMode defaults to "strip"
+}
+
+// Throw on unknown fields — tight API contracts
+export class Payment extends Model {
+  static table = "payments";
+  static strictMode = "fail" as const;
+  static schema = v.object({
+    amount:   v.number().min(0).required(),
+    currency: v.string().length(3).required(),
+  });
+}
+
+// Accept anything — flexible / audit models
+export class AuditEntry extends Model {
+  static table = "audit_entries";
+  static strictMode = "allow" as const;
+  static schema = v.object({ action: v.string().required() });
+}
+```
+
+---
+
+## 📋 Summary
+
+| `strictMode` | Unknown fields | Throws? | Best for |
+|---|---|---|---|
+| `"strip"` *(default)* | Removed silently | No | Standard CRUD models |
+| `"fail"` | Aborts the write | Yes — `DatabaseWriterValidationError` | Strict API contracts, financial data |
+| `"allow"` | Stored as-is | No | Audit logs, event sourcing, flexible documents |

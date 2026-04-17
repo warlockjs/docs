@@ -1,0 +1,167 @@
+---
+sidebar_position: 5
+---
+
+# 🔄 Eager Loading
+
+Eager loading lets you pre-fetch related models in **separate queries** and merge them onto the parent results automatically — eliminating N+1 query problems.
+
+## 🏗️ Defining Relations
+
+Relations are declared as a `static relations` object on the model class. See the **Defining Relations** page in the Relationships section for the full API. The relation names used here must match the keys in that object.
+
+---
+
+## 📦 `with()` — Load Relations
+
+### `with(relation: string)`
+
+Load a single named relation:
+
+```ts title="src/repositories/post.repo.ts"
+const posts = await Post.query().with("author").get();
+// posts[0].author → User instance
+```
+
+### `with(relations: string[])`
+
+Load multiple relations at once:
+
+```ts
+const posts = await Post.query()
+  .with(["author", "category", "tags"])
+  .get();
+```
+
+### `with({ relation: callback })` — Constrained Eager Loading
+
+Apply a `QueryBuilderContract` callback to filter the related records:
+
+```ts title="src/repositories/user.repo.ts"
+const users = await User.query()
+  .with({
+    orders: (q) => q.where("status", "completed").orderBy("createdAt", "desc"),
+  })
+  .get();
+```
+
+:::tip
+Mix free relations and constrained relations in the same call:
+
+```ts
+Post.query().with(["category"]).with({ comments: (q) => q.limit(5) });
+```
+:::
+
+---
+
+## 🔢 `withCount()` — Count Related Records
+
+### `withCount(relation: string)` / `withCount(...relations: string[])`
+
+Add a `{relation}Count` attribute to each result without loading the related models:
+
+```ts title="src/repositories/post.repo.ts"
+const posts = await Post.query()
+  .withCount("comments", "likes")
+  .get();
+
+// posts[0].commentsCount → number
+// posts[0].likesCount → number
+```
+
+---
+
+## ✅ `has()` — Filter by Relation Existence
+
+### `has(relation: string)`
+
+Return only models that have at least one related record:
+
+```ts
+// Only posts that have at least one comment
+const posts = await Post.query().has("comments").get();
+```
+
+### `has(relation, operator, count)`
+
+Filter by a specific count of related records:
+
+```ts
+// Posts with 10 or more comments
+const popular = await Post.query().has("comments", ">=", 10).get();
+```
+
+---
+
+## 🔍 `whereHas()` / `orWhereHas()` — Constrained Existence Filter
+
+### `whereHas(relation, callback)`
+
+Filter parents where the relation satisfies a custom constraint:
+
+```ts title="src/repositories/post.repo.ts"
+const posts = await Post.query()
+  .whereHas("comments", (q) => {
+    q.where("approved", true);
+  })
+  .get();
+```
+
+### `orWhereHas(relation, callback)`
+
+Same as `whereHas` but joined with OR:
+
+```ts
+User.query()
+  .whereHas("roles", (q) => q.where("name", "admin"))
+  .orWhereHas("roles", (q) => q.where("name", "superadmin"));
+```
+
+---
+
+## 🚫 `doesntHave()` / `whereDoesntHave()` — Absence Filters
+
+### `doesntHave(relation)`
+
+Return models with no related records:
+
+```ts
+// Users who have never placed an order
+const newUsers = await User.query().doesntHave("orders").get();
+```
+
+### `whereDoesntHave(relation, callback)`
+
+Return models where no related records satisfy a constraint:
+
+```ts
+// Users with no approved reviews
+const unreviewed = await User.query()
+  .whereDoesntHave("reviews", (q) => q.where("approved", true))
+  .get();
+```
+
+---
+
+## 📦 Key Types
+
+### `LoadedRelationResult`
+
+The shape attached to a model instance after eager loading. The exact structure matches the relation type (single model, array, etc.).
+
+### `RelationConstraints`
+
+The callback type accepted by constrained `with()` calls:
+
+```ts
+type RelationConstraints = (query: QueryBuilderContract<any>) => void;
+```
+
+---
+
+:::info
+All `with()` eager loading runs **separate queries** — one per relation — then merges the results in application memory. This avoids cartesian product blowup but does mean multiple round-trips to the database.
+
+For a single-query JOIN approach that returns flat rows, see the **Joins** page and `joinWith()`.
+:::
