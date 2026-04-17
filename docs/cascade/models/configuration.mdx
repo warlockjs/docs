@@ -10,23 +10,20 @@ This page is the single source of truth for every static configuration knob avai
 
 ---
 
-## 🗃️ Collection / Table
+## 🗃️ Table Name
 
 ```ts
 export class Post extends Model {
-  public static collection = "posts"; // MongoDB alias (preferred)
-  // — or —
-  public static table = "posts";       // SQL-style alias, identical behaviour
+  public static table = "posts"; // canonical cross-driver property
 }
 ```
 
 | Property | Type | Description |
 |---|---|---|
-| `static table` | `string` | The database collection/table name. Required. |
-| `static collection` | `string` | MongoDB-friendly alias for `table`. Use whichever reads better. |
+| `static table` | `string` | The database table/collection name. **Required.** |
 
-:::tip
-`collection` and `table` are the same property under the hood. Pick the name that matches your driver vocabulary — both work identically.
+:::info MongoDB alias
+The MongoDB driver also accepts `static collection` as an alias for `table` for legacy compatibility. Always prefer `table` in new code — it works for both MongoDB and PostgreSQL.
 :::
 
 ---

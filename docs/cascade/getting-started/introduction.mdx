@@ -49,43 +49,61 @@ A `"mysql"` driver name is reserved but not yet supported — connecting with it
 
 ## 👀 Quick Peek: Defining a Model
 
-```ts title="src/models/user.ts"
-import { Model } from "@warlock.js/cascade";
+A real-world model in Cascade combines the table name, schema validation, serialization config, relations, and more — all as static class properties:
 
+```ts title="src/models/user.ts"
+import { Model, RegisterModel, hasMany } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+import { Post } from "./post";
+
+@RegisterModel()
 export class User extends Model {
-  /**
-   * The collection/table name (required)
-   */
-  public static collection = "users";
+  // ── Identity ──────────────────────────────────────────────
+  public static table = "users";
+  public static primaryKey = "id";
+
+  // ── Validation schema (powered by @warlock.js/seal) ───────
+  public static schema = v.object({
+    name: v.string().required(),
+    email: v.string().email().required(),
+    age:  v.number().min(18).optional(),
+  });
+
+  // ── Unknown-field policy ──────────────────────────────────
+  public static strictMode = "strip" as const; // "strip" | "fail" | "allow"
+
+  // ── JSON serialization (which fields are exposed) ─────────
+  public static resource = ["id", "name", "email", "createdAt"];
+
+  // ── Relations ─────────────────────────────────────────────
+  public static relations = {
+    posts: hasMany(Post, { foreignKey: "userId" }),
+  };
 }
 ```
 
-## ✨ Creating a User (So Easy!)
+| Property | What it does | Docs |
+|---|---|---|
+| `@RegisterModel()` | Registers the model in the global model registry | [define-model](../models/define-model) |
+| `static table` | Table/collection name — **always use `table`**, not `collection` | [configuration](../models/configuration) |
+| `static schema` | Seal validation schema — validated before every save | [schema](../validation/schema) |
+| `static strictMode` | What to do with unknown fields: strip, fail, or allow | [strict-mode](../validation/strict-mode) |
+| `static resource` | Fields included in `toJSON()` / API responses | [resources](../models/resources) |
+| `static relations` | Relation definitions (hasMany, hasOne, belongsTo…) | [defining-relations](../relationships/defining-relations) |
+
+## ✨ Creating a User
 
 ```ts title="src/controllers/users.ts"
 import { User } from "src/models/user";
 
-export async function createUser() {
-  const user = await User.create({
-    name: "Hasan Zohdy",
-    email: "hassanzohdy@gmail.com",
-  });
+const user = await User.create({
+  name: "Hasan Zohdy",
+  email: "hassanzohdy@gmail.com",
+});
 
-  console.log(user.data);
-}
-```
-
-Outputs:
-
-```json
-{
-  "id": 1231412,
-  "_id": "fagtrw43qwedasjoijwq",
-  "name": "Hasan Zohdy",
-  "email": "hassanzohdy@gmail.com",
-  "createdAt": "2023-06-01 00:00:00",
-  "updatedAt": "2023-06-01 00:00:00"
-}
+console.log(user.id);       // auto-generated integer
+console.log(user.get("name")); // "Hasan Zohdy"
+console.log(user.toJSON()); // only fields listed in `resource`
 ```
 
 ---
