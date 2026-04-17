@@ -1,0 +1,73 @@
+{
+    "name": "@warlock.js/core",
+    "version": "4.0.165",
+    "description": "A robust nodejs framework for building blazing fast applications",
+    "main": "./esm/index.js",
+    "bin": {
+        "warlock": "./bin/warlock.js"
+    },
+    "scripts": {
+        "update": "ncu -u"
+    },
+    "dependencies": {
+        "fastify": "^5.8.4",
+        "@fastify/cookie": "^11.0.2",
+        "@fastify/cors": "^11.2.0",
+        "@fastify/http-proxy": "^11.4.3",
+        "@fastify/multipart": "^9.4.0",
+        "@fastify/rate-limit": "^10.3.0",
+        "@fastify/static": "^9.1.0",
+        "@mongez/concat-route": "^1.0.0",
+        "@mongez/config": "^1.0.26",
+        "@mongez/copper": "^1.0.1",
+        "@mongez/dotenv": "^1.1.9",
+        "@mongez/events": "^2.1.0",
+        "@mongez/fs": "^3.0.5",
+        "@mongez/http": "^2.2.10",
+        "bcryptjs": "^3.0.3",
+        "@mongez/localization": "3.2.1",
+        "@mongez/reinforcements": "^2.3.17",
+        "@mongez/slug": "^1.0.7",
+        "pluralize-esm": "^9.0.5",
+        "@mongez/supportive-is": "^2.0.4",
+        "@mongez/time-wizard": "^1.0.6",
+        "@warlock.js/auth": "4.0.165",
+        "@warlock.js/cache": "4.0.165",
+        "@warlock.js/cascade": "4.0.165",
+        "@warlock.js/context": "4.0.165",
+        "@warlock.js/logger": "4.0.165",
+        "@warlock.js/seal": "4.0.165",
+        "axios": "^1.14.0",
+        "chokidar": "^5.0.0",
+        "dayjs": "^1.11.19",
+        "es-module-lexer": "^2.0.0",
+        "esbuild": "^0.27.2",
+        "fast-glob": "^3.3.3",
+        "find-my-way": "^9.3.0",
+        "eslint": "^9.18.0",
+        "typescript": "^5.7.3",
+        "mime": "^4.1.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/warlockjs/framework"
+    },
+    "keywords": [
+        "nodejs",
+        "framework",
+        "typescript",
+        "javascript",
+        "backend",
+        "warlockjs",
+        "nestjs",
+        "fastify",
+        "express",
+        "mongodb",
+        "postgres"
+    ],
+    "author": "hassanzohdy",
+    "license": "MIT",
+    "module": "./esm/index.js",
+    "typings": "./esm/index.d.ts",
+    "type": "module"
+}

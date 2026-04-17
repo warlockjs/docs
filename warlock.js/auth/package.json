@@ -1,0 +1,36 @@
+{
+    "name": "@warlock.js/auth",
+    "version": "4.0.165",
+    "description": "Authentication system for Warlock.js applications",
+    "main": "./esm/index.js",
+    "dependencies": {
+        "@mongez/password": "^1.0.2",
+        "fast-jwt": "^6.1.0"
+    },
+    "peerDependencies": {
+        "@mongez/copper": "^1.0.1",
+        "@mongez/events": "^2.1.0",
+        "@mongez/fs": "^3.0.5",
+        "@mongez/reinforcements": "^2.3.17",
+        "@warlock.js/cascade": "4.0.165",
+        "@warlock.js/core": "4.0.165",
+        "@warlock.js/logger": "4.0.165",
+        "@warlock.js/seal": "4.0.165"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/warlockjs/auth"
+    },
+    "keywords": [
+        "nodejs",
+        "auth",
+        "auth.js",
+        "authentication",
+        "authorization",
+        "jwt"
+    ],
+    "author": "hassanzohdy",
+    "license": "MIT",
+    "module": "./esm/index.js",
+    "typings": "./esm/index.d.ts"
+}

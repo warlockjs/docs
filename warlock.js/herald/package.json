@@ -1,0 +1,47 @@
+{
+    "name": "@warlock.js/herald",
+    "version": "4.0.165",
+    "description": "Message bus/communicators for RabbitMQ, Kafka, and more",
+    "main": "./cjs/index.js",
+    "dependencies": {
+        "@mongez/copper": "^1.0.1",
+        "@mongez/events": "^2.1.0",
+        "@mongez/reinforcements": "^2.3.17",
+        "@warlock.js/logger": "4.0.165",
+        "@warlock.js/seal": "4.0.165"
+    },
+    "scripts": {
+        "update": "npx ncu -u",
+        "fix": "eslint --fix -c ./.eslintrc.json ./src",
+        "format": "prettier --write ./src/**/*.{js,jsx,ts,tsx,css,md,json} --config ./.prettierrc.json",
+        "test": "vitest",
+        "test:coverage": "vitest --coverage",
+        "test:watch": "vitest --watch"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/warlockjs/herald"
+    },
+    "peerDependencies": {
+        "amqplib": "^0.10.0"
+    },
+    "peerDependenciesMeta": {
+        "amqplib": {
+            "optional": true
+        }
+    },
+    "keywords": [
+        "message-bus",
+        "rabbitmq",
+        "kafka",
+        "queue",
+        "pub-sub",
+        "communicator",
+        "amqp",
+        "message-broker"
+    ],
+    "author": "hassanzohdy",
+    "license": "MIT",
+    "module": "./esm/index.js",
+    "typings": "./cjs/index.d.ts"
+}
