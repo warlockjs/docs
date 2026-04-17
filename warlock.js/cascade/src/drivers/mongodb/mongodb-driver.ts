@@ -636,7 +636,7 @@ export class MongoDbDriver implements DriverContract {
       }
     }
 
-    return data;
+    return serialized;
   }
 
   /**

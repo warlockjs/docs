@@ -183,7 +183,7 @@ export async function updateById<TModel extends Model>(
   id: string | number,
   data: Record<string, unknown>,
 ): Promise<number> {
-  const result = await ModelClass.getDriver().update(ModelClass.table, { id }, { $set: data });
+  const result = await ModelClass.getDriver().update(ModelClass.table, { [ModelClass.primaryKey]: id }, { $set: data });
   return result.modifiedCount;
 }
 

@@ -183,7 +183,7 @@ export class ModelEvents<TModel> {
    * @param listener - The callback to invoke
    * @returns An unsubscribe function
    */
-  public onSaved<TContext = unknown>(listener: ModelEventListener<TModel, TContext>) {
+  public onSaved<TContext = unknown>(listener: ModelEventListener<TModel, TContext>): () => void {
     return this.on("saved", listener);
   }
 

@@ -1357,7 +1357,7 @@ export class MongoQueryBuilder<T = unknown>
    * Orders results by a date field in descending order (newest first).
    * @param column - The date column to sort by
    */
-  public latest(column: string = "createdAt") {
+  public latest(column: string = "createdAt"): Promise<T[]> {
     return this.orderBy(column, "desc").get();
   }
 

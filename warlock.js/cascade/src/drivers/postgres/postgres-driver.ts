@@ -871,7 +871,7 @@ export class PostgresDriver implements DriverContract {
   /**
    * Perform an atomic update operation.
    *
-   * Uses PostgreSQL's row-level locking for atomicity.
+   * Builds and executes an UPDATE query for the given filter and operations.
    *
    * @param table - Target table name
    * @param filter - Filter conditions
@@ -885,8 +885,6 @@ export class PostgresDriver implements DriverContract {
     operations: UpdateOperations,
     _options?: Record<string, unknown>,
   ): Promise<UpdateResult> {
-    // For PostgreSQL, we use SELECT FOR UPDATE to lock the row
-    // then perform the update
     const { sql, params } = this.buildUpdateQuery(table, filter, operations, 1);
 
     const result = await this.query(sql, params);

@@ -473,13 +473,6 @@ export class DatabaseWriter implements WriterContract {
 
   /**
    * Trigger sync operations after successful save.
-   * Only syncs on updates (not creates) unless sync config specifies embedOnCreate.
-   *
-   * @param changedFields - Fields that were changed (for filtering)
-   * @private
-   */
-  /**
-   * Trigger sync operations after successful save.
    *
    * Emits a model.updated event that ModelSyncOperation listens to.
    * The sync is handled by registered sync operations, not directly here.

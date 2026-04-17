@@ -946,7 +946,7 @@ export class PostgresMigrationDriver implements MigrationDriverContract {
    * @example
    * ```typescript
    * driver.getUuidDefault(); // "gen_random_uuid()"
-   * driver.getUuidDefault({ uuidStrategy: "v7" }); // "uuid_generate_v7()"
+   * driver.getUuidDefault({ uuidStrategy: "v7" }); // "uuidv7()"
    * driver.getUuidDefault({ uuidExpression: "uuid_generate_v1mc()" }); // "uuid_generate_v1mc()"
    * ```
    */

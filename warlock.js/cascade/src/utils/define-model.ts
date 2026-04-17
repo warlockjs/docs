@@ -27,7 +27,8 @@ export type DefineModelOptions<TSchema extends ModelSchema> = {
 
   /**
    * Optional: Delete strategy for the model.
-   * - "hard": Permanently delete records (default)
+   * - "trash": Move records to trash/soft-delete (default)
+   * - "hard": Permanently delete records
    * - "soft": Mark records as deleted but keep them in the database
    * - "disable": Mark records as disabled
    */

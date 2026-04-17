@@ -344,11 +344,6 @@ export interface MigrationContract {
   geometry(column: string): ColumnBuilder;
 
   /**
-   * Add a vector column for AI embeddings.
-   */
-  vector(column: string, dimensions: number): ColumnBuilder;
-
-  /**
    * Add an enum column with allowed values.
    */
   enum(column: string, values: string[]): ColumnBuilder;

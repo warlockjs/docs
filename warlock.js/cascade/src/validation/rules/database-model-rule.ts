@@ -3,7 +3,7 @@ import { ChildModel, Model } from "./../../model/model";
 import { getModelFromRegistry } from "./../../model/register-model";
 
 export const databaseModelRule: SchemaRule = {
-  name: "databaseModule",
+  name: "databaseModel",
   defaultErrorMessage: "The :input must be a valid :model model",
   async validate(value, context) {
     if (value instanceof Model === false) {

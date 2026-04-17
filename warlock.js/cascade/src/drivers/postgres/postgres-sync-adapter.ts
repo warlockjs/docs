@@ -140,14 +140,19 @@ export class PostgresSyncAdapter implements SyncAdapterContract {
     const whereClauses: string[] = [];
     for (const [key, value] of Object.entries(filter)) {
       if (key.includes(".")) {
-        // JSONB path filter
+        // JSONB path filter: intermediate segments use -> (jsonb), final uses ->> (text).
+        // e.g. "column.a" → "column"->>'a', "column.a.b" → "column"->'a'->>'b'
         const [column, ...pathParts] = key.split(".");
         const quotedColumn = this.driver.dialect.quoteIdentifier(column);
-        const jsonPath = pathParts.map((p) => `'${p}'`).join("->>");
+        const intermediateExpr = pathParts
+          .slice(0, -1)
+          .map((p) => `->'${p}'`)
+          .join("");
+        const finalExpr = `->>'${pathParts[pathParts.length - 1]}'`;
         const placeholder = this.driver.dialect.placeholder(paramIndex++);
         params.push(value);
 
-        whereClauses.push(`${quotedColumn}->>${jsonPath} = ${placeholder}`);
+        whereClauses.push(`${quotedColumn}${intermediateExpr}${finalExpr} = ${placeholder}`);
       } else {
         const quotedKey = this.driver.dialect.quoteIdentifier(key);
         const placeholder = this.driver.dialect.placeholder(paramIndex++);
@@ -209,12 +214,14 @@ export class PostgresSyncAdapter implements SyncAdapterContract {
       return `${quotedKey} = ${this.driver.dialect.placeholder(paramIndex++)}`;
     });
 
-    // Use a CTE to update array elements
+    // Use a CTE to update array elements.
+    // ctid is PostgreSQL's built-in physical row identifier, available on every
+    // table regardless of the primary key column name.
     const sql = `
       WITH updated AS (
-        SELECT id, (
+        SELECT ctid, (
           SELECT jsonb_agg(
-            CASE 
+            CASE
               WHEN ${arrayFilterCondition}
               THEN elem || jsonb_build_object(${updateExpr})
               ELSE elem
@@ -228,7 +235,7 @@ export class PostgresSyncAdapter implements SyncAdapterContract {
       UPDATE ${quotedTable} t
       SET ${quotedArrayField} = u.new_array
       FROM updated u
-      WHERE t.id = u.id
+      WHERE t.ctid = u.ctid
     `;
 
     const result = await this.driver.query(sql, params);
