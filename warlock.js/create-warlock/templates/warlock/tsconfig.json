@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["esnext", "dom"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "experimentalDecorators": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "downlevelIteration": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "typeRoots": ["./src/typings.d.ts"],
+    "noFallthroughCasesInSwitch": true,
+    "module": "ESNext",
+    "jsx": "react-jsx",
+    "isolatedModules": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "paths": {
+      "app/*": ["./src/app/*"]
+    },
+    "noEmit": true
+  },
+  "include": ["src", "warlock.config.ts", ".warlock/typings/*.d.ts"],
+  "exclude": ["node_modules"]
+}
