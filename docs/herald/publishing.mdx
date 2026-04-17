@@ -1,0 +1,273 @@
+---
+sidebar_position: 9
+title: Publishing Events
+description: Learn how to publish events to channels with Herald using direct publishing and EventMessage-based approaches.
+---
+
+# Publishing Events
+
+Herald gives you two ways to publish events to channels: **direct publishing** with `channel.publish()` and **structured publishing** via `EventMessage`. Each approach has its place, and you'll often use both in your application.
+
+## Direct Publishing with channel.publish()
+
+The simplest way to publish is to grab a channel and call `publish()` with your payload.
+
+```typescript title="src/services/order-service.ts"
+import { herald } from '@warlock.js/herald';
+
+async function placeOrder(order: Order) {
+  // ... create order logic ...
+
+  // Publish the order.placed event
+  await herald()
+    .channel("order.placed")
+    .publish({
+      orderId: order.id,
+      userId: order.userId,
+      items: order.items,
+      total: order.total,
+    });
+
+  return order;
+}
+```
+
+### Working with typed channels
+
+If you're using TypeScript, define your payload types and use them when creating channels:
+
+```typescript title="src/types/events.ts"
+export interface OrderPlacedPayload {
+  orderId: string;
+  userId: string;
+  items: Array<{ productId: string; quantity: number; price: number }>;
+  total: number;
+}
+```
+
+```typescript title="src/services/order-service.ts"
+import { herald } from '@warlock.js/herald';
+import type { OrderPlacedPayload } from '../types/events';
+
+async function placeOrder(order: Order) {
+  // TypeScript now knows the shape of your payload
+  await herald()
+    .channel<OrderPlacedPayload>("order.placed")
+    .publish({
+      orderId: order.id,
+      userId: order.userId,
+      items: order.items,
+      total: order.total,
+    });
+}
+```
+
+### What publish() returns
+
+The `publish()` method returns a Promise that resolves when the broker has **accepted** the message. This doesn't mean the message has been delivered to consumers—only that the broker has received it and will handle it.
+
+```typescript
+// publish() returns a Promise<void>
+const publishPromise = herald()
+  .channel("order.placed")
+  .publish({ orderId: "123", userId: "user-abc", items: [], total: 99.99 });
+
+await publishPromise; // Broker has accepted the message
+```
+
+:::tip Always await publish()
+Always await the promise returned by `publish()` to catch broker errors. If the broker is down or overloaded, the promise will reject, and you'll know immediately that the message wasn't sent.
+:::
+
+## Publishing via EventMessage
+
+For more control over serialization, versioning, and type safety, you can publish structured `EventMessage` objects. This approach wraps your payload in an envelope and supports event versioning.
+
+```typescript title="src/events/order-placed-event.ts"
+import { EventMessage } from '@warlock.js/herald';
+
+export class OrderPlacedEvent extends EventMessage<OrderPayload> {
+  public eventName = "order.placed";
+  public version = 1;
+
+  constructor(data: Order) {
+    super(data);
+  }
+
+  public toJSON(): OrderPayload {
+    return {
+      orderId: this.data.id,
+      userId: this.data.userId,
+      items: this.data.items,
+      total: this.data.total,
+    };
+  }
+}
+```
+
+Then publish with `publishEvent()`:
+
+```typescript title="src/services/order-service.ts"
+import { publishEvent } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/order-placed-event';
+
+async function placeOrder(order: Order) {
+  // ... create order logic ...
+
+  // Publish using EventMessage
+  await publishEvent(new OrderPlacedEvent(order));
+
+  return order;
+}
+```
+
+For more details on defining and versioning events, see the [Event Messages](/docs/herald/event-messages) page.
+
+## Real-World Example: Order Service
+
+Here's a realistic OrderService that publishes multiple events as an order progresses:
+
+```typescript title="src/services/order-service.ts"
+import { herald, publishEvent } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/order-placed-event';
+import { PaymentProcessedEvent } from '../events/payment-processed-event';
+import { InventoryUpdatedEvent } from '../events/inventory-updated-event';
+
+export class OrderService {
+  async placeOrder(userId: string, items: OrderItem[]): Promise<Order> {
+    // Create the order
+    const order = await this.createOrderInDatabase(userId, items);
+
+    // Publish the order.placed event
+    await publishEvent(new OrderPlacedEvent(order));
+
+    return order;
+  }
+
+  async processPayment(orderId: string, method: string): Promise<void> {
+    const order = await this.getOrder(orderId);
+    
+    // Process payment with payment gateway
+    const result = await this.paymentGateway.charge(order.total, method);
+
+    // Mark order as paid
+    await this.markOrderAsPaid(orderId, result.transactionId);
+
+    // Publish payment event
+    await publishEvent(
+      new PaymentProcessedEvent({
+        orderId: order.id,
+        amount: order.total,
+        method,
+      })
+    );
+  }
+
+  async updateInventory(orderId: string): Promise<void> {
+    const order = await this.getOrder(orderId);
+
+    for (const item of order.items) {
+      // Decrement inventory
+      await this.inventoryService.decrement(item.productId, item.quantity);
+
+      // Publish inventory.updated event
+      await publishEvent(
+        new InventoryUpdatedEvent({
+          productId: item.productId,
+          quantity: -item.quantity,
+          warehouseId: "main",
+        })
+      );
+    }
+  }
+}
+```
+
+## Publishing from HTTP Handlers
+
+You'll often publish events from route handlers or controllers:
+
+```typescript title="src/routes/orders.ts"
+import { Router, Request, Response } from 'express';
+import { herald, publishEvent } from '@warlock.js/herald';
+import { OrderService } from '../services/order-service';
+import { OrderPlacedEvent } from '../events/order-placed-event';
+
+const router = Router();
+const orderService = new OrderService();
+
+router.post('/orders', async (req: Request, res: Response) => {
+  try {
+    const { userId, items } = req.body;
+
+    // Create the order
+    const order = await orderService.placeOrder(userId, items);
+
+    // Publish event
+    await publishEvent(new OrderPlacedEvent(order));
+
+    res.status(201).json({ orderId: order.id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+export default router;
+```
+
+## Bulk Publishing Pattern
+
+When you need to publish multiple events at once, use `Promise.all()` to send them concurrently:
+
+```typescript title="src/services/order-service.ts"
+async function completeOrderFulfillment(orderId: string) {
+  const order = await this.getOrder(orderId);
+
+  // Publish all inventory updates concurrently
+  const inventoryEvents = order.items.map(item =>
+    publishEvent(
+      new InventoryUpdatedEvent({
+        productId: item.productId,
+        quantity: -item.quantity,
+        warehouseId: "main",
+      })
+    )
+  );
+
+  // Publish all at once
+  await Promise.all(inventoryEvents);
+
+  // Also publish fulfillment event
+  await publishEvent(new OrderFulfilledEvent(order));
+}
+```
+
+:::info Herald doesn't batch internally
+Herald publishes each message individually; it doesn't wait to batch multiple events into one batch. Use `Promise.all()` to publish multiple events concurrently without waiting for each one to complete before starting the next.
+:::
+
+## Error Handling
+
+When the broker is down or unavailable, the `publish()` promise will reject:
+
+```typescript title="src/services/order-service.ts"
+async function placeOrder(order: Order) {
+  try {
+    await publishEvent(new OrderPlacedEvent(order));
+  } catch (error) {
+    // Broker is down or other network error
+    console.error('Failed to publish order.placed event:', error);
+    
+    // Handle gracefully: retry, log, notify ops, etc.
+    await this.notifyOps(`Order ${order.id} published but event failed`);
+  }
+}
+```
+
+In production, consider wrapping event publishing in a retry mechanism or circuit breaker to handle transient broker failures.
+
+## See Also
+
+- [Event Messages](/docs/herald/event-messages) — Type-safe EventMessage definitions
+- [Publish Options](/docs/herald/publish-options) — Control message priority, TTL, delays, and more
+- [Channels](/docs/herald/channels) — Deep dive into channel organization

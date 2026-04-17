@@ -1,0 +1,369 @@
+---
+sidebar_position: 5
+title: Managing Multiple Brokers
+description: Connect multiple message brokers to separate concerns and improve reliability
+---
+
+As your application grows, you may find that different parts need different messaging characteristics. Herald supports connecting **multiple brokers simultaneously**, each with its own name and configuration.
+
+## Why use multiple brokers?
+
+In a real-world application, you might need:
+
+- **Orders broker** (RabbitMQ with durability) — for critical business events like order.placed, payment.processed
+- **Analytics broker** (Kafka) — for high-volume analytics and tracking events that can tolerate occasional loss
+- **Notifications broker** (Redis Streams) — for user notifications that need low latency but not necessarily durability
+
+Each broker can be optimized for its use case, isolated from the others, and independently managed.
+
+## Connecting multiple brokers
+
+Register each broker with a unique name, and mark one as the default:
+
+```typescript title="src/brokers.ts"
+import { connectToBroker, brokerRegistry } from "@warlock.js/herald";
+
+export async function initializeBrokers() {
+  // Primary broker for order events (default)
+  await connectToBroker({
+    driver: "rabbitmq",
+    name: "orders",
+    isDefault: true,
+    host: process.env.RABBITMQ_HOST,
+    port: parseInt(process.env.RABBITMQ_PORT),
+  });
+
+  // Analytics broker (Kafka)
+  await connectToBroker({
+    driver: "kafka",
+    name: "analytics",
+    isDefault: false,
+    brokers: [process.env.KAFKA_BROKERS],
+  });
+
+  // Notifications broker (Redis Streams)
+  await connectToBroker({
+    driver: "redis-streams",
+    name: "notifications",
+    isDefault: false,
+    host: process.env.REDIS_HOST,
+    port: parseInt(process.env.REDIS_PORT),
+  });
+
+  console.log("✓ All brokers connected");
+}
+```
+
+Notice the `isDefault: true` on the first broker and `isDefault: false` on the others. Only one broker should be the default.
+
+## Accessing a specific broker
+
+Use the `herald()` function with the broker name as an argument:
+
+```typescript
+import { herald } from "@warlock.js/herald";
+
+// Get the orders broker (default)
+const ordersBroker = herald();
+// Or be explicit:
+const ordersBroker = herald("orders");
+
+// Get the analytics broker
+const analyticsBroker = herald("analytics");
+
+// Get the notifications broker
+const notificationsBroker = herald("notifications");
+```
+
+Each broker instance has the same interface: you can call `.channel()`, `.on()`, etc.
+
+```typescript
+// Publish order events to the orders broker
+herald("orders").channel("orders").publish("order.placed", { ... });
+
+// Publish analytics events to the analytics broker
+herald("analytics").channel("events").publish("user.signup", { ... });
+
+// Publish notifications to the notifications broker
+herald("notifications").channel("notifications").publish("email.sent", { ... });
+```
+
+## The default broker
+
+When you call `herald()` with no arguments, you get the **default broker**:
+
+```typescript
+// These are equivalent if "orders" is the default
+herald().channel("orders");
+herald("orders").channel("orders");
+```
+
+The default broker is the **first one connected** with `isDefault: true`, or the first one connected overall if none explicitly set `isDefault: true`.
+
+To check if a broker is the default:
+
+```typescript
+const broker = herald("orders");
+if (broker.isDefault) {
+  console.log("This is the default broker");
+}
+```
+
+## The BrokerRegistry API
+
+The global `brokerRegistry` object lets you inspect and manage all connected brokers:
+
+```typescript
+import { brokerRegistry } from "@warlock.js/herald";
+
+// Get a specific broker by name
+const analyticsBroker = brokerRegistry.get("analytics");
+
+// Get the default broker
+const defaultBroker = brokerRegistry.getDefault();
+
+// Check if a broker exists
+if (brokerRegistry.has("notifications")) {
+  console.log("Notifications broker is connected");
+}
+
+// Get all brokers
+const allBrokers = brokerRegistry.all();
+allBrokers.forEach((broker) => {
+  console.log(`- ${broker.name} (default: ${broker.isDefault})`);
+});
+
+// Listen to registry events
+brokerRegistry.on("registered", (broker) => {
+  console.log(`Broker registered: ${broker.name}`);
+});
+
+brokerRegistry.on("connected", (broker) => {
+  console.log(`Broker connected: ${broker.name}`);
+});
+```
+
+## Real-world example: e-commerce with three brokers
+
+Here's a complete example of an e-commerce application using three separate brokers:
+
+```typescript title="src/main.ts"
+import express from "express";
+import { connectToBroker, herald, brokerRegistry } from "@warlock.js/herald";
+
+const app = express();
+app.use(express.json());
+
+// Initialize all brokers
+async function initializeBrokers() {
+  // Orders broker (RabbitMQ, default) — for critical business events
+  await connectToBroker({
+    driver: "rabbitmq",
+    name: "orders",
+    isDefault: true,
+    host: process.env.RABBITMQ_HOST || "localhost",
+    port: parseInt(process.env.RABBITMQ_PORT || "5672"),
+  });
+
+  // Analytics broker (Kafka) — for high-volume tracking
+  await connectToBroker({
+    driver: "kafka",
+    name: "analytics",
+    isDefault: false,
+    brokers: (process.env.KAFKA_BROKERS || "localhost:9092").split(","),
+  });
+
+  // Notifications broker (Redis Streams) — for low-latency alerts
+  await connectToBroker({
+    driver: "redis-streams",
+    name: "notifications",
+    isDefault: false,
+    host: process.env.REDIS_HOST || "localhost",
+    port: parseInt(process.env.REDIS_PORT || "6379"),
+  });
+
+  console.log("✓ All brokers connected");
+}
+
+// OrderService — publishes to orders broker
+class OrderService {
+  async createOrder(data: any) {
+    const order = await saveOrder(data);
+
+    // Publish to orders broker (explicit)
+    await herald("orders").channel("orders").publish("order.placed", {
+      orderId: order.id,
+      userId: order.userId,
+      total: order.total,
+    });
+
+    return order;
+  }
+
+  async processPayment(orderId: string, amount: number) {
+    const result = await processPaymentGateway(orderId, amount);
+
+    // Publish to orders broker
+    await herald("orders").channel("orders").publish("payment.processed", {
+      orderId,
+      amount,
+      status: result.status,
+    });
+
+    return result;
+  }
+}
+
+// AnalyticsService — publishes to analytics broker
+class AnalyticsService {
+  async trackUserSignup(userId: string) {
+    // Fire-and-forget: don't wait for analytics
+    herald("analytics").channel("events").publish("user.signup", {
+      userId,
+      timestamp: new Date().toISOString(),
+    }).catch((err) => console.error("Analytics error:", err));
+  }
+
+  async trackPurchase(userId: string, orderId: string, amount: number) {
+    herald("analytics").channel("events").publish("purchase.completed", {
+      userId,
+      orderId,
+      amount,
+      timestamp: new Date().toISOString(),
+    }).catch((err) => console.error("Analytics error:", err));
+  }
+}
+
+// NotificationService — publishes to notifications broker
+class NotificationService {
+  async sendOrderConfirmation(userId: string, orderId: string) {
+    // Publish to notifications broker with low latency
+    await herald("notifications").channel("notifications").publish("send_email", {
+      userId,
+      template: "order_confirmation",
+      orderId,
+    });
+  }
+
+  async sendPaymentReminder(userId: string, orderId: string) {
+    await herald("notifications").channel("notifications").publish("send_email", {
+      userId,
+      template: "payment_reminder",
+      orderId,
+    });
+  }
+}
+
+// API endpoints
+app.post("/api/orders", async (req, res) => {
+  try {
+    const order = await new OrderService().createOrder(req.body);
+    await new NotificationService().sendOrderConfirmation(order.userId, order.id);
+    await new AnalyticsService().trackPurchase(order.userId, order.id, order.total);
+
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/health", async (req, res) => {
+  const brokers = brokerRegistry.all();
+  const status = {};
+
+  for (const broker of brokers) {
+    status[broker.name] = {
+      isDefault: broker.isDefault,
+      driver: broker.driver.constructor.name,
+    };
+  }
+
+  res.json({ brokers: status });
+});
+
+// Start the app
+async function start() {
+  await initializeBrokers();
+
+  app.listen(3000, () => {
+    console.log("✓ Server listening on http://localhost:3000");
+  });
+}
+
+start().catch(console.error);
+```
+
+## Publishing to specific brokers
+
+Here's the pattern for publishing to different brokers based on event type:
+
+```typescript
+import { herald } from "@warlock.js/herald";
+
+export class EventPublisher {
+  // Business-critical events → orders broker (durable)
+  async publishOrderEvent(event: string, payload: any) {
+    return herald("orders").channel("orders").publish(event, payload);
+  }
+
+  // High-volume analytics → analytics broker (optimized for throughput)
+  async publishAnalyticsEvent(event: string, payload: any) {
+    return herald("analytics").channel("events").publish(event, payload);
+  }
+
+  // Time-sensitive notifications → notifications broker (low latency)
+  async publishNotificationEvent(event: string, payload: any) {
+    return herald("notifications").channel("notifications").publish(event, payload);
+  }
+}
+```
+
+## Environment-driven broker selection
+
+In development, you might not have all brokers available. Use environment variables to conditionally connect only what you need:
+
+```typescript title="src/brokers.ts"
+import { connectToBroker } from "@warlock.js/herald";
+
+export async function initializeBrokers() {
+  // Always connect the primary broker
+  await connectToBroker({
+    driver: "rabbitmq",
+    name: "orders",
+    isDefault: true,
+    host: process.env.RABBITMQ_HOST,
+  });
+
+  // Conditionally connect analytics broker
+  if (process.env.ENABLE_ANALYTICS === "true") {
+    await connectToBroker({
+      driver: "kafka",
+      name: "analytics",
+      brokers: [process.env.KAFKA_BROKERS],
+    });
+  }
+
+  // Conditionally connect notifications broker
+  if (process.env.ENABLE_NOTIFICATIONS === "true") {
+    await connectToBroker({
+      driver: "redis-streams",
+      name: "notifications",
+      host: process.env.REDIS_HOST,
+    });
+  }
+
+  console.log("✓ Brokers initialized");
+}
+```
+
+:::tip
+Use named brokers to isolate concerns. Critical business events (orders, payments) should go to a reliable, durable broker. Analytics and tracking can go to a high-throughput broker that's more lenient about durability. This way, a spike in analytics traffic won't slow down your order processing.
+:::
+
+---
+
+## Up next
+
+- **[Connecting to a Broker](./connecting.mdx)** — Learn the basics of `connectToBroker()`
+- **[Broker Events](./broker-events.mdx)** — Listen for connection and error events across all brokers
+- **[Error Handling](./error-handling.mdx)** — Handle errors gracefully in a multi-broker setup

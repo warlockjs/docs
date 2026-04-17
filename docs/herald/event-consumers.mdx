@@ -1,0 +1,425 @@
+---
+sidebar_position: 13
+title: "Event Consumers"
+description: "Build type-safe event consumers that auto-validate payloads, filter by version, and maintain stable consumer identities."
+---
+
+# Event Consumers
+
+**EventConsumer** classes give you type safety, automatic schema validation, version filtering, and structured event handling. This is the recommended pattern for production applications.
+
+## What EventConsumer Gives You
+
+- **Type safety** — Your payload is properly typed and accessible
+- **Auto-routing** — Herald automatically subscribes to the correct event channel using `eventName`
+- **Schema validation** — Optionally auto-validate payloads before your handler runs
+- **Version filtering** — Accept or reject events based on version ranges (crucial for migrations)
+- **Metadata access** — Event envelope with `messageId`, `occurredAt`, `metadata`, and raw message access
+- **Stable identity** — Set a persistent `consumerId` for queue position tracking across restarts
+
+## Defining an EventConsumer Class
+
+Create a class extending `EventConsumer<PayloadType>` and implement the `handle()` method:
+
+```typescript title="src/events/consumers/order-notification.consumer.ts"
+import { EventConsumer, ConsumedEventMessage } from "@warlock.js/herald";
+
+interface OrderPayload {
+  orderId: string;
+  userId: string;
+  total: number;
+}
+
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+
+  public async handle(payload: OrderPayload, event: ConsumedEventMessage) {
+    await sendConfirmationEmail(payload.userId, {
+      orderId: payload.orderId,
+      total: payload.total,
+      placedAt: event.occurredAt,
+    });
+    
+    console.log(`Processed order ${payload.orderId} (messageId: ${event.messageId})`);
+  }
+}
+```
+
+### Static eventName (Required)
+
+The `eventName` **must** be a `static` property on your class. Herald uses this to auto-subscribe to the correct event channel.
+
+```typescript
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";  // ✓ correct
+  // NOT: public eventName = "order.placed";  (instance property won't work)
+```
+
+:::danger
+If you accidentally make `eventName` an instance property, Herald won't find it and the consumer won't subscribe. Always use `public static eventName`.
+:::
+
+### The handle() Signature
+
+Your `handle()` method receives two parameters:
+
+**`payload: PayloadType`** — The event data, fully typed:
+```typescript
+public async handle(payload: OrderPayload, event: ConsumedEventMessage) {
+  payload.orderId  // string — type-safe
+  payload.userId   // string
+  payload.total    // number
+}
+```
+
+**`event: ConsumedEventMessage`** — The message envelope containing:
+- `messageId` — Unique ID for this message
+- `eventName` — The event channel name
+- `version` — Event schema version (for versioning migrations)
+- `occurredAt` — JavaScript Date when the event occurred
+- `metadata` — Custom headers and message metadata (e.g., `correlationId`, `retryCount`)
+- `message` — The raw Message object for low-level access
+
+Example: Using event metadata:
+
+```typescript
+public async handle(payload: OrderPayload, event: ConsumedEventMessage) {
+  const { messageId, version, occurredAt, metadata } = event;
+
+  logger.info("Processing order event", {
+    orderId: payload.orderId,
+    messageId,
+    version,
+    occurredAt,
+    correlationId: metadata.correlationId,
+  });
+
+  if (version < 2) {
+    logger.warn("Old event version", { version });
+  }
+
+  await processOrder(payload);
+}
+```
+
+## Payload Schema Validation
+
+Set the `schema` property (an instance property, not static) to auto-validate payloads before `handle()` is called:
+
+```typescript title="src/events/consumers/order-notification.consumer.ts"
+import { EventConsumer, ConsumedEventMessage } from "@warlock.js/herald";
+import { v } from "@warlock.js/seal";
+
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+
+  // Herald validates this before calling handle()
+  public schema = v.object({
+    orderId: v.string().required(),
+    userId: v.string().required(),
+    total: v.number().required().min(0),
+  });
+
+  public async handle(payload: OrderPayload, event: ConsumedEventMessage) {
+    // payload is guaranteed valid here
+    await sendConfirmationEmail(payload.userId, payload.orderId);
+  }
+}
+```
+
+:::info
+If validation fails, **handle() is NOT called**. The message is nacked and goes to the dead letter queue (if configured). This prevents invalid data from being processed.
+:::
+
+## Version Filtering
+
+Use `minVersion` and `maxVersion` static properties to filter events by version. This is essential for handling schema migrations without downtime.
+
+```typescript
+export class OrderNotificationConsumerV2 extends EventConsumer<OrderPayloadV2> {
+  public static eventName = "order.placed";
+  public static minVersion = 2;        // reject v1 events
+  // public static maxVersion = 3;     // optional: v2–v3 only
+
+  public async handle(payload: OrderPayloadV2, event: ConsumedEventMessage) {
+    // Herald only calls this for events where version >= 2
+    await sendRichNotification(payload);
+  }
+}
+```
+
+**Use case:** Run both V1 and V2 consumers simultaneously during a migration window:
+- V1 consumer: `minVersion = 1, maxVersion = 1` (legacy data)
+- V2 consumer: `minVersion = 2` (new feature)
+
+Herald checks `isAcceptedVersion(version)` before calling `handle()`.
+
+## Setting a Stable Consumer ID
+
+By default, Herald auto-generates a UUID for each consumer instance. Override `consumerId` to set a stable ID for stateful consumption:
+
+```typescript
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+  public static consumerId = "notification-svc-order";  // stable across restarts
+
+  public async handle(payload: OrderPayload, event: ConsumedEventMessage) {
+    await sendConfirmationEmail(payload.userId, payload.orderId);
+  }
+}
+```
+
+:::tip
+Always set `consumerId` for stateful consumers (those tracking queue position or offset). This ensures the consumer reconnects to the same position after a restart, avoiding duplicate or skipped message processing.
+:::
+
+## Using defineConsumer()
+
+For lightweight consumers, use the `defineConsumer()` factory function. **Important: `defineConsumer()` auto-applies `@Consumable()` internally — do NOT also add the decorator.**
+
+```typescript title="src/events/consumers/order-analytics.consumer.ts"
+import { defineConsumer } from "@warlock.js/herald";
+import { v } from "@warlock.js/seal";
+
+interface OrderPayload {
+  orderId: string;
+  total: number;
+  itemCount: number;
+}
+
+export const OrderAnalyticsConsumer = defineConsumer<OrderPayload>(
+  "order.placed",
+  {
+    async handle(payload, event) {
+      await analytics.track("order_placed", {
+        orderId: payload.orderId,
+        total: payload.total,
+        processedAt: event.occurredAt,
+      });
+    },
+  }
+);
+// That's it — automatically registered via @Consumable internally
+```
+
+### With Schema Validation
+
+```typescript
+export const OrderConsumer = defineConsumer<OrderPayload>(
+  "order.placed",
+  {
+    schema: v.object({
+      orderId: v.string().required(),
+      total: v.number().required().min(0),
+      itemCount: v.number().required().min(1),
+    }),
+
+    async handle(payload, event) {
+      // payload is guaranteed valid
+      await processOrder(payload);
+    },
+
+    // Optional custom validation (runs after schema, before handle)
+    async validate(payload) {
+      const order = await db.orders.findById(payload.orderId);
+      if (!order) {
+        console.warn(`Order not found: ${payload.orderId}`);
+        return false;  // false or falsy = skip handle()
+      }
+      return true;  // or ValidationResult object
+    },
+  }
+);
+```
+
+If `validate()` returns falsy or an invalid `ValidationResult`, `handle()` is not called.
+
+## Manual Subscription
+
+Use `subscribeConsumer()` to manually subscribe a consumer without the `@Consumable()` decorator. This is useful for non-default brokers, dynamic subscriptions, or testing:
+
+```typescript
+import { subscribeConsumer } from "@warlock.js/herald";
+
+// Subscribe to the default broker
+await subscribeConsumer(OrderNotificationConsumer);
+```
+
+## Class vs. defineConsumer()
+
+| Scenario | Recommendation |
+|----------|---|
+| Simple handler, no dependencies | `defineConsumer()` |
+| Need version filtering (`minVersion`/`maxVersion`) | Class |
+| Need stable `consumerId` | Class |
+| Complex logic, multiple methods, or dependency injection | Class |
+| Quick inline consumer | `defineConsumer()` |
+| Multiple services listening to the same event | Class (one per service) |
+
+## Real-World Example: E-Commerce Platform
+
+Here are four consumers for a typical e-commerce system:
+
+```typescript title="src/events/consumers/order-notification.consumer.ts"
+import { EventConsumer, ConsumedEventMessage } from "@warlock.js/herald";
+import { v } from "@warlock.js/seal";
+
+interface OrderPayload {
+  orderId: string;
+  userId: string;
+  total: number;
+  items: Array<{ sku: string; quantity: number }>;
+}
+
+@Consumable()
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+  public static consumerId = "notification-svc-order";
+  public static minVersion = 1;
+
+  public schema = v.object({
+    orderId: v.string().required(),
+    userId: v.string().required(),
+    total: v.number().required().min(0),
+    items: v.array(v.object({
+      sku: v.string().required(),
+      quantity: v.number().required().min(1),
+    })),
+  });
+
+  public async handle(payload: OrderPayload, event: ConsumedEventMessage) {
+    await emailService.sendOrderConfirmation(payload.userId, {
+      orderId: payload.orderId,
+      total: payload.total,
+      placedAt: event.occurredAt,
+    });
+  }
+}
+```
+
+```typescript title="src/events/consumers/inventory-update.consumer.ts"
+export class InventoryUpdateConsumer extends EventConsumer<InventoryPayload> {
+  public static eventName = "inventory.updated";
+  public static consumerId = "inventory-svc";
+
+  public async handle(payload: InventoryPayload, event: ConsumedEventMessage) {
+    await db.collection("inventory").updateOne(
+      { skuId: payload.skuId },
+      { 
+        $set: { quantity: payload.quantity, updatedAt: event.occurredAt },
+        $inc: { version: 1 }
+      }
+    );
+  }
+}
+```
+
+```typescript title="src/events/consumers/payment-verification.consumer.ts"
+export class PaymentVerificationConsumer extends EventConsumer<PaymentPayload> {
+  public static eventName = "payment.processed";
+  public static consumerId = "payment-svc-verify";
+
+  public async handle(payload: PaymentPayload, event: ConsumedEventMessage) {
+    const isValid = await paymentProvider.verify(payload.paymentId);
+    
+    if (!isValid) {
+      throw new Error(`Payment ${payload.paymentId} failed verification`);
+    }
+    
+    await db.collection("payments").insertOne({
+      paymentId: payload.paymentId,
+      amount: payload.amount,
+      status: "verified",
+      verifiedAt: new Date()
+    });
+  }
+}
+```
+
+```typescript title="src/events/consumers/analytics.consumer.ts"
+export const AnalyticsConsumer = defineConsumer<OrderPayload>(
+  "order.placed",
+  {
+    async handle(payload, event) {
+      await analytics.track("order_placed", {
+        orderId: payload.orderId,
+        total: payload.total,
+        itemCount: payload.items.length,
+        source: event.metadata.source,
+      });
+    },
+  }
+);
+```
+
+:::tip
+Keep one consumer class per event type. Even if multiple services listen to the same event, create separate consumer classes for each. This makes the code graph clear and testing straightforward.
+:::
+
+## Error Handling
+
+If your `handle()` method throws an error:
+
+1. Herald emits the error on the driver's `"error"` event
+2. The message is **not acknowledged** and will be re-delivered
+3. If configured with retry options, Herald retries before giving up
+4. Unrecoverable messages go to the dead letter queue
+
+```typescript
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+
+  public async handle(payload: OrderPayload, event: ConsumedEventMessage) {
+    try {
+      await sendConfirmationEmail(payload.userId, payload.orderId);
+    } catch (error) {
+      logger.error("Email failed", { 
+        orderId: payload.orderId, 
+        messageId: event.messageId,
+        error 
+      });
+      throw error;  // Herald will retry or send to dead letter
+    }
+  }
+}
+```
+
+Listen for errors at the driver level:
+
+```typescript
+const driver = herald.getDriver();
+driver.on("error", (error, message) => {
+  logger.error("Consumer error", {
+    error: error.message,
+    eventName: message?.eventName,
+    messageId: message?.messageId
+  });
+});
+```
+
+For advanced error handling and retries, see [Error Handling & Retries](/docs/herald/error-handling).
+
+## Consumer Identity and State
+
+Each consumer maintains state in the broker (queue position, retries, etc.). The identity is determined by:
+
+1. **`static consumerId`** — If set, use this value (recommended for production)
+2. **Auto-generated UUID** — If not set, Herald generates a UUID on first load
+
+```typescript
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+  
+  // Auto-generated: 550e8400-e29b-41d4-a716-446655440000 (new UUID each restart)
+  // ↑ This can cause duplicate processing — set consumerId instead!
+
+  public static consumerId = "notification-svc-order";
+  // ↑ This ID persists across restarts → queue position is preserved
+}
+```
+
+## Next Steps
+
+- See [The @Consumable Decorator](/docs/herald/consumable-decorator) for automatic registration
+- See [Subscribe Options](/docs/herald/subscribe-options) for advanced configuration (prefetch, concurrency, retries)
+- See [Consuming Messages](/docs/herald/consuming) for manual subscription control

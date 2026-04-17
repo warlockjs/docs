@@ -1,0 +1,360 @@
+---
+sidebar_position: 7
+title: Working with Channels
+description: Learn how to create, name, and manage Herald channels for message routing
+---
+
+# Working with Channels
+
+A **channel** is the core routing unit in Herald — it's a named queue or topic where messages are published and consumed. Think of it as a dedicated inbox for a specific event or command in your application.
+
+## Creating Channels
+
+Channels are created on-demand and automatically cached by the broker. When you request a channel that doesn't exist yet, Herald creates it; when you request it again, you get the same instance back.
+
+```typescript title="src/orders/channels.ts"
+import { herald } from "@warlock.js/herald";
+
+// Create and get a channel
+const orderChannel = herald().channel<OrderPayload>("order.placed");
+
+// Request the same channel again — returns the cached instance
+const sameChannel = herald().channel<OrderPayload>("order.placed");
+
+console.log(orderChannel === sameChannel); // true
+```
+
+## Generic Type Parameter: `<TPayload>`
+
+The generic type `<TPayload>` tells Herald (and TypeScript) what shape of message this channel expects. This gives you full type safety when publishing and subscribing.
+
+```typescript title="src/orders/channels.ts"
+interface OrderPayload {
+  orderId: number;
+  customerId: string;
+  total: number;
+  items: Array<{ sku: string; quantity: number }>;
+}
+
+// TypeScript knows this channel only accepts OrderPayload
+const channel = herald().channel<OrderPayload>("order.placed");
+
+// ✅ Valid — matches the type
+channel.publish({ orderId: 1, customerId: "user-123", total: 99.99, items: [] });
+
+// ❌ TypeScript error — missing required fields
+channel.publish({ orderId: 1 });
+```
+
+## `heraldChannel()` Shorthand vs `herald().channel()`
+
+Both do the same thing — they create or retrieve a channel. Use whichever feels more natural in your code:
+
+```typescript title="src/orders/service.ts"
+import { herald, heraldChannel } from "@warlock.js/herald";
+
+// Option 1: through the broker
+const channel1 = herald().channel<OrderPayload>("order.placed");
+
+// Option 2: shorthand (cleaner for one-off usage)
+const channel2 = heraldChannel<OrderPayload>("order.placed");
+
+// Both return the same cached instance
+console.log(channel1 === channel2); // true
+```
+
+**When to use each:**
+- Use **`heraldChannel()`** for quick, one-off channel access in service methods
+- Use **`herald().channel()`** when working with a specific broker instance or managing multiple brokers
+
+## Caching Behavior
+
+Channels are **automatically cached by the broker**. This means:
+
+1. The first call to `channel("order.placed")` creates it
+2. All subsequent calls return the same instance
+3. No performance penalty for requesting a channel multiple times
+4. Subscriptions and state persist across requests
+
+```typescript title="src/services/OrderService.ts"
+class OrderService {
+  async placeOrder(order: Order) {
+    // These all get the same cached channel instance
+    const channel = herald().channel<OrderPayload>("order.placed");
+    
+    channel.publish({ orderId: order.id, customerId: order.customerId, total: order.total, items: order.items });
+  }
+}
+
+class PaymentService {
+  subscribeToOrders() {
+    // Even though we're in a different service, we get the same channel
+    const channel = herald().channel<OrderPayload>("order.placed");
+    
+    channel.subscribe((payload) => {
+      console.log(`Processing payment for order ${payload.orderId}`);
+    });
+  }
+}
+```
+
+## Channel Naming Conventions
+
+Use the **`resource.action`** pattern for consistent, readable channel names:
+
+| Pattern | Example | Use Case |
+|---------|---------|----------|
+| `{resource}.{past-tense-action}` | `order.placed`, `payment.processed` | Events (something happened) |
+| `{resource}.{command}` | `user.update`, `inventory.sync` | Commands (do something) |
+| `{resource}.{status}` | `order.status`, `payment.status` | RPC/Request-Reply channels |
+
+:::tip Naming Best Practices
+- Use **lowercase** with dot separators
+- Use **past tense** for events: `placed`, `processed`, `updated`
+- Use **imperative** for commands: `update`, `delete`, `sync`
+- Be **specific**: `order.created` not `event`, `payment.processed` not `messages`
+- Avoid abbreviations: `order.placed` not `ord.plc`
+:::
+
+```typescript title="src/config/channels.ts"
+// Good: clear, consistent naming following resource.action pattern
+export const OrderChannels = {
+  placed: heraldChannel<OrderPlacedPayload>("order.placed"),
+  confirmed: heraldChannel<OrderConfirmedPayload>("order.confirmed"),
+  shipped: heraldChannel<OrderShippedPayload>("order.shipped"),
+  status: heraldChannel<OrderStatusRequest>("order.status"), // RPC channel
+};
+
+export const PaymentChannels = {
+  processed: heraldChannel<PaymentProcessedPayload>("payment.processed"),
+  failed: heraldChannel<PaymentFailedPayload>("payment.failed"),
+  refunded: heraldChannel<PaymentRefundedPayload>("payment.refunded"),
+};
+
+export const InventoryChannels = {
+  updated: heraldChannel<InventoryUpdatedPayload>("inventory.updated"),
+  sync: heraldChannel<InventorySyncPayload>("inventory.sync"),
+};
+
+export const NotificationChannels = {
+  sent: heraldChannel<NotificationSentPayload>("notification.sent"),
+};
+```
+
+## Multiple Channels in Your Application
+
+A real application typically uses many channels. Here's how the e-commerce platform is structured:
+
+```typescript title="src/config/channels.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+// Order flow
+export const orderPlacedChannel = heraldChannel<OrderPlacedPayload>("order.placed");
+export const orderConfirmedChannel = heraldChannel<OrderConfirmedPayload>("order.confirmed");
+
+// Payment flow
+export const paymentProcessedChannel = heraldChannel<PaymentProcessedPayload>("payment.processed");
+export const paymentFailedChannel = heraldChannel<PaymentFailedPayload>("payment.failed");
+
+// Inventory updates
+export const inventoryUpdatedChannel = heraldChannel<InventoryUpdatedPayload>("inventory.updated");
+
+// Notifications
+export const notificationSentChannel = heraldChannel<NotificationSentPayload>("notification.sent");
+
+// RPC channels (request-reply patterns)
+export const orderStatusChannel = heraldChannel<OrderStatusRequest, OrderStatusResponse>("order.status");
+```
+
+Then import and use them throughout your services:
+
+```typescript title="src/services/OrderService.ts"
+import { orderPlacedChannel, paymentProcessedChannel } from "@/config/channels";
+
+export class OrderService {
+  async placeOrder(order: CreateOrderDTO) {
+    const savedOrder = await Order.create(order);
+    
+    // Publish the order.placed event
+    await orderPlacedChannel.publish({
+      orderId: savedOrder.id,
+      customerId: order.customerId,
+      total: order.total,
+      items: order.items,
+    });
+    
+    return savedOrder;
+  }
+
+  setupSubscriptions() {
+    // Listen for payment confirmations
+    paymentProcessedChannel.subscribe((payment) => {
+      console.log(`Payment confirmed for order ${payment.orderId}`);
+      // Update order status, send confirmation email, etc.
+    });
+  }
+}
+```
+
+## Getting Channel Statistics
+
+Use `channel.stats()` to inspect the channel's current state:
+
+```typescript title="src/admin/ChannelMonitor.ts"
+import { orderPlacedChannel } from "@/config/channels";
+
+const stats = orderPlacedChannel.stats();
+
+console.log(stats);
+// {
+//   name: "order.placed",
+//   messageCount: 1250,      // Messages currently in queue
+//   consumerCount: 3         // Active subscribers
+// }
+```
+
+This is useful for monitoring, debugging, and ensuring your channels are being consumed properly:
+
+```typescript title="src/health/healthCheck.ts"
+export async function checkChannelHealth() {
+  const channels = [
+    orderPlacedChannel,
+    paymentProcessedChannel,
+    inventoryUpdatedChannel,
+  ];
+
+  for (const channel of channels) {
+    const stats = channel.stats();
+    
+    // Alert if messages are piling up
+    if (stats.messageCount > 1000) {
+      console.warn(`Channel ${stats.name} has ${stats.messageCount} pending messages`);
+    }
+    
+    // Alert if no consumers are listening
+    if (stats.consumerCount === 0) {
+      console.warn(`Channel ${stats.name} has no active consumers`);
+    }
+  }
+}
+```
+
+## Closing Channels
+
+Channels can be explicitly closed with `channel.close()`. This is useful for cleanup, testing, or when a channel is no longer needed.
+
+```typescript title="src/services/OrderService.ts"
+// Close a channel when done with it
+orderPlacedChannel.close();
+
+// After closing, subscriptions are cancelled and no new messages can be published
+// (attempting to publish will throw an error)
+```
+
+:::info When to Close Channels
+- **Testing**: clean up channels between test suites
+- **Graceful shutdown**: close channels when your application is shutting down
+- **Resource cleanup**: for temporary or short-lived channels
+- **Rarely needed** in production — let your broker manage channel lifecycle
+:::
+
+## Real-World Example: Channel Registry
+
+Centralizing your channel definitions makes them easy to discover, maintain, and type-safe across your codebase:
+
+```typescript title="src/config/channels.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+// ============ Order Events ============
+export interface OrderPlacedPayload {
+  orderId: number;
+  customerId: string;
+  total: number;
+  items: Array<{ sku: string; quantity: number }>;
+  timestamp: Date;
+}
+
+export interface OrderConfirmedPayload {
+  orderId: number;
+  confirmedAt: Date;
+}
+
+export const orderPlaced = heraldChannel<OrderPlacedPayload>("order.placed");
+export const orderConfirmed = heraldChannel<OrderConfirmedPayload>("order.confirmed");
+
+// ============ Payment Events ============
+export interface PaymentProcessedPayload {
+  orderId: number;
+  paymentId: string;
+  amount: number;
+  method: string;
+  timestamp: Date;
+}
+
+export interface PaymentFailedPayload {
+  orderId: number;
+  reason: string;
+  timestamp: Date;
+}
+
+export const paymentProcessed = heraldChannel<PaymentProcessedPayload>("payment.processed");
+export const paymentFailed = heraldChannel<PaymentFailedPayload>("payment.failed");
+
+// ============ Inventory Events ============
+export interface InventoryUpdatedPayload {
+  sku: string;
+  quantity: number;
+  change: number;
+  reason: "order" | "restock" | "adjustment";
+}
+
+export const inventoryUpdated = heraldChannel<InventoryUpdatedPayload>("inventory.updated");
+
+// ============ Notification Events ============
+export interface NotificationSentPayload {
+  orderId: number;
+  type: "email" | "sms" | "push";
+  recipient: string;
+  timestamp: Date;
+}
+
+export const notificationSent = heraldChannel<NotificationSentPayload>("notification.sent");
+```
+
+Then use it in your services with full type safety and autocomplete:
+
+```typescript title="src/services/OrderService.ts"
+import { orderPlaced, orderConfirmed, paymentProcessed } from "@/config/channels";
+
+export class OrderService {
+  async placeOrder(data: CreateOrderDTO) {
+    const order = await Order.create(data);
+    
+    // Type-safe publishing with autocomplete
+    await orderPlaced.publish({
+      orderId: order.id,
+      customerId: order.customerId,
+      total: order.total,
+      items: order.items,
+      timestamp: new Date(),
+    });
+    
+    return order;
+  }
+
+  setupSubscriptions() {
+    // Type-safe subscription — payload is typed as PaymentProcessedPayload
+    paymentProcessed.subscribe((payload) => {
+      // TypeScript knows payload.orderId, payload.amount, etc.
+      this.updateOrderStatus(payload.orderId, "paid");
+    });
+  }
+}
+```
+
+## Next Steps
+
+- [Channel Options](./channel-options.mdx) — Configure channels with durable, autoDelete, schema validation, and more
+- [Publishing Messages](./publishing.mdx) — Send messages to channels
+- [Consuming Messages](./consuming.mdx) — Subscribe and process messages
+- [Request-Reply](./request-reply.mdx) — Use channels for RPC-style request-response patterns

@@ -1,79 +1,85 @@
 ---
 sidebar_position: 1
+title: Introduction to Herald
+description: What Herald is, why you need it, and the core concepts you'll use every day
 ---
 
-# Introduction
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-Herald is the message bus package for Warlock.js. It gives your application a clean, type-safe way to publish and consume events across services — whether you are building a monolith that needs internal event routing or a microservice architecture that passes messages through RabbitMQ.
+Herald is a typed, event-driven messaging library for Node.js that lets you decouple services in your application by routing events and messages through a broker. It handles the complexity of connecting to message brokers (like RabbitMQ), defining typed events, publishing them, and subscribing to them with type safety.
 
 ## What Herald does
 
-```typescript
-import { connectToCommunicator, communicators } from "@warlock.js/herald";
+Herald wraps a message broker in a clean, JavaScript-friendly API. You define typed events, publish them from one service, and handle them in another—all while keeping your code loosely coupled and testable.
 
-// Connect once at startup
-await connectToCommunicator({
-  driver: "rabbitmq",
-  host: "localhost",
-  port: 5672,
-});
+```ts title="src/main.ts"
+import { connectToBroker, publishEvent } from '@warlock.js/herald';
 
-// Publish from anywhere in your app
-await communicators().channel("order.placed").publish({ orderId: "ord-123" });
+// Connect at startup
+await connectToBroker({ driver: 'rabbitmq', host: 'localhost' });
 
-// Subscribe from anywhere in your app
-communicators()
-  .channel<{ orderId: string }>("order.placed")
-  .subscribe(async (message, ctx) => {
-    console.log("New order:", message.payload.orderId);
-    await ctx.ack();
-  });
+// Publish an event
+await publishEvent(new OrderPlaced({ orderId: '123', total: 99.99 }));
+
+// In another service, handle it
+import { subscribeConsumer } from '@warlock.js/herald';
+
+subscribeConsumer(SendOrderNotificationConsumer);
 ```
 
-Herald handles the low-level broker details so your code only deals with channels, payloads, and handlers.
+## Core concepts at a glance
 
-## Core concepts
-
-| Concept | Description |
-|---|---|
-| **Communicator** | A named, connected wrapper around a broker driver. You can have multiple (e.g. one for notifications, one for analytics). |
-| **Driver** | The actual broker implementation — RabbitMQ today, Kafka coming soon. |
-| **Channel** | A named queue or topic. Channels are lazy-created and cached. |
-| **EventMessage** | A typed class that defines a publishable event and its payload shape. |
-| **EventConsumer** | A typed class that defines how to handle one specific event. |
-| **@Consumable** | A decorator that auto-subscribes an `EventConsumer` when a communicator connects. |
+| Concept | What it is |
+|---------|-----------|
+| **Broker** | The central connection to your message broker (RabbitMQ, Kafka, etc.). Each named broker is a separate connection. |
+| **Driver** | The adapter that speaks to a specific broker technology. Same code, different drivers = different brokers. |
+| **Channel** | A named topic or queue where events flow. Automatically created and cached. Think of it as a pub/sub topic. |
+| **EventMessage** | A typed event class that producers send. Carries a payload and metadata (ID, timestamp, etc.). |
+| **EventConsumer** | A typed handler class that processes events from a channel. Knows which event it handles and how. |
+| **@Consumable** | A decorator that auto-registers a consumer when the broker connects, so you don't manually wire things up. |
 
 ## Supported drivers
 
-| Driver | Status |
-|---|---|
-| RabbitMQ | Stable |
-| Kafka | Coming soon |
+| Driver | Status | Notes |
+|--------|--------|-------|
+| **RabbitMQ** | Stable | Production-ready. Requires `amqplib` peer dependency. |
+| **Kafka** | Coming soon | High-throughput distributed events. |
+| **Redis Streams** | Planned | Lightweight, in-memory broker. |
+| **SQS** | Planned | AWS-native queue service. |
 
-## Package
+## When to use Herald
 
-Herald is a standalone package. Install it separately from the Warlock.js core:
+- **Microservices**: Decouple OrderService from PaymentService from NotificationService.
+- **Async workflows**: Offload heavy work (emails, reports) to background consumers.
+- **Event sourcing**: Build an audit trail of what happened in your system.
+- **Cross-service communication**: Avoid direct HTTP calls; let events carry the data.
+- **Scalability**: Add consumer instances without changing producer code.
 
-```bash
-npm install @warlock.js/herald amqplib
-# or
-pnpm add @warlock.js/herald amqplib
-# or
-yarn add @warlock.js/herald amqplib
-```
+## Installation
 
-If you use the Warlock CLI, the `--driver` flag installs the required peer dependency for you:
+<Tabs>
+  <TabItem value="npm" label="npm" default>
+    ```bash
+    npm install @warlock.js/herald amqplib
+    ```
+  </TabItem>
+  <TabItem value="yarn" label="yarn">
+    ```bash
+    yarn add @warlock.js/herald amqplib
+    ```
+  </TabItem>
+  <TabItem value="pnpm" label="pnpm">
+    ```bash
+    pnpm add @warlock.js/herald amqplib
+    ```
+  </TabItem>
+</Tabs>
 
-```bash
-npx warlock add herald --driver=rabbitmq
-```
+The `amqplib` package is required if you're using RabbitMQ as your broker driver. If you plan to use a different driver later, you'll install its peer dependency instead.
 
 ## Next steps
 
-- [Getting Started](./getting-started) — set up your first connection
-- [Producers](./producers) — define and publish events
-- [Consumers](./consumers) — define and consume events
-- [Request / Reply](./request-reply) — synchronous RPC over the message bus
-- [RabbitMQ](./rabbitmq) — driver-specific configuration
-- [Error Handling](./error-handling) — retries, dead-letter queues, nack strategies
-- [Configuration](./configuration) — full config reference
+Ready to get started? Head to [Quick Start](quick-start) to set up your first broker and publish an event in 5 minutes.
+
+Want to understand the concepts more deeply first? Check out [Core Concepts](core-concepts) for a detailed look at how Broker, Driver, Channel, and Consumer work together.

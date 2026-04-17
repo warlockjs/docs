@@ -1,0 +1,274 @@
+---
+sidebar_position: 4
+title: Connecting to a Broker
+description: Connect your application to a message broker and access it anywhere with the herald() accessor
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+When you're ready to start using Herald, the first thing you need to do is **connect your application to a message broker**. This registers the broker in the global registry and makes it accessible throughout your app.
+
+## What connectToBroker does
+
+The `connectToBroker()` function performs three critical tasks:
+
+1. **Registers the broker** in the global `BrokerRegistry`
+2. **Returns a Broker instance** that you can use immediately
+3. **Triggers a "connected" event** on the registry so other parts of your app know the broker is ready
+
+After you call `connectToBroker()`, you can use the `herald()` accessor anywhere in your codebase to get that broker instance back.
+
+## Basic connection example
+
+Here's the simplest way to connect to a local RabbitMQ broker:
+
+```typescript title="src/main.ts"
+import { connectToBroker, herald } from "@warlock.js/herald";
+
+async function main() {
+  // Connect to the broker
+  const broker = await connectToBroker({
+    driver: "rabbitmq",
+    host: "localhost",
+    port: 5672,
+  });
+
+  console.log(`Connected to broker: ${broker.name}`);
+
+  // Now you can use herald() anywhere
+  const channel = herald().channel("orders");
+  await channel.publish("order.placed", { orderId: 123 });
+}
+
+main().catch(console.error);
+```
+
+The `connectToBroker()` function is **async** — you must `await` it before proceeding.
+
+## Using the herald() accessor
+
+After `connectToBroker()` completes, you can call `herald()` from anywhere in your code to get the broker instance back. You don't need to pass it around or store references:
+
+```typescript
+// In src/services/OrderService.ts
+import { herald } from "@warlock.js/herald";
+
+export class OrderService {
+  async createOrder(data: any) {
+    const order = await saveOrder(data);
+
+    // Get the broker and publish an event
+    const channel = herald().channel("orders");
+    await channel.publish("order.placed", { orderId: order.id });
+
+    return order;
+  }
+}
+```
+
+The `herald()` function returns the **default broker** by default. If you have multiple brokers, pass the broker name: `herald("analytics")` or `herald("notifications")`.
+
+## The heraldChannel() shorthand
+
+For convenience, Herald provides a shorthand function that combines `herald()` and `.channel()`:
+
+```typescript
+import { heraldChannel } from "@warlock.js/herald";
+
+// Instead of:
+// herald().channel("orders").publish(...)
+
+// Use:
+heraldChannel("orders").publish("order.placed", { orderId: 123 });
+```
+
+**When to use it:** `heraldChannel()` is great for one-off publishes or when you don't need to hold a reference to the channel. For consuming events or repeated publishes, get the channel once with `herald().channel()` and store it.
+
+## Connection options
+
+Here's a complete reference for the `connectToBroker()` options:
+
+| Option | Type | Required | Default | Description |
+|--------|------|----------|---------|-------------|
+| `driver` | string | Yes | — | Message broker driver: `"rabbitmq"`, `"kafka"`, `"redis-streams"`, or `"sqs"` |
+| `name` | string | No | `"default"` | Name for this broker instance. Use meaningful names if you have multiple brokers (e.g., `"analytics"`, `"notifications"`) |
+| `isDefault` | boolean | No | `true` | Whether this broker becomes the default. The first broker connected is always default |
+
+## RabbitMQ-specific options
+
+When you set `driver: "rabbitmq"`, you can pass additional options:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `host` | string | — | RabbitMQ server hostname |
+| `port` | number | `5672` | RabbitMQ server port |
+| `username` | string | `"guest"` | AMQP username |
+| `password` | string | `"guest"` | AMQP password |
+| `vhost` | string | `"/"` | AMQP virtual host |
+| `uri` | string | — | Full AMQP URI (e.g., `amqp://user:pass@host:5672/vhost`). When provided, overrides `host`, `port`, `username`, `password`, and `vhost` |
+| `heartbeat` | number | — | Heartbeat interval in seconds. Keeps the connection alive |
+| `connectionTimeout` | number | — | Connection timeout in milliseconds |
+| `reconnect` | boolean | `true` | Automatically reconnect on connection loss |
+| `reconnectDelay` | number | — | Milliseconds to wait between reconnection attempts |
+| `prefetch` | number | — | Global prefetch count for message consumption |
+| `clientOptions` | object | — | Additional RabbitMQ client-specific options |
+
+## Using environment variables
+
+For production, never hardcode connection details. Use environment variables instead:
+
+```typescript title="src/main.ts"
+import { connectToBroker } from "@warlock.js/herald";
+
+async function main() {
+  const broker = await connectToBroker({
+    driver: process.env.MESSAGE_BROKER_DRIVER || "rabbitmq",
+    host: process.env.MESSAGE_BROKER_HOST || "localhost",
+    port: parseInt(process.env.MESSAGE_BROKER_PORT || "5672"),
+    username: process.env.MESSAGE_BROKER_USERNAME || "guest",
+    password: process.env.MESSAGE_BROKER_PASSWORD || "guest",
+  });
+
+  console.log("Broker connected successfully");
+}
+
+main().catch(console.error);
+```
+
+:::tip
+For production, use the URI form with a single environment variable:
+
+```typescript
+const broker = await connectToBroker({
+  driver: "rabbitmq",
+  uri: process.env.RABBITMQ_URI,
+});
+```
+
+This is safer (no password in multiple env vars) and easier to manage.
+:::
+
+## Connecting at app startup
+
+The best place to call `connectToBroker()` is in your application's **entry point**, before any other code that might need the broker:
+
+```typescript title="src/main.ts"
+import express from "express";
+import { connectToBroker } from "@warlock.js/herald";
+import { router } from "./routes";
+
+async function main() {
+  // 1. Connect to the broker FIRST
+  const broker = await connectToBroker({
+    driver: "rabbitmq",
+    host: process.env.MESSAGE_BROKER_HOST,
+    port: parseInt(process.env.MESSAGE_BROKER_PORT),
+  });
+
+  console.log(`✓ Connected to broker: ${broker.name}`);
+
+  // 2. Create and start the HTTP server
+  const app = express();
+  app.use(express.json());
+  app.use("/api", router);
+
+  const server = app.listen(3000, () => {
+    console.log("✓ HTTP server listening on port 3000");
+  });
+
+  // 3. Graceful shutdown
+  process.on("SIGINT", async () => {
+    console.log("Shutting down...");
+    server.close();
+    await broker.disconnect?.();
+    process.exit(0);
+  });
+}
+
+main().catch((error) => {
+  console.error("Failed to start application:", error);
+  process.exit(1);
+});
+```
+
+:::danger
+Never call `herald()` before `connectToBroker()` completes. The broker won't be registered yet, and you'll get an error or undefined behavior.
+
+Always `await` the `connectToBroker()` call:
+
+```typescript
+// ✓ Correct
+await connectToBroker({ ... });
+const broker = herald();
+
+// ✗ Wrong — don't do this
+connectToBroker({ ... }); // Not awaited!
+const broker = herald(); // Error: broker not registered yet
+```
+:::
+
+## Real-world example: e-commerce order processing
+
+Here's a complete example of an e-commerce application connecting to a broker and using it to publish order events:
+
+```typescript title="src/main.ts"
+import express from "express";
+import { connectToBroker, herald } from "@warlock.js/herald";
+
+const app = express();
+app.use(express.json());
+
+// Initialize broker on startup
+async function initializeBroker() {
+  await connectToBroker({
+    driver: "rabbitmq",
+    host: process.env.RABBITMQ_HOST || "localhost",
+    port: parseInt(process.env.RABBITMQ_PORT || "5672"),
+    username: process.env.RABBITMQ_USER || "guest",
+    password: process.env.RABBITMQ_PASS || "guest",
+  });
+
+  console.log("✓ Message broker connected");
+}
+
+// Order creation endpoint
+app.post("/api/orders", async (req, res) => {
+  try {
+    // Save the order to database
+    const order = await saveOrder(req.body);
+
+    // Publish order.placed event
+    const ordersChannel = herald().channel("orders");
+    await ordersChannel.publish("order.placed", {
+      orderId: order.id,
+      userId: order.userId,
+      total: order.total,
+      timestamp: new Date().toISOString(),
+    });
+
+    res.json({ success: true, order });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Start the app
+async function start() {
+  await initializeBroker();
+
+  app.listen(3000, () => {
+    console.log("✓ Server listening on http://localhost:3000");
+  });
+}
+
+start().catch(console.error);
+```
+
+---
+
+## Up next
+
+- **[Multiple Brokers](./multiple-brokers.mdx)** — Connect multiple brokers for different concerns (analytics, notifications, etc.)
+- **[Broker Events](./broker-events.mdx)** — Listen for connection, disconnection, and error events
+- **[RabbitMQ Guide](./rabbitmq.mdx)** — Deep dive into RabbitMQ-specific configuration and best practices

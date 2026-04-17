@@ -1,0 +1,366 @@
+---
+sidebar_position: 17
+title: Subscription Management
+description: Control subscription lifecycle with pause, resume, and unsubscribe operations
+---
+
+# Subscription Management
+
+When you call `subscribe()` or `respond()` on a channel, Herald returns a `Subscription` object. This object is your handle for controlling the consumer's lifecycle—pausing it, resuming it, or stopping it entirely.
+
+## What is a Subscription?
+
+A subscription represents an active consumer listening on a channel:
+
+```typescript
+const subscription = await herald()
+  .channel("order.placed")
+  .subscribe(async (message, ctx) => {
+    // handler
+  });
+
+// subscription.id — unique identifier
+// subscription.channel — "order.placed"
+// subscription.consumerTag — broker-assigned tag
+// subscription.isActive — true if not unsubscribed
+```
+
+You need to keep a reference to the subscription to manage it later.
+
+## unsubscribe() — Stop Consuming
+
+Use `unsubscribe()` to permanently stop listening on a channel.
+
+```typescript title="src/index.ts"
+const sub = await herald().channel("order.placed").subscribe(handler);
+
+// Later...
+await sub.unsubscribe();
+```
+
+### Graceful Shutdown Pattern
+
+When your application shuts down, unsubscribe all consumers so the broker knows you're no longer listening:
+
+```typescript title="src/app.ts"
+const subscriptions: Subscription[] = [];
+
+// Register consumers
+subscriptions.push(
+  await herald().channel("order.placed").subscribe(orderHandler)
+);
+subscriptions.push(
+  await herald().channel("payment.processed").subscribe(paymentHandler)
+);
+subscriptions.push(
+  await herald().channel("inventory.updated").subscribe(inventoryHandler)
+);
+
+// On shutdown
+process.on("SIGTERM", async () => {
+  logger.info("Shutting down...");
+  
+  // Unsubscribe all consumers
+  await Promise.all(subscriptions.map(sub => sub.unsubscribe()));
+  
+  logger.info("All consumers unsubscribed");
+  process.exit(0);
+});
+```
+
+### Dynamic Consumer Pattern
+
+Enable or disable consumers based on feature flags or configuration:
+
+```typescript title="src/services/analytics.service.ts"
+let analyticsSub: Subscription | null = null;
+
+async function enableAnalytics() {
+  if (!analyticsSub) {
+    analyticsSub = await herald()
+      .channel("order.placed")
+      .subscribe(trackOrderAnalytics);
+    logger.info("Analytics consumer enabled");
+  }
+}
+
+async function disableAnalytics() {
+  if (analyticsSub) {
+    await analyticsSub.unsubscribe();
+    analyticsSub = null;
+    logger.info("Analytics consumer disabled");
+  }
+}
+```
+
+## pause() — Temporarily Stop
+
+Use `pause()` to temporarily stop receiving messages without unsubscribing. Messages remain in the queue while paused.
+
+```typescript title="src/services/processor.ts"
+const subscription = await herald()
+  .channel("analytics.event")
+  .subscribe(processEvent);
+
+// Pause the consumer
+await subscription.pause();
+logger.info("Analytics consumer paused");
+```
+
+### Use Cases for Pause
+
+**Rate limiting**: Throttle consumption when downstream systems are overloaded
+```typescript
+if (database.connectionPool.available < 5) {
+  await subscription.pause();
+  await sleep(30000); // Wait 30 seconds
+  await subscription.resume();
+}
+```
+
+**Backpressure handling**: Stop consuming if your queue depth is too high
+```typescript
+const queueDepth = await cache.get("processing_queue_depth");
+if (queueDepth > 1000) {
+  await subscription.pause();
+}
+```
+
+**Maintenance mode**: Pause during database migrations or service updates
+```typescript
+if (maintenanceMode.enabled) {
+  await subscription.pause();
+  logger.info("Paused during maintenance");
+}
+```
+
+## resume() — Resume After Pause
+
+Use `resume()` to start receiving messages again after a pause.
+
+```typescript title="src/services/processor.ts"
+// Check if resources are available again
+const available = await database.isHealthy();
+if (available && !subscription.isActive) {
+  await subscription.resume();
+  logger.info("Consumer resumed");
+}
+```
+
+:::info Queued Messages
+When you resume, all messages that queued up while paused are delivered immediately. You won't lose anything—the broker keeps them safe.
+:::
+
+## isActive — Check Status
+
+The `isActive` property tells you if a subscription is still active (not unsubscribed):
+
+```typescript title="src/services/manager.ts"
+if (subscription.isActive) {
+  await subscription.pause();
+} else {
+  logger.warn("Subscription is already stopped");
+}
+```
+
+:::tip Before Pause or Resume
+Always check `isActive` before calling `pause()` or `resume()` to avoid errors on already-unsubscribed consumers.
+:::
+
+## Subscription Manager Pattern
+
+For complex applications with many consumers, centralize subscription management:
+
+```typescript title="src/lib/subscription-manager.ts"
+class SubscriptionManager {
+  private subscriptions = new Map<string, Subscription>();
+
+  async register(name: string, channel: string, handler: MessageHandler) {
+    const sub = await herald()
+      .channel(channel)
+      .subscribe(handler);
+    
+    this.subscriptions.set(name, sub);
+    logger.info(`Registered consumer: ${name}`);
+  }
+
+  async pauseAll() {
+    for (const [name, sub] of this.subscriptions) {
+      if (sub.isActive) {
+        await sub.pause();
+        logger.info(`Paused: ${name}`);
+      }
+    }
+  }
+
+  async resumeAll() {
+    for (const [name, sub] of this.subscriptions) {
+      if (sub.isActive) {
+        await sub.resume();
+        logger.info(`Resumed: ${name}`);
+      }
+    }
+  }
+
+  async unsubscribeAll() {
+    for (const [name, sub] of this.subscriptions) {
+      if (sub.isActive) {
+        await sub.unsubscribe();
+        logger.info(`Unsubscribed: ${name}`);
+      }
+    }
+  }
+
+  get(name: string) {
+    return this.subscriptions.get(name);
+  }
+}
+
+export const subManager = new SubscriptionManager();
+```
+
+Usage in your app:
+
+```typescript title="src/index.ts"
+import { subManager } from "./lib/subscription-manager";
+
+// Register consumers
+await subManager.register("orders", "order.placed", orderHandler);
+await subManager.register("payments", "payment.processed", paymentHandler);
+await subManager.register("analytics", "order.placed", analyticsHandler);
+
+// On maintenance
+app.post("/admin/maintenance/pause", async (req, res) => {
+  await subManager.pauseAll();
+  res.json({ message: "All consumers paused" });
+});
+
+app.post("/admin/maintenance/resume", async (req, res) => {
+  await subManager.resumeAll();
+  res.json({ message: "All consumers resumed" });
+});
+
+// On shutdown
+process.on("SIGTERM", async () => {
+  await subManager.unsubscribeAll();
+  process.exit(0);
+});
+```
+
+## Managing Multiple Subscriptions
+
+Subscribe to multiple channels and store them in an array for coordinated control:
+
+```typescript title="src/services/order-processor.ts"
+const subscriptions: Subscription[] = [];
+
+async function initializeConsumers() {
+  subscriptions.push(
+    await herald().channel("order.placed").subscribe(async (msg, ctx) => {
+      await createOrder(msg.payload);
+      await ctx.ack();
+    })
+  );
+
+  subscriptions.push(
+    await herald().channel("payment.processed").subscribe(async (msg, ctx) => {
+      await updateOrderPaymentStatus(msg.payload);
+      await ctx.ack();
+    })
+  );
+
+  subscriptions.push(
+    await herald().channel("order.shipped").subscribe(async (msg, ctx) => {
+      await notifyCustomerShipped(msg.payload);
+      await ctx.ack();
+    })
+  );
+}
+
+async function pauseAllOrderConsumers() {
+  await Promise.all(subscriptions.map(sub => sub.pause()));
+  logger.info("All order consumers paused");
+}
+
+async function shutdownConsumers() {
+  await Promise.all(subscriptions.map(sub => sub.unsubscribe()));
+  logger.info("All consumers shut down");
+}
+```
+
+## Real-World: E-Commerce Platform Shutdown
+
+Here's a complete shutdown sequence for an e-commerce order processor:
+
+```typescript title="src/app.ts"
+import { subManager } from "./lib/subscription-manager";
+import { Herald } from "@warlock.js/herald";
+
+const app = express();
+
+async function startApp() {
+  // Initialize Herald
+  const herald = new Herald();
+  await herald.connect();
+
+  // Register all consumers
+  await subManager.register("orders", "order.placed", handleOrderPlaced);
+  await subManager.register("payments", "payment.processed", handlePaymentProcessed);
+  await subManager.register("inventory", "inventory.updated", handleInventoryUpdated);
+  await subManager.register("notifications", "order.placed", handleNotifications);
+
+  // Start server
+  const server = app.listen(3000, () => {
+    logger.info("Order processor started on port 3000");
+  });
+
+  // Graceful shutdown handler
+  const shutdown = async (signal: string) => {
+    logger.info(`Received ${signal}, starting graceful shutdown`);
+
+    // Stop accepting new requests
+    server.close(() => {
+      logger.info("HTTP server closed");
+    });
+
+    try {
+      // Pause all consumers first to stop new message processing
+      logger.info("Pausing all consumers...");
+      await subManager.pauseAll();
+
+      // Wait for in-flight messages to complete
+      logger.info("Waiting for in-flight messages...");
+      await sleep(5000);
+
+      // Unsubscribe all consumers
+      logger.info("Unsubscribing all consumers...");
+      await subManager.unsubscribeAll();
+
+      // Close Herald connection
+      logger.info("Closing Herald connection...");
+      await herald.close();
+
+      logger.info("Graceful shutdown complete");
+      process.exit(0);
+    } catch (err) {
+      logger.error("Error during shutdown", err);
+      process.exit(1);
+    }
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+}
+
+startApp().catch(err => {
+  logger.error("Failed to start app", err);
+  process.exit(1);
+});
+```
+
+## Related Pages
+
+- [Consuming Messages](/docs/herald/consuming) — How to subscribe and receive messages
+- [Message Context](/docs/herald/message-context) — ack, nack, reply, retry
+- [Error Handling](/docs/herald/error-handling) — Handle failures in consumers
+- [Request-Reply](/docs/herald/request-reply) — RPC with respond() subscriptions

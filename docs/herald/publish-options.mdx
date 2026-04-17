@@ -1,0 +1,261 @@
+---
+sidebar_position: 11
+title: Publish Options
+description: Control message priority, TTL, delays, persistence, and other delivery options when publishing events to Herald.
+---
+
+# Publish Options
+
+When you call `publish()` or `publishEvent()`, you can pass a second argument with options to control how the broker handles your message.
+
+## Options Reference
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `priority` | `number` (0–255) | `5` | Message processing priority. Higher values are processed first. |
+| `ttl` | `number` (milliseconds) | `undefined` | Time-to-live. Message expires if not consumed after N milliseconds. |
+| `delay` | `number` (milliseconds) | `undefined` | Delay message delivery by N milliseconds. Requires broker plugin support. |
+| `headers` | `Record<string, any>` | `{}` | Arbitrary key-value headers to include in the message envelope. |
+| `persistent` | `boolean` | `true` | Survive broker restart. Set to `false` only for non-critical events. |
+| `correlationId` | `string` | `undefined` | For RPC patterns. Herald sets this automatically when using request/reply. |
+| `expiration` | `string` | `undefined` | Message expiry as a string (RabbitMQ-specific format). Usually prefer `ttl`. |
+
+## Priority
+
+Control the order in which messages are processed. Ranges from 0 (lowest) to 255 (highest). Default is 5.
+
+Higher-priority messages are processed before lower-priority ones, useful for urgent tasks:
+
+```typescript title="src/services/notification-service.ts"
+import { publishEvent } from '@warlock.js/herald';
+import { NotificationSentEvent } from '../events/notification-sent-event';
+
+export class NotificationService {
+  async sendUrgentAlert(userId: string) {
+    // Urgent alerts get processed first
+    await publishEvent(
+      new NotificationSentEvent({ userId, type: "urgent-alert", channel: "sms" }),
+      { priority: 200 }  // High priority: 200
+    );
+  }
+
+  async sendAnalyticsEvent(userId: string) {
+    // Analytics events are low priority
+    await publishEvent(
+      new NotificationSentEvent({ userId, type: "analytics", channel: "log" }),
+      { priority: 1 }  // Low priority: 1
+    );
+  }
+
+  async sendNormalNotification(userId: string) {
+    // Default priority
+    await publishEvent(
+      new NotificationSentEvent({ userId, type: "order-update", channel: "email" })
+      // priority not specified: uses default 5
+    );
+  }
+}
+```
+
+In this example:
+- Urgent alerts (priority 200) are processed immediately
+- Normal notifications (priority 5) are handled next
+- Analytics events (priority 1) are processed last
+
+## TTL (Time-To-Live)
+
+Set how long a message remains valid. If no consumer processes it within the TTL window, the message expires and is discarded.
+
+```typescript title="src/services/flash-sale-service.ts"
+import { publishEvent } from '@warlock.js/herald';
+
+// Flash sale event valid for exactly 1 hour
+const FLASH_SALE_DURATION = 60 * 60 * 1000; // 1 hour in ms
+
+async function publishFlashSale(saleData: FlashSale) {
+  await publishEvent(
+    new FlashSaleEvent(saleData),
+    {
+      ttl: FLASH_SALE_DURATION,  // Message expires after 1 hour
+    }
+  );
+}
+```
+
+Use cases for TTL:
+- **Time-sensitive events** — Flash sales, limited-time offers
+- **Batch updates** — Metrics that are only valid for a window
+- **Transient notifications** — Alerts that expire if not acted on immediately
+
+:::info Default TTL is unlimited
+Without specifying `ttl`, messages never expire. They remain in the broker until consumed or the broker is restarted (depending on `persistent`).
+:::
+
+## Delay
+
+Delay message delivery to a future time. The message is held by the broker and only delivered after N milliseconds.
+
+```typescript title="src/services/reminder-service.ts"
+import { publishEvent } from '@warlock.js/herald';
+import { ReminderSentEvent } from '../events/reminder-sent-event';
+
+async function scheduleOrderReminder(orderId: string, userId: string) {
+  // Remind user 24 hours after order
+  const DELAY_24_HOURS = 24 * 60 * 60 * 1000;
+
+  await publishEvent(
+    new ReminderSentEvent({ userId, type: "order-reminder", orderId }),
+    {
+      delay: DELAY_24_HOURS,
+    }
+  );
+}
+```
+
+Common use cases:
+- **Reminder emails** — 24 hours after signup, order confirmation, etc.
+- **Retry notifications** — "Payment failed, try again in 15 minutes"
+- **Scheduled tasks** — Send a digest email at a specific time
+
+:::info Delay requires broker plugin support
+The `delay` option requires a broker plugin (e.g., RabbitMQ's `rabbitmq-delayed-message-exchange`). Check your broker documentation to enable this feature. Without the plugin, the `delay` option is ignored.
+:::
+
+## Headers
+
+Attach arbitrary metadata headers to the message envelope. These are accessible to consumers:
+
+```typescript title="src/services/order-service.ts"
+import { publishEvent } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/order-placed-event';
+
+async function placeOrder(order: Order, sourceRegion: string) {
+  await publishEvent(
+    new OrderPlacedEvent(order),
+    {
+      headers: {
+        "x-source-service": "order-service",
+        "x-region": sourceRegion,
+        "x-user-agent": "mobile-app",
+        "x-version": "1.2.3",
+      },
+    }
+  );
+}
+```
+
+Consumers can read these headers from the message metadata. Useful for:
+- **Request tracing** — Track where the message originated
+- **A/B testing** — Tag messages by experiment variant
+- **Geographic routing** — Identify the region or data center
+- **Custom metadata** — Any domain-specific tagging
+
+## Persistent
+
+Control whether messages survive a broker restart. Default is `true` (persistent).
+
+Set `persistent: false` only for non-critical events that you can afford to lose:
+
+```typescript title="src/services/analytics-service.ts"
+import { publishEvent } from '@warlock.js/herald';
+import { AnalyticsEvent } from '../events/analytics-event';
+
+async function recordPageView(userId: string, page: string) {
+  // Analytics events are not critical; lost events are acceptable
+  await publishEvent(
+    new AnalyticsEvent({ userId, page, timestamp: Date.now() }),
+    {
+      persistent: false,  // Don't survive broker restart
+    }
+  );
+}
+```
+
+:::danger Only set persistent: false for non-critical events
+Business-critical events like orders, payments, and inventory updates must have `persistent: true`. Only set this to `false` for analytics, logging, and other events you can afford to lose.
+:::
+
+## Correlation ID
+
+Used internally for RPC (request/reply) patterns. Herald sets this automatically when using request/reply—you typically don't need to set it manually.
+
+See the [Request/Reply Guide](/docs/herald/request-reply) for details on RPC patterns.
+
+```typescript
+// Manually set for tracing RPC chains
+await publishEvent(event, {
+  correlationId: "req-12345",
+});
+```
+
+## Expiration
+
+An alternative to `ttl` for specifying message expiry. This is RabbitMQ-specific and uses a string format.
+
+Prefer `ttl` for most use cases; use `expiration` only if you're explicitly using RabbitMQ and need its string format:
+
+```typescript
+// RabbitMQ-specific format
+await publishEvent(event, {
+  expiration: "3600000",  // String: "milliseconds"
+});
+
+// Prefer ttl instead
+await publishEvent(event, {
+  ttl: 3600000,  // Number: milliseconds
+});
+```
+
+## Combining Options
+
+Here's a realistic example that combines multiple options:
+
+```typescript title="src/services/order-service.ts"
+import { publishEvent } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/order-placed-event';
+
+async function placeUrgentOrder(order: Order, userId: string, source: string) {
+  const event = new OrderPlacedEvent(order);
+
+  await publishEvent(event, {
+    // High priority: urgent orders processed first
+    priority: 200,
+
+    // Must survive broker restart
+    persistent: true,
+
+    // Attach metadata for tracing
+    headers: {
+      "x-source": source,
+      "x-order-type": "urgent",
+      "x-user-id": userId,
+    },
+
+    // Attach a correlation ID for distributed tracing
+    correlationId: `order-${order.id}`,
+  });
+}
+```
+
+## Default Options
+
+For most events in production, you don't need to set any options. The defaults are safe:
+
+```typescript title="src/services/order-service.ts"
+// No options needed for typical orders
+await publishEvent(new OrderPlacedEvent(order));
+// Uses: priority=5, persistent=true, ttl=undefined, no headers, etc.
+```
+
+Reserve explicit options for special cases:
+- **High-priority events** — Urgent notifications, critical updates
+- **Non-critical events** — Analytics, logging (set `persistent: false`)
+- **Time-sensitive events** — Flash sales, limited offers (set `ttl`)
+- **Delayed tasks** — Reminders, scheduled actions (set `delay`)
+- **Traced events** — RPC patterns, distributed tracing (set `headers`, `correlationId`)
+
+## See Also
+
+- [Publishing Events](/docs/herald/publishing) — How to publish with options
+- [Event Messages](/docs/herald/event-messages) — Type-safe event definitions
+- [Channels](/docs/herald/channels) — Channel organization and configuration

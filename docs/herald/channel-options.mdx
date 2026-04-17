@@ -1,0 +1,564 @@
+---
+sidebar_position: 8
+title: Channel Options
+description: Configure Herald channels with durable queues, dead-letter exchanges, TTL, size limits, and schema validation
+---
+
+# Channel Options
+
+When creating a channel, you can customize its behavior with options. These control durability, message expiration, size limits, validation, and more. Pass options as the second argument to `channel()`.
+
+## Options Reference
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `type` | `"queue" \| "topic"` | `"queue"` | Channel type — queue for work distribution, topic for pub-sub |
+| `durable` | `boolean` | `true` | Messages survive broker restart |
+| `autoDelete` | `boolean` | `false` | Delete channel when last consumer disconnects |
+| `exclusive` | `boolean` | `false` | Only this connection can use this channel |
+| `deadLetter` | `DeadLetterOptions \| string` | — | Dead-letter configuration for failed messages |
+| `maxMessageSize` | `number` | — | Maximum message size in bytes |
+| `messageTtl` | `number` | — | Message TTL in milliseconds |
+| `maxLength` | `number` | — | Max queue length (oldest messages dropped when exceeded) |
+| `schema` | `SealSchema` | — | Payload validation schema |
+
+## Channel Type: Queue vs Topic
+
+### Queue: Work Distribution
+
+A **queue** delivers each message to **exactly one consumer**. Use this for:
+- Distributing work across multiple workers
+- Processing tasks that should only run once
+- Job queues, background tasks
+
+```typescript title="src/config/channels.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+// Queue: each order.placed event goes to exactly one consumer
+export const orderPlaced = heraldChannel("order.placed", {
+  type: "queue",
+});
+```
+
+```typescript title="src/services/OrderService.ts"
+import { orderPlaced } from "@/config/channels";
+
+// Subscriber 1
+orderPlaced.subscribe((payload) => {
+  console.log("Worker A processing order", payload.orderId);
+});
+
+// Subscriber 2
+orderPlaced.subscribe((payload) => {
+  console.log("Worker B processing order", payload.orderId);
+});
+
+// When you publish, only ONE of them processes it
+orderPlaced.publish({ orderId: 1, customerId: "user-123", total: 99.99, items: [] });
+// Output: "Worker A processing order 1" (or Worker B, but not both)
+```
+
+### Topic: Broadcast to All
+
+A **topic** delivers each message to **all subscribers**. Use this for:
+- Notifying multiple services of an event
+- Broadcasting state changes
+- Publishing events that many consumers should react to
+
+```typescript title="src/config/channels.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+// Topic: all interested services get notified of payment processing
+export const paymentProcessed = heraldChannel("payment.processed", {
+  type: "topic",
+});
+```
+
+```typescript title="src/services/PaymentService.ts"
+import { paymentProcessed } from "@/config/channels";
+
+// Subscriber 1: update order status
+paymentProcessed.subscribe((payload) => {
+  console.log("Marking order as paid:", payload.orderId);
+});
+
+// Subscriber 2: send confirmation email
+paymentProcessed.subscribe((payload) => {
+  console.log("Sending payment confirmation to:", payload.customer);
+});
+
+// Subscriber 3: update inventory
+paymentProcessed.subscribe((payload) => {
+  console.log("Reserving inventory for order:", payload.orderId);
+});
+
+// When you publish, ALL subscribers get it
+paymentProcessed.publish({
+  orderId: 1,
+  customer: "user@example.com",
+  amount: 99.99,
+});
+// Output:
+// "Marking order as paid: 1"
+// "Sending payment confirmation to: user@example.com"
+// "Reserving inventory for order: 1"
+```
+
+## Durability: Surviving Restarts
+
+**`durable: true`** (default) means messages are persisted and survive broker restarts. **`durable: false`** means messages are lost if the broker restarts.
+
+```typescript title="src/config/channels.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+// Production: durable, survives restarts
+export const orderPlaced = heraldChannel("order.placed", {
+  durable: true, // default
+});
+
+// Temporary/ephemeral channel (rare)
+export const analyticsEvent = heraldChannel("analytics.event", {
+  durable: false, // messages lost on restart
+});
+```
+
+:::danger Production Durability
+Always set `durable: true` in production for any channel carrying important business events. Setting `durable: false` means **data loss on restarts** — unacceptable for orders, payments, or any critical data.
+:::
+
+## Auto-Delete: Cleanup Ephemeral Channels
+
+**`autoDelete: true`** automatically deletes the channel when the last consumer disconnects. Useful for:
+- RPC reply channels
+- Temporary request-response queues
+- Test fixtures
+
+```typescript title="src/rpc/OrderStatusRPC.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+// RPC channel: auto-deletes when no more clients are listening
+export const orderStatus = heraldChannel("order.status", {
+  autoDelete: true,
+  exclusive: false, // multiple clients can use it
+});
+```
+
+When the last client disconnects, the channel is cleaned up automatically:
+
+```typescript title="src/services/client.ts"
+const subscription = orderStatus.subscribe((request) => {
+  // Handle RPC request
+});
+
+// When subscription is cancelled or expires, and no other subscribers exist,
+// the orderStatus channel is automatically deleted
+subscription.unsubscribe();
+```
+
+## Exclusive Channels: Per-Connection Isolation
+
+**`exclusive: true`** restricts the channel to a single connection. Only that connection can publish or subscribe. Use this for:
+- Per-instance queues in clustered deployments
+- Private request-reply channels
+- Isolating work to specific workers
+
+```typescript title="src/workers/TaskWorker.ts"
+import { herald, heraldChannel } from "@warlock.js/herald";
+
+const workerId = process.env.WORKER_ID || "worker-1";
+
+// Each worker gets its own exclusive queue
+const workerQueue = heraldChannel(`worker.${workerId}.tasks`, {
+  exclusive: true, // only this connection can use it
+});
+
+workerQueue.subscribe((task) => {
+  console.log(`Worker ${workerId} processing task:`, task.id);
+});
+```
+
+Useful in Kubernetes/distributed scenarios where you want to route work to specific instances:
+
+```typescript title="src/services/dispatcher.ts"
+// Dispatch task to specific worker
+const workerQueue = herald().channel(`worker.worker-1.tasks`);
+workerQueue.publish({ id: "task-1", action: "send_email" });
+
+// Only worker-1 will process it
+```
+
+## Dead-Letter Handling
+
+When message processing fails, send it to a **dead-letter queue** for manual inspection or retry logic. Configure with a string (shorthand) or `DeadLetterOptions` object.
+
+### Simple Shorthand
+
+```typescript title="src/config/channels.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+// Messages that fail processing go to order.placed.dlq
+export const orderPlaced = heraldChannel("order.placed", {
+  deadLetter: "order.placed.dlq",
+});
+```
+
+### Full Configuration
+
+```typescript title="src/config/channels.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+export const orderPlaced = heraldChannel("order.placed", {
+  deadLetter: {
+    channel: "order.dlq", // custom DLQ name
+    preserveOriginal: true, // keep original headers/metadata
+  },
+});
+```
+
+### Real-World Example
+
+```typescript title="src/services/OrderService.ts"
+import { orderPlaced } from "@/config/channels";
+
+orderPlaced.subscribe(
+  async (payload) => {
+    try {
+      // Process order
+      await validateOrder(payload);
+      await saveOrder(payload);
+    } catch (error) {
+      // Handler throws — message goes to dead-letter
+      throw new Error(`Failed to process order ${payload.orderId}: ${error.message}`);
+    }
+  },
+  { maxRetries: 3 } // Retry 3 times before sending to DLQ
+);
+
+// Monitor the dead-letter queue
+heraldChannel("order.placed.dlq").subscribe((failedOrder) => {
+  console.error("Order failed processing (moved to DLQ):", failedOrder);
+  // Send alert to ops, log for manual review, etc.
+});
+```
+
+## Message TTL: Expiration
+
+**`messageTtl`** sets a time-to-live for messages in milliseconds. Messages older than the TTL are automatically discarded.
+
+```typescript title="src/config/channels.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+// Notifications expire after 1 hour (3,600,000 ms)
+export const notificationSent = heraldChannel("notification.sent", {
+  messageTtl: 3600000, // 1 hour
+});
+
+// Analytics events expire after 24 hours
+export const analyticsEvent = heraldChannel("analytics.event", {
+  messageTtl: 86400000, // 24 hours
+});
+
+// Real-time cache updates expire after 5 minutes
+export const cacheInvalidated = heraldChannel("cache.invalidated", {
+  messageTtl: 300000, // 5 minutes
+});
+```
+
+Useful for:
+- **Temporary notifications**: no point notifying if the event is days old
+- **Cache invalidation**: stale cache keys aren't worth processing
+- **Ephemeral analytics**: immediate events matter, old ones don't
+- **Preventing queue bloat**: auto-cleanup keeps memory/storage manageable
+
+```typescript title="src/config/channels.ts"
+// If a notification isn't processed within 1 hour, it's discarded
+// (customer already saw email, push notification, or message)
+export const notificationSent = heraldChannel("notification.sent", {
+  messageTtl: 3600000,
+  durable: true,
+});
+```
+
+## Max Length: Queue Size Limit
+
+**`maxLength`** sets the maximum number of messages in the queue. When the limit is exceeded, the **oldest messages are dropped** to make room.
+
+```typescript title="src/config/channels.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+// Keep only the last 10,000 analytics events
+export const analyticsEvent = heraldChannel("analytics.event", {
+  maxLength: 10000,
+});
+
+// Keep only recent inventory changes (last 100)
+export const inventoryUpdated = heraldChannel("inventory.updated", {
+  maxLength: 100,
+});
+
+// Notifications: keep recent ones (last 1000)
+export const notificationSent = heraldChannel("notification.sent", {
+  maxLength: 1000,
+});
+```
+
+Without `maxLength`, a slow consumer can cause the queue to grow unbounded, eventually exhausting memory. Setting a limit prevents runaway memory usage:
+
+```typescript title="src/config/channels.ts"
+// Bad: no limit, queue can grow infinitely
+export const analyticsEvent = heraldChannel("analytics.event");
+
+// Good: bounded queue with sensible limits
+export const analyticsEvent = heraldChannel("analytics.event", {
+  maxLength: 50000, // keep ~50k messages
+  messageTtl: 86400000, // plus auto-expire after 24 hours
+});
+```
+
+## Schema Validation with Seal
+
+Validate incoming payloads against a **Seal schema** before processing. Invalid messages are rejected before they enter the queue.
+
+```typescript title="src/config/channels.ts"
+import { heraldChannel } from "@warlock.js/herald";
+import { v } from "@warlock.js/seal";
+
+const OrderPayloadSchema = v.object({
+  orderId: v.int().required(),
+  customerId: v.string().required().minLength(1),
+  total: v.number().required().min(0),
+  items: v.array().items(
+    v.object({
+      sku: v.string().required(),
+      quantity: v.int().required().min(1),
+    })
+  ).required(),
+});
+
+export const orderPlaced = heraldChannel("order.placed", {
+  schema: OrderPayloadSchema,
+  durable: true,
+});
+```
+
+When you publish, the payload is validated automatically:
+
+```typescript title="src/services/OrderService.ts"
+import { orderPlaced } from "@/config/channels";
+
+// ✅ Valid payload — accepted
+orderPlaced.publish({
+  orderId: 1,
+  customerId: "user-123",
+  total: 99.99,
+  items: [
+    { sku: "WIDGET-001", quantity: 2 },
+    { sku: "GADGET-002", quantity: 1 },
+  ],
+});
+
+// ❌ Invalid — missing customerId
+orderPlaced.publish({
+  orderId: 1,
+  total: 99.99,
+  items: [],
+});
+// Throws: "customerId is required"
+
+// ❌ Invalid — total is negative
+orderPlaced.publish({
+  orderId: 1,
+  customerId: "user-123",
+  total: -50,
+  items: [],
+});
+// Throws: "total must be >= 0"
+```
+
+Schema validation ensures data integrity and catches bugs early. Read more in the [Seal documentation](../../seal/overview.mdx).
+
+## Production-Ready Configuration
+
+Here's a complete, production-ready channel setup for the e-commerce platform:
+
+```typescript title="src/config/channels.ts"
+import { heraldChannel } from "@warlock.js/herald";
+import { v } from "@warlock.js/seal";
+
+// ============ Order Events ============
+
+const OrderPlacedSchema = v.object({
+  orderId: v.int().required(),
+  customerId: v.string().required().minLength(1),
+  total: v.number().required().min(0),
+  items: v.array()
+    .items(
+      v.object({
+        sku: v.string().required(),
+        quantity: v.int().required().min(1),
+      })
+    )
+    .required()
+    .minLength(1),
+  timestamp: v.date().required(),
+});
+
+export const orderPlaced = heraldChannel("order.placed", {
+  type: "topic", // all interested services should react
+  durable: true, // critical business event
+  deadLetter: "order.placed.dlq", // capture failures
+  maxLength: 100000, // keep recent orders
+  messageTtl: 604800000, // 7 days
+  schema: OrderPlacedSchema, // validate payload
+});
+
+// ============ Payment Events ============
+
+const PaymentProcessedSchema = v.object({
+  orderId: v.int().required(),
+  paymentId: v.string().required(),
+  amount: v.number().required().min(0),
+  method: v.enum(["card", "bank_transfer", "digital_wallet"]).required(),
+  timestamp: v.date().required(),
+});
+
+export const paymentProcessed = heraldChannel("payment.processed", {
+  type: "topic",
+  durable: true,
+  deadLetter: "payment.processed.dlq",
+  maxLength: 50000,
+  schema: PaymentProcessedSchema,
+});
+
+// ============ Inventory Updates ============
+
+const InventoryUpdatedSchema = v.object({
+  sku: v.string().required(),
+  quantity: v.int().required().min(0),
+  change: v.int().required(),
+  reason: v.enum(["order", "restock", "adjustment"]).required(),
+  timestamp: v.date().required(),
+});
+
+export const inventoryUpdated = heraldChannel("inventory.updated", {
+  type: "queue", // one worker processes each update
+  durable: true,
+  deadLetter: "inventory.updated.dlq",
+  maxLength: 50000,
+  schema: InventoryUpdatedSchema,
+});
+
+// ============ Notifications ============
+
+const NotificationSentSchema = v.object({
+  orderId: v.int().required(),
+  type: v.enum(["email", "sms", "push"]).required(),
+  recipient: v.string().required(),
+  timestamp: v.date().required(),
+});
+
+export const notificationSent = heraldChannel("notification.sent", {
+  type: "queue",
+  durable: true,
+  deadLetter: "notification.sent.dlq",
+  maxLength: 100000,
+  messageTtl: 3600000, // 1 hour (no point retrying day-old notifications)
+  schema: NotificationSentSchema,
+});
+
+// ============ RPC: Order Status Queries ============
+
+export const orderStatus = heraldChannel("order.status", {
+  type: "queue",
+  autoDelete: true, // temp RPC channels clean up automatically
+  exclusive: false,
+  durable: false, // RPC requests aren't worth persisting
+});
+```
+
+Now services can safely publish with full validation and proper error handling:
+
+```typescript title="src/services/OrderService.ts"
+import { orderPlaced, inventoryUpdated } from "@/config/channels";
+
+export class OrderService {
+  async placeOrder(data: CreateOrderDTO) {
+    const order = await Order.create(data);
+
+    // Publish with schema validation and DLQ fallback
+    await orderPlaced.publish({
+      orderId: order.id,
+      customerId: order.customerId,
+      total: order.total,
+      items: order.items,
+      timestamp: new Date(),
+    });
+
+    // Update inventory for each item
+    for (const item of order.items) {
+      await inventoryUpdated.publish({
+        sku: item.sku,
+        quantity: item.quantity,
+        change: -item.quantity,
+        reason: "order",
+        timestamp: new Date(),
+      });
+    }
+
+    return order;
+  }
+}
+```
+
+## Common Option Combinations
+
+### High-Volume Analytics
+```typescript
+heraldChannel("analytics.event", {
+  type: "topic",
+  durable: false, // events aren't critical
+  maxLength: 50000, // bounded memory
+  messageTtl: 86400000, // 24 hours
+  // no schema — flexible event structure
+});
+```
+
+### Critical Business Events
+```typescript
+heraldChannel("order.placed", {
+  type: "topic",
+  durable: true, // never lose orders
+  deadLetter: "order.placed.dlq", // capture failures
+  maxLength: 100000,
+  messageTtl: 604800000, // 7 days retention
+  schema: OrderSchema, // strict validation
+});
+```
+
+### Work Distribution Queue
+```typescript
+heraldChannel("email.send", {
+  type: "queue", // distribute work
+  durable: true,
+  deadLetter: "email.send.dlq",
+  maxLength: 50000,
+  maxMessageSize: 1000000, // 1MB limit
+});
+```
+
+### Temporary RPC Channel
+```typescript
+heraldChannel("rpc.request.payment", {
+  autoDelete: true, // cleanup when done
+  exclusive: false,
+  durable: false, // RPC requests aren't persisted
+});
+```
+
+## Next Steps
+
+- [Channels](./channels.mdx) — Understanding channels and the naming convention
+- [Publishing Messages](./publishing.mdx) — Send messages to channels
+- [Consuming Messages](./consuming.mdx) — Subscribe and process messages
+- [Dead-Letter Queues & Retries](./retries-and-dlq.mdx) — Configure retry logic and failure handling
+- [Schema Validation](../../seal/overview.mdx) — Learn about Seal schema validation

@@ -1,0 +1,1132 @@
+---
+sidebar_position: 22
+title: Real-World Examples
+description: Complete, production-ready implementations of e-commerce, RPC, multi-broker, schema validation, versioning, and graceful shutdown patterns
+---
+
+This guide showcases complete, copy-paste-ready examples of advanced Herald patterns. Each example includes all files with full TypeScript code and realistic business logic.
+
+## Example 1: Complete E-Commerce Order Pipeline
+
+This is a full implementation of a distributed e-commerce system where OrderService publishes an event that triggers multiple consumers: notification, inventory, and analytics.
+
+### Event definition
+
+```typescript title="src/events/order-placed.event.ts"
+import { defineEvent } from '@warlock.js/herald';
+
+export const OrderPlacedEvent = defineEvent('order.placed', {
+  shape: {
+    orderId: String,
+    userId: String,
+    email: String,
+    items: Array, // Item[]: { sku: string; quantity: number; price: number }
+    subtotal: Number,
+    tax: Number,
+    total: Number,
+    shippingAddress: Object, // { street: string; city: string; state: string; zip: string; country: string }
+    timestamp: Number,
+    correlationId: String,
+  },
+});
+
+// Item type for reference
+export interface OrderItem {
+  sku: string;
+  quantity: number;
+  price: number;
+  name: string;
+}
+
+// Exported type for consumers
+export type OrderPlacedPayload = {
+  orderId: string;
+  userId: string;
+  email: string;
+  items: OrderItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  shippingAddress: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  };
+  timestamp: number;
+  correlationId: string;
+};
+```
+
+### Notification consumer (sends order confirmation email)
+
+```typescript title="src/consumers/order-notification.consumer.ts"
+import { defineConsumer } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/order-placed.event';
+
+interface EmailService {
+  sendOrderConfirmation(params: {
+    to: string;
+    orderId: string;
+    total: number;
+    items: Array<{ name: string; quantity: number; price: number }>;
+    estimatedDelivery: Date;
+  }): Promise<void>;
+}
+
+declare const emailService: EmailService;
+
+@Consumable({
+  consumerId: 'order-notification-handler',
+  prefetch: 5, // Balance throughput and latency
+})
+export class OrderNotificationConsumer extends defineConsumer(OrderPlacedEvent, {
+  async handle(event, ctx) {
+    const { orderId, email, items, total, timestamp, correlationId } = event.payload;
+
+    try {
+      // Idempotency: check if already sent
+      const existingNotification = await database.query<{ sentAt: Date }>(
+        'SELECT * FROM notification_log WHERE order_id = ?',
+        [orderId],
+      );
+
+      if (existingNotification) {
+        console.log(`[${correlationId}] Notification already sent for order ${orderId}`);
+        await ctx.ack();
+        return;
+      }
+
+      // Calculate estimated delivery (5 business days from now)
+      const estimatedDelivery = addBusinessDays(new Date(), 5);
+
+      // Send email
+      await emailService.sendOrderConfirmation({
+        to: email,
+        orderId,
+        total,
+        items: items.map((item) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        estimatedDelivery,
+      });
+
+      // Log for idempotency
+      await database.query(
+        'INSERT INTO notification_log (order_id, email, sent_at, correlation_id) VALUES (?, ?, ?, ?)',
+        [orderId, email, new Date(), correlationId],
+      );
+
+      await ctx.ack();
+      console.log(
+        `[${correlationId}] Order notification sent for ${orderId} to ${email}`,
+      );
+    } catch (error) {
+      console.error(
+        `[${correlationId}] Failed to send notification for ${orderId}:`,
+        error,
+      );
+      await ctx.nack();
+    }
+  },
+}) {}
+
+function addBusinessDays(date: Date, days: number): Date {
+  let count = 0;
+  const result = new Date(date);
+
+  while (count < days) {
+    result.setDate(result.getDate() + 1);
+    const dayOfWeek = result.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      // Skip weekends
+      count++;
+    }
+  }
+
+  return result;
+}
+```
+
+### Inventory consumer (decrements stock)
+
+```typescript title="src/consumers/inventory-update.consumer.ts"
+import { defineConsumer } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/order-placed.event';
+
+interface InventoryService {
+  decrementStock(sku: string, quantity: number): Promise<void>;
+  getStock(sku: string): Promise<number>;
+}
+
+declare const inventoryService: InventoryService;
+
+@Consumable({
+  consumerId: 'inventory-adjuster',
+  prefetch: 1, // Critical work; process one at a time
+})
+export class InventoryConsumer extends defineConsumer(OrderPlacedEvent, {
+  async handle(event, ctx) {
+    const { orderId, items, correlationId } = event.payload;
+
+    try {
+      // Idempotency: check if already adjusted
+      const existingAdjustment = await database.query(
+        'SELECT * FROM inventory_adjustments WHERE order_id = ?',
+        [orderId],
+      );
+
+      if (existingAdjustment) {
+        console.log(
+          `[${correlationId}] Inventory already adjusted for order ${orderId}`,
+        );
+        await ctx.ack();
+        return;
+      }
+
+      // Decrement stock for each item
+      const adjustments = [];
+      for (const item of items) {
+        const currentStock = await inventoryService.getStock(item.sku);
+
+        if (currentStock < item.quantity) {
+          // Out of stock; nack to retry or handle later
+          throw new Error(
+            `Out of stock: ${item.sku} (need ${item.quantity}, have ${currentStock})`,
+          );
+        }
+
+        await inventoryService.decrementStock(item.sku, item.quantity);
+        adjustments.push({
+          sku: item.sku,
+          quantity: item.quantity,
+          previousStock: currentStock,
+          newStock: currentStock - item.quantity,
+        });
+      }
+
+      // Log adjustment for audit trail
+      await database.query(
+        'INSERT INTO inventory_adjustments (order_id, adjustments, adjusted_at, correlation_id) VALUES (?, ?, ?, ?)',
+        [orderId, JSON.stringify(adjustments), new Date(), correlationId],
+      );
+
+      await ctx.ack();
+      console.log(`[${correlationId}] Inventory decremented for order ${orderId}`);
+    } catch (error) {
+      console.error(
+        `[${correlationId}] Inventory adjustment failed for ${orderId}:`,
+        error.message,
+      );
+      await ctx.nack(); // Retry; will eventually go to DLQ
+    }
+  },
+}) {}
+
+// Mock database for example
+const database = {
+  query: async (sql: string, params: any[]) => {
+    // Real implementation would use a database connection
+    console.log('Executing:', sql, params);
+    return null;
+  },
+};
+```
+
+### Analytics consumer (high-volume tracking)
+
+```typescript title="src/consumers/analytics.consumer.ts"
+import { defineConsumer } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/order-placed.event';
+
+interface AnalyticsService {
+  trackOrderPlaced(orderId: string, data: Record<string, any>): Promise<void>;
+  trackUserPurchase(userId: string, amount: number): Promise<void>;
+  trackCategoryRevenue(category: string, revenue: number): Promise<void>;
+}
+
+declare const analyticsService: AnalyticsService;
+
+@Consumable({
+  consumerId: 'analytics-tracker',
+  prefetch: 50, // High throughput; batch multiple events
+})
+export class AnalyticsConsumer extends defineConsumer(OrderPlacedEvent, {
+  async handle(event, ctx) {
+    const { orderId, userId, total, items, timestamp, correlationId } = event.payload;
+
+    try {
+      // Parallel tracking (non-critical; fire and forget style)
+      await Promise.all([
+        // Track order metrics
+        analyticsService.trackOrderPlaced(orderId, {
+          userId,
+          total,
+          itemCount: items.length,
+          timestamp,
+          correlationId,
+        }),
+
+        // Track user purchase behavior
+        analyticsService.trackUserPurchase(userId, total),
+
+        // Track category revenue (aggregate by category)
+        ...items.map((item) =>
+          analyticsService.trackCategoryRevenue(item.category, item.price * item.quantity),
+        ),
+      ]);
+
+      // Acknowledge; don't retry if failed (analytics is non-critical)
+      await ctx.ack();
+      console.log(`[${correlationId}] Analytics tracked for order ${orderId}`);
+    } catch (error) {
+      // Log but still acknowledge; we don't want to block the pipeline for analytics
+      console.warn(
+        `[${correlationId}] Analytics tracking failed for ${orderId}:`,
+        error.message,
+      );
+      await ctx.ack(); // Nack would block fulfillment for this non-critical service
+    }
+  },
+}) {}
+```
+
+### Order service (publishes the event)
+
+```typescript title="src/services/order.service.ts"
+import { publishEvent, generateId } from '@warlock.js/herald';
+import { OrderPlacedEvent, OrderItem } from '../events/order-placed.event';
+
+interface CreateOrderRequest {
+  userId: string;
+  email: string;
+  items: OrderItem[];
+  shippingAddress: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  };
+}
+
+interface OrderDatabase {
+  createOrder(order: {
+    id: string;
+    userId: string;
+    email: string;
+    items: OrderItem[];
+    total: number;
+    status: string;
+    createdAt: Date;
+  }): Promise<{ id: string }>;
+}
+
+declare const orderDatabase: OrderDatabase;
+
+export async function createOrder(request: CreateOrderRequest) {
+  // Generate unique order ID
+  const orderId = generateId('order-');
+
+  // Calculate totals
+  const subtotal = request.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const tax = subtotal * 0.08; // 8% tax
+  const total = subtotal + tax;
+
+  // Generate correlation ID for tracing across services
+  const correlationId = generateId('corr-');
+
+  try {
+    // Save order to database
+    await orderDatabase.createOrder({
+      id: orderId,
+      userId: request.userId,
+      email: request.email,
+      items: request.items,
+      total,
+      status: 'created',
+      createdAt: new Date(),
+    });
+
+    // Publish event; consumers will handle everything else
+    await publishEvent(
+      new OrderPlacedEvent({
+        orderId,
+        userId: request.userId,
+        email: request.email,
+        items: request.items,
+        subtotal,
+        tax,
+        total,
+        shippingAddress: request.shippingAddress,
+        timestamp: Date.now(),
+        correlationId,
+      }),
+    );
+
+    console.log(`[${correlationId}] Order ${orderId} created and published`);
+
+    return {
+      orderId,
+      total,
+      status: 'created',
+      correlationId, // Return for client to track
+    };
+  } catch (error) {
+    console.error(`Failed to create order for user ${request.userId}:`, error);
+    throw new Error(`Order creation failed: ${error.message}`);
+  }
+}
+```
+
+### Main bootstrap
+
+```typescript title="src/main.ts"
+import { connectToBroker, heraldChannel } from '@warlock.js/herald';
+
+// Import consumer files so @Consumable runs — order vs connectToBroker doesn't matter
+import './consumers/order-notification.consumer';
+import './consumers/inventory-update.consumer';
+import './consumers/analytics.consumer';
+
+async function bootstrap() {
+  // Configure channels with dead-letter and persistence
+  const orderChannel = heraldChannel('order.placed', {
+    durable: true,
+    deadLetter: { channel: 'order.placed.dlq' },
+    messageTtl: 7 * 24 * 60 * 60 * 1000, // Keep for 7 days
+    maxLength: 100_000,
+  });
+
+  const dlqChannel = heraldChannel('order.placed.dlq', {
+    durable: true,
+    messageTtl: 30 * 24 * 60 * 60 * 1000, // Keep DLQ for 30 days
+  });
+
+  // Subscribe to DLQ for alerting
+  dlqChannel.subscribe(async (message, ctx) => {
+    console.error('CRITICAL: Order event in DLQ:', message);
+    // Alert ops team
+    await alertService.critical({
+      title: 'Order event processing failed',
+      body: `Order: ${message.payload.orderId}`,
+    });
+    await ctx.ack();
+  });
+
+  // Connect to broker
+  await connectToBroker({
+    driver: 'rabbitmq',
+    uri: process.env.RABBITMQ_URI,
+    reconnect: true,
+    reconnectDelay: 5000,
+  });
+
+  console.log('✓ Broker connected');
+  console.log('✓ Consumers registered');
+
+  // Start HTTP server
+  import express from 'express';
+  const app = express();
+  app.use(express.json());
+
+  app.post('/api/orders', async (req, res) => {
+    try {
+      const order = await createOrder(req.body);
+      res.status(201).json(order);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/health', async (req, res) => {
+    const health = await herald().driver.healthCheck?.();
+    res.status(health?.healthy ? 200 : 503).json(health);
+  });
+
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`✓ Server listening on :${port}`);
+  });
+}
+
+bootstrap().catch(console.error);
+```
+
+---
+
+## Example 2: RPC (Request-Reply) — Order Status Service
+
+This pattern shows synchronous request-response communication over the message broker using Herald's RPC capabilities.
+
+### Order status types
+
+```typescript title="src/rpc/order-status.types.ts"
+export interface OrderStatusRequest {
+  orderId: string;
+  correlationId: string;
+}
+
+export interface OrderStatusResponse {
+  orderId: string;
+  status: 'created' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+  lastUpdate: Date;
+  trackingNumber?: string;
+  estimatedDelivery?: Date;
+  error?: string;
+}
+```
+
+### Fulfillment service (responder)
+
+The FulfillmentService listens on the "order.status" channel and responds with the order status:
+
+```typescript title="src/services/fulfillment.service.ts"
+import { heraldChannel } from '@warlock.js/herald';
+import { OrderStatusRequest, OrderStatusResponse } from '../rpc/order-status.types';
+
+interface OrderStatusDatabase {
+  getStatus(orderId: string): Promise<{
+    status: string;
+    lastUpdate: Date;
+    trackingNumber?: string;
+    estimatedDelivery?: Date;
+  } | null>;
+}
+
+declare const database: OrderStatusDatabase;
+
+export async function setupOrderStatusRPC() {
+  const statusChannel = heraldChannel('order.status');
+
+  // Listen for requests and respond
+  statusChannel.subscribe(async (message, ctx) => {
+    const { orderId, correlationId } = message.payload as OrderStatusRequest;
+
+    try {
+      // Look up order status
+      const order = await database.getStatus(orderId);
+
+      if (!order) {
+        const response: OrderStatusResponse = {
+          orderId,
+          status: 'cancelled',
+          lastUpdate: new Date(),
+          error: 'Order not found',
+        };
+        await ctx.reply(response);
+        await ctx.ack();
+        return;
+      }
+
+      const response: OrderStatusResponse = {
+        orderId,
+        status: order.status as any,
+        lastUpdate: order.lastUpdate,
+        trackingNumber: order.trackingNumber,
+        estimatedDelivery: order.estimatedDelivery,
+      };
+
+      // Reply with status
+      await ctx.reply(response);
+      await ctx.ack();
+
+      console.log(`[${correlationId}] Status request for ${orderId} answered`);
+    } catch (error) {
+      console.error(`[${correlationId}] Status lookup failed:`, error);
+      const errorResponse: OrderStatusResponse = {
+        orderId,
+        status: 'cancelled',
+        lastUpdate: new Date(),
+        error: error.message,
+      };
+      await ctx.reply(errorResponse);
+      await ctx.nack();
+    }
+  });
+}
+```
+
+### Order service (requester)
+
+The OrderService makes RPC requests to ask about order status:
+
+```typescript title="src/services/order-status-client.ts"
+import { heraldChannel } from '@warlock.js/herald';
+import { OrderStatusRequest, OrderStatusResponse } from '../rpc/order-status.types';
+
+export async function getOrderStatus(
+  orderId: string,
+): Promise<OrderStatusResponse | null> {
+  const statusChannel = heraldChannel('order.status');
+
+  const correlationId = generateId('rpc-');
+
+  try {
+    // Request status with 10 second timeout
+    const response = await statusChannel.request<OrderStatusResponse>(
+      {
+        orderId,
+        correlationId,
+      } as OrderStatusRequest,
+      { timeout: 10_000 },
+    );
+
+    console.log(`[${correlationId}] Received status for ${orderId}`);
+    return response;
+  } catch (error) {
+    if (error.message.includes('timeout')) {
+      console.error(`[${correlationId}] Status request timed out for ${orderId}`);
+      return null;
+    }
+
+    console.error(`[${correlationId}] Status request failed:`, error);
+    throw error;
+  }
+}
+
+// Example HTTP endpoint
+export function setupOrderStatusEndpoint(app: any) {
+  app.get('/api/orders/:orderId/status', async (req, res) => {
+    const { orderId } = req.params;
+
+    try {
+      const status = await getOrderStatus(orderId);
+      if (!status) {
+        return res.status(503).json({ error: 'Service unavailable' });
+      }
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+}
+```
+
+### Bootstrap both services
+
+```typescript title="src/main.ts"
+import { connectToBroker } from '@warlock.js/herald';
+import { setupOrderStatusRPC } from './services/fulfillment.service';
+
+async function bootstrap() {
+  await connectToBroker({
+    driver: 'rabbitmq',
+    uri: process.env.RABBITMQ_URI,
+  });
+
+  // Set up RPC handler
+  await setupOrderStatusRPC();
+
+  console.log('✓ RPC handlers registered');
+
+  // Start HTTP server
+  import express from 'express';
+  const app = express();
+  setupOrderStatusEndpoint(app);
+
+  app.listen(3000);
+}
+
+bootstrap().catch(console.error);
+```
+
+---
+
+## Example 3: Multi-Broker Setup
+
+Run three separate brokers: one for orders, one for analytics, one for notifications.
+
+### Connection setup
+
+```typescript title="src/config/brokers.ts"
+import { connectToBroker } from '@warlock.js/herald';
+
+export async function setupBrokers() {
+  // Orders broker (primary, critical)
+  await connectToBroker({
+    driver: 'rabbitmq',
+    uri: process.env.RABBITMQ_ORDERS_URI,
+    name: 'orders',
+    isDefault: true, // Default when using herald()
+    reconnect: true,
+    prefetch: 1,
+  });
+
+  // Analytics broker (high throughput)
+  await connectToBroker({
+    driver: 'rabbitmq',
+    uri: process.env.RABBITMQ_ANALYTICS_URI,
+    name: 'analytics',
+    reconnect: true,
+    prefetch: 50,
+  });
+
+  // Notifications broker (independent)
+  await connectToBroker({
+    driver: 'rabbitmq',
+    uri: process.env.RABBITMQ_NOTIFICATIONS_URI,
+    name: 'notifications',
+    reconnect: true,
+    prefetch: 5,
+  });
+
+  console.log('✓ All brokers connected');
+}
+```
+
+### Publishing to specific brokers
+
+```typescript title="src/services/multi-broker.service.ts"
+import { herald } from '@warlock.js/herald';
+
+export async function publishOrderEvent(order: any) {
+  // Publish to orders broker (default)
+  await herald()
+    .channel('orders.placed')
+    .publish(order);
+
+  console.log('Order published to orders broker');
+}
+
+export async function publishAnalyticsEvent(event: any) {
+  // Publish to analytics broker (specify by name)
+  await herald('analytics')
+    .channel('analytics.order_created')
+    .publish(event);
+
+  console.log('Event published to analytics broker');
+}
+
+export async function publishNotificationEvent(notification: any) {
+  // Publish to notifications broker
+  await herald('notifications')
+    .channel('notifications.email_queue')
+    .publish(notification);
+
+  console.log('Notification published to notifications broker');
+}
+```
+
+### Monitoring multiple brokers
+
+```typescript title="src/health/multi-broker-health.ts"
+import { brokerRegistry } from '@warlock.js/herald';
+
+export async function getBrokerHealth() {
+  const brokers = brokerRegistry.list();
+  const health = {};
+
+  for (const broker of brokers) {
+    try {
+      const result = await broker.driver.healthCheck?.();
+      health[broker.name] = {
+        healthy: result?.healthy,
+        latency: result?.latency,
+      };
+    } catch (error) {
+      health[broker.name] = {
+        healthy: false,
+        error: error.message,
+      };
+    }
+  }
+
+  return {
+    overall: Object.values(health).every((h: any) => h.healthy),
+    brokers: health,
+  };
+}
+
+export function setupHealthEndpoint(app: any) {
+  app.get('/health/brokers', async (req, res) => {
+    const health = await getBrokerHealth();
+    res.status(health.overall ? 200 : 503).json(health);
+  });
+}
+```
+
+---
+
+## Example 4: Schema-Validated Channel (with Seal)
+
+Validate event payloads using the Seal validation library:
+
+```typescript title="src/channels/validated-channel.ts"
+import { heraldChannel } from '@warlock.js/herald';
+import v from '@warlock.js/seal'; // Validation library
+
+export const validatedOrderChannel = heraldChannel('order.placed', {
+  // Optional: Attach a validation schema
+  schema: v.object({
+    orderId: v.string().required(),
+    userId: v.string().required(),
+    email: v.string().email().required(),
+    total: v.number().min(0).required(),
+    items: v.array(
+      v.object({
+        sku: v.string().required(),
+        quantity: v.number().min(1).required(),
+        price: v.number().min(0).required(),
+      }),
+    ).required(),
+    timestamp: v.number().required(),
+  }),
+});
+
+export async function publishValidatedOrder(data: any) {
+  try {
+    // Schema validation happens automatically on publish
+    await validatedOrderChannel.publish(data);
+    console.log('Valid order published');
+  } catch (error) {
+    if (error.message.includes('validation')) {
+      console.error('Invalid order payload:', error);
+      // Handle validation error: log, alert, etc.
+    }
+    throw error;
+  }
+}
+
+export async function subscribeToValidatedOrders() {
+  // Consumer always receives validated data (guaranteed)
+  await validatedOrderChannel.subscribe(async (message, ctx) => {
+    const { orderId, userId, email, items, total } = message.payload;
+
+    // Safe to use directly; validation already passed
+    console.log(`Processing order ${orderId} for user ${userId}`);
+
+    await ctx.ack();
+  });
+}
+```
+
+---
+
+## Example 5: Graceful Shutdown
+
+Production-grade graceful shutdown that drains in-flight messages:
+
+```typescript title="src/shutdown/graceful.ts"
+import { herald, brokerRegistry } from '@warlock.js/herald';
+import { EventEmitter } from 'events';
+
+const shutdownEmitter = new EventEmitter();
+let isShuttingDown = false;
+
+export async function initiateGracefulShutdown() {
+  if (isShuttingDown) {
+    console.warn('Shutdown already in progress');
+    return;
+  }
+
+  isShuttingDown = true;
+  console.log('Initiating graceful shutdown...');
+
+  // Phase 1: Stop accepting new work
+  console.log('Phase 1: Stopping new work...');
+  shutdownEmitter.emit('shutdown-started');
+
+  // Phase 2: Unsubscribe from all channels (drain in-flight)
+  console.log('Phase 2: Draining consumers...');
+  const brokers = brokerRegistry.list();
+  for (const broker of brokers) {
+    const channelNames = broker.driver.getChannelNames() || [];
+    for (const channelName of channelNames) {
+      try {
+        await broker.channel(channelName).unsubscribeAll();
+        console.log(`  ✓ Drained ${broker.name}/${channelName}`);
+      } catch (error) {
+        console.warn(`  ✗ Failed to drain ${broker.name}/${channelName}:`, error.message);
+      }
+    }
+  }
+
+  // Phase 3: Close all broker connections
+  console.log('Phase 3: Closing broker connections...');
+  for (const broker of brokers) {
+    try {
+      await broker.disconnect();
+      console.log(`  ✓ Closed ${broker.name}`);
+    } catch (error) {
+      console.warn(`  ✗ Failed to close ${broker.name}:`, error.message);
+    }
+  }
+
+  console.log('✓ Graceful shutdown complete');
+  return true;
+}
+
+export function setupGracefulShutdown() {
+  // Handle SIGTERM (k8s, docker)
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM received');
+    await initiateGracefulShutdown();
+    process.exit(0);
+  });
+
+  // Handle SIGINT (ctrl+c)
+  process.on('SIGINT', async () => {
+    console.log('SIGINT received');
+    await initiateGracefulShutdown();
+    process.exit(0);
+  });
+
+  // Handle uncaught exceptions
+  process.on('uncaughtException', async (error) => {
+    console.error('Uncaught exception:', error);
+    await initiateGracefulShutdown();
+    process.exit(1);
+  });
+
+  // Handle unhandled rejections
+  process.on('unhandledRejection', async (reason, promise) => {
+    console.error('Unhandled rejection at', promise, 'reason:', reason);
+    await initiateGracefulShutdown();
+    process.exit(1);
+  });
+}
+
+export function onShutdown(callback: () => void | Promise<void>) {
+  shutdownEmitter.on('shutdown-started', callback);
+}
+```
+
+### Usage in main
+
+```typescript title="src/main.ts"
+import { setupGracefulShutdown, onShutdown } from './shutdown/graceful';
+
+async function bootstrap() {
+  // Set up graceful shutdown handlers
+  setupGracefulShutdown();
+
+  // Register cleanup hooks
+  onShutdown(async () => {
+    console.log('Closing database connection...');
+    await database.close();
+  });
+
+  onShutdown(async () => {
+    console.log('Closing HTTP server...');
+    await httpServer.close();
+  });
+
+  // ... rest of bootstrap
+}
+```
+
+---
+
+## Example 6: Event Versioning & Migration
+
+Handle multiple event versions during production migrations:
+
+### Define both versions
+
+```typescript title="src/events/order-placed-versions.event.ts"
+import { defineEvent } from '@warlock.js/herald';
+
+// Version 1: Original (deprecated, being phased out)
+export const OrderPlacedEventV1 = defineEvent('order.placed.v1', {
+  shape: {
+    orderId: String,
+    total: Number,
+    timestamp: Number,
+  },
+});
+
+// Version 2: Enhanced with user info
+export const OrderPlacedEventV2 = defineEvent('order.placed.v2', {
+  shape: {
+    orderId: String,
+    userId: String,
+    email: String,
+    total: Number,
+    items: Array, // Added: item details
+    timestamp: Number,
+  },
+});
+
+// Current version (producers should use this)
+export const OrderPlacedEvent = OrderPlacedEventV2;
+```
+
+### Version-aware consumer
+
+```typescript title="src/consumers/order-processor.consumer.ts"
+import { defineConsumer, heraldChannel } from '@warlock.js/herald';
+import {
+  OrderPlacedEventV1,
+  OrderPlacedEventV2,
+} from '../events/order-placed-versions.event';
+
+// Consume both versions; migrate in handler
+@Consumable({ consumerId: 'order-processor', prefetch: 1 })
+export class OrderProcessorConsumer extends defineConsumer(OrderPlacedEventV2, {
+  async handle(event, ctx) {
+    const payload = event.payload;
+
+    try {
+      // Detect version by checking for v2 fields
+      if ('items' in payload && 'email' in payload) {
+        // V2 format
+        await processOrderV2(payload);
+      } else {
+        // V1 format (shouldn't happen if producers migrated, but safe-guard)
+        await processOrderV1(payload);
+      }
+
+      await ctx.ack();
+    } catch (error) {
+      console.error(`Order processing failed:`, error);
+      await ctx.nack();
+    }
+  },
+}) {}
+
+// V2 handler (new code)
+async function processOrderV2(payload: any) {
+  const { orderId, userId, email, items, total } = payload;
+
+  console.log(`[V2] Processing order ${orderId} for ${email}`);
+  // Process with all v2 data available
+  await orderService.create({
+    orderId,
+    userId,
+    email,
+    items,
+    total,
+  });
+}
+
+// V1 handler (temporary, during migration)
+async function processOrderV1(payload: any) {
+  const { orderId, total } = payload;
+
+  console.log(`[V1] Processing order ${orderId} (legacy format)`);
+  // Fetch user from database (inefficient, but supports v1)
+  const user = await userService.findByOrderId(orderId);
+
+  if (!user) {
+    throw new Error(`User not found for order ${orderId}`);
+  }
+
+  // Convert to v2 structure
+  await orderService.create({
+    orderId,
+    userId: user.id,
+    email: user.email,
+    items: [], // V1 doesn't have items; skip
+    total,
+  });
+}
+
+// Alternative: Separate consumers for each version
+@Consumable({ consumerId: 'order-processor-v1' })
+export class OrderProcessorV1Consumer extends defineConsumer(OrderPlacedEventV1, {
+  async handle(event, ctx) {
+    await processOrderV1(event.payload);
+    await ctx.ack();
+  },
+}) {}
+
+@Consumable({ consumerId: 'order-processor-v2' })
+export class OrderProcessorV2Consumer extends defineConsumer(OrderPlacedEventV2, {
+  async handle(event, ctx) {
+    await processOrderV2(event.payload);
+    await ctx.ack();
+  },
+}) {}
+```
+
+### Migration timeline
+
+```typescript title="src/producers/order-producer.ts"
+import { publishEvent } from '@warlock.js/herald';
+import {
+  OrderPlacedEventV1,
+  OrderPlacedEventV2,
+} from '../events/order-placed-versions.event';
+
+// Phase 1 (week 1-2): Producers publish both v1 and v2
+export async function publishOrderPlacedDuringMigration(order: any) {
+  // Publish v1 for backward compatibility
+  await publishEvent(new OrderPlacedEventV1(order));
+
+  // Also publish v2 (new format)
+  await publishEvent(new OrderPlacedEventV2(order));
+
+  console.log('Published both v1 and v2');
+}
+
+// Phase 2 (week 3+): Producers publish only v2
+export async function publishOrderPlacedPostMigration(order: any) {
+  await publishEvent(new OrderPlacedEventV2(order));
+  console.log('Published v2 only');
+}
+
+// Phase 3 (week 5+): Remove v1 consumers once backlog is drained
+// (Requires monitoring DLQ and message counts)
+```
+
+### Migration monitoring
+
+```typescript title="src/monitoring/migration.ts"
+import { herald } from '@warlock.js/herald';
+
+export async function checkMigrationStatus() {
+  const v1Queue = herald().channel('order.placed.v1');
+  const v2Queue = herald().channel('order.placed.v2');
+
+  const v1Stats = await v1Queue.stats?.();
+  const v2Stats = await v2Queue.stats?.();
+
+  console.log('V1 queue:', {
+    messages: v1Stats?.messageCount,
+    consumers: v1Stats?.consumerCount,
+  });
+
+  console.log('V2 queue:', {
+    messages: v2Stats?.messageCount,
+    consumers: v2Stats?.consumerCount,
+  });
+
+  // Safe to remove v1 consumer when:
+  // - v1 queue is empty
+  // - v2 queue has all messages
+  // - No v1 producers running
+  if (v1Stats?.messageCount === 0) {
+    console.log('✓ V1 migration complete; safe to remove v1 consumers');
+  }
+}
+
+// Monitor periodically
+setInterval(() => {
+  checkMigrationStatus().catch(console.error);
+}, 60_000); // Every minute
+```
+
+---
+
+## Summary
+
+These examples cover the full spectrum of Herald usage:
+
+1. **E-Commerce Pipeline** — Multi-consumer pub/sub with transactional guarantees
+2. **RPC** — Synchronous request-response over messaging
+3. **Multi-Broker** — Separate brokers for different concerns
+4. **Schema Validation** — Type-safe channels with Seal
+5. **Graceful Shutdown** — Drain consumers and close cleanly
+6. **Event Versioning** — Zero-downtime migrations with multiple versions
+
+Use these as templates for your own production systems. Adapt the business logic to your domain; the patterns remain the same.
+
+## Next steps
+
+- **[Best Practices](best-practices)** — Design principles and patterns
+- **[RabbitMQ Advanced](rabbitmq-advanced)** — Deep-dive configuration and TLS
+- **[Error Handling](retries-and-dead-letters)** — Retries, dead-letter queues, and recovery

@@ -1,0 +1,339 @@
+---
+sidebar_position: 3
+title: Core Concepts
+description: The 6 foundational concepts that power Herald — understand these and everything else clicks into place
+---
+
+Before diving into the API details, here are the 6 core concepts that everything in Herald builds on. Each one solves a specific problem in event-driven architecture.
+
+## 1. Broker — Your connection to the message network
+
+A **Broker** is your application's gateway to a message broker (RabbitMQ, Kafka, etc.). It wraps a driver, maintains the connection, and provides access to channels.
+
+You create a broker by calling `connectToBroker()` at startup:
+
+```typescript title="src/main.ts"
+import { connectToBroker, herald } from '@warlock.js/herald';
+
+const broker = await connectToBroker({
+  driver: 'rabbitmq',
+  host: 'localhost',
+  port: 5672,
+});
+
+// Access it anywhere afterward
+herald();           // default broker
+herald('default');  // same, by name
+```
+
+You can register multiple named brokers for different purposes:
+
+```typescript
+await connectToBroker({ name: 'orders',    isDefault: true, driver: 'rabbitmq', host: process.env.ORDERS_MQ });
+await connectToBroker({ name: 'analytics', driver: 'rabbitmq', host: process.env.ANALYTICS_MQ });
+
+herald().channel('order.placed').publish({ orderId: 'ord-123' });          // default broker
+herald('analytics').channel('page.viewed').publish({ page: '/checkout' }); // named broker
+```
+
+## 2. Driver — The broker implementation abstraction
+
+A **Driver** is the adapter that speaks to a specific broker technology. Herald ships with RabbitMQ; Kafka and others are planned.
+
+All drivers implement `BrokerDriverContract`, so your application code stays identical regardless of the broker underneath — only the connection config changes.
+
+```typescript
+// Same channel/publish/subscribe API regardless of driver
+await herald().channel('order.placed').publish({ orderId: 'ord-123' });
+```
+
+## 3. Channel — Named queues where events flow
+
+A **Channel** is a named queue or topic. Producers publish to it, consumers subscribe from it. Channels are lazy-created on first access and cached — calling `.channel('order.placed')` twice returns the same instance.
+
+```typescript
+import { herald } from '@warlock.js/herald';
+
+const channel = herald().channel('order.placed');
+
+await channel.publish({ orderId: 'ord-123', total: 99.99 });
+
+channel.subscribe(async (message, ctx) => {
+  console.log('Order placed:', message.payload.orderId);
+  await ctx.ack();
+});
+```
+
+Add a type parameter to get full TypeScript safety on the payload:
+
+```typescript
+interface OrderPayload {
+  orderId: string;
+  total: number;
+}
+
+const channel = herald().channel<OrderPayload>('order.placed');
+
+await channel.publish({ orderId: 'ord-123', total: 99.99 }); // ✓
+// await channel.publish({ userId: 'u-1' }); // ✗ TypeScript error
+```
+
+### Channel options
+
+Pass options as the second argument to configure the underlying queue:
+
+```typescript
+const channel = herald().channel<OrderPayload>('order.placed', {
+  durable: true,           // survive broker restarts (default: true)
+  autoDelete: false,       // delete queue when last consumer disconnects
+  exclusive: false,        // restrict to this connection only
+  messageTtl: 3_600_000,  // expire messages after 1 hour
+  maxLength: 10_000,       // drop oldest when queue exceeds this
+  maxMessageSize: 65_536,  // reject messages larger than 64 KB
+  deadLetter: {            // where failed messages go
+    channel: 'order.placed.dlq',
+    preserveOriginal: true,
+  },
+  schema: OrderSchema,     // Seal ObjectValidator — validates payload on publish
+});
+```
+
+`type` can be `"queue"` (default, point-to-point) or `"topic"` (broadcast).
+
+## 4. EventMessage — Typed, publishable events
+
+An **EventMessage** is a class that represents a specific domain event. It carries a typed payload and produces an envelope (with `messageId`, `eventName`, `version`, `occurredAt`) that Herald serializes for the broker.
+
+### Defining with a class
+
+Extend `EventMessage<TPayload>` and set `eventName`:
+
+```typescript title="src/events/messages/order-placed.event.ts"
+import { EventMessage } from '@warlock.js/herald';
+
+interface OrderPayload {
+  orderId: string;
+  userId: string;
+  total: number;
+}
+
+export class OrderPlacedEvent extends EventMessage<OrderPayload> {
+  public eventName = 'order.placed';
+}
+```
+
+Publish it with `publishEvent()`:
+
+```typescript title="src/services/order.service.ts"
+import { publishEvent } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/messages/order-placed.event';
+
+await publishEvent(new OrderPlacedEvent({ orderId: 'ord-123', userId: 'usr-456', total: 99.99 }));
+```
+
+Override `toJSON()` to transform the data before it's sent (e.g. strip private fields, reshape):
+
+```typescript
+export class OrderPlacedEvent extends EventMessage<OrderPayload> {
+  public eventName = 'order.placed';
+
+  public toJSON(): OrderPayload {
+    // Only send what consumers need
+    return {
+      orderId: this.data!.orderId,
+      userId:  this.data!.userId,
+      total:   this.data!.total,
+    };
+  }
+}
+```
+
+Optional fields on every EventMessage: `version`, `metadata`, `messageId`, `schema` (Seal `ObjectValidator` for payload validation).
+
+### Defining with `defineEvent()`
+
+For quick, inline definitions without a full class:
+
+```typescript
+import { defineEvent } from '@warlock.js/herald';
+
+// No transform — IncomingData = OutgoingData
+const PaymentProcessedEvent = defineEvent<PaymentPayload>('payment.processed');
+
+// With transform — IncomingData is your domain object, OutgoingData is the wire payload
+const OrderPlacedEvent = defineEvent<Order, OrderPayload>('order.placed', {
+  toJSON: (order) => ({
+    orderId: order.id,
+    userId:  order.userId,
+    total:   order.total,
+  }),
+});
+
+await publishEvent(new OrderPlacedEvent(order)); // pass the domain object
+```
+
+`defineEvent` options: `{ toJSON?, schema? }` — that's it.
+
+## 5. EventConsumer — Typed event handlers
+
+An **EventConsumer** is a class that knows how to handle one specific event. It declares the event name it handles and implements a `handle()` method.
+
+### Defining with a class
+
+Extend `EventConsumer<Payload>` and set the `static eventName`:
+
+```typescript title="src/events/consumers/order-notification.consumer.ts"
+import { EventConsumer, Consumable } from '@warlock.js/herald';
+import type { ConsumedEventMessage } from '@warlock.js/herald';
+
+interface OrderPayload {
+  orderId: string;
+  userId: string;
+  total: number;
+}
+
+@Consumable()
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = 'order.placed';
+
+  public async handle(payload: OrderPayload, event: ConsumedEventMessage) {
+    await sendConfirmationEmail(payload.userId, payload.orderId);
+  }
+}
+```
+
+`handle(payload, event)` receives:
+- **`payload`** — the typed, deserialized payload
+- **`event`** — the full envelope: `messageId`, `eventName`, `version`, `occurredAt`, `metadata`, and `message` (the raw `Message<T>` for low-level access)
+
+Additional static fields: `minVersion`, `maxVersion` (filter events by version range), `consumerId` (stable re-subscription ID).
+
+### Defining with `defineConsumer()`
+
+For quick inline consumers. `defineConsumer` auto-applies `@Consumable()` internally — do **not** also add the decorator:
+
+```typescript title="src/events/consumers/analytics.consumer.ts"
+import { defineConsumer } from '@warlock.js/herald';
+
+// Already @Consumable — no decorator needed
+export const AnalyticsConsumer = defineConsumer<OrderPayload>('order.placed', {
+  async handle(payload, event) {
+    await analytics.track('order_placed', {
+      orderId:  payload.orderId,
+      total:    payload.total,
+      occurredAt: event.occurredAt,
+    });
+  },
+});
+```
+
+`defineConsumer` options: `{ handle, schema?, validate? }`.
+
+## 6. @Consumable — Auto-registration without manual wiring
+
+The **@Consumable** decorator auto-registers an EventConsumer when the broker connects, eliminating manual `subscribeConsumer()` calls.
+
+When the decorated class file is imported, the decorator runs immediately:
+- If a broker is already connected → subscribes right away
+- If not → adds to `pendingSubscribers`; subscribed automatically when any broker connects
+
+Import order relative to `connectToBroker()` doesn't matter — just make sure the file is imported somewhere during startup:
+
+```typescript title="src/main.ts"
+import { connectToBroker } from '@warlock.js/herald';
+import './events/consumers/order-notification.consumer'; // triggers @Consumable
+
+async function bootstrap() {
+  await connectToBroker({ driver: 'rabbitmq', host: 'localhost' });
+  // Consumer is subscribed automatically
+}
+
+bootstrap();
+```
+
+Use a barrel file to import all consumers at once:
+
+```typescript title="src/events/index.ts"
+export { OrderNotificationConsumer } from './consumers/order-notification.consumer';
+export { InventoryUpdateConsumer }   from './consumers/inventory-update.consumer';
+export { AnalyticsConsumer }         from './consumers/analytics.consumer';
+```
+
+```typescript title="src/main.ts"
+import './events'; // one line registers everything
+```
+
+## How they fit together
+
+```
+Producer                           Broker                      Consumer
+────────                          ────────                    ──────────
+new OrderPlacedEvent(data)
+  └─ toJSON() → payload
+  └─ serialize() → envelope
+        │
+        ▼
+publishEvent(event)
+  └─ herald().publish(event)
+        │
+        ▼
+  Channel "order.placed"  ──→  Driver (RabbitMQ)  ──→  RabbitMQ queue
+                                                              │
+                                                              ▼
+                                                   Driver delivers message
+                                                              │
+                                                              ▼
+                                                 EventConsumer.handle(payload, event)
+                                                              │
+                                                              ▼
+                                                         ctx.ack()
+```
+
+## Putting it all together
+
+```typescript title="src/events/messages/order-placed.event.ts"
+import { EventMessage } from '@warlock.js/herald';
+
+export class OrderPlacedEvent extends EventMessage<OrderPayload> {
+  public eventName = 'order.placed';
+  public version = 1;
+}
+```
+
+```typescript title="src/events/consumers/order-notification.consumer.ts"
+import { EventConsumer, Consumable } from '@warlock.js/herald';
+
+@Consumable()
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = 'order.placed';
+
+  public async handle(payload: OrderPayload) {
+    await sendEmail(payload.userId, `Order ${payload.orderId} confirmed`);
+  }
+}
+```
+
+```typescript title="src/services/order.service.ts"
+import { publishEvent } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/messages/order-placed.event';
+
+export async function placeOrder(data: OrderPayload) {
+  await publishEvent(new OrderPlacedEvent(data));
+}
+```
+
+```typescript title="src/main.ts"
+import { connectToBroker } from '@warlock.js/herald';
+import './events/consumers/order-notification.consumer';
+
+await connectToBroker({ driver: 'rabbitmq', host: 'localhost' });
+// Consumer auto-subscribed. Done.
+```
+
+## Next steps
+
+- **[Connecting](connecting)** — Full broker connection options and multi-broker setups
+- **[Event Messages](event-messages)** — `toJSON()`, versioning, schema validation, `defineEvent()`
+- **[Event Consumers](event-consumers)** — `minVersion`, `maxVersion`, `defineConsumer()`, schema validation
+- **[@Consumable Decorator](consumable-decorator)** — How `pendingSubscribers` works, broker targeting
+- **[Request / Reply](request-reply)** — Synchronous RPC over the message bus

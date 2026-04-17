@@ -1,0 +1,345 @@
+---
+sidebar_position: 14
+title: The @Consumable Decorator
+description: Automatically register event consumers at startup using the @Consumable decorator to solve boot-order challenges.
+---
+
+# The @Consumable Decorator
+
+When you have many EventConsumer classes, managing startup becomes tricky: you need to import each consumer and call `subscribeConsumer()` manually, and you need to do this *after* the broker connects. The **@Consumable** decorator solves this by automatically queueing consumers and subscribing them the moment a broker becomes available.
+
+## The Boot-Order Problem
+
+Without @Consumable, you'd do this:
+
+```typescript title="src/main.ts (no @Consumable)"
+import { connectToBroker } from "@warlock.js/herald";
+
+// Import all consumers
+import { OrderNotificationConsumer } from "./consumers/order-notification.consumer";
+import { InventoryUpdateConsumer } from "./consumers/inventory-update.consumer";
+import { PaymentVerificationConsumer } from "./consumers/payment-verification.consumer";
+
+// Start the app
+async function main() {
+  // Must connect BEFORE subscribing
+  await connectToBroker();
+  
+  // Then manually subscribe each consumer
+  herald.subscribeConsumer(OrderNotificationConsumer);
+  herald.subscribeConsumer(InventoryUpdateConsumer);
+  herald.subscribeConsumer(PaymentVerificationConsumer);
+}
+
+main();
+```
+
+This couples your startup logic to your consumers and requires careful import ordering. The @Consumable decorator eliminates this:
+
+```typescript title="src/main.ts (with @Consumable)"
+import { connectToBroker } from "@warlock.js/herald";
+
+// Just import your consumers — the decorator handles registration
+import "./consumers/order-notification.consumer";
+import "./consumers/inventory-update.consumer";
+import "./consumers/payment-verification.consumer";
+
+async function main() {
+  // connectToBroker triggers all pending subscriptions automatically
+  await connectToBroker();
+}
+
+main();
+```
+
+## How @Consumable Works
+
+When you decorate an EventConsumer class with `@Consumable()`:
+
+1. **On import**, the decorator registers the class in `pendingSubscribers`
+2. **On broker connect**, Herald listens to the `brokerRegistry.on("connected", ...)` event
+3. **Automatically subscribes** the pending consumer to its channel
+
+```typescript title="src/consumers/order-notification.consumer.ts"
+import { EventConsumer, Consumable } from "@warlock.js/herald";
+
+@Consumable()
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+
+  public async handle(payload: OrderPayload) {
+    await sendConfirmationEmail(payload.userId, {
+      orderId: payload.orderId,
+      total: payload.totalAmount
+    });
+  }
+}
+```
+
+The decorator runs as soon as the class is defined (i.e. when the file is first imported). Whether that's before or after `connectToBroker()` doesn't matter — the decorator handles both cases automatically.
+
+## Just import the consumer file
+
+The only requirement is that the consumer file is imported **somewhere** in your app startup, so the decorator gets to run. Import order relative to `connectToBroker()` is irrelevant.
+
+A common pattern is a barrel file that collects all consumers:
+
+```typescript title="src/events/index.ts"
+export { OrderNotificationConsumer } from "./consumers/order-notification.consumer";
+export { InventoryUpdateConsumer } from "./consumers/inventory-update.consumer";
+export { PaymentVerificationConsumer } from "./consumers/payment-verification.consumer";
+export { AnalyticsConsumer } from "./consumers/analytics.consumer";
+```
+
+Then import it anywhere in your startup — before or after `connectToBroker()`:
+
+```typescript title="src/main.ts"
+import { connectToBroker } from "@warlock.js/herald";
+import "./events"; // loads consumer files — decorator queues or subscribes immediately
+
+async function main() {
+  await connectToBroker({ driver: 'rabbitmq', host: 'localhost' });
+
+  const app = express();
+  app.listen(3000);
+}
+
+main();
+```
+
+:::info
+If the broker is already connected when a consumer file is imported, `@Consumable` subscribes immediately. If not, the consumer is added to `pendingSubscribers` and subscribed automatically when the broker connects. Either way, you don't need to think about order.
+:::
+
+## Passing Options to @Consumable
+
+You can override consumer options at the decorator level:
+
+```typescript title="src/consumers/order-notification.consumer.ts"
+import { EventConsumer, Consumable } from "@warlock.js/herald";
+
+@Consumable({
+  prefetch: 5,
+  retry: {
+    maxRetries: 3,
+    delay: 2000
+  }
+})
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+  
+  // If the class also has static consumerOptions, decorator options take precedence
+  public static consumerOptions = {
+    prefetch: 10 // This will be overridden by the decorator
+  };
+
+  public async handle(payload: OrderPayload) {
+    // ...
+  }
+}
+```
+
+The decorator options override any `static consumerOptions` on the class.
+
+## Understanding pendingSubscribers
+
+Internally, Herald maintains a `pendingSubscribers` array. When you decorate a class with `@Consumable()`, it's added to this queue:
+
+```typescript
+// You can inspect it (useful for debugging):
+import { brokerRegistry } from "@warlock.js/herald";
+
+console.log(brokerRegistry.pendingSubscribers);
+// Output:
+// [
+//   OrderNotificationConsumer,
+//   InventoryUpdateConsumer,
+//   PaymentVerificationConsumer,
+//   AnalyticsConsumer
+// ]
+```
+
+When a broker connects, Herald processes this array and subscribes each consumer. After subscription, the pending consumer is removed from the queue.
+
+## Multiple Brokers
+
+@Consumable always subscribes to the **default broker**. If you have multiple brokers:
+
+```typescript
+// These use @Consumable — they all subscribe to the default broker
+import "./events/order-consumers";   // Subscribe to default broker
+import "./events/payment-consumers"; // Subscribe to default broker
+
+// For non-default brokers, subscribe manually
+import { PaymentAuditConsumer } from "./consumers/payment-audit.consumer";
+
+const paymentBroker = herald.createBroker({ /* custom config */ });
+paymentBroker.subscribeConsumer(PaymentAuditConsumer);
+```
+
+:::tip
+Keep @Consumable consumers on the default broker. For specialized brokers, use manual `subscribeConsumer()` calls.
+:::
+
+## Organizing Consumers
+
+Here's a recommended file structure for a larger project:
+
+```
+src/
+├── events/
+│   ├── consumers/
+│   │   ├── order/
+│   │   │   ├── order-notification.consumer.ts
+│   │   │   └── order-analytics.consumer.ts
+│   │   ├── payment/
+│   │   │   ├── payment-verification.consumer.ts
+│   │   │   └── payment-audit.consumer.ts
+│   │   └── inventory/
+│   │       └── inventory-update.consumer.ts
+│   └── index.ts    ← Barrel file
+├── services/
+│   ├── notification.service.ts
+│   ├── payment.service.ts
+│   └── inventory.service.ts
+└── main.ts         ← Import events/index.ts first
+```
+
+The barrel file consolidates all imports:
+
+```typescript title="src/events/index.ts"
+// Order consumers
+import "./consumers/order/order-notification.consumer";
+import "./consumers/order/order-analytics.consumer";
+
+// Payment consumers
+import "./consumers/payment/payment-verification.consumer";
+import "./consumers/payment/payment-audit.consumer";
+
+// Inventory consumers
+import "./consumers/inventory/inventory-update.consumer";
+```
+
+And your main.ts stays clean:
+
+```typescript title="src/main.ts"
+import { connectToBroker } from "@warlock.js/herald";
+
+// One import to register all @Consumable classes
+import "./events";
+
+async function main() {
+  // All consumers are ready
+  await connectToBroker();
+
+  const app = express();
+  app.listen(3000);
+  console.log("App running on port 3000");
+}
+
+main();
+```
+
+## Real-World Example: E-Commerce Startup
+
+Here's a complete startup sequence:
+
+```typescript title="src/events/consumers/order-notification.consumer.ts"
+import { EventConsumer, Consumable } from "@warlock.js/herald";
+
+@Consumable({ prefetch: 10 })
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+
+  public async handle(payload: OrderPayload) {
+    await emailService.sendOrderConfirmation(payload);
+  }
+}
+```
+
+```typescript title="src/events/consumers/inventory-update.consumer.ts"
+@Consumable({ prefetch: 5 })
+export class InventoryUpdateConsumer extends EventConsumer<InventoryPayload> {
+  public static eventName = "inventory.updated";
+
+  public async handle(payload: InventoryPayload) {
+    await inventoryService.updateStock(payload);
+  }
+}
+```
+
+```typescript title="src/events/consumers/payment-verification.consumer.ts"
+@Consumable({
+  retry: { maxRetries: 5, delay: 1000 },
+  deadLetter: "payment.dlq"
+})
+export class PaymentVerificationConsumer extends EventConsumer<PaymentPayload> {
+  public static eventName = "payment.processed";
+
+  public async handle(payload: PaymentPayload) {
+    await paymentService.verify(payload);
+  }
+}
+```
+
+```typescript title="src/events/consumers/analytics.consumer.ts"
+@Consumable({ autoAck: true })
+export class AnalyticsConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+
+  public async handle(payload: OrderPayload) {
+    await analytics.trackOrder(payload);
+  }
+}
+```
+
+```typescript title="src/events/index.ts"
+// Import all consumers — side effect registers them
+import "./consumers/order-notification.consumer";
+import "./consumers/inventory-update.consumer";
+import "./consumers/payment-verification.consumer";
+import "./consumers/analytics.consumer";
+```
+
+```typescript title="src/main.ts"
+import { connectToBroker } from "@warlock.js/herald";
+import "./events"; // Register all @Consumable consumers
+
+async function main() {
+  console.log("Connecting to broker...");
+  await connectToBroker();
+  
+  console.log("Starting app...");
+  const app = express();
+  
+  app.post("/orders", async (req, res) => {
+    const order = await orderService.create(req.body);
+    res.json(order);
+  });
+  
+  app.listen(3000, () => {
+    console.log("App running on port 3000");
+    console.log("All consumers registered and listening");
+  });
+}
+
+main().catch(console.error);
+```
+
+When this app starts:
+
+1. `./events` is imported → all consumer classes are imported
+2. Each class has `@Consumable()` → they register in `pendingSubscribers`
+3. `connectToBroker()` is called → broker connects
+4. Herald processes `pendingSubscribers` → all consumers subscribe automatically
+5. Your app is ready to receive events
+
+:::tip
+Use @Consumable for all production consumers. It eliminates manual subscription boilerplate and ensures consistent startup ordering.
+:::
+
+## Next Steps
+
+- For consumer options (retry, deadLetter, prefetch), see [Subscribe Options](/docs/herald/subscribe-options)
+- For manual control and testing, see [Consuming Messages](/docs/herald/consuming)
+- For event-driven architecture patterns, see [Event Consumers](/docs/herald/event-consumers)

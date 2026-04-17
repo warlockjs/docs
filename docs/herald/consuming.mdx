@@ -1,0 +1,239 @@
+---
+sidebar_position: 12
+title: Consuming Messages
+description: Learn how to subscribe to and consume messages from Herald channels using direct subscriptions and message acknowledgment.
+---
+
+# Consuming Messages
+
+Herald gives you two powerful ways to consume messages from your channels: **direct subscriptions** with `channel.subscribe()` and **event consumer classes** for more structured event handling. This page covers the direct subscription approach; head to the [Event Consumers](/docs/herald/event-consumers) page for the class-based pattern.
+
+## Direct Subscription
+
+The simplest way to consume messages is to call `channel.subscribe(handler, opts?)` on a channel. Your handler receives the message and a context object to control what happens next.
+
+### Basic Example
+
+Here's a notification service listening for orders:
+
+```typescript title="src/services/notification.ts"
+import { herald } from "@warlock.js/herald";
+
+const orderChannel = herald.channel("order.placed");
+
+orderChannel.subscribe(async (message, ctx) => {
+  const { orderId, userId, totalAmount } = message.payload;
+  
+  try {
+    await sendConfirmationEmail(userId, { orderId, totalAmount });
+    await ctx.ack(); // Confirm we processed it
+  } catch (error) {
+    await ctx.nack(true); // Requeue for retry
+  }
+});
+```
+
+### Message Structure
+
+Each message you receive has two parts:
+
+**`message.payload`** — the actual event data:
+```typescript
+message.payload // { orderId: "123", userId: "user-456", totalAmount: 99.99 }
+```
+
+**`message.metadata`** — Herald's tracking info:
+```typescript
+message.metadata.messageId      // "msg-abc123"
+message.metadata.correlationId  // "corr-xyz789"
+message.metadata.timestamp      // "2026-04-17T10:30:00Z"
+message.metadata.retryCount     // 0 (incremented on each retry)
+message.metadata.headers        // Custom headers if provided
+```
+
+### Acknowledging Messages
+
+Always call `await ctx.ack()` when you've successfully processed a message. This tells Herald the message was handled and should be removed from the queue.
+
+```typescript title="src/services/analytics.ts"
+const paymentChannel = herald.channel("payment.processed");
+
+paymentChannel.subscribe(async (message, ctx) => {
+  const { amount, currency, paymentMethod } = message.payload;
+  
+  // Store analytics
+  await db.analytics.insert({
+    event: "payment.processed",
+    amount,
+    currency,
+    processedAt: new Date()
+  });
+  
+  await ctx.ack(); // Remove from queue
+});
+```
+
+:::danger
+If you don't call `ctx.ack()`, Herald assumes the message wasn't processed and will re-deliver it repeatedly. This can cause duplicate processing and overwhelming message buildup.
+:::
+
+### Negative Acknowledgment
+
+Sometimes you can't process a message right now (temporary error, service down, etc.). Use `ctx.nack(requeue)`:
+
+- **`ctx.nack(true)`** — Requeue the message to try again later
+- **`ctx.nack(false)`** — Discard the message permanently
+
+```typescript title="src/services/inventory.ts"
+const inventoryChannel = herald.channel("inventory.updated");
+
+inventoryChannel.subscribe(async (message, ctx) => {
+  const { skuId, quantity } = message.payload;
+  
+  try {
+    await updateInventory(skuId, quantity);
+    await ctx.ack();
+  } catch (error) {
+    if (error instanceof NetworkError) {
+      // Temporary issue, try again
+      await ctx.nack(true);
+    } else if (error instanceof ValidationError) {
+      // Invalid data, don't retry
+      console.error("Invalid inventory update", error);
+      await ctx.nack(false);
+    }
+  }
+});
+```
+
+### Auto-Acknowledgment
+
+If your handler never fails and you don't need manual control, enable `autoAck: true`:
+
+```typescript title="src/services/logging.ts"
+const allChannel = herald.channel("*");
+
+allChannel.subscribe(
+  async (message) => {
+    logger.debug("Event occurred", { 
+      channel: message.metadata.headers.channel,
+      payload: message.payload 
+    });
+    // No ctx.ack() needed — autoAck handles it
+  },
+  { autoAck: true }
+);
+```
+
+:::tip
+Use `autoAck: true` only for fire-and-forget consumers (logging, metrics). For critical operations, always manually acknowledge to catch errors.
+:::
+
+## Real-World Example: Multi-Event Analytics
+
+Here's an analytics service listening to multiple events and handling them appropriately:
+
+```typescript title="src/services/analytics.ts"
+import { herald } from "@warlock.js/herald";
+
+class AnalyticsService {
+  async start() {
+    // Track orders
+    herald.channel("order.placed").subscribe(async (message, ctx) => {
+      const { orderId, totalAmount } = message.payload;
+      await this.trackOrderPlaced(orderId, totalAmount);
+      await ctx.ack();
+    });
+
+    // Track payments
+    herald.channel("payment.processed").subscribe(async (message, ctx) => {
+      const { paymentId, status } = message.payload;
+      await this.trackPayment(paymentId, status);
+      await ctx.ack();
+    });
+
+    // Track inventory changes
+    herald.channel("inventory.updated").subscribe(async (message, ctx) => {
+      const { skuId, quantity } = message.payload;
+      await this.trackInventory(skuId, quantity);
+      await ctx.ack();
+    });
+  }
+
+  private async trackOrderPlaced(orderId: string, total: number) {
+    await db.collection("analytics").insertOne({
+      type: "order_placed",
+      orderId,
+      total,
+      timestamp: new Date()
+    });
+  }
+
+  private async trackPayment(paymentId: string, status: string) {
+    // ...
+  }
+
+  private async trackInventory(skuId: string, quantity: number) {
+    // ...
+  }
+}
+
+const analytics = new AnalyticsService();
+await analytics.start();
+```
+
+## Subscription Object
+
+The `channel.subscribe()` call returns a `Subscription` object you can use to manage the subscription later:
+
+```typescript
+const subscription = herald.channel("order.placed").subscribe(handler);
+
+subscription.id          // unique subscription ID
+subscription.channel    // "order.placed"
+subscription.isActive   // true if currently consuming
+
+await subscription.pause();      // Stop consuming, keep queue intact
+await subscription.resume();     // Resume consuming
+await subscription.unsubscribe(); // Stop and clean up
+```
+
+See [Subscription Management](/docs/herald/subscription-management) for detailed control.
+
+## Error Handling
+
+If your handler throws an error, the behavior depends on your `autoAck` setting:
+
+- **autoAck: false** (default) — The message is not acknowledged. It will be re-delivered.
+- **autoAck: true** — The message is already acknowledged, so the error is logged but the message won't be retried.
+
+:::info
+For critical operations, avoid `autoAck: true` and handle errors explicitly in your try-catch, using `ctx.nack()` to requeue on recoverable errors.
+:::
+
+```typescript title="src/services/notification.ts"
+// Good: explicit error handling
+orderChannel.subscribe(async (message, ctx) => {
+  try {
+    await sendEmail(message.payload.userId, "...");
+    await ctx.ack();
+  } catch (error) {
+    logger.error("Email failed", error);
+    await ctx.nack(true); // Requeue
+  }
+});
+
+// Risky: autoAck silently swallows errors
+orderChannel.subscribe(
+  async (message) => {
+    await sendEmail(message.payload.userId, "..."); // If this throws, it's lost
+  },
+  { autoAck: true }
+);
+```
+
+## Next Steps
+
+- For structured, type-safe consumers, see [Event Consumers](/docs/herald/event-consumers)
+- For automatic subscriber registration at startup, see [The @Consumable Decorator](/docs/herald/consumable-decorator)
+- For retry logic and dead-letter handling, see [Subscribe Options](/docs/herald/subscribe-options)

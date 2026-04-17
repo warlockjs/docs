@@ -1,0 +1,186 @@
+---
+sidebar_position: 2
+title: Quick Start
+description: Get up and running with Herald in 5 minutes
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+In this guide, you'll set up Herald, connect to RabbitMQ, publish your first event, and subscribe to it. By the end, you'll have a working event-driven flow using the e-commerce scenario (order placement, payment processing, inventory updates, notifications).
+
+## Step 1: Install dependencies
+
+<Tabs>
+  <TabItem value="npm" label="npm" default>
+    ```bash
+    npm install @warlock.js/herald amqplib
+    ```
+  </TabItem>
+  <TabItem value="yarn" label="yarn">
+    ```bash
+    yarn add @warlock.js/herald amqplib
+    ```
+  </TabItem>
+  <TabItem value="pnpm" label="pnpm">
+    ```bash
+    pnpm add @warlock.js/herald amqplib
+    ```
+  </TabItem>
+</Tabs>
+
+## Step 2: Connect to the broker
+
+In your application bootstrap file, call `connectToBroker()` to establish the connection to RabbitMQ. This happens once at startup.
+
+```typescript title="src/main.ts"
+import { connectToBroker } from '@warlock.js/herald';
+
+async function bootstrap() {
+  await connectToBroker({
+    driver: 'rabbitmq',
+    host: process.env.RABBITMQ_HOST ?? 'localhost',
+    port: 5672,
+    username: process.env.RABBITMQ_USER ?? 'guest',
+    password: process.env.RABBITMQ_PASS ?? 'guest',
+  });
+
+  console.log('Connected to message broker');
+}
+
+bootstrap();
+```
+
+## Step 3: Publish your first event
+
+Use `herald()` to access the default broker, then `channel()` to get a named channel, and `publish()` to send.
+
+```typescript title="src/services/order.service.ts"
+import { herald } from '@warlock.js/herald';
+
+export async function createOrder(orderId: string, total: number) {
+  await herald()
+    .channel('order.placed')
+    .publish({ orderId, total, timestamp: Date.now() });
+}
+```
+
+## Step 4: Subscribe and handle the event
+
+Create a subscriber to listen for the `order.placed` event. The handler receives the message and a context object for acknowledgment.
+
+```typescript title="src/consumers/notification.consumer.ts"
+import { herald } from '@warlock.js/herald';
+
+export async function listenForOrderPlaced() {
+  herald()
+    .channel('order.placed')
+    .subscribe(async (message, ctx) => {
+      const { orderId, total } = message.payload;
+      console.log(`Sending notification for order ${orderId}`);
+
+      await sendOrderConfirmationEmail(orderId);
+      await ctx.ack();
+    });
+}
+
+async function sendOrderConfirmationEmail(orderId: string) {
+  console.log(`Email sent for ${orderId}`);
+}
+```
+
+Subscribe when the broker connects:
+
+```typescript title="src/main.ts"
+import { connectToBroker } from '@warlock.js/herald';
+import { listenForOrderPlaced } from './consumers/notification.consumer';
+
+async function bootstrap() {
+  await connectToBroker({
+    driver: 'rabbitmq',
+    host: 'localhost',
+  });
+
+  await listenForOrderPlaced();
+}
+
+bootstrap();
+```
+
+:::danger
+Always `await ctx.ack()` when processing is complete. Without it, the message is redelivered repeatedly until the consumer restarts.
+:::
+
+## Step 5: Use typed EventMessage and EventConsumer (recommended)
+
+For larger apps, use the `EventMessage` and `EventConsumer` classes for better type safety and cleaner code structure.
+
+```typescript title="src/events/messages/order-placed.event.ts"
+import { EventMessage } from '@warlock.js/herald';
+
+interface OrderPayload {
+  orderId: string;
+  userId: string;
+  total: number;
+  timestamp: number;
+}
+
+export class OrderPlacedEvent extends EventMessage<OrderPayload> {
+  public eventName = 'order.placed';
+}
+```
+
+```typescript title="src/events/consumers/order-notification.consumer.ts"
+import { EventConsumer, Consumable } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../messages/order-placed.event';
+
+@Consumable()
+export class OrderNotificationConsumer extends EventConsumer<OrderPlacedEvent['payload']> {
+  public static eventName = 'order.placed';
+
+  public async handle(payload: OrderPlacedEvent['payload']) {
+    console.log(`Sending notification for order ${payload.orderId}: $${payload.total}`);
+    // Send notification email, SMS, etc.
+  }
+}
+```
+
+Import the consumer file anywhere in your app startup — the decorator queues it automatically and subscribes once the broker connects:
+
+```typescript title="src/main.ts"
+import { connectToBroker } from '@warlock.js/herald';
+import './events/consumers/order-notification.consumer'; // import order doesn't matter
+
+async function bootstrap() {
+  await connectToBroker({
+    driver: 'rabbitmq',
+    host: 'localhost',
+  });
+}
+
+bootstrap();
+```
+
+Publish using the typed event:
+
+```typescript title="src/services/order.service.ts"
+import { publishEvent } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/messages/order-placed.event';
+
+export async function createOrder(orderId: string, userId: string, total: number) {
+  await publishEvent(
+    new OrderPlacedEvent({ orderId, userId, total, timestamp: Date.now() })
+  );
+}
+```
+
+## What's next?
+
+You now have a working pub/sub system. Here are your next stops:
+
+- **[Core Concepts](core-concepts)** — Understand Broker, Driver, Channel, EventMessage, and EventConsumer in depth.
+- **[Event Messages](event-messages)** — Define typed events with transformations and versioning.
+- **[Event Consumers](event-consumers)** — Handle events with full type safety.
+- **[@Consumable Decorator](consumable-decorator)** — Auto-register consumers without manual wiring.
+- **[Request / Reply](request-reply)** — Use your message bus for synchronous RPC calls.
+- **[Error Handling](error-handling)** — Handle retries, dead-letter queues, and nack strategies.

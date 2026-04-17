@@ -1,0 +1,465 @@
+---
+sidebar_position: 15
+title: Subscribe Options
+description: Configure consumer behavior with prefetch limits, retries, dead-letter handling, consumer groups, and more.
+---
+
+# Subscribe Options
+
+When you subscribe to a channel or use EventConsumer, you can configure how the consumer behaves with `SubscribeOptions`. These options let you tune performance, handle failures, and manage message delivery.
+
+## Options Reference
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `consumerId` | `string` | `undefined` | Stable consumer identifier for resuming from the same position |
+| `group` | `string` | `undefined` | Consumer group (Kafka-style); instances in same group share the load |
+| `prefetch` | `number` | `undefined` | Max unacknowledged messages held by this consumer |
+| `autoAck` | `boolean` | `false` | Automatically acknowledge after handler returns (no error) |
+| `retry` | `RetryOptions` | `undefined` | Retry policy: `{ maxRetries: number, delay: number }` |
+| `deadLetter` | `string \| DeadLetterOptions` | `undefined` | Channel to send failed messages; string shorthand or full config |
+| `exclusive` | `boolean` | `false` | Only one consumer on this queue at a time |
+
+## consumerId
+
+A stable identifier for this consumer. Herald uses it to track position in the message queue, so if the consumer reconnects, it can resume from where it left off.
+
+```typescript title="src/consumers/order-notification.consumer.ts"
+export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+  
+  // Consumer will resume from the same position on reconnect
+  public static consumerOptions = {
+    consumerId: "notification-service-order-consumer"
+  };
+
+  public async handle(payload: OrderPayload) {
+    await sendEmail(payload.userId, "Your order is confirmed!");
+  }
+}
+```
+
+:::tip
+Always set `consumerId` for stateful consumers. Use a descriptive name like `"service-name-event-consumer"` so you can identify it in logs.
+:::
+
+## group
+
+Consumer groups enable **competing consumers**: multiple instances with the same group ID share the load. This is especially useful in Kafka, where each instance gets a partition.
+
+```typescript
+@Consumable({
+  group: "order-processors",
+  consumerId: "order-processor-1"
+})
+export class OrderProcessorConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+
+  public async handle(payload: OrderPayload) {
+    await processOrder(payload);
+  }
+}
+```
+
+Run multiple instances with the same `group`:
+
+```bash
+# Instance 1
+CONSUMER_ID=order-processor-1 node src/main.ts
+
+# Instance 2
+CONSUMER_ID=order-processor-2 node src/main.ts
+
+# Instance 3
+CONSUMER_ID=order-processor-3 node src/main.ts
+```
+
+All three instances consume from the same queue, but each message is handled by exactly one instance (the broker distributes them).
+
+:::info
+Consumer groups are primarily a **Kafka concept**. On RabbitMQ, setting a `group` maps to competing consumers on a single queue. Check your broker's documentation for exact behavior.
+:::
+
+## prefetch
+
+Controls how many messages the consumer can hold unacknowledged at once. This prevents overwhelming slow consumers.
+
+```typescript
+@Consumable({ prefetch: 1 })
+export class HeavyComputationConsumer extends EventConsumer<ComputePayload> {
+  public static eventName = "compute.task";
+
+  public async handle(payload: ComputePayload) {
+    // CPU-intensive work — process one at a time
+    const result = await heavyCompute(payload);
+    await saveResult(result);
+  }
+}
+```
+
+```typescript
+@Consumable({ prefetch: 50 })
+export class FastLoggingConsumer extends EventConsumer<LogPayload> {
+  public static eventName = "user.action";
+
+  public async handle(payload: LogPayload) {
+    // Quick I/O — can handle many in parallel
+    await logToFile(payload);
+  }
+}
+```
+
+| Prefetch | Use Case |
+|----------|----------|
+| `1` | CPU-intensive handlers, database writes, slow services |
+| `5–10` | Balanced: moderate work, normal services |
+| `50–100` | Fast I/O: logging, caching, quick transformations |
+
+:::tip
+Start with `prefetch: 1` for new consumers, then increase if monitoring shows low latency. Too high a prefetch can cause memory issues or cascading failures if a consumer crashes.
+:::
+
+## autoAck
+
+When `autoAck: true`, Herald automatically acknowledges the message after your handler returns *without throwing*. This saves you from calling `ctx.ack()`.
+
+```typescript
+// Without autoAck (must call ctx.ack())
+export class ManualAckConsumer extends EventConsumer<Payload> {
+  public static eventName = "my.event";
+
+  public async handle(payload: Payload, message, ctx) {
+    await doWork(payload);
+    await ctx.ack(); // Must acknowledge
+  }
+}
+
+// With autoAck (implicit)
+export class AutoAckConsumer extends EventConsumer<Payload> {
+  public static eventName = "my.event";
+  
+  public static consumerOptions = { autoAck: true };
+
+  public async handle(payload: Payload) {
+    await doWork(payload);
+    // Automatically acknowledged if no error thrown
+  }
+}
+```
+
+**When to use:**
+
+✅ **Enable autoAck:**
+- Fire-and-forget logging
+- Metrics collection
+- Non-critical events
+
+❌ **Disable autoAck (default):**
+- Critical data processing (payments, inventory)
+- When you need to handle errors gracefully
+- When you might need to nack/retry
+
+```typescript title="Good: explicit error handling"
+@Consumable({ autoAck: false }) // Default
+export class PaymentConsumer extends EventConsumer<PaymentPayload> {
+  public static eventName = "payment.processed";
+
+  public async handle(payload: PaymentPayload, message: ConsumedEventMessage) {
+    try {
+      await verifyPayment(payload);
+      // Message implicitly nacked if handler throws
+    } catch (error) {
+      console.error("Payment verification failed", error);
+      throw error; // Will be retried (or sent to dead letter)
+    }
+  }
+}
+```
+
+```typescript title="Risky: autoAck silently loses errors"
+@Consumable({ autoAck: true })
+export class PaymentConsumer extends EventConsumer<PaymentPayload> {
+  public static eventName = "payment.processed";
+
+  public async handle(payload: PaymentPayload) {
+    await verifyPayment(payload); // If this throws, it's lost silently!
+  }
+}
+```
+
+## retry
+
+Retry failed messages with a configurable max count and delay.
+
+```typescript
+@Consumable({
+  retry: {
+    maxRetries: 3,
+    delay: 5000 // 5 seconds between retries
+  }
+})
+export class InventoryConsumer extends EventConsumer<InventoryPayload> {
+  public static eventName = "inventory.updated";
+
+  public async handle(payload: InventoryPayload) {
+    // If this throws, retry up to 3 times with 5-second delays
+    await updateDatabase(payload);
+  }
+}
+```
+
+**Retry flow:**
+
+1. Handler executes → throws error
+2. Herald increments `metadata.retryCount`
+3. Herald waits `delay` milliseconds
+4. Handler runs again
+5. After `maxRetries` failures → message goes to dead letter (if configured) or discarded
+
+```typescript
+public async handle(payload: Payload, message: ConsumedEventMessage) {
+  if (message.metadata.retryCount > 0) {
+    logger.warn(`Retry attempt ${message.metadata.retryCount}`, payload);
+  }
+  
+  try {
+    await flakeyService.call(payload);
+  } catch (error) {
+    if (message.metadata.retryCount < 2) {
+      throw error; // Let retry handle it
+    } else {
+      // Last attempt, save to a log
+      logger.error("Final retry failed", error);
+      throw error; // Goes to dead letter
+    }
+  }
+}
+```
+
+:::tip
+Use exponential backoff mentally: `delay: (retryCount + 1) * 1000` for 1s, 2s, 3s... But Herald doesn't support dynamic delay, so pick a reasonable fixed value. For flaky APIs, 2–3 retries with a 5–10 second delay usually suffices.
+:::
+
+## deadLetter
+
+Failed messages (after all retries) are sent to a dead-letter channel for inspection and manual remediation.
+
+### String Shorthand
+
+```typescript
+@Consumable({
+  retry: { maxRetries: 3, delay: 1000 },
+  deadLetter: "order.placed.dlq"
+})
+export class OrderConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+
+  public async handle(payload: OrderPayload) {
+    await processOrder(payload);
+  }
+}
+```
+
+If the handler fails after 3 retries, the message is sent to `"order.placed.dlq"`.
+
+### Full Configuration
+
+```typescript
+@Consumable({
+  retry: { maxRetries: 3, delay: 1000 },
+  deadLetter: {
+    channel: "order.placed.dlq",
+    preserveOriginal: true  // Keep original message intact
+  }
+})
+export class OrderConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+
+  public async handle(payload: OrderPayload) {
+    await processOrder(payload);
+  }
+}
+```
+
+**Setup a consumer to monitor dead letters:**
+
+```typescript title="src/consumers/dlq-handler.consumer.ts"
+export class DeadLetterHandler extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed.dlq";
+
+  public async handle(payload: OrderPayload, message: ConsumedEventMessage) {
+    // Log for manual review
+    await db.collection("dead_letters").insertOne({
+      originalEvent: message.eventName,
+      payload,
+      failureReason: message.metadata.headers.error,
+      receivedAt: new Date()
+    });
+    
+    // Alert operations team
+    await alertOps({
+      message: "Order processing failed permanently",
+      orderId: payload.orderId,
+      dlqLink: `https://admin.example.com/dlq/${message.messageId}`
+    });
+  }
+}
+```
+
+## exclusive
+
+When `exclusive: true`, only one consumer can listen to this queue at a time. Useful for leader-election or singleton patterns.
+
+```typescript
+@Consumable({
+  exclusive: true,
+  consumerId: "primary-scheduler"
+})
+export class SchedulerConsumer extends EventConsumer<SchedulePayload> {
+  public static eventName = "scheduler.tick";
+
+  public async handle(payload: SchedulePayload) {
+    // Only one instance runs this, even with multiple app replicas
+    await runScheduledTasks();
+  }
+}
+```
+
+If multiple instances try to subscribe with `exclusive: true`, only the first succeeds. The others wait until the first disconnects.
+
+:::danger
+Use `exclusive: true` sparingly. It's a single point of failure. For critical work, pair it with a healthcheck and failover strategy.
+:::
+
+## Production-Ready Consumer
+
+Here's a comprehensive example combining multiple options:
+
+```typescript title="src/consumers/payment-processor.consumer.ts"
+import { EventConsumer, Consumable } from "@warlock.js/herald";
+
+interface PaymentPayload {
+  paymentId: string;
+  amount: number;
+  customerId: string;
+  method: "card" | "bank";
+}
+
+@Consumable({
+  // Identify this consumer for tracking
+  consumerId: "payment-processor-primary",
+  
+  // Group for load balancing across instances
+  group: "payment-processors",
+  
+  // Handle one at a time (payments are critical)
+  prefetch: 1,
+  
+  // Retry failed payments 5 times with 10-second delays
+  retry: {
+    maxRetries: 5,
+    delay: 10000
+  },
+  
+  // Send permanently failed payments to DLQ
+  deadLetter: {
+    channel: "payment.failed.dlq",
+    preserveOriginal: true
+  },
+  
+  // Don't auto-ack — we control acknowledgment
+  autoAck: false
+})
+export class PaymentProcessorConsumer extends EventConsumer<PaymentPayload> {
+  public static eventName = "payment.processed";
+
+  public async handle(
+    payload: PaymentPayload,
+    message: ConsumedEventMessage,
+    ctx: MessageContext
+  ) {
+    const { paymentId, amount, customerId } = payload;
+    const traceId = message.metadata.headers.traceId || message.messageId;
+
+    logger.info("Processing payment", { paymentId, amount, traceId });
+
+    try {
+      // Idempotency: check if already processed
+      const existing = await db.collection("payments").findOne({ paymentId });
+      if (existing && existing.status === "completed") {
+        logger.info("Payment already processed", { paymentId });
+        await ctx.ack();
+        return;
+      }
+
+      // Process the payment
+      const result = await paymentGateway.charge({
+        customerId,
+        amount,
+        idempotencyKey: paymentId
+      });
+
+      // Save result
+      await db.collection("payments").insertOne({
+        paymentId,
+        amount,
+        customerId,
+        status: "completed",
+        gatewayResponse: result,
+        processedAt: new Date(),
+        retries: message.metadata.retryCount
+      });
+
+      logger.info("Payment completed", { paymentId, traceId });
+      await ctx.ack();
+    } catch (error) {
+      const isRetryable = error.code === "NETWORK_TIMEOUT" || 
+                          error.code === "RATE_LIMITED";
+      
+      if (isRetryable && message.metadata.retryCount < 4) {
+        logger.warn(`Payment retryable error (attempt ${message.metadata.retryCount + 1})`, {
+          paymentId,
+          error: error.message
+        });
+        throw error; // Let retry logic handle it
+      } else {
+        // Permanent error or final retry
+        logger.error("Payment failed permanently", {
+          paymentId,
+          error: error.message,
+          attempts: message.metadata.retryCount + 1
+        });
+        
+        // Update database
+        await db.collection("payments").insertOne({
+          paymentId,
+          amount,
+          customerId,
+          status: "failed",
+          error: error.message,
+          failedAt: new Date(),
+          retries: message.metadata.retryCount
+        });
+
+        throw error; // Goes to DLQ
+      }
+    }
+  }
+}
+```
+
+## Combining Options: Reference Table
+
+| Scenario | Options |
+|----------|---------|
+| **Simple logging** | `{ autoAck: true, prefetch: 50 }` |
+| **Critical data processing** | `{ prefetch: 1, retry: { maxRetries: 3, delay: 5000 }, deadLetter: "dlq" }` |
+| **Load-balanced workers** | `{ group: "workers", prefetch: 5, consumerId: "worker-N" }` |
+| **Background job processor** | `{ prefetch: 10, retry: { maxRetries: 5, delay: 10000 }, deadLetter: "failed-jobs" }` |
+| **Singleton scheduler** | `{ exclusive: true, consumerId: "scheduler", prefetch: 1 }` |
+
+## Next Steps
+
+- For example consumers using these options, see [Event Consumers](/docs/herald/event-consumers)
+- For automatic registration with @Consumable, see [The @Consumable Decorator](/docs/herald/consumable-decorator)
+- For manual subscription control, see [Consuming Messages](/docs/herald/consuming)

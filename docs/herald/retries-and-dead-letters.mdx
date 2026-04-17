@@ -1,0 +1,362 @@
+---
+sidebar_position: 19
+title: "Retries and Dead Letter Queues"
+description: "Handle transient failures gracefully with automatic retries and dead letter queues for failed messages."
+---
+
+# Retries and Dead Letter Queues
+
+When a consumer fails to process a message, Herald provides two powerful mechanisms to handle the situation gracefully: **retries** for transient failures and **dead letter queues (DLQs)** for permanently failed messages.
+
+## Understanding the Flow
+
+When a consumer's handler throws an error or you explicitly call `nack()`, here's what happens:
+
+1. **Handler Fails** — An error is thrown or `ctx.nack()` is called
+2. **Retry Check** — Has the message been retried less than `maxRetries` times?
+   - ✅ Yes → Wait `delay` ms, then redeliver to the handler
+   - ❌ No → Send to dead letter queue (if configured) or discard
+3. **DLQ Processing** — A separate consumer picks up the failed message for logging/alerting
+
+## Configuring Retries
+
+You can configure retry behavior when subscribing to a channel:
+
+```typescript title="src/consumers/order.consumer.ts"
+import { herald } from "@warlock.js/herald";
+
+herald()
+  .channel<OrderPayload>("order.placed")
+  .subscribe(
+    async (message, ctx) => {
+      try {
+        await this.processOrder(message.payload);
+      } catch (error) {
+        // Explicit nack — message will be retried
+        ctx.nack();
+      }
+    },
+    {
+      retry: {
+        maxRetries: 3,
+        delay: 2000, // 2 seconds between retries
+      },
+    }
+  );
+```
+
+The `retry` option accepts a `RetryOptions` object:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `maxRetries` | number | Maximum number of retry attempts before giving up |
+| `delay` | number | Milliseconds to wait between retry attempts |
+
+After exhausting retries, the message is sent to the dead letter queue if configured, otherwise it's discarded.
+
+### Using @Consumable with Retries
+
+If you're using class-based consumers, configure retries in the decorator:
+
+```typescript title="src/consumers/notification.consumer.ts"
+import { Consumable } from "@warlock.js/herald";
+
+@Consumable("notification.sent", {
+  retry: {
+    maxRetries: 3,
+    delay: 1000,
+  },
+})
+export class NotificationConsumer {
+  async handle(payload: NotificationPayload) {
+    // Email sending is flaky — retries help here
+    await this.emailService.send(payload.email);
+  }
+}
+```
+
+## Checking Retry Count
+
+Inside your consumer handler, you can check how many times the message has been retried using `message.metadata.retryCount`:
+
+```typescript title="src/consumers/payment.consumer.ts"
+herald()
+  .channel<PaymentPayload>("payment.processed")
+  .subscribe(async (message, ctx) => {
+    const { retryCount } = message.metadata;
+
+    if (retryCount === 0) {
+      // First attempt
+      logger.info("Processing payment", { paymentId: message.payload.paymentId });
+    } else if (retryCount > 1) {
+      // Final retry — log as warning
+      logger.warn("Final retry attempt for payment", {
+        paymentId: message.payload.paymentId,
+        retryCount,
+      });
+    }
+
+    try {
+      await this.chargeCard(message.payload);
+    } catch (error) {
+      ctx.nack(); // Will retry, or go to DLQ after maxRetries
+    }
+  });
+```
+
+## Dead Letter Queues (DLQ)
+
+A **dead letter queue** is where messages that have exhausted all retries are sent. It's just another channel that you consume from separately, allowing you to:
+
+- Alert your ops team
+- Log for debugging
+- Store in a database for manual review
+- Attempt alternative processing
+
+### Configuring a Dead Letter Queue
+
+There are two ways to configure a DLQ:
+
+**Simple string form** (most common):
+
+```typescript title="src/consumers/order.consumer.ts"
+herald()
+  .channel<OrderPayload>("order.placed")
+  .subscribe(
+    async (message, ctx) => {
+      await this.processOrder(message.payload);
+    },
+    {
+      retry: { maxRetries: 3, delay: 2000 },
+      deadLetter: "order.placed.dlq", // Message goes here after retries exhausted
+    }
+  );
+```
+
+**Object form** (with options):
+
+```typescript title="src/consumers/order.consumer.ts"
+herald()
+  .channel<OrderPayload>("order.placed")
+  .subscribe(
+    async (message, ctx) => {
+      await this.processOrder(message.payload);
+    },
+    {
+      retry: { maxRetries: 3, delay: 2000 },
+      deadLetter: {
+        channel: "order.placed.dlq",
+        preserveOriginal: true, // Keep original message headers
+      },
+    }
+  );
+```
+
+:::info
+The DLQ is just another channel in Herald. You consume from it like any other channel — there's no special magic. This makes it flexible and composable.
+:::
+
+### Understanding Message Metadata in DLQ
+
+When a message arrives in the DLQ, it carries metadata about its journey:
+
+```typescript title="src/consumers/order-dlq.consumer.ts"
+herald()
+  .channel<OrderPayload>("order.placed.dlq")
+  .subscribe(async (message, ctx) => {
+    const { retryCount, originalChannel } = message.metadata;
+
+    logger.error("Order processing failed permanently", {
+      orderId: message.payload.orderId,
+      retryCount, // How many times it was retried
+      originalChannel, // Where it came from (e.g., "order.placed")
+    });
+
+    // Alert ops team
+    await this.alertOpsTeam(message.payload);
+
+    // Store for manual review
+    await this.dlqRepository.save({
+      channel: originalChannel,
+      payload: message.payload,
+      retryCount,
+      failedAt: new Date(),
+    });
+
+    // Acknowledge DLQ message after handling
+    ctx.ack();
+  });
+```
+
+| Metadata | Type | Description |
+|----------|------|-------------|
+| `retryCount` | number | Total number of retry attempts made |
+| `originalChannel` | string | The channel where the message originally failed |
+
+:::tip
+Set up a DLQ consumer from day one, even in development. Don't wait until production to discover how to handle permanently failed messages.
+:::
+
+## Subscriber-Level vs Channel-Level DLQ
+
+Herald supports DLQ configuration at two levels:
+
+**Subscriber-level** (SubscribeOptions.deadLetter):
+
+```typescript
+herald()
+  .channel<OrderPayload>("order.placed")
+  .subscribe(handler, {
+    deadLetter: "order.placed.dlq", // Only this subscriber's failures go here
+  });
+```
+
+Each subscriber can have its own DLQ, useful if different handlers handle the same channel differently.
+
+**Channel-level** (ChannelOptions.deadLetter):
+
+```typescript
+herald()
+  .channel<OrderPayload>("order.placed", {
+    deadLetter: "order.placed.dlq", // All subscribers' failures go here
+  })
+  .subscribe(handler1)
+  .subscribe(handler2);
+```
+
+Use channel-level when you want a single DLQ for all processing of that message type. Use subscriber-level when different consumers need different failure handling.
+
+## Manual Retry
+
+Sometimes you want to manually retry a message within your handler logic:
+
+```typescript title="src/consumers/external-api.consumer.ts"
+herald()
+  .channel<DataSyncPayload>("data.sync")
+  .subscribe(
+    async (message, ctx) => {
+      try {
+        await this.syncWithExternalAPI(message.payload);
+      } catch (error) {
+        if (error instanceof NetworkError && message.metadata.retryCount < 2) {
+          // Manually trigger a retry for network errors on early attempts
+          ctx.retry();
+        } else {
+          // Otherwise nack to use normal retry logic
+          ctx.nack();
+        }
+      }
+    },
+    {
+      retry: { maxRetries: 5, delay: 3000 },
+      deadLetter: "data.sync.dlq",
+    }
+  );
+```
+
+`ctx.retry()` manually triggers a retry and increments the retry count, respecting your configured delay.
+
+## Real-World Example: E-Commerce Order Processing
+
+Here's a complete setup for a production e-commerce platform:
+
+```typescript title="src/consumers/order-processing.ts"
+import { herald } from "@warlock.js/herald";
+import { OrderPayload } from "@/types";
+
+// Main order processor — critical, needs retries and DLQ
+herald()
+  .channel<OrderPayload>("order.placed")
+  .subscribe(
+    async (message, ctx) => {
+      const { orderId, customerId, items } = message.payload;
+      const { retryCount } = message.metadata;
+
+      try {
+        if (retryCount > 0) {
+          logger.warn("Retrying order", { orderId, retryCount });
+        }
+
+        // Process payment
+        await paymentService.charge(customerId, items);
+
+        // Create fulfillment
+        await fulfillmentService.createOrder(orderId, items);
+
+        // Success
+        ctx.ack();
+      } catch (error) {
+        if (error instanceof PaymentGatewayError) {
+          // Transient error — nack for retry
+          logger.warn("Payment gateway error, will retry", { orderId, error: error.message });
+          ctx.nack();
+        } else {
+          // Unknown error — let it go to DLQ
+          logger.error("Order processing error", { orderId, error });
+          ctx.nack();
+        }
+      }
+    },
+    {
+      retry: {
+        maxRetries: 3,
+        delay: 2000, // Start with 2s, exponential backoff would be better
+      },
+      deadLetter: {
+        channel: "order.placed.dlq",
+        preserveOriginal: true,
+      },
+    }
+  );
+
+// DLQ consumer — alerts team and stores for review
+herald()
+  .channel<OrderPayload>("order.placed.dlq")
+  .subscribe(async (message, ctx) => {
+    const { orderId } = message.payload;
+    const { retryCount, originalChannel } = message.metadata;
+
+    try {
+      // Log to central tracking
+      await errorTracker.logFailedOrder({
+        orderId,
+        retries: retryCount,
+        timestamp: new Date(),
+      });
+
+      // Alert on-call engineer
+      await slackService.sendMessage(
+        "#critical-orders",
+        `Order ${orderId} failed after ${retryCount} retries. Needs manual intervention.`
+      );
+
+      // Store for admin dashboard
+      await dlqMessageRepository.save({
+        channel: originalChannel,
+        orderId,
+        payload: message.payload,
+        retryCount,
+        timestamp: new Date(),
+      });
+
+      ctx.ack();
+    } catch (error) {
+      logger.error("DLQ processing failed", { orderId, error });
+      // Don't nack DLQ — we already logged it
+    }
+  });
+```
+
+## Best Practices
+
+- **Set appropriate delays** — Too short and you overwhelm a flaky service; too long and you delay failure notifications
+- **Log context** — Include order IDs, user IDs, timestamps so you can trace failures
+- **Monitor DLQ size** — If it grows unbounded, something is systematically broken
+- **Design for idempotency** — Assume messages may be processed twice (see [Error Handling](./error-handling.mdx))
+- **Consume DLQ messages** — An empty DLQ consumer logs failures silently; always have a consumer that alerts
+
+## See Also
+
+- [Error Handling](./error-handling.mdx) — Centralized error handling and idempotency
+- [Consuming Messages](./consuming.mdx) — Subscribe options and message context
+- [Message Context API](./message-context.mdx) — `nack()`, `ack()`, `retry()` methods

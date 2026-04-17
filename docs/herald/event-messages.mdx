@@ -1,0 +1,417 @@
+---
+sidebar_position: 10
+title: "Event Messages"
+description: "Type-safe EventMessage classes for structured event publishing with automatic envelope serialization and optional schema validation."
+---
+
+# Event Messages
+
+EventMessage gives you type-safe event publishing with automatic envelope wrapping, schema validation, and custom serialization. Define event classes that control exactly what gets sent over the broker—no raw payloads, no surprises.
+
+## What EventMessage Gives You
+
+- **Type safety** — TypeScript generics ensure your payload is strongly typed
+- **Automatic envelope** — Herald wraps your payload with `messageId`, `eventName`, `version`, `occurredAt`, and `metadata`
+- **Serialization control** — Override `toJSON()` to transform or filter data before publishing
+- **Optional schema validation** — Validate payload shape with Seal schemas before publishing
+- **Versioning** — Built-in `version` property for evolving events without breaking consumers
+
+## Defining an EventMessage Class
+
+Create a class that extends `EventMessage<TPayload>`, where `TPayload` is the shape of your outgoing payload:
+
+```typescript title="src/events/order-placed-event.ts"
+import { EventMessage } from '@warlock.js/herald';
+
+export interface OrderPayload {
+  orderId: string;
+  userId: string;
+  items: Array<{ productId: string; qty: number; price: number }>;
+  total: number;
+}
+
+export class OrderPlacedEvent extends EventMessage<OrderPayload> {
+  public eventName = 'order.placed';
+}
+
+// Use it
+const payload: OrderPayload = {
+  orderId: 'ord-123',
+  userId: 'usr-456',
+  items: [{ productId: 'prod-789', qty: 2, price: 49.99 }],
+  total: 99.98,
+};
+
+await publishEvent(new OrderPlacedEvent(payload));
+```
+
+The generic `<TPayload>` defines the type of data your event carries. The constructor accepts `data?: TPayload`.
+
+## Customizing toJSON()
+
+By default, `toJSON()` returns your data as-is. Override it to transform, filter, or reshape your payload before it gets published:
+
+```typescript title="src/events/order-placed-event.ts"
+import { EventMessage } from '@warlock.js/herald';
+
+export interface OrderPayload {
+  orderId: string;
+  userId: string;
+  total: number;
+  itemCount: number;  // derived field
+}
+
+export class OrderPlacedEvent extends EventMessage<OrderPayload> {
+  public eventName = 'order.placed';
+
+  public toJSON(): OrderPayload {
+    // Keep payloads lean—don't expose everything
+    return {
+      orderId: this.data!.orderId,
+      userId: this.data!.userId,
+      total: this.data!.total,
+      itemCount: this.data!.items.length,  // transform items to count
+    };
+  }
+}
+```
+
+:::tip Keep payloads small
+Don't send full database records or domain models. Send only what consumers actually need. If they need more details, let them query the API.
+:::
+
+## The Message Envelope
+
+When you publish an EventMessage, Herald automatically wraps your `toJSON()` output in an envelope. You don't call `serialize()` directly—Herald does it internally:
+
+```typescript
+// Your event publishes this data:
+{
+  orderId: 'ord-123',
+  userId: 'usr-456',
+  total: 99.98,
+  itemCount: 1
+}
+
+// Herald sends this envelope to the broker:
+{
+  payload: {                              // from toJSON()
+    orderId: 'ord-123',
+    userId: 'usr-456',
+    total: 99.98,
+    itemCount: 1
+  },
+  messageId: 'uuid-auto-generated',       // auto-generated if not set
+  eventName: 'order.placed',              // from event.eventName
+  version: 1,                             // from event.version (optional)
+  occurredAt: '2026-04-17T14:30:00Z',     // ISO timestamp
+  metadata: { ... },                      // if you set event.metadata
+  __through: 'EventMessage'               // internal flag
+}
+```
+
+Consumers receive the full envelope (see [Consuming Events](/docs/herald/consuming-events)).
+
+## Attaching Metadata and Message ID
+
+Set `metadata` and `messageId` directly on the event instance:
+
+```typescript title="src/services/order-service.ts"
+const event = new OrderPlacedEvent({
+  orderId: 'ord-123',
+  userId: 'usr-456',
+  items: [{ productId: 'prod-789', qty: 2, price: 49.99 }],
+  total: 99.98,
+});
+
+// Add arbitrary metadata
+event.metadata = { source: 'order-service', region: 'us-east-1' };
+
+// Set a deterministic messageId for idempotency
+event.messageId = `order-${order.id}`;
+
+await publishEvent(event);
+```
+
+:::tip Use deterministic messageId for idempotency
+If you generate a messageId from a deterministic source (like the order ID), retries will be deduplicated by the broker. If you omit `messageId`, Herald generates a random UUID.
+:::
+
+## Versioning Events
+
+Use the `version` property when your payload shape changes:
+
+```typescript title="src/events/order-placed-event.ts"
+export class OrderPlacedEventV2 extends EventMessage<OrderPayloadV2> {
+  public eventName = 'order.placed';
+  public version = 2;
+
+  public toJSON(): OrderPayloadV2 {
+    // V2 adds shippingAddress
+    return {
+      orderId: this.data!.orderId,
+      userId: this.data!.userId,
+      total: this.data!.total,
+      itemCount: this.data!.items.length,
+      shippingAddress: {
+        street: this.data!.shippingAddress.street,
+        city: this.data!.shippingAddress.city,
+        country: this.data!.shippingAddress.country,
+      },
+    };
+  }
+}
+```
+
+Consumers can filter events by version using `minVersion` / `maxVersion` in their subscriber config. See [Consuming Events](/docs/herald/consuming-events).
+
+## Schema Validation
+
+Set a `schema` property to auto-validate your payload before publishing. Use Seal validators:
+
+```typescript title="src/events/order-placed-event.ts"
+import { v } from '@warlock.js/seal';
+import { EventMessage } from '@warlock.js/herald';
+
+export class OrderPlacedEvent extends EventMessage<OrderPayload> {
+  public eventName = 'order.placed';
+
+  public schema = v.object({
+    orderId: v.string().required(),
+    userId: v.string().required(),
+    total: v.number().required().min(0),
+    items: v.array(v.object({
+      productId: v.string().required(),
+      qty: v.int().required().min(1),
+      price: v.number().required().min(0),
+    })).required().min(1),
+  });
+}
+```
+
+Herald validates the payload (from `toJSON()`) against this schema before publishing. If validation fails, the publish throws an error.
+
+## Using defineEvent()
+
+For simple events without custom logic, use `defineEvent()` to define an event inline:
+
+```typescript title="src/events/index.ts"
+import { defineEvent } from '@warlock.js/herald';
+
+// No transform (IncomingData = OutgoingData)
+const PaymentProcessedEvent = defineEvent<PaymentPayload>(
+  'payment.processed'
+);
+
+// With transform (IncomingData → OutgoingData)
+const OrderPlacedEvent = defineEvent<Order, OrderPayload>(
+  'order.placed',
+  {
+    toJSON: (order) => ({
+      orderId: order.id,
+      userId: order.userId,
+      total: order.total,
+      itemCount: order.items.length,
+    }),
+  }
+);
+```
+
+Use it the same way as a class:
+
+```typescript
+await publishEvent(new OrderPlacedEvent(order));
+```
+
+`defineEvent()` accepts an options object with:
+- `toJSON?: (data: IncomingData) => OutgoingData` — Optional transform function
+- `schema?: ObjectValidator` — Optional Seal schema for validation
+
+If you omit `toJSON`, the event returns `data` as-is (same as the base class).
+
+## Class vs defineEvent()
+
+| Scenario | Use |
+|----------|-----|
+| Simple payload, no transform | `defineEvent()` without `toJSON` |
+| Need to transform one type into another | `defineEvent()` with `toJSON` |
+| Complex validation or computed fields | Class with custom `toJSON()` |
+| Need versioning or class methods | Class with `version` property |
+| Reused across many files | Class (named export) |
+| Quick inline event | `defineEvent()` |
+
+## Real-World Example: E-Commerce Events
+
+Here are four complete event definitions for an e-commerce platform:
+
+```typescript title="src/events/messages/index.ts"
+import { EventMessage } from '@warlock.js/herald';
+import { v } from '@warlock.js/seal';
+
+// Order Placed Event
+export interface OrderPayload {
+  orderId: string;
+  userId: string;
+  items: Array<{ productId: string; qty: number; price: number }>;
+  total: number;
+}
+
+export class OrderPlacedEvent extends EventMessage<OrderPayload> {
+  public eventName = 'order.placed';
+  public version = 1;
+
+  public schema = v.object({
+    orderId: v.string().required(),
+    userId: v.string().required(),
+    items: v.array(v.object({
+      productId: v.string().required(),
+      qty: v.int().required().min(1),
+      price: v.number().required().min(0),
+    })).required().min(1),
+    total: v.number().required().min(0),
+  });
+}
+
+// Payment Processed Event
+export interface PaymentPayload {
+  orderId: string;
+  amount: number;
+  method: string;
+}
+
+export class PaymentProcessedEvent extends EventMessage<PaymentPayload> {
+  public eventName = 'payment.processed';
+  public version = 1;
+
+  public schema = v.object({
+    orderId: v.string().required(),
+    amount: v.number().required().min(0),
+    method: v.string().required(),
+  });
+}
+
+// Inventory Updated Event
+export interface InventoryPayload {
+  productId: string;
+  quantity: number;
+  warehouseId: string;
+}
+
+export class InventoryUpdatedEvent extends EventMessage<InventoryPayload> {
+  public eventName = 'inventory.updated';
+
+  public schema = v.object({
+    productId: v.string().required(),
+    quantity: v.int().required(),
+    warehouseId: v.string().required(),
+  });
+}
+
+// Notification Sent Event
+export interface NotificationPayload {
+  userId: string;
+  type: string;
+  channel: string;
+}
+
+export class NotificationSentEvent extends EventMessage<NotificationPayload> {
+  public eventName = 'notification.sent';
+
+  public schema = v.object({
+    userId: v.string().required(),
+    type: v.string().required(),
+    channel: v.string().required(),
+  });
+}
+```
+
+## Publishing in Your Service
+
+Here's how to use these events in a domain service:
+
+```typescript title="src/services/order-service.ts"
+import { publishEvent } from '@warlock.js/herald';
+import {
+  OrderPlacedEvent,
+  PaymentProcessedEvent,
+  InventoryUpdatedEvent,
+  NotificationSentEvent,
+} from '../events/messages';
+
+export class OrderService {
+  async placeOrder(userId: string, items: OrderItem[]) {
+    // Create order
+    const order = await Order.create({ userId, items });
+
+    // Publish event
+    const event = new OrderPlacedEvent({
+      orderId: order.id,
+      userId: order.userId,
+      items: order.items,
+      total: order.total,
+    });
+
+    await publishEvent(event);
+    return order;
+  }
+
+  async processPayment(orderId: string, method: string) {
+    const order = await Order.findById(orderId);
+
+    // Charge customer
+    const payment = await gateway.charge(order.total, method);
+
+    // Publish event
+    await publishEvent(
+      new PaymentProcessedEvent({
+        orderId: order.id,
+        amount: order.total,
+        method,
+      })
+    );
+  }
+
+  async updateInventory(orderId: string) {
+    const order = await Order.findById(orderId);
+
+    // Decrement stock
+    for (const item of order.items) {
+      await Product.decrementStock(item.productId, item.qty);
+
+      await publishEvent(
+        new InventoryUpdatedEvent({
+          productId: item.productId,
+          quantity: -item.qty,
+          warehouseId: 'main',
+        })
+      );
+    }
+  }
+}
+```
+
+:::tip Name EventMessage classes with the `<Event>Event` suffix
+Use `OrderPlacedEvent`, `PaymentProcessedEvent`, etc. This makes it clear in your code that a class is an event and maintains consistency across your codebase.
+:::
+
+## API Reference
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `eventName` | `string` | Name of the event (required, defined in subclass) |
+| `version` | `number?` | Optional version for payload evolution |
+| `metadata` | `Record<string, any>?` | Arbitrary metadata attached to the envelope |
+| `messageId` | `string?` | Unique message identifier (auto-generated if not set) |
+| `schema` | `ObjectValidator?` | Seal validator for payload validation |
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `toJSON()` | `TPayload` | Transform and return the payload (override to customize) |
+| `serialize()` | `object` | Build the full envelope (called internally by Herald) |
+
+## See Also
+
+- [Publishing Events](/docs/herald/publishing) — How to publish EventMessage instances
+- [Consuming Events](/docs/herald/consuming-events) — Subscribe to and handle events
+- [Consumable Decorator](/docs/herald/consumable-decorator) — Automatic subscriber registration
+- [Channels](/docs/herald/channels) — Schema-validated message channels

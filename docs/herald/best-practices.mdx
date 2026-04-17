@@ -1,0 +1,515 @@
+---
+sidebar_position: 21
+title: Best Practices & Patterns
+description: Design patterns for events, consumers, reliability, connections, and performance in Herald
+---
+
+This guide synthesizes do's and don'ts across all Herald usage, organized by domain. These patterns will help you build reliable, scalable event-driven systems.
+
+## Event design
+
+### Naming conventions
+
+| ✅ Do | ❌ Don't | Why |
+|-------|----------|-----|
+| Use past tense: `order.placed`, `payment.processed` | Use present tense: `order.place`, `payment.process` | Past tense signals what already happened; present tense looks like a command. |
+| Use `resource.action` pattern: `user.updated`, `inventory.adjusted` | Use generic names: `event`, `message`, `data_changed` | Consistency and clarity across your system. |
+| Version events: `order.placed.v2` if payload changes | Don't version, just change the payload | Explicit versioning lets you run multiple versions during migration. |
+| Include IDs and references: `{ orderId: '123', userId: '456' }` | Include full nested objects: `{ order: { id: '123', ...entire object } }` | Keep payloads small; let consumers fetch full data if needed. |
+| Use `static version = 2` on EventMessage classes | Don't embed version in payload | Type-safe version tracking avoids errors. |
+
+Example of good naming:
+
+```typescript title="src/events/index.ts"
+export const UserSignupEvent = defineEvent('user.signup', {
+  shape: {
+    userId: String,
+    email: String,
+    timestamp: Number,
+  },
+});
+
+export const OrderPlacedEvent = defineEvent('order.placed', {
+  shape: {
+    orderId: String,
+    userId: String,
+    total: Number,
+    timestamp: Number,
+  },
+});
+
+export const PaymentProcessedEvent = defineEvent('payment.processed', {
+  shape: {
+    paymentId: String,
+    orderId: String,
+    amount: Number,
+    status: String, // 'success' | 'failed'
+    timestamp: Number,
+  },
+});
+```
+
+### Payload design
+
+| ✅ Do | ❌ Don't | Why |
+|-------|----------|-----|
+| Include only required data and IDs | Include sensitive data: passwords, PII, API keys | Credentials and PII in events are a security risk if logs are exposed. |
+| Make payloads small (< 10 KB typical) | Send huge objects; duplicate data | Large messages slow down the broker; consumers can fetch full data. |
+| Use timestamps; coordinate on UTC | Omit timestamps; use ambiguous time references | Timestamps are essential for ordering, debugging, and replay logic. |
+| Include a correlation ID for tracing | Don't track requests across services | Correlation IDs help you debug cross-service flows in logs. |
+| Make payload immutable; don't change structure | Frequently change payload structure | Breaking changes require migration logic and versioning. |
+
+Example of good payload design:
+
+```typescript title="src/events/payment.event.ts"
+import { defineEvent } from '@warlock.js/herald';
+
+export const PaymentProcessedEvent = defineEvent('payment.processed', {
+  shape: {
+    paymentId: String,
+    orderId: String,
+    userId: String,         // Include user ID for tracing
+    amount: Number,
+    currency: String,       // ISO 4217 currency code
+    status: String,         // 'success' | 'failed'
+    failureReason: String,  // null if success
+    timestamp: Number,      // Unix ms (UTC)
+    correlationId: String,  // Trace across services
+    // DON'T include: password, ssn, full credit card, api_keys, email, phone
+  },
+});
+```
+
+### Versioning events
+
+When your payload structure changes, use explicit versioning:
+
+```typescript title="src/events/order.event.ts"
+import { defineEvent } from '@warlock.js/herald';
+
+// Version 1: Original payload
+export const OrderPlacedEventV1 = defineEvent('order.placed.v1', {
+  shape: {
+    orderId: String,
+    total: Number,
+  },
+  static version = 1,
+});
+
+// Version 2: Added userId, email, and timestamp
+export const OrderPlacedEventV2 = defineEvent('order.placed.v2', {
+  shape: {
+    orderId: String,
+    userId: String,      // NEW
+    userEmail: String,   // NEW
+    total: Number,
+    timestamp: Number,   // NEW
+  },
+  static version = 2,
+});
+```
+
+During migration, run both consumers:
+
+```typescript title="src/consumers/index.ts"
+// Handle v1 events (temporary, during migration window)
+@Consumable()
+export class OrderPlacedV1Handler extends defineConsumer(OrderPlacedEventV1, {
+  async handle(event) {
+    // Fetch user from database since we don't have userId in v1
+    const user = await userService.findById(event.payload.orderId); // Inefficient!
+    // Process order...
+  },
+}) {}
+
+// Handle v2 events (new code)
+@Consumable()
+export class OrderPlacedV2Handler extends defineConsumer(OrderPlacedEventV2, {
+  async handle(event) {
+    // User data is already in the event
+    const { userId, userEmail } = event.payload;
+    // Process order...
+  },
+}) {}
+```
+
+Once all producers emit v2 and v1 consumers have drained the backlog, remove the v1 consumer.
+
+## Consumer design
+
+### One consumer per event type
+
+| ✅ Do | ❌ Don't | Why |
+|-------|----------|-----|
+| Create one consumer class per event | Handle multiple unrelated events in one consumer | Single responsibility; easier to test and scale. |
+| Always await `ctx.ack()` or `ctx.nack()` | Leave messages unacknowledged | Unacked messages block the queue; they'll retry forever. |
+| Make consumers idempotent (safe to reprocess) | Assume "process once" semantics | Network failures cause retries; consumers must be idempotent. |
+| Set a stable `consumerId` for stateful work | Use random/auto-generated consumer IDs | Stable IDs ensure consistent consumer group behavior. |
+| Set `prefetch: 1` for slow/heavy consumers | Use high prefetch (default 10) for heavy work | Prevents one consumer from hogging memory; allows fair distribution. |
+
+Example of a well-designed consumer:
+
+```typescript title="src/consumers/order-notification.consumer.ts"
+import { herald, defineConsumer } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/order-placed.event';
+
+@Consumable({
+  consumerId: 'order-notification-handler', // Stable ID for scaling
+  prefetch: 1,                               // Process one at a time
+})
+export class OrderNotificationConsumer extends defineConsumer(OrderPlacedEvent, {
+  async handle(event, ctx) {
+    const { orderId, userId, userEmail } = event.payload;
+
+    try {
+      // Check if already processed (idempotency)
+      const notification = await notificationService.findByOrderId(orderId);
+      if (notification) {
+        console.log(`Notification already sent for order ${orderId}`);
+        await ctx.ack();
+        return;
+      }
+
+      // Send email
+      await emailService.sendOrderConfirmation({
+        to: userEmail,
+        orderId,
+        subject: 'Order Confirmation',
+      });
+
+      // Save state
+      await notificationService.create({ orderId, userId, sentAt: new Date() });
+
+      // Acknowledge success
+      await ctx.ack();
+    } catch (error) {
+      console.error(`Failed to send notification for order ${orderId}:`, error);
+      // Nack to retry; will go to dead-letter queue after max retries
+      await ctx.nack();
+    }
+  },
+}) {}
+```
+
+### Idempotency
+
+Consumers must handle being called multiple times with the same message (due to retries, network failures, redelivery):
+
+```typescript title="src/consumers/inventory.consumer.ts"
+import { defineConsumer } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/order-placed.event';
+
+@Consumable({ consumerId: 'inventory-adjustment' })
+export class InventoryConsumer extends defineConsumer(OrderPlacedEvent, {
+  async handle(event, ctx) {
+    const { orderId, items } = event.payload;
+
+    try {
+      // Check if already processed
+      const adjustment = await inventoryService.findAdjustmentByOrderId(orderId);
+      if (adjustment) {
+        console.log(`Inventory already adjusted for order ${orderId}`);
+        await ctx.ack();
+        return; // Already processed; safe to acknowledge and skip
+      }
+
+      // Decrement inventory atomically
+      await inventoryService.decrementByOrderId(orderId, items);
+
+      // Record the adjustment for future idempotency checks
+      await inventoryService.saveAdjustment({
+        orderId,
+        items,
+        adjustedAt: new Date(),
+      });
+
+      await ctx.ack();
+    } catch (error) {
+      console.error(`Inventory adjustment failed for order ${orderId}:`, error);
+      await ctx.nack();
+    }
+  },
+}) {}
+```
+
+### Async/await all the way
+
+| ✅ Do | ❌ Don't | Why |
+|-------|----------|-----|
+| Use async handlers; await all I/O | Do heavy synchronous work in consumers | Blocking the event loop starves other consumers. |
+| Use `Promise.all()` for parallel non-dependent work | Await operations sequentially | Better throughput; process multiple tasks in parallel. |
+| Delegate to services/repositories | Embed SQL queries, HTTP calls inline | Separation of concerns; easier to test and reuse. |
+| Set timeout/deadlines for external calls | Leave external calls unbounded | Prevents hung consumers from blocking the queue. |
+
+Good async pattern:
+
+```typescript title="src/consumers/analytics.consumer.ts"
+import { defineConsumer } from '@warlock.js/herald';
+import { OrderPlacedEvent } from '../events/order-placed.event';
+
+@Consumable({ consumerId: 'analytics', prefetch: 50 })
+export class AnalyticsConsumer extends defineConsumer(OrderPlacedEvent, {
+  async handle(event, ctx) {
+    const { orderId, total, userId } = event.payload;
+
+    try {
+      // Parallel work: track metrics, update user stats, log event
+      await Promise.all([
+        analyticsService.trackOrderPlaced(orderId, { total, userId }),
+        userService.incrementOrderCount(userId),
+        loggingService.logEvent({
+          type: 'order_placed',
+          orderId,
+          timestamp: Date.now(),
+        }),
+      ]);
+
+      await ctx.ack();
+    } catch (error) {
+      console.error(`Analytics failed for order ${orderId}:`, error);
+      await ctx.nack();
+    }
+  },
+}) {}
+```
+
+## Connection and startup
+
+| ✅ Do | ❌ Don't | Why |
+|-------|----------|-----|
+| Call `connectToBroker()` before starting HTTP server | Start server before broker ready | Requests may try to publish before broker is connected. |
+| Import all `@Consumable` files somewhere in startup | Never import consumer files | The decorator runs on import — unloaded files are never registered. Import order vs `connectToBroker` doesn't matter. |
+| Use URI form with env vars in production | Hardcode credentials in code | Credentials in code are a security risk; env vars are standard practice. |
+| Load consumers in explicit imports | Use dynamic imports or auto-discovery | Explicit imports are clear and testable. |
+| Always use TLS in production | Use plain AMQP in production | Plain AMQP sends credentials unencrypted. |
+
+Good startup pattern:
+
+```typescript title="src/main.ts"
+import { connectToBroker } from '@warlock.js/herald';
+
+// Consumer files can be imported in any order, before or after connectToBroker
+import './consumers/order-notification.consumer';
+import './consumers/inventory.consumer';
+import './consumers/analytics.consumer';
+
+// Broker connection
+const broker = await connectToBroker({
+  driver: 'rabbitmq',
+  uri: process.env.RABBITMQ_URI, // amqp://user:pass@host:5672/vhost
+  heartbeat: 60,
+  reconnect: true,
+});
+
+console.log('✓ Broker connected, consumers registered');
+
+// NOW start HTTP server
+import express from 'express';
+const app = express();
+
+app.listen(3000, () => {
+  console.log('✓ Server listening on :3000');
+});
+```
+
+## Reliability
+
+| ✅ Do | ❌ Don't | Why |
+|-------|----------|-----|
+| Configure `deadLetter` for critical events | Publish without dead-letter setup | Messages are lost if they can't be processed. |
+| Listen to broker `error` events | Ignore errors | Errors signal connection/broker issues you need to know about. |
+| Set appropriate `retry` + `delay` | Set infinite retries with no delay | Retry storms overload the broker; delays give upstream services time to recover. |
+| Monitor dead-letter queue (DLQ) depth | Ignore DLQ | DLQ depth is a critical health metric; growing DLQ = systemic problem. |
+| Use `autoAck: false` for critical work | Use `autoAck: true` | Auto-ack is dangerous; messages are lost if processing fails. |
+| Publish with acknowledgement | Fire and forget | Acknowledgement confirms the broker persisted the message. |
+
+Dead-letter configuration example:
+
+```typescript title="src/events/setup.ts"
+import { herald, heraldChannel } from '@warlock.js/herald';
+
+// Set up critical queue with dead-letter
+const paymentChannel = heraldChannel('payment.processed', {
+  deadLetter: {
+    channel: 'payment.processed.dlq', // Dead-letter queue
+  },
+  messageTtl: 24 * 60 * 60 * 1000, // Auto-expire after 24 hours
+  maxLength: 100_000,                // Prevent unbounded growth
+});
+
+// Set up DLQ listener (alerts on poison messages)
+const dlq = heraldChannel('payment.processed.dlq');
+dlq.subscribe(async (message, ctx) => {
+  console.error('CRITICAL: Message in DLQ:', message);
+  // Alert ops team, page on-call engineer
+  await alertService.critical({
+    title: 'Payment DLQ has messages',
+    body: `Message: ${JSON.stringify(message)}`,
+  });
+  await ctx.ack();
+});
+```
+
+Error handling:
+
+```typescript title="src/main.ts"
+import { herald } from '@warlock.js/herald';
+
+await connectToBroker({ driver: 'rabbitmq', host: 'localhost' });
+
+// Listen for broker errors
+herald().driver.on('error', (error) => {
+  console.error('Broker error:', error.message);
+  // Send to monitoring/alerting system
+  sendToSentry(error);
+});
+
+herald().driver.on('disconnected', () => {
+  console.warn('Broker disconnected');
+  // Trigger paging/alerts if critical
+});
+```
+
+## Performance
+
+| ✅ Do | ❌ Don't | Why |
+|-------|----------|-----|
+| Reuse channels; `herald().channel()` caches them | Create a new channel for each publish | Channels are lightweight; reuse reduces overhead. |
+| Use `Promise.all()` for multiple publishes | Await each publish sequentially | Parallel publishes are much faster. |
+| Set `messageTtl` on non-critical queues | Leave all messages forever | Unbounded queues consume memory; TTL cleans up stale messages. |
+| Set `maxLength` on high-volume queues | Allow queues to grow unbounded | Protects memory; old messages are dropped if queue exceeds max. |
+| Batch processing with high prefetch for analytics | Process one message at a time for everything | Batching is much faster for high-volume, non-critical work. |
+| Use `noAck: true` only for non-critical fire-and-forget | Don't acknowledge critical messages | Non-ack events like metrics can be safely lost. |
+
+Performance tuning example:
+
+```typescript title="src/events/setup.ts"
+import { heraldChannel } from '@warlock.js/herald';
+
+// Critical payment queue: durable, one-at-a-time, dead-letter
+const paymentChannel = heraldChannel('payment.processed', {
+  durable: true,
+  deadLetter: { channel: 'payment.dlq' },
+  messageTtl: 24 * 60 * 60 * 1000, // Keep for 24 hours
+  maxLength: 10_000,                 // Prevent unbounded growth
+});
+
+// High-volume analytics: durable but lightweight
+const analyticsChannel = heraldChannel('analytics.events', {
+  durable: true,
+  messageTtl: 1 * 60 * 60 * 1000, // Keep for 1 hour (old data is stale)
+  maxLength: 1_000_000,             // Tolerate large queue
+});
+
+// Temporary notifications: not durable, auto-delete when done
+const notificationChannel = heraldChannel('notifications', {
+  durable: false,
+  autoDelete: true,
+});
+```
+
+Publishing performance:
+
+```typescript title="src/services/order.service.ts"
+import { herald } from '@warlock.js/herald';
+
+export async function createBulkOrders(orders: Order[]) {
+  // ❌ Slow: sequential
+  // for (const order of orders) {
+  //   await herald().channel('order.placed').publish(order);
+  // }
+
+  // ✅ Fast: parallel
+  const publishPromises = orders.map((order) =>
+    herald().channel('order.placed').publish(order),
+  );
+
+  await Promise.all(publishPromises);
+}
+```
+
+## Graceful shutdown
+
+Always close connections cleanly:
+
+```typescript title="src/main.ts"
+import { connectToBroker, herald } from '@warlock.js/herald';
+
+await connectToBroker({ driver: 'rabbitmq', host: 'localhost' });
+
+let isShuttingDown = false;
+
+// Graceful shutdown handler
+const gracefulShutdown = async () => {
+  if (isShuttingDown) return; // Prevent multiple calls
+  isShuttingDown = true;
+
+  console.log('Shutting down gracefully...');
+
+  // Stop accepting new work
+  // (disable new HTTP requests, stop consuming from channels, etc.)
+
+  // Unsubscribe all consumers
+  // (this will drain in-flight messages)
+  const broker = herald();
+  for (const channel of broker.driver.getChannelNames()) {
+    await broker.channel(channel).unsubscribeAll();
+  }
+
+  // Close broker connection
+  await broker.disconnect();
+
+  console.log('Shutdown complete');
+  process.exit(0);
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+```
+
+## Testing patterns
+
+| ✅ Do | ❌ Don't | Why |
+|-------|----------|-----|
+| Mock the broker; don't use real RabbitMQ in unit tests | Spin up RabbitMQ for every test | Real brokers are slow and flaky for unit tests. |
+| Use in-memory broker for integration tests | Test with production broker | In-memory brokers are fast and deterministic. |
+| Disable `reconnect` in test setup | Use default auto-reconnect in tests | Retries slow down tests; disable for faster runs. |
+| Stub event publishing in unit tests | Publish real events in unit tests | Real publishing is slow and couples tests. |
+| Mock consumers in service tests | Run real consumers in tests | Real consumers are slow and have side effects. |
+
+Example test setup:
+
+```typescript title="src/__tests__/setup.ts"
+import { connectToBroker } from '@warlock.js/herald';
+
+// Use in-memory broker for tests (if available)
+export async function setupTestBroker() {
+  await connectToBroker({
+    driver: 'rabbitmq',
+    host: 'localhost',
+    reconnect: false, // No retries; fail fast in tests
+    connectionTimeout: 5000,
+  });
+}
+
+// Or mock the broker entirely
+export function mockBroker() {
+  const publishedEvents = [];
+
+  jest.mock('@warlock.js/herald', () => ({
+    publishEvent: jest.fn((event) => {
+      publishedEvents.push(event);
+      return Promise.resolve();
+    }),
+    // ... other mocks
+  }));
+
+  return { publishedEvents };
+}
+```
+
+## Next steps
+
+- **[RabbitMQ Advanced Configuration](rabbitmq-advanced)** — Deep dive into connection options, TLS, virtual hosts
+- **[Real-World Examples](real-world-examples)** — Complete implementations of e-commerce, RPC, and multi-broker setups
+- **[Retries & Dead Letters](retries-and-dead-letters)** — Detailed failure handling and message recovery

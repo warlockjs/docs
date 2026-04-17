@@ -1,0 +1,250 @@
+---
+sidebar_position: 16
+title: Message Context
+description: Control message lifecycle with ack, nack, reply, and retry operations
+---
+
+# Message Context
+
+When you receive a message through Herald, you get a `MessageContext` object that gives you full control over what happens to that message. It's how you tell the broker whether processing succeeded, failed, or needs to be retried.
+
+## Understanding Message Lifecycle
+
+After your handler processes a message, you need to tell Herald what to do with it:
+- **Acknowledge it** — message stays off the queue, processing is done
+- **Negative acknowledge it** — message goes back to the queue for retry or dead lettering
+- **Retry it** — manually trigger another attempt with an incremented counter
+- **Reply to it** — send a response (if using RPC pattern)
+
+Without explicitly handling the message, it remains in a pending state and will be redelivered if your consumer reconnects.
+
+## ack() — Acknowledge Success
+
+Use `ack()` when you've successfully processed a message.
+
+```typescript title="src/services/order.service.ts"
+await herald().channel("order.placed").subscribe(async (message, ctx) => {
+  // Send confirmation email
+  await mailer.sendOrderConfirmation(message.payload.email);
+  
+  // Tell Herald we're done with this message
+  await ctx.ack();
+});
+```
+
+:::danger Critical
+Always call `ack()` when you're done processing. If you don't, the message will be redelivered after your consumer reconnects or times out. This can cause duplicate processing.
+:::
+
+:::info Multi-Step Processing
+If your handler needs to complete multiple steps before confirming success, only call `ack()` after all steps are done. This ensures you don't lose work if something fails partway through.
+:::
+
+## nack(requeue?) — Negative Acknowledge
+
+Use `nack()` when processing failed. The `requeue` parameter controls what happens next:
+
+### nack(true) — Requeue for Retry
+
+The message goes back to the front of the queue. Another consumer (or the same one after restart) will try again.
+
+```typescript title="src/services/payment.service.ts"
+await herald().channel("payment.process").subscribe(async (message, ctx) => {
+  try {
+    await paymentGateway.charge(message.payload);
+    await ctx.ack();
+  } catch (err) {
+    if (err instanceof PaymentGatewayUnavailable) {
+      // Temporary failure; try again later
+      await ctx.nack(true);
+    } else {
+      // Permanent failure
+      await ctx.nack(false);
+    }
+  }
+});
+```
+
+### nack(false) — Discard (Dead Letter)
+
+The message is discarded, typically moved to a dead letter queue (DLQ) for inspection. Use this when the message is permanently invalid and will never be processable.
+
+```typescript title="src/services/inventory.service.ts"
+await herald().channel("inventory.updated").subscribe(async (message, ctx) => {
+  // Validate payload
+  if (!message.payload.productId) {
+    console.error("Invalid inventory update: missing productId");
+    // Message is malformed; don't retry
+    await ctx.nack(false);
+    return;
+  }
+  
+  await updateInventory(message.payload);
+  await ctx.ack();
+});
+```
+
+## reject(requeue?) — Semantic Alternative to nack()
+
+`reject()` is an alias for `nack()`, but use it when you want to express "this message is bad" semantically:
+
+```typescript title="src/services/validation.service.ts"
+await herald().channel("order.placed").subscribe(async (message, ctx) => {
+  const schema = await getValidationSchema();
+  
+  if (!schema.validate(message.payload)) {
+    // Semantic: this message doesn't meet requirements
+    await ctx.reject(false);
+    return;
+  }
+  
+  await processOrder(message.payload);
+  await ctx.ack();
+});
+```
+
+- Use `nack()` when you can't process it right now but might be able to later
+- Use `reject()` when the message is fundamentally invalid
+
+## reply(payload) — RPC Response
+
+Use `reply()` when you're implementing the responder side of an RPC pattern. This sends a response back to the requester.
+
+```typescript title="src/services/fulfillment.service.ts"
+await herald()
+  .channel("order.status")
+  .respond(async (message, ctx) => {
+    const order = await db.orders.findById(message.payload.orderId);
+    // reply() is called automatically; just return the response
+    return {
+      status: order.status,
+      estimatedDelivery: order.estimatedDelivery,
+    };
+  });
+```
+
+:::info RPC Details
+See the [Request-Reply](/docs/herald/request-reply) page for complete RPC examples. The responder automatically calls `ack()` after your handler returns successfully.
+:::
+
+## retry() — Manual Retry
+
+Manually trigger a retry with an incremented `retryCount`.
+
+```typescript title="src/services/webhook.service.ts"
+let attempts = 0;
+const maxAttempts = 5;
+
+await herald().channel("webhook.event").subscribe(async (message, ctx) => {
+  try {
+    await sendWebhook(message.payload);
+    await ctx.ack();
+  } catch (err) {
+    if (attempts < maxAttempts) {
+      attempts++;
+      // Increment counter and requeue
+      await ctx.retry();
+    } else {
+      // Give up
+      await ctx.nack(false);
+    }
+  }
+});
+```
+
+The `retryCount` in the message metadata increments each time you call `retry()`, helping you implement escalating behavior (exponential backoff, different fallbacks, etc.).
+
+## MessageMetadata Reference
+
+Every message carries metadata about itself and its journey through the system:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `messageId` | `string` | Unique identifier for this message instance |
+| `correlationId` | `string \| undefined` | Groups related messages; used in RPC to link request-response |
+| `replyTo` | `string \| undefined` | Queue name where responses should be sent (RPC only) |
+| `priority` | `number \| undefined` | Priority level (broker-specific; higher = more urgent) |
+| `timestamp` | `Date` | When the message was published |
+| `headers` | `Record<string, any>` | Arbitrary key-value pairs set by the publisher |
+| `retryCount` | `number` | How many times this message has been retried |
+| `originalChannel` | `string \| undefined` | Original channel if this message came from a dead letter queue |
+
+### Using Metadata for Idempotency
+
+Use `messageId` or `correlationId` to detect and skip duplicate processing:
+
+```typescript title="src/services/order.service.ts"
+const processedIds = new Set<string>();
+
+await herald().channel("order.placed").subscribe(async (message, ctx) => {
+  const { messageId } = message.metadata;
+  
+  if (processedIds.has(messageId)) {
+    // Already processed this one
+    await ctx.ack();
+    return;
+  }
+  
+  try {
+    await createOrder(message.payload);
+    processedIds.add(messageId);
+    await ctx.ack();
+  } catch (err) {
+    await ctx.nack(true);
+  }
+});
+```
+
+## Complete Error Handling Example
+
+Here's a real-world consumer handling all scenarios:
+
+```typescript title="src/consumers/order-processor.ts"
+await herald().channel("order.placed").subscribe(async (message, ctx) => {
+  const { orderId, customerId } = message.payload;
+  const { messageId, retryCount } = message.metadata;
+  
+  // Skip if already processed
+  if (await db.processedMessages.exists(messageId)) {
+    await ctx.ack();
+    return;
+  }
+  
+  try {
+    // Process the order
+    await createOrder(message.payload);
+    await db.processedMessages.add(messageId);
+    await ctx.ack();
+    
+  } catch (err) {
+    // Decide based on error type and retry count
+    if (retryCount >= 3) {
+      // Too many retries; give up
+      logger.error(`Order ${orderId} failed after ${retryCount} retries`, err);
+      await ctx.nack(false); // Dead letter
+      
+    } else if (err instanceof TemporaryError) {
+      // Temporary issue; try again
+      logger.warn(`Order ${orderId} temporary failure; requeueing`, err);
+      await ctx.nack(true);
+      
+    } else if (err instanceof ValidationError) {
+      // Invalid payload; don't retry
+      logger.error(`Order ${orderId} invalid`, err);
+      await ctx.nack(false);
+      
+    } else {
+      // Unknown error; be conservative
+      logger.error(`Order ${orderId} unknown error`, err);
+      await ctx.nack(true);
+    }
+  }
+});
+```
+
+## Related Pages
+
+- [Consuming Messages](/docs/herald/consuming) — How to subscribe and receive messages
+- [Subscription Management](/docs/herald/subscription-management) — pause, resume, unsubscribe
+- [Request-Reply](/docs/herald/request-reply) — Using reply() in RPC patterns
+- [Retries and Dead Letters](/docs/herald/retries-and-dead-letters) — Automatic retry policies

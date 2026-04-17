@@ -1,142 +1,418 @@
 ---
-sidebar_position: 5
+sidebar_position: 18
+title: Request-Reply (RPC)
+description: Implement synchronous request-response patterns over async message bus
 ---
 
-# Request / Reply (RPC)
+# Request-Reply (RPC)
 
-Herald supports the request-reply pattern (also called RPC — Remote Procedure Call) over the message bus. This lets you send a message and await a typed response, all through your broker, without managing correlation IDs or reply queues manually.
+Herald supports request-reply (RPC) patterns on top of its async message bus. This lets you send a message and wait for a response—useful when you need data or confirmation from another service.
 
-## Requester side
+## When to Use RPC vs Pub/Sub
 
-Call `channel.request()` with a payload and an optional timeout:
+### Use RPC (Request-Reply)
 
-```typescript
-import { communicators } from "@warlock.js/herald";
+- You need a response: "What's the status of order #123?"
+- Checking availability: "Can you process this payment?"
+- Getting data: "Fetch user preferences from Profile Service"
+- Synchronous workflows that don't make sense without a reply
 
-interface ResizeRequest {
-  imageUrl: string;
-  width: number;
-  height: number;
-}
+### Use Pub/Sub
 
-interface ResizeResult {
-  processedUrl: string;
-  durationMs: number;
-}
+- Fire-and-forget: "An order was placed" (event)
+- Multiple consumers should react: inventory, analytics, notifications
+- Don't need a response
+- Decoupled event propagation
 
-const result = await communicators()
-  .channel<ResizeRequest>("image.resize")
-  .request<ResizeResult>(
-    { imageUrl: "https://cdn.example.com/photo.jpg", width: 800, height: 600 },
-    { timeout: 30_000 }, // default: 30 s
-  );
+## channel.request() — Send Request and Wait
 
-console.log("Resized image URL:", result.processedUrl);
+To send a request and wait for a response:
+
+```typescript title="src/services/order.service.ts"
+const response = await herald()
+  .channel<OrderStatusRequest, OrderStatusResponse>("order.status")
+  .request({ orderId: "ord-123" });
+
+console.log(response.status); // "processing"
 ```
 
-Herald:
-1. Creates a temporary exclusive reply queue
-2. Publishes your message with `replyTo` and `correlationId` properties set
-3. Waits for a matching reply
-4. Resolves the promise with the typed response or rejects after the timeout
+### With Timeout
 
-## Responder side
+Always set a timeout to prevent indefinite hangs:
 
-Register a handler with `channel.respond()`. The return value of your handler becomes the response:
+```typescript title="src/services/order.service.ts"
+try {
+  const response = await herald()
+    .channel<OrderStatusRequest, OrderStatusResponse>("order.status")
+    .request(
+      { orderId: "ord-123" },
+      { timeout: 5000 } // 5 second timeout
+    );
 
-```typescript
-import { communicators } from "@warlock.js/herald";
+  console.log(`Order status: ${response.status}`);
 
-communicators()
-  .channel<ResizeRequest>("image.resize")
-  .respond<ResizeResult>(async (message) => {
-    const { imageUrl, width, height } = message.payload;
+} catch (err) {
+  if (err.name === "TimeoutError") {
+    logger.warn("Fulfillment service not responding");
+    // Fallback behavior
+  } else {
+    throw err;
+  }
+}
+```
 
-    const processed = await resizeImage(imageUrl, width, height);
+:::danger Always Set Timeout
+Without a timeout, if the responder crashes or never responds, your request hangs forever. Set a reasonable timeout based on expected response time.
+:::
 
+### With Headers and Priority
+
+Pass additional options to the request:
+
+```typescript title="src/services/order.service.ts"
+const response = await herald()
+  .channel<OrderStatusRequest, OrderStatusResponse>("order.status")
+  .request(
+    { orderId: "ord-123" },
+    {
+      timeout: 5000,
+      priority: 10, // High priority
+      headers: {
+        "request-source": "order-service",
+        "correlation-id": currentRequest.id,
+      },
+    }
+  );
+```
+
+## channel.respond() — Register as Responder
+
+Implement the responder side to handle incoming requests:
+
+```typescript title="src/services/fulfillment.service.ts"
+await herald()
+  .channel<OrderStatusRequest, OrderStatusResponse>("order.status")
+  .respond(async (message, ctx) => {
+    const { orderId } = message.payload;
+
+    // Fetch the data
+    const order = await db.orders.findById(orderId);
+
+    if (!order) {
+      throw new Error(`Order not found: ${orderId}`);
+    }
+
+    // Return the response
     return {
-      processedUrl: processed.url,
-      durationMs: processed.durationMs,
+      status: order.status,
+      estimatedDelivery: order.estimatedDelivery,
+      trackingNumber: order.trackingNumber,
     };
   });
 ```
 
-Herald automatically calls `ctx.reply(response)` and `ctx.ack()` after your handler returns.
+The responder handler:
+- Receives the request message and context
+- Returns the response payload
+- Herald automatically sends the response back to the requester
+- Errors thrown in the handler are sent to the requester as errors
 
-## Timeout handling
+## How RPC Works Under the Hood
 
-If no reply arrives within the timeout window, `request()` rejects with an error:
+Herald handles the complexity of request-reply:
 
-```typescript
-import { communicators } from "@warlock.js/herald";
+1. **Requester** publishes a message on the RPC channel with:
+   - `replyTo`: temporary queue name for the response
+   - `correlationId`: unique ID to match this request to its response
+2. **Responder** subscribes to the RPC channel and calls your handler
+3. **Herald** automatically creates a reply queue, sends the response there
+4. **Requester** receives and correlates the response with the request
+5. **Request promise resolves** with the response payload
 
+You don't need to manage any of this—Herald does it all.
+
+## Error Handling
+
+Errors in the responder are sent back to the requester:
+
+```typescript title="src/services/fulfillment.service.ts"
+await herald()
+  .channel<OrderStatusRequest, OrderStatusResponse>("order.status")
+  .respond(async (message, ctx) => {
+    const { orderId } = message.payload;
+
+    if (!orderId) {
+      // This error is sent back to the requester
+      throw new Error("orderId is required");
+    }
+
+    const order = await db.orders.findById(orderId);
+    if (!order) {
+      throw new NotFoundError(`Order ${orderId} not found`);
+    }
+
+    return { status: order.status };
+  });
+```
+
+Requester catches the error:
+
+```typescript title="src/services/order.service.ts"
 try {
-  const result = await communicators()
-    .channel<{ query: string }>("search.execute")
-    .request<{ results: string[] }>(
-      { query: "warlock.js" },
-      { timeout: 5_000 },
-    );
-} catch (error) {
-  if (error instanceof Error && error.message.includes("Request timeout")) {
-    // Handle timeout gracefully
-    return { results: [] };
+  const response = await herald()
+    .channel("order.status")
+    .request({ orderId: "ord-123" }, { timeout: 5000 });
+
+  console.log(response.status);
+
+} catch (err) {
+  if (err.message === "Order not found") {
+    // Handle this case
+  } else {
+    throw err;
   }
-  throw error;
 }
 ```
 
-## Manual reply via ctx
+## Real-World Example: Order Status Service
 
-When you need the responder to have full control over acknowledgement — for example when you want to nack on errors — use `ctx.reply()` directly inside a regular `subscribe()` handler:
+Here's a complete RPC implementation in an e-commerce platform:
 
-```typescript
-import { communicators } from "@warlock.js/herald";
+### Responder: Fulfillment Service
 
-communicators()
-  .channel<{ query: string }>("search.execute")
-  .subscribe(async (message, ctx) => {
+```typescript title="src/consumers/order-status.responder.ts"
+import { herald } from "../lib/herald";
+import { db } from "../lib/database";
+import { logger } from "../lib/logger";
+
+interface OrderStatusRequest {
+  orderId: string;
+}
+
+interface OrderStatusResponse {
+  orderId: string;
+  status: "pending" | "processing" | "shipped" | "delivered";
+  estimatedDelivery?: string;
+  trackingNumber?: string;
+  lastUpdated: string;
+}
+
+export async function registerOrderStatusResponder() {
+  await herald()
+    .channel<OrderStatusRequest, OrderStatusResponse>("order.status")
+    .respond(async (message, ctx) => {
+      const { orderId } = message.payload;
+
+      try {
+        // Validate request
+        if (!orderId || typeof orderId !== "string") {
+          throw new Error("Invalid orderId");
+        }
+
+        // Fetch order
+        const order = await db.orders.findById(orderId);
+
+        if (!order) {
+          throw new NotFoundError(`Order ${orderId} not found`);
+        }
+
+        // Check permissions
+        if (message.metadata.headers["user-id"] !== order.customerId) {
+          throw new UnauthorizedError("Cannot access this order");
+        }
+
+        // Build response
+        const response: OrderStatusResponse = {
+          orderId: order.id,
+          status: order.status,
+          lastUpdated: order.updatedAt.toISOString(),
+        };
+
+        if (order.estimatedDelivery) {
+          response.estimatedDelivery = order.estimatedDelivery.toISOString();
+        }
+
+        if (order.trackingNumber) {
+          response.trackingNumber = order.trackingNumber;
+        }
+
+        logger.info(`Order status requested: ${orderId}`);
+        return response;
+
+      } catch (err) {
+        logger.error(`Error fetching order status: ${orderId}`, err);
+        throw err;
+      }
+    });
+}
+```
+
+### Requester: Order Service
+
+```typescript title="src/services/order.service.ts"
+import { herald } from "../lib/herald";
+import { cache } from "../lib/cache";
+
+interface OrderStatusRequest {
+  orderId: string;
+}
+
+interface OrderStatusResponse {
+  orderId: string;
+  status: string;
+  estimatedDelivery?: string;
+  trackingNumber?: string;
+  lastUpdated: string;
+}
+
+export class OrderService {
+  async getOrderStatus(
+    orderId: string,
+    userId: string
+  ): Promise<OrderStatusResponse> {
+    // Check cache first
+    const cached = await cache.get(`order:${orderId}:status`);
+    if (cached) {
+      return cached;
+    }
+
     try {
-      const results = await runSearch(message.payload.query);
-      await ctx.reply({ results });
-      await ctx.ack();
-    } catch (error) {
-      await ctx.nack(false); // don't requeue; let the requester time out
+      // Request status from fulfillment service
+      const response = await herald()
+        .channel<OrderStatusRequest, OrderStatusResponse>("order.status")
+        .request(
+          { orderId },
+          {
+            timeout: 5000,
+            headers: { "user-id": userId }, // Pass user context
+          }
+        );
+
+      // Cache for 30 seconds
+      await cache.set(`order:${orderId}:status`, response, 30);
+
+      return response;
+
+    } catch (err) {
+      if (err.name === "TimeoutError") {
+        logger.warn(`Order status timeout for ${orderId}`);
+        throw new ServiceUnavailableError(
+          "Fulfillment service is temporarily unavailable"
+        );
+      }
+
+      if (err.message.includes("not found")) {
+        throw new NotFoundError(`Order ${orderId} not found`);
+      }
+
+      throw err;
+    }
+  }
+
+  async checkPaymentCapability(orderId: string): Promise<boolean> {
+    try {
+      // Quick RPC to payment service
+      const result = await herald()
+        .channel<{ orderId: string }, { canProcess: boolean }>("payment.check")
+        .request({ orderId }, { timeout: 2000 });
+
+      return result.canProcess;
+
+    } catch (err) {
+      // If payment service doesn't respond, assume we can't process
+      logger.warn(`Payment check failed for ${orderId}`, err);
+      return false;
+    }
+  }
+}
+```
+
+### Startup
+
+```typescript title="src/index.ts"
+import { registerOrderStatusResponder } from "./consumers/order-status.responder";
+
+async function startApp() {
+  // Register RPC responder
+  await registerOrderStatusResponder();
+
+  // Start HTTP server
+  app.get("/api/orders/:id/status", async (req, res) => {
+    try {
+      const status = await orderService.getOrderStatus(
+        req.params.id,
+        req.user.id
+      );
+      res.json(status);
+    } catch (err) {
+      // Handle errors
     }
   });
+
+  app.listen(3000);
+}
 ```
 
-## Full worked example
+## Multiple Responders (Competing Consumers)
 
-```typescript
-// === responder.ts — runs in the worker process ===
-import { connectToCommunicator, communicators } from "@warlock.js/herald";
+If multiple instances run the same responder, each request is processed by one responder (competing consumer pattern):
 
-await connectToCommunicator({ driver: "rabbitmq", host: "localhost" });
+```typescript title="src/fulfillment/index.ts"
+// Both instances subscribe to the same channel
+// Incoming requests are distributed among them
+await herald()
+  .channel("order.status")
+  .respond(handleOrderStatusRequest);
+```
 
-communicators()
-  .channel<{ a: number; b: number }>("math.add")
-  .respond<{ sum: number }>(async (message) => {
-    const { a, b } = message.payload;
-    return { sum: a + b };
+Only one responder handles each request. If you need multiple consumers reacting to the same message (fan-out), use pub/sub instead.
+
+## RPC with Message Metadata
+
+Use request metadata for correlation and tracing:
+
+```typescript title="src/services/order.service.ts"
+const response = await herald()
+  .channel("order.status")
+  .request(
+    { orderId: "ord-123" },
+    {
+      timeout: 5000,
+      headers: {
+        "correlation-id": request.correlationId, // Distributed tracing
+        "request-source": "order-service",
+        "tenant-id": request.tenantId,
+      },
+    }
+  );
+```
+
+Responder can access this metadata:
+
+```typescript title="src/services/fulfillment.service.ts"
+await herald()
+  .channel("order.status")
+  .respond(async (message, ctx) => {
+    const { "correlation-id": correlationId } = message.metadata.headers;
+
+    logger.info(`[${correlationId}] Fetching order status...`);
+
+    // ... process request
   });
 ```
 
-```typescript
-// === requester.ts — runs in the API process ===
-import { connectToCommunicator, communicators } from "@warlock.js/herald";
+## Best Practices
 
-await connectToCommunicator({ driver: "rabbitmq", host: "localhost" });
+- **Set appropriate timeouts**: Based on expected response time. 5-30 seconds is typical.
+- **Handle timeouts gracefully**: Fallback to cached data or degraded mode.
+- **Use correlation IDs**: Link requests across services for debugging.
+- **Responder performance**: Keep response handlers fast. Heavy work belongs in pub/sub.
+- **Error messages**: Make errors descriptive so requester can handle them properly.
+- **Test RPC paths**: Ensure responder starts before requester makes requests.
 
-const response = await communicators()
-  .channel<{ a: number; b: number }>("math.add")
-  .request<{ sum: number }>({ a: 3, b: 4 });
+## Related Pages
 
-console.log(response.sum); // 7
-```
-
-## Notes
-
-- Each `request()` call creates and tears down its own exclusive reply queue. This is the standard AMQP RPC pattern and is safe under concurrent load.
-- The `respond()` handler should be idempotent where possible — network issues can cause re-delivery.
-- For long-running background jobs prefer fire-and-forget events with a separate completion event rather than RPC.
+- [Consuming Messages](/docs/herald/consuming) — subscribe() and respond()
+- [Message Context](/docs/herald/message-context) — Working with message lifecycle
+- [Subscription Management](/docs/herald/subscription-management) — Manage responder lifecycle
+- [Channels](/docs/herald/channels) — RPC channels vs pub/sub channels

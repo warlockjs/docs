@@ -1,0 +1,339 @@
+---
+sidebar_position: 6
+title: Broker Events and Health Checks
+description: Monitor connection status, detect errors, and implement health checks for your brokers
+---
+
+Herald emits events at two levels: **registry level** (global, across all brokers) and **driver level** (per individual broker). Understanding these events is critical for monitoring, logging, and graceful error handling.
+
+## Registry events
+
+The global `brokerRegistry` emits events whenever brokers are registered or their connection status changes:
+
+```typescript
+import { brokerRegistry } from "@warlock.js/herald";
+
+// Fires when a broker is registered (before connection)
+brokerRegistry.on("registered", (broker) => {
+  console.log(`Broker registered: ${broker.name}`);
+});
+
+// Fires when a broker becomes the default
+brokerRegistry.on("default-registered", (broker) => {
+  console.log(`Default broker set: ${broker.name}`);
+});
+
+// Fires when a broker successfully connects
+brokerRegistry.on("connected", (broker) => {
+  console.log(`Broker connected: ${broker.name}`);
+});
+
+// Fires when a broker disconnects
+brokerRegistry.on("disconnected", (broker) => {
+  console.log(`Broker disconnected: ${broker.name}`);
+});
+```
+
+Registry events fire **before driver events** during the connection lifecycle. When you call `connectToBroker()`:
+
+1. "registered" event fires
+2. "default-registered" fires (if it's the default)
+3. Connection attempt begins
+4. "connected" fires (on driver as well)
+
+## Driver events
+
+Each broker's underlying driver emits its own events. Listen to them with `broker.driver.on()`:
+
+```typescript
+import { herald } from "@warlock.js/herald";
+
+const broker = herald();
+
+// Fires when the connection is established
+broker.driver.on("connected", () => {
+  console.log("Connected to message broker");
+});
+
+// Fires when the connection is lost
+broker.driver.on("disconnected", () => {
+  console.log("Disconnected from message broker");
+});
+
+// Fires when an error occurs
+broker.driver.on("error", (error, eventName) => {
+  console.error(`Driver error (${eventName}):`, error);
+});
+
+// Fires when the driver attempts to reconnect
+broker.driver.on("reconnecting", () => {
+  console.log("Attempting to reconnect...");
+});
+```
+
+### Understanding driver events
+
+- **"connected"** — The broker is ready to publish and consume messages
+- **"disconnected"** — The connection was lost. If `reconnect: true`, the driver will attempt to reconnect
+- **"error"** — An error occurred. This includes consumer errors, connection errors, and driver-level failures
+- **"reconnecting"** — The driver is attempting to reconnect after a disconnection
+
+The **"error" event is critical**. If you don't listen to it, errors from your consumers will be silently swallowed (not thrown or logged by default).
+
+## Real-world example: centralized health monitoring
+
+Here's how to set up comprehensive monitoring for all brokers in your application:
+
+```typescript title="src/monitoring.ts"
+import { brokerRegistry, herald } from "@warlock.js/herald";
+
+export function setupBrokerMonitoring() {
+  // Track broker health status
+  const brokerHealth = new Map<string, { connected: boolean; lastError?: Error }>();
+
+  // Initialize health tracking for all brokers
+  brokerRegistry.on("registered", (broker) => {
+    brokerHealth.set(broker.name, { connected: false });
+  });
+
+  // Registry-level connection tracking
+  brokerRegistry.on("connected", (broker) => {
+    brokerHealth.set(broker.name, { connected: true });
+    console.log(`✓ ${broker.name} connected`);
+  });
+
+  brokerRegistry.on("disconnected", (broker) => {
+    brokerHealth.set(broker.name, { connected: false });
+    console.warn(`✗ ${broker.name} disconnected`);
+  });
+
+  // Driver-level event monitoring
+  brokerRegistry.all().forEach((broker) => {
+    // Monitor driver errors
+    broker.driver.on("error", (error, eventName) => {
+      brokerHealth.set(broker.name, {
+        connected: false,
+        lastError: error,
+      });
+      console.error(`[${broker.name}] ${eventName} error:`, error.message);
+    });
+
+    // Monitor reconnection attempts
+    broker.driver.on("reconnecting", () => {
+      console.log(`[${broker.name}] Reconnecting...`);
+    });
+
+    // Connection restored after disconnection
+    broker.driver.on("connected", () => {
+      brokerHealth.set(broker.name, { connected: true });
+      console.log(`[${broker.name}] Reconnected successfully`);
+    });
+  });
+
+  return brokerHealth;
+}
+
+// Health check utility
+export function getBrokerHealth() {
+  const health = {};
+
+  brokerRegistry.all().forEach((broker) => {
+    health[broker.name] = {
+      connected: broker.driver.isConnected?.() ?? false,
+      driver: broker.driver.constructor.name,
+      isDefault: broker.isDefault,
+    };
+  });
+
+  return health;
+}
+```
+
+Then expose the health status via an HTTP endpoint:
+
+```typescript
+import express from "express";
+import { setupBrokerMonitoring, getBrokerHealth } from "./monitoring";
+
+const app = express();
+
+// Set up monitoring on startup
+setupBrokerMonitoring();
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  const health = getBrokerHealth();
+  const allConnected = Object.values(health).every((b: any) => b.connected);
+
+  res.status(allConnected ? 200 : 503).json({
+    status: allConnected ? "healthy" : "degraded",
+    brokers: health,
+  });
+});
+
+app.listen(3000);
+```
+
+## Logging reconnection attempts with backoff awareness
+
+Here's a pattern for intelligent logging of reconnection attempts:
+
+```typescript title="src/brokers.ts"
+import { connectToBroker, herald } from "@warlock.js/herald";
+
+export async function initializeBrokers() {
+  const brokers = [
+    { name: "orders", driver: "rabbitmq" },
+    { name: "analytics", driver: "kafka" },
+    { name: "notifications", driver: "redis-streams" },
+  ];
+
+  for (const config of brokers) {
+    const broker = await connectToBroker({
+      name: config.name,
+      driver: config.driver,
+      // These options affect reconnect timing
+      reconnect: true,
+      reconnectDelay: 2000, // Start with 2 seconds
+    });
+
+    let reconnectAttempt = 0;
+
+    broker.driver.on("reconnecting", () => {
+      reconnectAttempt++;
+      const backoffMs = Math.min(
+        2000 * Math.pow(1.5, reconnectAttempt - 1),
+        30000
+      );
+      console.warn(
+        `[${config.name}] Reconnect attempt ${reconnectAttempt} (backoff: ${backoffMs}ms)`
+      );
+    });
+
+    broker.driver.on("connected", () => {
+      if (reconnectAttempt > 0) {
+        console.log(`[${config.name}] Reconnected after ${reconnectAttempt} attempts`);
+      }
+      reconnectAttempt = 0;
+    });
+
+    broker.driver.on("disconnected", () => {
+      reconnectAttempt = 0;
+      console.warn(`[${config.name}] Disconnected`);
+    });
+  }
+}
+```
+
+## Graceful shutdown on disconnection
+
+When a broker disconnects, you might want to stop accepting new requests to prevent queuing them locally:
+
+```typescript title="src/server.ts"
+import express from "express";
+import { herald } from "@warlock.js/herald";
+
+const app = express();
+
+// Track broker readiness
+let brokerReady = true;
+
+// Listen for broker disconnection
+herald().driver.on("disconnected", () => {
+  console.warn("Broker disconnected — stopping new requests");
+  brokerReady = false;
+});
+
+herald().driver.on("connected", () => {
+  console.log("Broker reconnected — resuming requests");
+  brokerReady = true;
+});
+
+// Middleware to reject requests if broker is down
+app.use((req, res, next) => {
+  if (!brokerReady) {
+    return res.status(503).json({
+      error: "Service temporarily unavailable",
+      message: "Broker connection lost",
+    });
+  }
+  next();
+});
+
+// Graceful shutdown
+process.on("SIGINT", async () => {
+  console.log("Shutting down gracefully...");
+  brokerReady = false; // Stop accepting new requests
+
+  // Wait a bit for in-flight requests to complete
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
+  process.exit(0);
+});
+
+app.listen(3000);
+```
+
+:::info
+When listening to registry events, they fire in order: "registered" → "default-registered" (if applicable) → (connection attempt) → "connected". When listening to driver events, they fire for the individual broker's lifecycle.
+:::
+
+## Health checks
+
+You can explicitly check the health of a broker using the `healthCheck()` method:
+
+```typescript
+import { herald } from "@warlock.js/herald";
+
+export async function checkBrokerHealth() {
+  const broker = herald("orders");
+
+  const result = await broker.driver.healthCheck?.();
+  // Returns: { healthy: boolean, latency?: number, error?: string, details?: Record<string, any> }
+
+  if (result?.healthy) {
+    console.log(`Broker is healthy (latency: ${result.latency}ms)`);
+  } else {
+    console.error(`Broker health check failed: ${result?.error}`);
+  }
+
+  return result;
+}
+```
+
+Expose this in your monitoring/metrics endpoint:
+
+```typescript
+app.get("/metrics/broker-health", async (req, res) => {
+  const health = {};
+
+  for (const broker of brokerRegistry.all()) {
+    health[broker.name] = await broker.driver.healthCheck?.();
+  }
+
+  res.json(health);
+});
+```
+
+:::tip
+Always listen for the "error" event on your driver, or errors will be silently discarded. This is especially important for consumer errors — if you don't handle them, messages might be lost or stuck.
+
+```typescript
+// ✓ Good — you'll see consumer errors
+broker.driver.on("error", (error) => {
+  console.error("Consumer error:", error);
+  // Handle or report the error
+});
+
+// ✗ Bad — errors are hidden
+// No listener for "error" event
+```
+:::
+
+---
+
+## Up next
+
+- **[Connecting to a Broker](./connecting.mdx)** — Understand the initial connection flow
+- **[Multiple Brokers](./multiple-brokers.mdx)** — Listen to events on multiple brokers simultaneously
+- **[Error Handling](./error-handling.mdx)** — Comprehensive error handling strategies
