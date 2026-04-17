@@ -1,0 +1,155 @@
+---
+sidebar_position: 5
+---
+
+# Recipes
+
+Ready-to-use setups for common scenarios. Each snippet is self-contained — copy the full import and setup directly into your project.
+
+---
+
+## Dev console + production file
+
+```ts title="src/logger.ts"
+import { logger, ConsoleLog, FileLog } from "@warlock.js/logger";
+
+if (process.env.NODE_ENV === "production") {
+  logger.setChannels([
+    new FileLog({
+      storagePath: process.cwd() + "/storage/logs",
+      chunk: "daily",
+      rotate: true,
+      maxFileSize: 50 * 1024 * 1024, // 50 MB per file before rotation
+    }),
+  ]);
+} else {
+  logger.setChannels([new ConsoleLog()]);
+}
+```
+
+---
+
+## Errors-only file alongside full console
+
+Write every log level to the console during development, but maintain a dedicated `errors.log` file that only captures `error` and `warn` entries. Useful when you want a clean errors file to tail in production without losing full output visibility.
+
+```ts title="src/logger.ts"
+import { logger, ConsoleLog, FileLog } from "@warlock.js/logger";
+
+logger.setChannels([
+  new ConsoleLog(),
+
+  new FileLog({
+    storagePath: process.cwd() + "/storage/logs",
+    name: "errors",
+    levels: ["error", "warn"],
+    chunk: "daily",
+    rotate: true,
+  }),
+]);
+```
+
+---
+
+## Console + JSON file for log aggregators
+
+Ship structured logs to an aggregator (Datadog, Loki, CloudWatch, etc.) by writing a JSON file alongside the human-readable console output.
+
+```ts title="src/logger.ts"
+import { logger, ConsoleLog, JSONFileLog } from "@warlock.js/logger";
+
+logger.setChannels([
+  new ConsoleLog(),
+
+  new JSONFileLog({
+    storagePath: process.cwd() + "/storage/logs",
+    name: "app",
+    chunk: "hourly",
+    rotate: true,
+    maxFileSize: 100 * 1024 * 1024, // 100 MB
+  }),
+]);
+```
+
+---
+
+## Grouping logs by level and module
+
+`groupBy` lets the file channel split output into sub-files based on fields in `LoggingData`. This keeps large log directories navigable without post-processing.
+
+```ts title="src/logger.ts"
+import { logger, FileLog } from "@warlock.js/logger";
+
+logger.setChannels([
+  new FileLog({
+    storagePath: process.cwd() + "/storage/logs",
+    chunk: "daily",
+    groupBy: ["type", "module"],
+    // Creates paths like: ./storage/logs/error/payments/2024-01-15.log
+  }),
+]);
+```
+
+---
+
+## Capturing all unhandled errors
+
+Call `captureAnyUnhandledRejection()` once at startup. It hooks into `process.on("unhandledRejection")` and `process.on("uncaughtException")` and forwards both to the active logger channels.
+
+```ts title="src/logger.ts"
+import {
+  logger,
+  ConsoleLog,
+  FileLog,
+  captureAnyUnhandledRejection,
+} from "@warlock.js/logger";
+
+logger.setChannels([
+  new ConsoleLog(),
+  new FileLog({
+    storagePath: process.cwd() + "/storage/logs",
+    chunk: "daily",
+    levels: ["error"],
+  }),
+]);
+
+// Must be called after channels are configured
+captureAnyUnhandledRejection();
+```
+
+:::tip
+Call `captureAnyUnhandledRejection()` only once. Calling it multiple times registers duplicate listeners and will log the same rejection several times.
+:::
+
+---
+
+## Disabling logging in tests
+
+Set zero channels before your test suite runs. No output, no file handles, no noise.
+
+```ts title="src/setupTests.ts"
+import { logger } from "@warlock.js/logger";
+
+// Run before any test file imports the configured logger
+logger.setChannels([]);
+```
+
+If you are using Jest, add this file to `setupFilesAfterFramework` (or `setupFiles`) in your Jest config:
+
+```json title="jest.config.json"
+{
+  "setupFilesAfterFramework": ["<rootDir>/src/setupTests.ts"]
+}
+```
+
+For Vitest, use `setupFiles` in `vite.config.ts`:
+
+```ts title="vite.config.ts"
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    setupFiles: ["src/setupTests.ts"],
+  },
+});
+```

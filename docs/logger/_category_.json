@@ -1,8 +1,8 @@
 {
-  "label": "Log",
+  "label": "Logger",
   "position": 8,
   "link": {
-    "type": "generated-index",
-    "description": "Logging In Warlock"
+    "type": "doc",
+    "id": "logger/getting-started"
   }
 }

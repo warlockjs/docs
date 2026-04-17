@@ -2,7 +2,7 @@
 sidebar_position: 1
 ---
 
-# Logger
+# Getting Started
 
 > Structured, multi-channel logging for Node.js — with five severity levels, a clean three-argument API, and full TypeScript support.
 
@@ -110,18 +110,6 @@ const entry: LoggingData = {
 await log(entry);
 ```
 
-The `LoggingData` type in full:
-
-```ts
-type LoggingData = {
-  type: "info" | "debug" | "warn" | "error" | "success";
-  module: string;
-  action: string;
-  message: any;
-  context?: Record<string, any>;
-};
-```
-
 **Use the shorthand** for simple messages. **Use `LoggingData`** when you need the `context` field — file and JSON channels persist it alongside the entry; the console channel displays it inline.
 
 ---
@@ -182,11 +170,9 @@ See the [Channels](./channels) page for full configuration options and examples.
 
 ---
 
-## Utilities
+## Capturing unhandled errors
 
-### `captureAnyUnhandledRejection()`
-
-Registers process-level handlers for `unhandledRejection` and `uncaughtException`. Both are forwarded to `log.error()` with `module: "app"`. Call it once at startup.
+`captureAnyUnhandledRejection()` registers process-level handlers for `unhandledRejection` and `uncaughtException`. Both are forwarded to `log.error()` with `module: "app"`. Call it once at startup.
 
 ```ts title="src/index.ts"
 import { logger, log, captureAnyUnhandledRejection } from "@warlock.js/logger";
@@ -199,19 +185,10 @@ captureAnyUnhandledRejection();
 // are automatically logged before the process exits.
 ```
 
-### `clearMessage()`
-
-Strips ANSI escape codes from a string. Useful when you need clean output for non-terminal destinations.
-
-```ts
-import { clearMessage } from "@warlock.js/logger";
-
-clearMessage("\u001b[32mHello\u001b[0m"); // → "Hello"
-```
-
 ---
 
 ## What's next
 
 - [Channels](./channels) — configure `ConsoleLog`, `FileLog`, and `JSONFileLog` output destinations
-- [Setup](./setup) — wire multiple channels together and configure env-based log levels
+- [Configuration](./configuration) — wire multiple channels together and configure env-based log levels
+- [Recipes](./recipes) — ready-to-use setups for common production scenarios

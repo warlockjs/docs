@@ -1,6 +1,8 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
 ---
+
+
 
 # Channels
 
@@ -431,99 +433,7 @@ Storing the stack as `string[]` rather than a raw string makes it trivial to que
 
 ## Custom channels
 
-Extend `LogChannel` and implement the `log` method. The abstract base class handles configuration merging, level filtering, the `filter` predicate, and date formatting for you.
-
-### Complete example — SlackLog
-
-```ts title="src/channels/slack-log.ts"
-import { LogChannel, type LoggingData } from "@warlock.js/logger";
-
-type SlackConfig = {
-  webhookUrl: string;
-  /** Forward only these levels to Slack. Omit to forward all levels. */
-  levels?: ("error" | "warn")[];
-};
-
-export class SlackLog extends LogChannel<SlackConfig> {
-  public name = "slack";
-
-  public async log(data: LoggingData) {
-    // shouldBeLogged checks both the levels list and the filter predicate
-    if (!this.shouldBeLogged(data)) return;
-
-    const { type, module, action, message } = data;
-
-    await fetch(this.config("webhookUrl"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text: `[${type.toUpperCase()}] [${module}][${action}]: ${message}`,
-      }),
-    });
-  }
-}
-```
-
-Register it alongside the built-in channels:
-
-```ts title="src/config/log.ts"
-import { ConsoleLog, FileLog } from "@warlock.js/logger";
-import { SlackLog } from "../channels/slack-log";
-
-const channels = [
-  new ConsoleLog(),
-  new FileLog({ chunk: "daily" }),
-  new SlackLog({
-    webhookUrl: process.env.SLACK_WEBHOOK_URL!,
-    levels: ["error", "warn"],
-  }),
-];
-```
-
-### The `init()` hook
-
-Override the protected `init()` method for any one-time setup that should happen after construction — opening a socket, establishing a database connection, preparing a write stream, etc.
-
-```ts
-import { LogChannel, type LoggingData } from "@warlock.js/logger";
-
-type DbConfig = { connectionString: string };
-
-export class DatabaseLog extends LogChannel<DbConfig> {
-  public name = "database";
-  private client!: SomeDbClient;
-
-  protected async init() {
-    // Runs once, automatically, after the channel is constructed.
-    // The logger waits for this promise before marking the channel ready.
-    this.client = await SomeDbClient.connect(this.config("connectionString"));
-  }
-
-  public async log(data: LoggingData) {
-    if (!this.shouldBeLogged(data)) return;
-    await this.client.insert("logs", data);
-  }
-}
-```
-
-### `LogChannel` API reference
-
-| Member | Type | Description |
-|---|---|---|
-| `name` | `string` | Unique identifier for this channel |
-| `description` | `string?` | Optional human-readable description |
-| `terminal` | `boolean` | `true` if output goes to a terminal. ANSI codes are preserved when `true`; stripped via `clearMessage()` when `false` (default) |
-| `log(data)` | abstract method | Implement your write/send logic here |
-| `shouldBeLogged(data)` | protected method | Returns `false` if `data.type` is not in `levels` or if `filter` returns `false` |
-| `config(key)` | protected method | Type-safe accessor that merges provided options with channel defaults |
-| `getDateAndTimeFormat()` | protected method | Returns `{ date, time }` Day.js format strings resolved from config |
-| `init()` | protected hook | Optional async setup called once after construction |
-| `defaultConfigurations` | protected field | Override in subclasses to provide option defaults (merged with user-supplied config) |
-| `withBasicConfigurations(config)` | protected method | Factory helper that merges a partial config with a pass-through `filter` as the baseline |
-
-:::note No built-in flushSync
-None of the built-in channels (`ConsoleLog`, `FileLog`, `JSONFileLog`) implement a `flushSync` method. `FileLog` flushes its buffer automatically every 5 seconds or when the buffer reaches `maxMessagesToWrite`.
-:::
+Need to send logs to Slack, a database, or any other destination? See [Custom Channels](./custom-channels) for a full guide on extending `LogChannel` and using the `init()` hook.
 
 ---
 
