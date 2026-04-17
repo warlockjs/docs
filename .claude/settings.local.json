@@ -11,5 +11,6 @@
       "Bash(done)",
       "Bash(ls:*)"
     ]
-  }
+  },
+  "prefersReducedMotion": false
 }
