@@ -1,32 +1,42 @@
 # relation-hydrator
 source: relations/relation-hydrator.ts
-description: Restores eager-loaded relations onto model instances from plain snapshot objects.
+description: Restores eager-loaded relations from snapshot data onto model instances
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
-- `ChildModel`, `Model` from `../model/model`
+- `ChildModel, Model` from `../model/model`
 - `getModelFromRegistry` from `../model/register-model`
 - `RelationDefinition` from `./types`
 
 ## Exports
-- `SerializedRelation` — type for one serialized relation entry  [lines 34-34]
-- `ModelSnapshot` — plain-object shape with `data` and `relations`  [lines 41-44]
-- `RelationHydrator` — static class hydrating relations from snapshots  [lines 63-116]
+- `SerializedRelation` — Shape of relation in snapshot [lines 34-34]
+- `ModelSnapshot` — Plain-object shape of model snapshot [lines 41-44]
+- `RelationHydrator` — Class for restoring relations from snapshots [lines 63-116]
 
-## Classes / Functions / Types / Constants
+## Types
 
-### `type SerializedRelation`
-Union: `null | ModelSnapshot | ModelSnapshot[]`. [line 34]
+### `SerializedRelation` [lines 34-34]
+- Union: null | ModelSnapshot | ModelSnapshot[]
+- null indicates loaded relation with no match
+- ModelSnapshot for single relations
+- ModelSnapshot[] for collection relations
 
-### `type ModelSnapshot`
-Object `{ data: Record<string, unknown>; relations: Record<string, SerializedRelation> }`. [lines 41-44]
+### `ModelSnapshot` [lines 41-44]
+- `data: Record<string, unknown>` — Model data
+- `relations: Record<string, SerializedRelation>` — Nested relations by name
 
-### `class RelationHydrator`
-Provides a single static method; no instance state. [lines 63-116]
+## Classes
 
-#### `static hydrate(model, relationDefs, relationsSnapshot)`
-Iterates snapshot entries, resolves model classes, recursively calls `fromSnapshot`,
-and sets values on `model.loadedRelations` and as direct properties.
-side-effects: mutates `model.loadedRelations` Map and sets properties on model. [lines 79-115]
+### `RelationHydrator` [lines 63-116]
+
+#### `static hydrate(model: Model, relationDefs: Record<string, RelationDefinition>, relationsSnapshot: Record<string, SerializedRelation> | undefined): void` [lines 79-115]
+- Hydrates all relations from snapshot onto model instance
+- Looks up relation definitions to find target model classes
+- Recursively calls fromSnapshot on nested snapshots
+- Sets relations on both loadedRelations Map and as direct properties
+- Preserves null entries for explicitly loaded but unmatched relations
+- Gracefully skips unknown relation names from older schema versions

@@ -1,33 +1,32 @@
 # scope-methods
 source: model/methods/scope-methods.ts
-description: Helpers to add and remove global and local query scopes on a model class.
+description: Global and local model scope management
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
 - `QueryBuilderContract` from `../../contracts`
-- `GlobalScopeOptions`, `LocalScopeCallback`, `ChildModel`, `Model` from `../model`
+- `GlobalScopeOptions, LocalScopeCallback, ChildModel, Model` from `../model`
 
 ## Exports
-- `addGlobalModelScope` — registers named global scope on model class  [lines 4-14]
-- `removeGlobalModelScope` — deletes named global scope from model class  [lines 16-18]
-- `addLocalModelScope` — registers named local scope on model class  [lines 20-26]
-- `removeLocalModelScope` — deletes named local scope from model class  [lines 28-30]
+- `addGlobalModelScope` — Register global query scope [lines 4-14]
+- `removeGlobalModelScope` — Remove global query scope [lines 16-18]
+- `addLocalModelScope` — Register local query scope [lines 20-26]
+- `removeLocalModelScope` — Remove local query scope [lines 28-30]
 
 ## Classes / Functions / Types / Constants
-### `addGlobalModelScope`
-[lines 4-14]
-- side-effects: mutates `ModelClass.globalScopes` map
 
-### `removeGlobalModelScope`
-[lines 16-18]
-- side-effects: mutates `ModelClass.globalScopes` map
+### `addGlobalModelScope(ModelClass: ChildModel<any>, name: string, callback: (query: QueryBuilderContract) => void, options: GlobalScopeOptions = {}): void` [lines 4-14]
+- Registers a named global scope with optional timing control (before/after)
 
-### `addLocalModelScope`
-[lines 20-26]
-- side-effects: mutates `ModelClass.localScopes` map
+### `removeGlobalModelScope(ModelClass: ChildModel<any>, name: string): void` [lines 16-18]
+- Removes a global scope by name
 
-### `removeLocalModelScope`
-[lines 28-30]
-- side-effects: mutates `ModelClass.localScopes` map
+### `addLocalModelScope(ModelClass: ChildModel<any>, name: string, callback: LocalScopeCallback): void` [lines 20-26]
+- Registers a named local scope with callback
+
+### `removeLocalModelScope(ModelClass: ChildModel<any>, name: string): void` [lines 28-30]
+- Removes a local scope by name

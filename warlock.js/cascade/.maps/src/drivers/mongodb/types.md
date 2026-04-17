@@ -1,30 +1,31 @@
 # types
+
 source: drivers/mongodb/types.ts
-description: MongoDB driver-specific type definitions for pipeline stages, operations, and driver options.
+description: Type definitions for MongoDB pipeline stages, operations, and driver configuration
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
-- `TransactionOptions` from `mongodb`
+- `TransactionOptions` from `mongodb` (type)
 
 ## Exports
-- `PipelineStage` — union of MongoDB aggregation stage name strings  [lines 6-17]
-- `Operation` — single query builder chain operation with stage and data  [lines 23-32]
-- `MongoDriverOptions` — cascade-next MongoDB driver configuration options  [lines 40-59]
+- `PipelineStage` — Union type for MongoDB aggregation pipeline stage names [lines 6-17]
+- `Operation` — Type for representing query builder chain operations [lines 23-32]
+- `MongoDriverOptions` — Type for MongoDB driver-specific cascade configuration [lines 40-59]
 
 ## Classes / Functions / Types / Constants
 
-### type `PipelineStage`  [lines 6-17]
-Union of supported MongoDB aggregation stage name literals.
+### `PipelineStage` [lines 6-17]
+- Union type of MongoDB aggregation pipeline stage names: $match, $project, $sort, $group, $lookup, $limit, $skip, $unwind, $addFields, $setWindowFields, $vectorSearch
 
-### type `Operation`  [lines 23-32]
-- `stage: PipelineStage` — aggregation stage this operation belongs to
-- `mergeable: boolean` — whether operation merges with same-stage ops
-- `type: string` — operation type for processing logic
-- `data: any` — operation payload data
+### `Operation` [lines 23-32]
+- Object type representing a single operation in the query builder chain with properties: stage (PipelineStage), mergeable (boolean), type (string), data (any)
 
-### type `MongoDriverOptions`  [lines 40-59]
-- `autoGenerateId?: boolean` — enable numeric auto-increment ID generation
-- `counterCollection?: string` — collection name for ID counters
-- `transactionOptions?: TransactionOptions` — default transaction options
+### `MongoDriverOptions` [lines 40-59]
+- Configuration object for cascade-next MongoDB driver with optional properties:
+  - `autoGenerateId?: boolean` — Enable auto-generation of numeric IDs (default: false)
+  - `counterCollection?: string` — Counter collection name for auto-generated IDs (default: "counters")
+  - `transactionOptions?: TransactionOptions` — Transaction options applied to all transactions unless overridden

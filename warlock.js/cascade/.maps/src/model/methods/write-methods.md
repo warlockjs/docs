@@ -1,46 +1,38 @@
 # write-methods
 source: model/methods/write-methods.ts
-description: Async write helpers for creating, upserting, and saving model records.
-complexity: medium
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+description: Model persistence and record creation/update operations
+complexity: simple
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
 - `DatabaseWriter` from `../../writer/database-writer`
 - `WriterOptions` from `../../contracts`
-- `ChildModel`, `Model`, `ModelSchema` from `../model`
+- `ChildModel, Model, ModelSchema` from `../model`
 - `emitModelEvent` from `./instance-event-methods`
 
 ## Exports
-- `saveModel` — persists model instance via DatabaseWriter  [lines 6-16]
-- `createRecord` — instantiates and saves a new model record  [lines 18-25]
-- `createManyRecords` — creates multiple records in parallel  [lines 27-32]
-- `findOrCreateRecord` — returns existing record or creates new one  [lines 34-49]
-- `upsertRecord` — upserts record with timestamps and saving events  [lines 51-97]
+- `saveModel` — Save model with optional merge and options [lines 6-16]
+- `createRecord` — Create single record from data [lines 18-25]
+- `createManyRecords` — Create multiple records [lines 27-32]
+- `findOrCreateRecord` — Find or create record [lines 34-49]
+- `upsertRecord` — Create or update record with timestamp handling [lines 51-97]
 
 ## Classes / Functions / Types / Constants
-### `saveModel<TModel>`  async
-[lines 6-16]
-- Merges optional partial schema before delegating to `DatabaseWriter.save`.
-- side-effects: mutates model data via merge; persists to database
-- throws: propagates writer errors
 
-### `createRecord<TModel, TSchema>`  async
-[lines 18-25]
-- side-effects: inserts new row into database
-- throws: propagates save errors
+### `saveModel<TModel extends Model>(model: TModel, options?: WriterOptions & { merge?: Partial<ModelSchema> }): Promise<TModel>` [lines 6-16]
+- Merges optional data and saves model using DatabaseWriter; returns model
 
-### `createManyRecords<TModel, TSchema>`  async
-[lines 27-32]
-- side-effects: inserts multiple rows concurrently
-- throws: propagates save errors
+### `createRecord<TModel extends Model, TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema>(ModelClass: ChildModel<TModel>, data: Partial<TSchema>): Promise<TModel>` [lines 18-25]
+- Creates and saves new record; returns saved model
 
-### `findOrCreateRecord<TModel, TSchema>`  async
-[lines 34-49]
-- throws: propagates query or save errors
+### `createManyRecords<TModel extends Model, TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema>(ModelClass: ChildModel<TModel>, data: Partial<TSchema>[]): Promise<TModel[]>` [lines 27-32]
+- Creates and saves multiple records; returns array of saved models
 
-### `upsertRecord<TModel, TSchema>`  async
-[lines 51-97]
-- Emits `saving`/`saved` events; injects createdAt/updatedAt timestamps before upsert.
-- side-effects: writes to database; emits model events; resets dirty tracker
-- throws: propagates driver or event errors
+### `findOrCreateRecord<TModel extends Model, TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema>(ModelClass: ChildModel<TModel>, filter: Partial<TSchema>, data: Partial<TSchema>): Promise<TModel>` [lines 34-49]
+- Finds existing record by filter or creates with merged filter and data
+
+### `upsertRecord<TModel extends Model, TSchema extends ModelSchema = TModel extends Model<infer S> ? S : ModelSchema>(ModelClass: ChildModel<TModel>, filter: Partial<TSchema>, data: Partial<TSchema>, options?: Record<string, unknown>): Promise<TModel>` [lines 51-97]
+- Inserts or updates record; manages createdAt/updatedAt timestamps; emits saving events with mode context; resets dirty tracker

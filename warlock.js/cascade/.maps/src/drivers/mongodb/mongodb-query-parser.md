@@ -1,38 +1,37 @@
 # mongodb-query-parser
 source: drivers/mongodb/mongodb-query-parser.ts
-description: Parses abstract query builder operations into a MongoDB aggregation pipeline.
+description: Parses query builder operations into a MongoDB aggregation pipeline, merging compatible stages and post-processing $group output.
 complexity: complex
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-opus-4-7
+last-updated-by: claude-opus-4-7
 
 ## Imports
 - `colors` from `@mongez/copper`
-- `Collection` from `mongodb`
-- `GroupByInput`, `RawExpression`, `WhereOperator` from `../../contracts`
-- `isAggregateExpression`, `AggregateExpression` from `../../expressions/aggregate-expressions`
-- `MongoQueryBuilder` from `./mongodb-query-builder`
-- `Operation`, `PipelineStage` from `./types`
+- `Collection` (type) from `mongodb`
+- `GroupByInput`, `RawExpression`, `WhereOperator` (types) from `../../contracts`
+- `isAggregateExpression`, `AggregateExpression` (type) from `../../expressions/aggregate-expressions`
+- `MongoQueryBuilder` (type) from `./mongodb-query-builder`
+- `Operation`, `PipelineStage` (types) from `./types`
 
 ## Exports
-- `MongoQueryParserOptions` — parser configuration type  [lines 14-21]
-- `MongoQueryParser` — pipeline parser class  [lines 31-1658]
+- `MongoQueryParserOptions` — Options type for configuring the MongoDB query parser.  [lines 14-21]
+- `MongoQueryParser` — Class that parses query builder operations into a MongoDB aggregation pipeline.  [lines 31-1658]
 
-## Types
-- `MongoQueryParserOptions`  [lines 14-21] — Parser configuration options shape
+## Classes / Functions / Types / Constants
 
-## Classes
-### MongoQueryParser  [lines 31-1658] — Builds aggregation pipeline from operations
+### `MongoQueryParserOptions` [lines 14-21]
+- Type alias with fields: `collection: Collection`, `operations: Operation[]`, `createSubBuilder: () => MongoQueryBuilder`.
 
-fields:
-- `readonly collection: Collection` (private)  [line 35]
-- `readonly operations: Operation[]` (private)  [line 40]
-- `readonly createSubBuilder: () => MongoQueryBuilder` (private)  [line 45]
-- `readonly groupFieldNames: Map<number, string | string[]>` (private)  [line 51]
+### `MongoQueryParser` [lines 31-1658]
+- Converts abstract builder operations into a MongoDB aggregation pipeline. Intelligently merges mergeable operations (multiple where clauses, selects, sorts, groups) into single pipeline stages. Tracks group field names for post-processing `_id` renaming and supports pretty-printing the resulting pipeline. All other methods on the class are private implementation details.
 
-methods:
-- `constructor(options: MongoQueryParserOptions)`  [lines 58-62] — Initializes parser state
-- `parse(): any[]`  [lines 84-137] — Builds full aggregation pipeline
-  - side-effects: populates groupFieldNames map
-- `toPrettyString(): string`  [lines 236-259] — Formats pipeline as debug string
-  - side-effects: calls parse()
-  - throws: `Error` — when invalid date in pipeline
+#### `constructor(options: MongoQueryParserOptions)` [lines 58-62]
+- Stores collection, operations list, and sub-builder factory for later use during parsing.
+
+#### `parse(): any[]` [lines 84-137]
+- Walks operations, buffering mergeable ones per stage and flushing them via `buildStage`. Tracks group stage indexes for auto `_id` renaming. Returns the finished pipeline after `postProcessGroupStages` rewrites `_id` to actual group field names and drops the raw `_id`.
+
+#### `toPrettyString(): string` [lines 236-259]
+- Runs `parse()` and formats the resulting pipeline as a colored, human-readable multi-stage string for debugging. Returns `"MongoDB Aggregation Pipeline: (empty)"` when the pipeline is empty.

@@ -1,19 +1,42 @@
 # sql-grammar
 source: migration/sql-grammar.ts
-description: Parses, classifies, and sorts SQL statements by execution phase for dependency-safe migration ordering.
-complexity: medium
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+description: Static utility class for classifying, phasing, and sorting SQL DDL statements
+complexity: moderate
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-sonnet-4-6
+last-updated-by: claude-sonnet-4-6
 
 ## Imports
 - `SQLStatementType`, `TaggedSQL` from `./types`
 
 ## Exports
-- `SQLGrammar` — SQL classifier and phase sorter  [lines 7-160]
+- `SQLGrammar` — Static utility class for SQL statement introspection: phase assignment, semantic classification, extension-name extraction, and phase-aware sorting  [lines 7-160]
 
 ## Classes / Functions / Types / Constants
-- `class SQLGrammar` — Global SQL phase/type classification utility  [lines 7-160]
-  - `static phase(sql: string): 1 | 2 | 3 | 4 | 5 | 6` — Determine execution phase for DDL ordering  [lines 27-65]
-  - `static classify(sql: string): SQLStatementType` — Classify statement into semantic type  [lines 81-110]
-  - `static extractExtensionName(sql: string): string | undefined` — Parse name from CREATE EXTENSION  [lines 125-132]
-  - `static sort(statements: TaggedSQL[]): TaggedSQL[]` — Sort by phase, date, migration name  [lines 137-159]
+
+### `SQLGrammar` [lines 7-160]
+- All methods are `public static`. No instance state; class is used as a namespace for SQL introspection utilities.
+- Operates on raw SQL strings by uppercasing and trimming before matching.
+
+#### `phase(sql: string): 1 | 2 | 3 | 4 | 5 | 6` [lines 27-65]
+- Returns the execution phase of a SQL statement to ensure DDL runs in dependency-safe order.
+- Phase table:
+  - `1` — CREATE EXTENSION / TYPE / DOMAIN / SCHEMA (prerequisites and shared objects)
+  - `2` — CREATE TABLE (base table creation)
+  - `3` — ALTER TABLE … ADD COLUMN / ADD PRIMARY KEY (column and PK additions)
+  - `4` — ALTER TABLE … ADD FOREIGN KEY; CREATE [UNIQUE] INDEX (indexes and FK constraints)
+  - `5` — ALTER TABLE … DROP COLUMN / DROP CONSTRAINT / ALTER COLUMN; DROP TABLE / TRUNCATE TABLE / DROP INDEX (destructive ops)
+  - `6` — Everything else: raw DML, triggers, procedures, views
+
+#### `classify(sql: string): SQLStatementType` [lines 81-110]
+- Returns the semantic `SQLStatementType` for a given SQL statement; independent of phase.
+- Matching order (to avoid misclassification): CREATE EXTENSION → CREATE SCHEMA → CREATE TYPE → CREATE DOMAIN → CREATE TABLE → DROP TABLE → TRUNCATE TABLE → DROP INDEX → CREATE UNIQUE INDEX → CREATE INDEX; then ALTER TABLE sub-clauses: ADD FOREIGN KEY → DROP FOREIGN KEY → ADD PRIMARY KEY → DROP CONSTRAINT (→ DROP_PRIMARY_KEY) → ADD COLUMN → DROP COLUMN → RENAME COLUMN → RENAME TO (→ RENAME_TABLE) → ALTER COLUMN (→ MODIFY_COLUMN).
+- Falls back to `"RAW"` for unrecognized patterns.
+
+#### `extractExtensionName(sql: string): string | undefined` [lines 125-132]
+- Parses `CREATE EXTENSION [IF NOT EXISTS] <name>` with a case-insensitive regex and returns the lowercased extension name.
+- Returns `undefined` if the statement is not a CREATE EXTENSION or the name cannot be parsed.
+
+#### `sort(statements: TaggedSQL[]): TaggedSQL[]` [lines 137-159]
+- Returns a new array (non-mutating `.slice()`) of `TaggedSQL` sorted by: (1) `phase` ascending, (2) `createdAt` date ascending (invalid/missing dates treated as `0`), (3) `migrationName` lexicographic tie-break.

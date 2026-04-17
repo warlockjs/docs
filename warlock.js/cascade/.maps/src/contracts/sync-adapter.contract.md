@@ -1,38 +1,44 @@
 # sync-adapter.contract
 source: contracts/sync-adapter.contract.ts
-description: Defines SyncAdapterContract and SyncInstruction for driver-level bulk denormalization sync execution.
+description: Contract for database-specific sync instruction execution
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
-
-## Imports
-_(none)_
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Exports
-- `SyncInstruction` — descriptor for a single sync update operation  [lines 5-41]
-- `SyncAdapterContract` — interface for executing sync batches  [lines 47-71]
+- `SyncInstruction` — Type defining a sync operation [lines 5-41]
+- `SyncAdapterContract` — Interface for executing sync operations [lines 47-71]
 
-## Types / Interfaces
+## Types
 
 ### `SyncInstruction` [lines 5-41]
-- `targetTable: string`
-- `targetModel: string`
-- `filter: Record<string, unknown>`
-- `update: Record<string, unknown>`
-- `depth: number` — depth in the sync chain
-- `chain: string[]` — model names leading to this instruction
-- `sourceModel: string`
-- `sourceId: string | number`
-- `isArrayUpdate?: boolean` — requires positional operator
-- `arrayField?: string`
-- `identifierField?: string`
-- `identifierValue?: string | number`
+- `targetTable: string` — Target table/collection name
+- `targetModel: string` — Target model name
+- `filter: Record<string, unknown>` — Filter to identify documents
+- `update: Record<string, unknown>` — Update operations to apply
+- `depth: number` — Current depth in sync chain
+- `chain: string[]` — Model names in sync chain
+- `sourceModel: string` — Source model name
+- `sourceId: string | number` — Source model ID
+- `isArrayUpdate?: boolean` — Whether this is an array update
+- `arrayField?: string` — Array field path for positional updates
+- `identifierField?: string` — Identifier field for array matching
+- `identifierValue?: string | number` — Identifier value for array matching
+
+## Interfaces
 
 ### `SyncAdapterContract` [lines 47-71]
-Driver-specific adapter that executes sync update instructions.
-- `executeBatch(instructions: SyncInstruction[]): Promise<number>` [line 54]
-  — side-effects: writes updates to target collections; returns affected count
-- `executeOne(instruction: SyncInstruction): Promise<number>` [line 62]
-  — side-effects: writes single update; returns affected count
-- `executeArrayUpdate(instruction: SyncInstruction): Promise<number>` [line 70]
-  — side-effects: writes positional array update; returns affected count
+
+#### `executeBatch(instructions: SyncInstruction[]): Promise<number>` [lines 54-54]
+- Executes batch of sync instructions
+- Returns number of documents affected
+
+#### `executeOne(instruction: SyncInstruction): Promise<number>` [lines 62-62]
+- Executes single sync instruction
+- Returns number of documents affected
+
+#### `executeArrayUpdate(instruction: SyncInstruction): Promise<number>` [lines 70-70]
+- Executes array update with positional operators
+- Returns number of documents affected

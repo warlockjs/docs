@@ -1,24 +1,28 @@
 # database-writer.utils
+
 source: utils/database-writer.utils.ts
-description: Provides a factory that wraps a model-aware callback into a seal TransformerCallback for pre-save value transformation.
+description: Utility for transforming model data before database persistence
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
-- `TransformerCallback` from `@warlock.js/seal`
-- `Model` from `../model/model`
+- `TransformerCallback` from `@warlock.js/seal` (type)
+- `Model` from `../model/model` (type)
 
 ## Exports
-- `ModelTransformCallback` — callback type receiving model transform options  [line 12]
-- `useModelTransformer` — wraps model callback into seal TransformerCallback  [lines 17-28]
+- `ModelTransformCallback` — Type for model transformation callbacks [line 12]
+- `useModelTransformer` — Function to create model transformer callbacks [lines 17-28]
 
 ## Classes / Functions / Types / Constants
 
-### `ModelTransformCallback`
-type  [line 12]
-Function signature for model-aware value transformer callbacks.
+### `transformCallbackOptions` [lines 4-10]
+- Object type containing model transformation context: model, column, value, isChanged, isNew
 
-### `useModelTransformer`
-function  [lines 17-28]
-Adapts a `ModelTransformCallback` to seal's `TransformerCallback` shape.
+### `ModelTransformCallback` [line 12]
+- Type alias for a transformation callback that receives options and returns a transformed string value
+
+#### `useModelTransformer(callback: ModelTransformCallback): TransformerCallback` [lines 17-28]
+- Creates a transformer callback that applies the given model transformation callback before saving values to the database; extracts model context, column name, and change state

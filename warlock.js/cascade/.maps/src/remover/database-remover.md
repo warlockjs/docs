@@ -1,9 +1,11 @@
 # database-remover
 source: remover/database-remover.ts
-description: Implements the full model deletion pipeline supporting trash, soft, and permanent strategies.
-complexity: complex
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+description: Orchestrates the complete model deletion pipeline including strategy resolution, validation, event emission, driver execution, and post-deletion cleanup.
+complexity: moderate
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-sonnet-4-6
+last-updated-by: claude-sonnet-4-6
 
 ## Imports
 - `events` from `@mongez/events`
@@ -15,18 +17,15 @@ last-mapped: 2026-04-17 03:34:41 PM
 - `DataSource` from `./../data-source/data-source`
 
 ## Exports
-- `DatabaseRemover` — orchestrates model deletion with strategy routing  [lines 33-266]
+- `DatabaseRemover` — Class implementing `RemoverContract` that manages the full deletion lifecycle for a model instance.  [lines 33-266]
 
 ## Classes / Functions / Types / Constants
 
 ### `DatabaseRemover` [lines 33-266]
-implements `RemoverContract`; orchestrates model deletion via strategy.
+- Implements `RemoverContract`. Accepts a `Model` instance at construction and resolves the data source, driver, table, and primary key from the model's static constructor. Supports three deletion strategies: `"trash"` (moves record to a trash table then deletes original), `"permanent"` (direct hard delete), and `"soft"` (sets a `deletedAt` timestamp via update). Strategy is resolved in priority order: call-time option → model static `deleteStrategy` → data source `defaultDeleteStrategy` → `"permanent"`.
 
 #### `constructor(model: Model)` [lines 64-71]
-Initializes remover from model instance; resolves driver and table.
-side-effects: reads model constructor, data source, and driver references.
+- Stores the model instance and derives `ctor`, `dataSource`, `driver`, `table`, and `primaryKey` from it.
 
-#### `destroy(options?: RemoverOptions): Promise<RemoverResult>` [lines 80-200]
-Executes deletion pipeline; resolves strategy, validates, emits events.
-throws: `Error` if model is new, primary key missing, or record not found.
-side-effects: emits `deleting`/`deleted` events; mutates `model.isNew`; triggers async sync.
+#### `destroy(options: RemoverOptions = {}): Promise<RemoverResult>` [lines 80-200]
+- Resolves the deletion strategy, validates that the model is persisted and has a primary key, emits a `"deleting"` event (unless `options.skipEvents`), executes the appropriate driver operation for the resolved strategy, throws if `deletedCount === 0`, marks the model as new for `"trash"` and `"permanent"` strategies, emits a `"deleted"` event (unless `options.skipEvents`), triggers sync operations fire-and-forget (unless `options.skipSync`), and returns `{ success: true, deletedCount, strategy, trashRecord }`.

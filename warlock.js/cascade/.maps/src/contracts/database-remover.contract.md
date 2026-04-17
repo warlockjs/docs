@@ -1,32 +1,40 @@
 # database-remover.contract
 source: contracts/database-remover.contract.ts
-description: Defines RemoverContract and supporting types for the full model deletion pipeline.
+description: Contract for orchestrating model deletion with strategies and events
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
 - `DeleteStrategy` from `../types`
 
 ## Exports
-- `RemoverContract` — deletion orchestration interface  [lines 24-53]
-- `RemoverOptions` — options controlling destroy behaviour  [lines 58-82]
-- `RemoverResult` — result returned after destroy completes  [lines 87-111]
+- `RemoverContract` — Interface for model deletion [lines 24-52]
+- `RemoverOptions` — Configuration for destroy operation [lines 58-82]
+- `RemoverResult` — Result of destroy operation [lines 87-111]
 
-## Types / Interfaces
-
-### `RemoverContract` [lines 24-53]
-Orchestrates strategy resolution, events, and driver execution for deletion.
-- `destroy(options?: RemoverOptions): Promise<RemoverResult>` [line 52]
-  — throws: if model is new or deletion fails; side-effects: emits deleting/deleted events
+## Types
 
 ### `RemoverOptions` [lines 58-82]
-- `strategy?: DeleteStrategy` — overrides model/datasource default = undefined
-- `skipEvents?: boolean` — suppress lifecycle events = false
-- `skipSync?: boolean` — suppress post-delete sync = false
+- `strategy?: DeleteStrategy` — Override delete strategy (trash, permanent, soft)
+- `skipEvents?: boolean` — Skip lifecycle event emission (default: false)
+- `skipSync?: boolean` — Skip sync operations after delete (default: false)
 
 ### `RemoverResult` [lines 87-111]
-- `success: boolean`
-- `deletedCount: number` — 0 on failure, 1 otherwise
-- `strategy: DeleteStrategy`
-- `trashRecord?: Record<string, unknown>` — populated when strategy is "trash"
+- `success: boolean` — Whether destroy operation succeeded
+- `deletedCount: number` — Number of records deleted
+- `strategy: DeleteStrategy` — Delete strategy that was used
+- `trashRecord?: Record<string, unknown>` — Original data if trash strategy used
+
+## Interfaces
+
+### `RemoverContract` [lines 24-52]
+
+#### `destroy(options?: RemoverOptions): Promise<RemoverResult>` [lines 52-52]
+- Destroys (deletes) model instance from database
+- Performs deletion based on resolved strategy
+- Automatically emits lifecycle events
+- Returns result with success status and metadata
+- Throws if model is new or deletion fails

@@ -1,44 +1,45 @@
 # model.types
 source: model/model.types.ts
-description: Type definitions for model scoping, schema, and static method signatures.
-complexity: medium
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+description: Type definitions for model scoping, schema, and class references
+complexity: simple
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
 - `QueryBuilderContract` from `../contracts`
 - `Model` from `./model`
 
 ## Exports
-- `ScopeTiming` — Timing control for global scopes [line 7]
-- `GlobalScopeDefinition` — Global scope definition with callback and timing [line 12]
-- `LocalScopeCallback` — Local scope callback function [line 20]
-- `GlobalScopeOptions` — Options for adding global scopes [line 25]
-- `ModelSchema` — Generic schema type representing model data [line 32]
-- `ChildModel` — Static side of model subclass for this-typed methods [line 49]
+- `ScopeTiming` — Timing control for global scopes [lines 7-7]
+- `GlobalScopeDefinition` — Global scope with callback and timing [lines 12-15]
+- `LocalScopeCallback` — Local scope callback type [lines 20-20]
+- `GlobalScopeOptions` — Options for adding global scopes [lines 25-27]
+- `ModelSchema` — Generic schema representation [lines 32-32]
+- `ChildModel` — Static side of model subclass [lines 49-113]
 
-## Types & Interfaces
-### ScopeTiming [line 7] — Timing control for global scopes
-- Union type: `"before" | "after"`
+## Types
 
-### GlobalScopeDefinition [lines 12-15] — Global scope with callback and timing
-- `callback: (query: QueryBuilderContract) => void` — Query modification function
-- `timing: ScopeTiming` — When to apply scope relative to execution
+### `ScopeTiming` [lines 7-7]
+- Union type: "before" | "after"
+- Controls when global scope is applied relative to other scopes
 
-### LocalScopeCallback [line 20] — Local scope callback function
-- Signature: `(query: QueryBuilderContract, ...args: any[]) => void`
+### `GlobalScopeDefinition` [lines 12-15]
+- `callback: (query: QueryBuilderContract) => void` — Scope callback
+- `timing: ScopeTiming` — Whether scope applies before or after
 
-### GlobalScopeOptions [lines 25-27] — Options for adding global scopes
-- `timing?: ScopeTiming` — Optional timing control, defaults to "before"
+### `LocalScopeCallback` [lines 20-20]
+- `(query: QueryBuilderContract, ...args: any[]) => void` — Local scope callback signature
 
-### ModelSchema [line 32] — Generic schema type representing model data
-- Type alias: `Record<string, any>`
+### `GlobalScopeOptions` [lines 25-27]
+- `timing?: ScopeTiming` — Optional timing specification
 
-### ChildModel [lines 49-113] — Static side of model subclass
-- Constructor: `(new (...args: any[]) => TModel)`
-- Static methods: query, find, first, last, all, latest, count, where
-- Event methods: on, once, off, events, globalEvents
-- Data mutation: create, createMany, update, delete, deleteOne
-- Lifecycle: createdAtColumn, updatedAtColumn, deletedAtColumn
-- Configuration: table, primaryKey, dataSource, schema, strictMode
-- 40+ static properties and methods for type-safe subclass handling
+### `ModelSchema` [lines 32-32]
+- `Record<string, any>` — Flexible schema object structure
+
+### `ChildModel<TModel extends Model>` [lines 49-113]
+- Constructor type for model subclasses with static properties and methods
+- Picks static members from Model class for proper type inference
+- Enables typed static factory methods (find, create, query, etc)
+- Includes relation, event, and scope management

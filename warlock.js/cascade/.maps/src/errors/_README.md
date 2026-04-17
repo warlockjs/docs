@@ -1,42 +1,11 @@
-# Errors
-created: 2026-04-17 03:34:41 PM
-updated: 2026-04-17 03:34:41 PM
+# errors
 
-> Custom error classes for data source resolution and transaction lifecycle management.
+Custom error classes for the two most critical failure modes in Cascade: inability to resolve a named data source and an explicit transaction rollback. Both classes extend native `Error`, capture V8 stack traces, and carry typed fields so callers can inspect failure context programmatically rather than parsing message strings.
 
-## What lives here
-- `missing-data-source.error.ts` — Error thrown when requested data source not found
-- `transaction-rollback.error.ts` — Error thrown when transaction explicitly rolled back
+last-updated: 2026-04-17
+updated-by: claude-sonnet-4-6
 
-## Public API
-- `MissingDataSourceError` — Extends Error, includes optional dataSourceName field
-- `TransactionRollbackError` — Extends Error, includes optional reason field
+## Files
 
-## How it fits together
-These error classes provide typed exceptions for cascade's core operations. MissingDataSourceError signals registry lookup failures, while TransactionRollbackError manages explicit transaction unwinding. Both maintain proper stack traces via Error.captureStackTrace for V8 environments. They're caught and handled by transaction wrappers and data source resolution logic.
-
-## Working examples
-```typescript
-// Throwing MissingDataSourceError
-try {
-  throw new MissingDataSourceError("Data source 'users' not found", "users");
-} catch (error) {
-  if (error instanceof MissingDataSourceError) {
-    console.log(error.dataSourceName); // "users"
-  }
-}
-
-// Throwing TransactionRollbackError
-try {
-  throw new TransactionRollbackError("User cancelled operation");
-} catch (error) {
-  if (error instanceof TransactionRollbackError) {
-    console.log(error.reason); // "User cancelled operation"
-  }
-}
-```
-
-## DO NOT
-- Do NOT throw base Error class — use typed error classes instead for better error handling
-- Do NOT assume data source exists without catching MissingDataSourceError
-- Do NOT suppress TransactionRollbackError — let transaction wrapper handle cleanup
+- [missing-data-source.error.md](./missing-data-source.error.md) — Error thrown when a requested data source cannot be found in the registry
+- [transaction-rollback.error.md](./transaction-rollback.error.md) — Error used as a control-flow signal to roll back an in-progress transaction

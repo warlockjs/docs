@@ -1,51 +1,37 @@
 # relation-loader
 source: relations/relation-loader.ts
-description: Batch-loads all relation types for model arrays, preventing N+1 queries.
-complexity: complex
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+description: Core relation loading engine for Cascade ORM providing batched, nested, and constrained eager-loading for all relation types.
+complexity: moderate
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-opus-4-7
+last-updated-by: claude-opus-4-7
 
 ## Imports
-- `ChildModel`, `Model` from `../model/model`
+- `ChildModel`, `Model` (type) from `../model/model`
 - `getModelFromRegistry` from `../model/register-model`
-- `LoadedRelationResult`, `RelationConstraintCallback`, `RelationConstraints`, `RelationDefinition` from `./types`
+- `LoadedRelationResult`, `RelationConstraintCallback`, `RelationConstraints`, `RelationDefinition` (type) from `./types`
 
 ## Exports
-- `RelationLoader` — generic class batch-loading relations for model arrays  [lines 54-598]
+- `RelationLoader` — Efficiently loads relationships for one or more model instances, preventing N+1 via batch loading.  [lines 54-598]
 
 ## Classes / Functions / Types / Constants
 
-### `class RelationLoader<TModel extends Model>`
-Handles hasOne, hasMany, belongsTo, belongsToMany with nested dot-notation support. [lines 54-598]
+### `RelationLoader<TModel extends Model = Model>` [lines 54-598]
+- Generic class responsible for eager-loading relations onto a collection of model instances.
+- Handles batch loading, nested (dot-notation) relations, constraint callbacks, and all four relation types (`hasOne`, `hasMany`, `belongsTo`, `belongsToMany`).
+- Private state: `models: TModel[]` (line 62), `modelClass: ChildModel<TModel>` (line 67).
 
-#### `constructor(models, modelClass)`
-Stores model array and class reference. [lines 79-82]
+#### `constructor(models: TModel[], modelClass: ChildModel<TModel>)` [lines 79-82]
+- Stores the target model instances and their class constructor for subsequent loading operations.
 
-#### `public async load(relations, constraints?)`
-Entry point; normalises input and dispatches per relation.
-throws: `Error` if relation is not defined on the model class.
-side-effects: mutates each model's `loadedRelations` Map and direct properties. [lines 108-127]
+#### `load(relations: string | string[], constraints?: RelationConstraints): Promise<void>` [lines 108-127]
+- Public entrypoint. Normalizes the relation argument to an array, then loads each relation sequentially.
+- Short-circuits when `this.models` is empty.
+- Extracts per-relation callback constraint from the `constraints` map; only callback-type constraints are forwarded to `loadRelation` (object-form constraints are dropped at line 123).
 
-#### `private async loadRelation(name, constraint?)`
-Parses dot notation, selects loader by type, recurses for nested paths.
-throws: `Error` if relation definition is missing. [lines 139-176]
-
-#### `private async loadHasMany(name, definition, constraint?)`
-Batch-fetches related records grouped by foreign key.
-side-effects: calls `setRelationOnModels`, mutating all models. [lines 185-219]
-
-#### `private async loadHasOne(name, definition, constraint?)`
-Batch-fetches single related record per model.
-side-effects: calls `setRelationOnModels`, mutating all models. [lines 228-268]
-
-#### `private async loadBelongsTo(name, definition, constraint?)`
-Batch-fetches owner records indexed by owner key.
-side-effects: calls `setRelationOnModels`, mutating all models. [lines 277-314]
-
-#### `private async loadBelongsToMany(name, definition, constraint?)`
-Queries pivot table then related model; builds per-model arrays.
-throws: `Error` if `definition.pivot` is absent.
-side-effects: calls `setRelationOnModels`, mutating all models. [lines 323-401]
-
-#### `private async loadNestedRelations(parentRelation, remainingPath, constraint?)`
-Collects loaded related models and creates nested `RelationLoader`. [lines 414-448]
+## Ambiguities / Notes
+- All remaining methods (`loadRelation`, `loadHasMany`, `loadHasOne`, `loadBelongsTo`, `loadBelongsToMany`, `loadNestedRelations`, `parseNestedRelation`, `resolveModelClass`, `getRelationDefinition`, `collectKeyValues`, `groupBy`, `inferForeignKey`, `setRelationOnModels`, `getLoadedRelation`, `setLoadedRelation`) are `private` and intentionally omitted per mapping rules.
+- `loadBelongsToMany` key mapping (lines 337-340) uses an unusual assignment where `definition.localKey` drives `pivotLocalKey` and `definition.pivotLocalKey` drives the loader's `localKey`; this naming appears inverted relative to the other relation types but matches the source verbatim.
+- `getRelationDefinition` and `getLoadedRelation`/`setLoadedRelation` rely on structural casts (`as unknown as { ... }`) to access `relations` and `loadedRelations` members, implying these are conventions on Model rather than typed on `ChildModel`/`Model` directly.
+- `setLoadedRelation` (line 596) also assigns the relation value as a direct property on the model instance alongside storing it in the `loadedRelations` Map.

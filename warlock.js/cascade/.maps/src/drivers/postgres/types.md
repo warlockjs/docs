@@ -1,61 +1,84 @@
 # types
 source: drivers/postgres/types.ts
-description: Type definitions for PostgreSQL driver configuration, query results, transactions, and internal query builder structures.
-complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+description: Pure TypeScript type definitions for the PostgreSQL driver — connection config, pool config, query result, transactions, where clauses, notifications, and COPY options.
+complexity: moderate
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-sonnet-4-6
+last-updated-by: claude-sonnet-4-6
 
 ## Imports
-_(none)_
+_(none — this file exports only type aliases; no runtime imports)_
 
 ## Exports
-- `PostgresConnectionConfig` — Connection config type  [lines 12-36]
-- `PostgresPoolConfig` — Pool config extending connection config  [lines 41-54]
-- `PostgresQueryResult` — Generic query result wrapper type  [lines 59-71]
-- `PostgresIsolationLevel` — Union of four isolation level strings  [lines 76-80]
-- `PostgresTransactionOptions` — Transaction options type  [lines 85-92]
-- `PostgresOperation` — Internal query-builder operation type  [lines 97-113]
-- `PostgresWhereClause` — Internal pending WHERE clause representation  [lines 118-147]
-- `PostgresNotification` — NOTIFY payload structure  [lines 152-159]
-- `PostgresCopyOptions` — COPY command options for bulk operations  [lines 164-179]
+- `PostgresConnectionConfig` — Connection options for a single PostgreSQL client.  [lines 12-36]
+- `PostgresPoolConfig` — Pool-level options extending `PostgresConnectionConfig`.  [lines 41-54]
+- `PostgresQueryResult<T>` — Typed wrapper around a pg query result.  [lines 59-71]
+- `PostgresIsolationLevel` — Union of the four SQL transaction isolation levels.  [lines 76-81]
+- `PostgresTransactionOptions` — Options bag for beginning a transaction.  [lines 85-92]
+- `PostgresOperation` — Internal descriptor of a single query-builder operation.  [lines 97-113]
+- `PostgresWhereClause` — Internal representation of a pending WHERE predicate.  [lines 118-147]
+- `PostgresNotification` — Shape of a PostgreSQL `LISTEN`/`NOTIFY` notification event.  [lines 152-159]
+- `PostgresCopyOptions` — Options for PostgreSQL bulk `COPY` operations.  [lines 164-179]
 
 ## Classes / Functions / Types / Constants
 
-### type `PostgresConnectionConfig`  [lines 12-36]
-- `readonly host?: string`
-- `readonly port?: number`
-- `readonly database: string`
-- `readonly user?: string`
-- `readonly password?: string`
-- `readonly connectionString?: string`
-- `readonly ssl?: boolean | { rejectUnauthorized?, ca?, cert?, key? }`
-- `readonly logging?: boolean`
+### `PostgresConnectionConfig` [lines 12-36]
+- All fields readonly.
+- Required: `database: string`
+- Optional: `host?: string`, `port?: number`, `user?: string`, `password?: string`, `connectionString?: string`
+- `ssl?: boolean | { rejectUnauthorized?: boolean; ca?: string; cert?: string; key?: string }`
+- `logging?: boolean` — enables query/execution-time logging
 
-### type `PostgresPoolConfig`  [lines 41-54]
-Extends `PostgresConnectionConfig` with pool-sizing fields.
-- `readonly max?: number`; `readonly min?: number`; `readonly idleTimeoutMillis?: number`
-- `readonly connectionTimeoutMillis?: number`; `readonly maxUses?: number`; `readonly application_name?: string`
+### `PostgresPoolConfig` [lines 41-54]
+- Extends `PostgresConnectionConfig` with pool-sizing readonly optionals.
+- `max?: number` — maximum pool clients (default 10); `min?: number` — minimum idle clients (default 0)
+- `idleTimeoutMillis?: number` — ms before idle client is closed
+- `connectionTimeoutMillis?: number` — ms to wait for a client before timeout
+- `maxUses?: number` — max queries per connection before recycling
+- `application_name?: string` — identifier shown in pg_stat_activity
 
-### type `PostgresQueryResult<T>`  [lines 59-71]
-- `readonly rows: T[]`; `readonly rowCount: number | null`
-- `readonly fields: Array<{ name: string; dataTypeID: number }>`; `readonly command: string`
+### `PostgresQueryResult<T = Record<string, unknown>>` [lines 59-71]
+- `readonly rows: T[]` — result rows
+- `readonly rowCount: number | null` — rows affected by INSERT/UPDATE/DELETE
+- `readonly fields: Array<{ readonly name: string; readonly dataTypeID: number }>` — column metadata
+- `readonly command: string` — SQL command type executed (SELECT, INSERT, etc.)
 
-### type `PostgresIsolationLevel`  [lines 76-80]
-Union: `"read uncommitted" | "read committed" | "repeatable read" | "serializable"`
+### `PostgresIsolationLevel` [lines 76-81]
+- String literal union: `"read uncommitted" | "read committed" | "repeatable read" | "serializable"`
 
-### type `PostgresTransactionOptions`  [lines 85-92]
-- `readonly isolationLevel?: PostgresIsolationLevel`; `readonly readOnly?: boolean`; `readonly deferrable?: boolean`
+### `PostgresTransactionOptions` [lines 85-92]
+- `readonly isolationLevel?: PostgresIsolationLevel`
+- `readonly readOnly?: boolean` — open a read-only transaction
+- `readonly deferrable?: boolean` — use DEFERRABLE mode (valid only for serializable + read-only)
 
-### type `PostgresOperation`  [lines 97-113]
-- `readonly stage` — One of select/from/join/where/groupBy/having/orderBy/limit/offset
-- `readonly type: string`; `readonly data: Record<string, unknown>`
+### `PostgresOperation` [lines 97-113]
+- Internal query-builder operation descriptor.
+- `readonly stage`: literal union `"select" | "from" | "join" | "where" | "groupBy" | "having" | "orderBy" | "limit" | "offset"`
+- `readonly type: string` — operation name/variant within the stage
+- `readonly data: Record<string, unknown>` — operation payload
 
-### type `PostgresWhereClause`  [lines 118-147]
-- `readonly boolean: "and" | "or"`; `readonly type` — One of 11 clause kinds
-- `readonly column?`, `operator?`, `value?`, `raw?`, `bindings?`, `nested?: PostgresWhereClause[]`
+### `PostgresWhereClause` [lines 118-147]
+- Internal recursive representation of a pending WHERE predicate.
+- `readonly boolean: "and" | "or"` — combinator with the previous clause
+- `readonly type`: literal union `"basic" | "raw" | "null" | "notNull" | "in" | "notIn" | "between" | "notBetween" | "exists" | "notExists" | "nested" | "column"`
+- `readonly column?: string`, `readonly operator?: string`, `readonly value?: unknown`
+- `readonly raw?: string` — raw SQL fragment for `"raw"` type
+- `readonly bindings?: unknown[]` — parameter bindings for raw clauses
+- `readonly nested?: PostgresWhereClause[]` — child clauses for `"nested"` type (recursive)
 
-### type `PostgresNotification`  [lines 152-159]
-- `readonly channel: string`; `readonly payload?: string`; `readonly processId: number`
+### `PostgresNotification` [lines 152-159]
+- Represents a payload received via PostgreSQL `LISTEN`/`NOTIFY`.
+- `readonly channel: string` — notification channel name
+- `readonly payload?: string` — optional string payload
+- `readonly processId: number` — PID of the notifying backend process
 
-### type `PostgresCopyOptions`  [lines 164-179]
-- `readonly format?: "text" | "csv" | "binary"`; delimiter, quote, escape, header, null, columns fields
+### `PostgresCopyOptions` [lines 164-179]
+- Options for PostgreSQL bulk `COPY FROM`/`COPY TO` operations.
+- `readonly format?: "text" | "csv" | "binary"`
+- `readonly delimiter?: string` — field delimiter (text/csv)
+- `readonly quote?: string` — quote character (csv)
+- `readonly escape?: string` — escape character (csv)
+- `readonly header?: boolean` — include header row
+- `readonly null?: string` — string representation of NULL values
+- `readonly columns?: string[]` — explicit column list

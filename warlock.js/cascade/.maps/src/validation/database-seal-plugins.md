@@ -1,21 +1,21 @@
 # database-seal-plugins
+
 source: validation/database-seal-plugins.ts
-description: Registers the embedValidator seal plugin as a side effect on import.
+description: Registers database-related seal plugins as a side effect
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
 - `registerPlugin` from `@warlock.js/seal`
 - `embedValidator` from `./plugins/embed-validator-plugin`
 
 ## Exports
-- `DatabaseSealPlugins` — type alias for embedValidator type  [line 15]
+- `DatabaseSealPlugins` — Type alias for embedValidator plugin type [line 15]
 
 ## Classes / Functions / Types / Constants
 
-### Types
-- `DatabaseSealPlugins` — union type of registered plugin types  [line 15]
-
-### Side Effects
-- side-effects: calls `registerPlugin(embedValidator)` on module load  [line 4]
+### `DatabaseSealPlugins` [line 15]
+- Type representing the embedded validator seal plugin for database validation

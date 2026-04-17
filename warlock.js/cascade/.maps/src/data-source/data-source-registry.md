@@ -1,9 +1,11 @@
 # data-source-registry
 source: data-source/data-source-registry.ts
-description: Singleton registry that stores named DataSource instances and emits lifecycle events for registration and connection state.
-complexity: medium
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+description: Singleton registry that stores named DataSource instances, manages the default source, and forwards driver connection events
+complexity: moderate
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-sonnet-4-6
+last-updated-by: claude-sonnet-4-6
 
 ## Imports
 - `EventEmitter` from `node:events`
@@ -12,51 +14,41 @@ last-mapped: 2026-04-17 03:34:41 PM
 - `DataSource`, `DataSourceOptions` from `./data-source`
 
 ## Exports
-- `DataSourceRegistryEvent` — union type of four registry event names  [lines 14-18]
-- `DataSourceRegistryListener` — callback receiving a DataSource arg  [line 23]
-- `dataSourceRegistry` — singleton DataSourceRegistry instance  [line 194]
+- `DataSourceRegistryEvent` — Union type of registry event name strings  [lines 14-18]
+- `DataSourceRegistryListener` — Callback type `(dataSource: DataSource) => void`  [line 23]
+- `dataSourceRegistry` — Singleton `DataSourceRegistry` instance  [line 194]
 
 ## Classes / Functions / Types / Constants
 
-### type `DataSourceRegistryEvent`
-[lines 14-18]
-Union of `"registered" | "default-registered" | "connected" | "disconnected"`.
+### `DataSourceRegistryEvent` [lines 14-18]
+- String literal union: `"registered" | "default-registered" | "connected" | "disconnected"`. Describes all events the registry can emit.
 
-### type `DataSourceRegistryListener`
-[line 23]
-Callback signature `(dataSource: DataSource) => void`.
+### `DataSourceRegistryListener` [line 23]
+- Type alias for event callback: `(dataSource: DataSource) => void`.
 
-### class `DataSourceRegistry`
-[lines 26-192]
-Manages named data sources; forwards driver events centrally.
+### `DataSourceRegistry` (class, not directly exported) [lines 26-192]
+- Internal class holding a `Map<string, DataSource>`, an optional default source pointer, and a Node.js `EventEmitter`. Exposed externally only via the `dataSourceRegistry` singleton.
 
-#### `register(options: DataSourceOptions): DataSource`
-[lines 46-72]
-Creates and stores a DataSource; sets default if first or flagged.
-side-effects: emits `registered`, optionally `default-registered`; forwards driver `connected`/`disconnected`.
+#### `register(options: DataSourceOptions): DataSource` [lines 46-72]
+- Creates a new `DataSource` from `options`, stores it by name, and optionally promotes it to default (when `options.isDefault` is true or no default exists yet). Emits `"registered"` always; emits `"default-registered"` when the source becomes default. Forwards driver `"connected"` and `"disconnected"` events to the registry emitter, passing the `DataSource` to listeners.
 
-#### `clear(): void`
-[lines 77-80]
-Removes all registered sources and clears the default.
-side-effects: mutates internal sources map and defaultSource.
+#### `clear(): void` [lines 77-80]
+- Removes all registered data sources and clears the default source reference. Intended for test teardown or full resets.
 
-#### `on(event, listener): void`
-[lines 111-113]
-Subscribes a persistent listener to a registry event.
+#### `on(event: DataSourceRegistryEvent, listener: DataSourceRegistryListener): void` [lines 111-113]
+- Subscribes a persistent listener to a registry event.
 
-#### `once(event, listener): void`
-[lines 123-125]
-Subscribes a one-time listener to a registry event.
+#### `once(event: DataSourceRegistryEvent, listener: DataSourceRegistryListener): void` [lines 123-125]
+- Subscribes a one-shot listener that auto-removes after first invocation.
 
-#### `off(event, listener): void`
-[lines 133-135]
-Removes a previously registered listener.
+#### `off(event: DataSourceRegistryEvent, listener: DataSourceRegistryListener): void` [lines 133-135]
+- Unsubscribes a previously registered listener.
 
-#### `get(name?: string): DataSource`
-[lines 138-171]
-Returns source by name, context override, or default.
-throws: `MissingDataSourceError` if source not found.
+#### `get(name?: string): DataSource` [lines 138-171]
+- Resolves and returns a `DataSource`. Resolution priority: (1) context override from `databaseDataSourceContext` when `name` is omitted; (2) named lookup when `name` is provided; (3) default source when neither applies. Throws `MissingDataSourceError` if the resolved source is not found or no default is registered.
 
-#### `getAllDataSources(): DataSource[]`
-[lines 189-191]
-Returns array of all registered data sources.
+#### `getAllDataSources(): DataSource[]` [lines 189-191]
+- Returns an array of all registered `DataSource` instances. Useful for batch operations such as disconnecting all drivers on shutdown.
+
+### `dataSourceRegistry` [line 194]
+- Module-level singleton of `DataSourceRegistry`. All application code interacts with this single shared instance.

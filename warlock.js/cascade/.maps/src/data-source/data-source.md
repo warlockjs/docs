@@ -1,73 +1,49 @@
 # data-source
 source: data-source/data-source.ts
-description: Defines DataSourceOptions and the DataSource class that couples a driver with its configuration metadata.
-complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+description: DataSourceOptions type and DataSource class coupling a named driver with per-source model, migration, and delete-strategy defaults
+complexity: moderate
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-sonnet-4-6
+last-updated-by: claude-sonnet-4-6
 
 ## Imports
 - `DriverContract`, `IdGeneratorContract` from `../contracts`
 - `DeleteStrategy`, `MigrationDefaults`, `ModelDefaults` from `../types`
 
 ## Exports
-- `DataSourceOptions` — configuration shape for registering a data source  [lines 7-82]
-- `DataSource` — class wrapping a driver with its metadata  [lines 110-178]
+- `DataSourceOptions` — Configuration object type for registering a data source  [lines 7-82]
+- `DataSource` — Class wrapping a driver with its metadata and defaults  [lines 110-178]
 
 ## Classes / Functions / Types / Constants
 
-### type `DataSourceOptions`
-[lines 7-82]
-Configuration bag passed to DataSource constructor.
-- `name: string` — unique data source identifier
-- `driver: DriverContract` — bound database driver
-- `isDefault?: boolean` — marks as default source
-- `defaultDeleteStrategy?: DeleteStrategy` — fallback delete strategy
-- `defaultTrashTable?: string` — fallback trash collection name
-- `modelDefaults?: Partial<ModelDefaults>` — per-source model defaults
-- `migrationDefaults?: MigrationDefaults` — per-source migration defaults
-- `migrations?.transactional?: boolean` — wrap migrations in transactions
-- `migrations?.table?: string` — migrations tracking table name
+### `DataSourceOptions` [lines 7-82]
+- Plain object type consumed by `DataSource` constructor and `DataSourceRegistry.register()`. All fields except `name` and `driver` are optional.
+- `name: string` — Unique identifier for the data source.
+- `driver: DriverContract` — The database driver instance.
+- `isDefault?: boolean` — Promotes this source as the registry default.
+- `defaultDeleteStrategy?: DeleteStrategy` — Fallback delete strategy for models; defaults to `"permanent"` when unset.
+- `defaultTrashTable?: string` — Fallback trash collection name for the `"trash"` strategy; defaults to `{table}Trash` pattern when unset.
+- `modelDefaults?: Partial<ModelDefaults>` — Per-source model configuration overrides.
+- `migrationDefaults?: MigrationDefaults` — Per-source migration defaults (e.g. UUID strategy).
+- `migrations?.transactional?: boolean` — Whether to wrap migrations in transactions; driver default applies when omitted.
+- `migrations?.table?: string` — Name of the migrations tracking table; defaults to `"_migrations"`.
 
-### class `DataSource`
-[lines 110-178]
-Immutable wrapper coupling a driver to its named configuration.
+### `DataSource` [lines 110-178]
+- Immutable value object that couples a named `DriverContract` with its configuration defaults. Constructed from `DataSourceOptions`; all public properties are `readonly`.
 
-#### `readonly name: string`
-[line 112]
-Unique identifier for this data source.
+#### `constructor(options: DataSourceOptions)` [lines 143-152]
+- Assigns all options to readonly properties. `isDefault` is coerced to `boolean` via `Boolean()`.
 
-#### `readonly driver: DriverContract`
-[line 115]
-Database driver for executing queries.
+#### `get idGenerator(): IdGeneratorContract | undefined` [lines 170-177]
+- Duck-type checks the driver for a `getIdGenerator()` method and returns its result, or `undefined`. NoSQL drivers (e.g. MongoDB) expose this; SQL drivers return `undefined` as they rely on native AUTO_INCREMENT/SERIAL.
 
-#### `readonly isDefault: boolean`
-[line 118]
-Whether this is the default data source.
-
-#### `readonly defaultDeleteStrategy?: DeleteStrategy`
-[line 121]
-Fallback delete strategy for models on this source.
-
-#### `readonly defaultTrashTable?: string`
-[line 124]
-Fallback trash collection name for trash strategy.
-
-#### `readonly modelDefaults?: Partial<ModelDefaults>`
-[line 127]
-Default model configuration for this source.
-
-#### `readonly migrationDefaults?: MigrationDefaults`
-[line 130]
-Migration-level defaults for this source.
-
-#### `readonly migrations?`
-[lines 133-136]
-Migration configuration: transactional flag and table name.
-
-#### `constructor(options: DataSourceOptions)`
-[lines 143-152]
-Assigns all options to readonly properties.
-
-#### `get idGenerator(): IdGeneratorContract | undefined`
-[lines 170-177]
-Retrieves ID generator from driver via duck typing; undefined for SQL drivers.
+#### Public readonly properties [lines 112-136]
+- `name: string` — Unique data source name.
+- `driver: DriverContract` — Bound database driver.
+- `isDefault: boolean` — Whether this is the default source.
+- `defaultDeleteStrategy?: DeleteStrategy` — Source-level delete strategy default.
+- `defaultTrashTable?: string` — Source-level trash table name default.
+- `modelDefaults?: Partial<ModelDefaults>` — Source-level model config defaults.
+- `migrationDefaults?: MigrationDefaults` — Source-level migration defaults.
+- `migrations?: { transactional?: boolean; table?: string }` — Migration execution settings.

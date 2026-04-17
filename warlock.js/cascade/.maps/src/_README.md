@@ -1,90 +1,35 @@
 # src
-created: 2026-04-17 03:34:41 PM
-updated: 2026-04-17 03:34:41 PM
 
-> Root entry layer of the cascade package, exporting the dirty-tracking classes and shared TypeScript types that every other subsystem depends on.
+Root of the Cascade ORM source map tree. This directory holds the package's top-level primitives: the central barrel re-export (`index`), the core type aliases that govern the whole ORM (`types`), and the two change-tracking implementations (`DatabaseDirtyTracker` for document databases and `SqlDatabaseDirtyTracker` for relational databases). Subdirectories cover every major subsystem — drivers, model, query-builder, relations, sync, migration, validation, and utilities.
 
-## What lives here
-- `database-dirty-tracker.ts` — change-tracking class that diffs initial and current snapshots using dot-notation flattening
-- `sql-database-dirty-tracker.ts` — SQL-aware subclass that preserves nested JSON column structure instead of decomposing it
-- `types.ts` — shared union types and configuration object types for model behaviour and migration defaults
+last-updated: 2026-04-17
+updated-by: claude-sonnet-4-6
 
-## Public API
-- `DatabaseDirtyTracker(data)` — initialises dirty tracking from a plain-object snapshot
-- `DatabaseDirtyTracker#getDirtyColumns(): string[]` — returns modified dot-notation column paths
-- `DatabaseDirtyTracker#hasChanges(): boolean` — true if any column was modified or removed
-- `DatabaseDirtyTracker#isDirty(column: string): boolean` — checks whether a specific column is dirty
-- `DatabaseDirtyTracker#getRemovedColumns(): string[]` — returns columns removed since baseline
-- `DatabaseDirtyTracker#getDirtyColumnsWithValues(): Record<string, { oldValue, newValue }>` — maps each dirty column to old/new pair
-- `DatabaseDirtyTracker#replaceCurrentData(data): void` — replaces current snapshot and recomputes diff
-- `DatabaseDirtyTracker#mergeChanges(partial): void` — deep-merges partial data into current snapshot
-- `DatabaseDirtyTracker#unset(columns): void` — removes one or more columns from current snapshot
-- `DatabaseDirtyTracker#reset(data?): void` — resets both snapshots, clears dirty sets
-- `SqlDatabaseDirtyTracker(data)` — SQL-aware tracker; inherits full DatabaseDirtyTracker API
-- `StrictMode` — `"strip" | "fail" | "allow"` unknown-field handling union
-- `DeleteStrategy` — `"trash" | "permanent" | "soft"` model deletion strategy union
-- `NamingConvention` — `"camelCase" | "snake_case"` database column naming union
-- `ModelDefaults` — runtime model behaviour configuration object type
-- `UuidStrategy` — `"v4" | "v7"` UUID generation strategy union
-- `MigrationDefaults` — DDL-level migration defaults configuration object type
+## Files
 
-## How it fits together
-`types.ts` has no imports and is the pure-type foundation consumed by every other layer (model, migration, data-source, drivers). `database-dirty-tracker.ts` imports only from external packages (`@mongez/reinforcements`, `@mongez/supportive-is`) and is used by the model layer to track field mutations before persistence. `sql-database-dirty-tracker.ts` extends `DatabaseDirtyTracker` and is wired in by SQL drivers that need whole-column JSON comparison. Nothing inside this folder imports from subdirectories; subdirectories import upward from here.
+- [database-dirty-tracker.md](./database-dirty-tracker.md) — Dot-notation change tracking for document-style model fields
+- [index.md](./index.md) — Central barrel re-exporting the entire public API
+- [sql-database-dirty-tracker.md](./sql-database-dirty-tracker.md) — SQL-aware change tracking that preserves nested object structure
+- [types.md](./types.md) — Core type aliases: StrictMode, DeleteStrategy, NamingConvention, ModelDefaults, UuidStrategy, MigrationDefaults
 
-## Working examples
-```typescript
-// Track field changes on a model record
-const tracker = new DatabaseDirtyTracker({ name: "Alice", age: 30 });
-tracker.mergeChanges({ age: 31 });
-console.log(tracker.hasChanges()); // true
-console.log(tracker.getDirtyColumns()); // ["age"]
-console.log(tracker.getDirtyColumnsWithValues());
-// { age: { oldValue: 30, newValue: 31 } }
+## Subdirectories
 
-// Remove a field and inspect removed columns
-tracker.unset("age");
-console.log(tracker.getRemovedColumns()); // ["age"]
-
-// Reset to current state as the new baseline
-tracker.reset();
-console.log(tracker.hasChanges()); // false
-```
-
-```typescript
-// SQL tracker keeps JSON columns intact (no dot-notation decomposition)
-const sqlTracker = new SqlDatabaseDirtyTracker({
-  name: "Bob",
-  meta: { role: "admin", level: 2 },
-});
-sqlTracker.mergeChanges({ meta: { role: "editor", level: 2 } });
-console.log(sqlTracker.getDirtyColumns()); // ["meta"]  — whole column, not "meta.role"
-```
-
-```typescript
-// Use shared types in model configuration
-import type { StrictMode, DeleteStrategy, NamingConvention, ModelDefaults } from "@warlock.js/cascade";
-
-const defaults: ModelDefaults = {
-  namingConvention: "snake_case",
-  deleteStrategy: "soft",
-  strictMode: "fail",
-  timestamps: true,
-};
-```
-
-```typescript
-// Configure migration defaults per data source
-import type { MigrationDefaults, UuidStrategy } from "@warlock.js/cascade";
-
-const migrationDefaults: MigrationDefaults = {
-  uuidStrategy: "v7",
-  primaryKey: "uuid",
-};
-```
-
-## DO NOT
-- Do NOT call `updateDirtyState()` directly — it is a protected internal method called automatically by all mutating public methods.
-- Do NOT use `SqlDatabaseDirtyTracker` for MongoDB or document databases — it disables dot-notation flattening, so nested field changes will be tracked only at the top-level key.
-- Do NOT pass already-flattened dot-notation objects to `DatabaseDirtyTracker` — the constructor expects raw nested objects and flattens them internally; double-flattening produces incorrect dirty paths.
-- Do NOT read `dirtyColumns` or `removedColumns` directly as Sets — use `getDirtyColumns()` and `getRemovedColumns()` which return plain arrays.
-- Do NOT assume `reset()` with no argument resets to the original construction data — it resets to the current snapshot, making current state the new baseline.
+- [context/](./context/_README.md) — AsyncLocalStorage contexts for data-source and transaction session binding
+- [contracts/](./contracts/_README.md) — Driver, writer, remover, restorer, query-builder, sync, migration, and blueprint contracts
+- [data-source/](./data-source/_README.md) — DataSource class and global data-source registry
+- [drivers/mongodb/](./drivers/mongodb/_README.md) — MongoDB driver implementation
+- [drivers/postgres/](./drivers/postgres/_README.md) — PostgreSQL driver implementation
+- [drivers/sql/](./drivers/sql/_README.md) — Shared SQL dialect contract and types
+- [errors/](./errors/_README.md) — Custom error types for missing data sources and transaction rollbacks
+- [events/](./events/_README.md) — Model event registry and typed lifecycle event helpers
+- [expressions/](./expressions/_README.md) — Aggregate expression helpers for query pipelines
+- [migration/](./migration/_README.md) — DDL schema management: column/index builders, migration runner, SQL grammar
+- [model/](./model/_README.md) — Abstract Model base class, registry decorator, and all method modules
+- [query-builder/](./query-builder/_README.md) — Driver-agnostic fluent query builder base class
+- [relations/](./relations/_README.md) — Relation types, helpers, eager-loading, pivot operations, and hydration
+- [remover/](./remover/_README.md) — DatabaseRemover service for delete-strategy orchestration
+- [restorer/](./restorer/_README.md) — DatabaseRestorer service for soft-delete restoration
+- [sync/](./sync/_README.md) — Cascading denormalized-data sync system
+- [utils/](./utils/_README.md) — Connection helpers, model definition utilities, and writer transform hooks
+- [validation/](./validation/_README.md) — Seal-integrated validation, embed validators, and writer error type
+- [writer/](./writer/_README.md) — DatabaseWriter orchestrating the full model save pipeline

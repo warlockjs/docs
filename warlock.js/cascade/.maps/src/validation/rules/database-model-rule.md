@@ -1,23 +1,30 @@
 # database-model-rule
 source: validation/rules/database-model-rule.ts
-description: Seal schema rules validating single and multiple Model instances.
+description: Validation rules for database model instances and collections
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
-- `invalidRule`, `VALID_RULE`, `SchemaRule` from `@warlock.js/seal`
-- `ChildModel`, `Model` from `../../model/model`
+- `invalidRule, VALID_RULE, SchemaRule` from `@warlock.js/seal`
+- `ChildModel, Model` from `../../model/model`
 - `getModelFromRegistry` from `../../model/register-model`
 
 ## Exports
-- `databaseModelRule` — validates value is a Model instance  [lines 5-16]
-- `databaseModelsRule` — validates value is array of Model instances  [lines 18-35]
+- `databaseModelRule` — Validation rule for single model instances [lines 5-16]
+- `databaseModelsRule` — Validation rule for collections of model instances [lines 18-35]
 
-## Classes / Functions / Types / Constants
+## Rules
 
-### Constants
-- `databaseModelRule: SchemaRule` — async; name `"databaseModule"`, returns invalid if not `Model`  [lines 5-16]
-  - side-effects: sets `context.attributesList.model` from options
-- `databaseModelsRule: SchemaRule<{ model: ChildModel<any> | string }>` — async; name `"databaseModels"`, validates array of models  [lines 18-35]
-  - side-effects: resolves string model name via registry; sets `context.attributesList.model`
+### `databaseModelRule` [lines 5-16]
+- Validates that a value is an instance of the Model class
+- Sets model name in context attributes list
+- Returns error if value is not a valid Model instance
+
+### `databaseModelsRule` [lines 18-35]
+- Validates that a value is an array of Model instances
+- Supports both model class references and string-based lookups via registry
+- Sets model name in context attributes list
+- Verifies all array items are Model instances

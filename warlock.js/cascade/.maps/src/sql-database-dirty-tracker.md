@@ -1,18 +1,20 @@
 # sql-database-dirty-tracker
 source: sql-database-dirty-tracker.ts
-description: SQL-specific dirty tracker that skips dot-notation flattening so JSON columns are compared as whole objects rather than decomposed paths.
+description: SQL-specific dirty tracker that preserves nested object structure instead of flattening
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
 - `DatabaseDirtyTracker` from `./database-dirty-tracker`
 
 ## Exports
-- `SqlDatabaseDirtyTracker` — SQL-aware subclass of DatabaseDirtyTracker  [lines 8-16]
+- `SqlDatabaseDirtyTracker` — Dirty tracker for SQL databases that avoids flattening nested objects [lines 8-16]
 
 ## Classes / Functions / Types / Constants
 
-### Classes
-- `SqlDatabaseDirtyTracker` — overrides flattening to preserve nested JSON structure  [lines 8-16]
-  - `flattenData(data)` — shallow-copies data without recursive flattening  [lines 12-14]
+### `SqlDatabaseDirtyTracker` [lines 8-16]
+- Extends `DatabaseDirtyTracker`
+- `flattenData(data)` — Overrides parent method to keep raw data structure without flattening nested objects (shallow copy) [lines 12-15]

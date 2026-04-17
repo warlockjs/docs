@@ -1,18 +1,26 @@
 # transaction-rollback.error
+
 source: errors/transaction-rollback.error.ts
-description: Error thrown when a transaction is explicitly rolled back via ctx.rollback().
+description: Error signaling explicit transaction rollback without application error semantics
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
-- `Error` from builtin
+None
 
 ## Exports
-- `TransactionRollbackError` — Error class for transaction rollback [line 8]
+- `TransactionRollbackError` — Custom error class for transaction rollbacks [lines 8-29]
 
-## Classes
-### TransactionRollbackError [lines 8-29] — Represents transaction rollback error
-extends: Error
-fields:
-- `reason?: string`  [line 12]
+## Classes / Functions / Types / Constants
+
+### `TransactionRollbackError` [lines 8-29]
+- Error thrown when a transaction is explicitly rolled back via ctx.rollback()
+
+#### `reason?: string` [line 12]
+- Optional reason for the rollback (for logging/debugging)
+
+#### `constructor(reason?: string)` [lines 19-28]
+- Creates a new TransactionRollbackError with optional rollback reason; sets error name and captures stack trace

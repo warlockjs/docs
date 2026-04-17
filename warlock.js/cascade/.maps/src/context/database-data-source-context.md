@@ -1,28 +1,39 @@
 # database-data-source-context
+
 source: context/database-data-source-context.ts
-description: Defines and exports a singleton context that tracks the active database data source per async scope.
+description: Manages active database connection/data source using AsyncLocalStorage context
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
-- `Context`, `contextManager` from `@warlock.js/context`
-- `DataSource` from `../data-source/data-source`
+- `Context, contextManager` from `@warlock.js/context`
+- `DataSource` from `../data-source/data-source` (type)
 
 ## Exports
-- `databaseDataSourceContext` — singleton instance registered as `db.datasource`  [line 39]
+- `databaseDataSourceContext` — Singleton context instance for data source management [line 39]
 
 ## Classes / Functions / Types / Constants
 
 ### `DataSourceContextValue` [line 4]
-type: `string | DataSource`
+- Type union of string or DataSource instance
 
-### `DataSourceContextStore` [line 6-8]
-type: object with optional `dataSource` field
+### `DataSourceContextStore` [lines 6-8]
+- Object type containing optional dataSource property
 
 ### `DatabaseDataSourceContext` [lines 16-37]
-class — extends `Context<DataSourceContextStore>` for data source tracking
-- `public getDataSource()` — returns current data source or undefined  [lines 20-22]
-- `public setDataSource(dataSource)` — writes data source into context store  [lines 27-29]
-  - side-effects: mutates context store
-- `public buildStore()` — returns default store with undefined dataSource  [lines 34-36]
+- Extends Context class to manage active database connection/data source using AsyncLocalStorage
+
+#### `getDataSource(): DataSourceContextValue | undefined` [lines 20-22]
+- Retrieves the current data source from context
+
+#### `setDataSource(dataSource: DataSourceContextValue): void` [lines 27-29]
+- Sets the data source in context
+
+#### `buildStore(): DataSourceContextStore` [lines 34-36]
+- Builds the initial data source store with undefined defaults
+
+### `databaseDataSourceContext` [line 39]
+- Singleton instance of DatabaseDataSourceContext registered with contextManager as "db.datasource"

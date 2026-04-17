@@ -1,25 +1,24 @@
 # restore-methods
 source: model/methods/restore-methods.ts
-description: Async helpers to restore soft-deleted model records via DatabaseRestorer.
+description: Model restoration from trash/soft-delete
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
 - `DatabaseRestorer` from `../../restorer/database-restorer`
-- `ChildModel`, `Model` from `../model`
+- `ChildModel, Model` from `../model`
 
 ## Exports
-- `restoreRecord` — restores single soft-deleted record by id  [lines 4-19]
-- `restoreAllRecords` — restores all soft-deleted records for model  [lines 21-29]
+- `restoreRecord` — Restore single soft-deleted record by id [lines 4-19]
+- `restoreAllRecords` — Restore all soft-deleted records [lines 21-29]
 
 ## Classes / Functions / Types / Constants
-### `restoreRecord<TModel>`  async
-[lines 4-19]
-- Delegates to `DatabaseRestorer.restore`; throws if no record returned.
-- throws: `Error` when restored record is missing from result
 
-### `restoreAllRecords<TModel>`  async
-[lines 21-29]
-- Delegates to `DatabaseRestorer.restoreAll`; returns empty array when none restored.
-- throws: propagates restorer errors
+### `restoreRecord<TModel extends Model>(ModelClass: ChildModel<TModel>, id: string | number, options?: { onIdConflict?: "fail" | "assignNew"; skipEvents?: boolean }): Promise<TModel>` [lines 4-19]
+- Restores a soft-deleted record by primary key with conflict handling; throws if restoration fails
+
+### `restoreAllRecords<TModel extends Model>(ModelClass: ChildModel<TModel>, options?: { onIdConflict?: "fail" | "assignNew"; skipEvents?: boolean }): Promise<TModel[]>` [lines 21-29]
+- Restores all soft-deleted records for a model; returns empty array if none restored

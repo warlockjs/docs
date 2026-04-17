@@ -1,29 +1,37 @@
 # database-id-generator.contract
 source: contracts/database-id-generator.contract.ts
-description: Defines IdGeneratorContract for sequential auto-increment ID generation in NoSQL databases.
+description: Contract for auto-increment ID generation in NoSQL databases
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
-
-## Imports
-_(none)_
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Exports
-- `GenerateIdOptions` — options for next-ID generation  [lines 4-11]
-- `IdGeneratorContract` — interface for atomic sequential ID generation  [lines 44-111]
+- `GenerateIdOptions` — Configuration for ID generation [lines 4-11]
+- `IdGeneratorContract` — Interface for sequential ID management [lines 44-111]
 
-## Types / Interfaces
+## Types
 
 ### `GenerateIdOptions` [lines 4-11]
-- `table: string` — target collection name
-- `initialId?: number` — starting value for first record = 1
-- `incrementIdBy?: number` — step between IDs = 1
+- `table: string` — Table/collection name
+- `initialId?: number` — Initial ID value for first record (default: 1)
+- `incrementIdBy?: number` — Increment amount per new record (default: 1)
+
+## Interfaces
 
 ### `IdGeneratorContract` [lines 44-111]
-Contract for atomic sequential ID generation in NoSQL stores.
-- `generateNextId(options: GenerateIdOptions): Promise<number>` [lines 68-68]
-  — throws: on concurrent write failure; side-effects: increments counter document
-- `getLastId(table: string): Promise<number>` [line 84]
-  — returns 0 if no IDs generated yet
-- `setLastId(table: string, id: number): Promise<void>` [line 110]
-  — side-effects: overwrites counter document
+
+#### `generateNextId(options: GenerateIdOptions): Promise<number>` [lines 68-68]
+- Generates next sequential ID for a table
+- Atomically increments counter in tracking collection
+- Creates counter document if not exists using initialId
+- Returns generated ID
+
+#### `getLastId(table: string): Promise<number>` [lines 84-84]
+- Returns last generated ID for a table
+- Returns 0 if no IDs have been generated yet
+
+#### `setLastId(table: string, id: number): Promise<void>` [lines 110-110]
+- Sets last ID for a table
+- Useful for migrations, manual ID management, and testing

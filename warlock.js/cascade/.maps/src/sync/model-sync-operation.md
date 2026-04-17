@@ -1,9 +1,11 @@
 # model-sync-operation
 source: sync/model-sync-operation.ts
-description: Manages a single source-to-target model sync relationship via event subscriptions.
-complexity: complex
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+description: Class managing a single sync relationship between source and target models via event subscriptions
+complexity: moderate
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-sonnet-4-6
+last-updated-by: claude-sonnet-4-6
 
 ## Imports
 - `events`, `EventSubscription` from `@mongez/events`
@@ -14,40 +16,39 @@ last-mapped: 2026-04-17 03:34:41 PM
 - `ModelSyncConfig`, `ModelSyncOperationContract` from `./types`
 
 ## Exports
-- `ModelSyncOperation` — class managing one model sync operation  [lines 34-355]
+- `ModelSyncOperation` — Class implementing `ModelSyncOperationContract` that manages event-driven sync between a source and target model  [lines 34-355]
 
 ## Classes / Functions / Types / Constants
 
-### `class ModelSyncOperation` implements `ModelSyncOperationContract`  [lines 34-355]
-Subscribes to source model events; triggers update or delete sync.
-side-effects: subscribes to model updated/deleted events on construct
+### `ModelSyncOperation` [lines 34-355]
+- Implements `ModelSyncOperationContract`. Subscribes to the source model's `updated` and `deleted` events in the constructor and delegates sync execution to `SyncManager`. Provides a fluent configuration API and lifecycle management methods. Private fields: `config: ModelSyncConfig`, `subscriptions: EventSubscription[]`, `isSubscribed: boolean`.
 
-#### `constructor(sourceModelClass, targetModelClass, targetField, isMany)`
-side-effects: calls `subscribe()`, registers event listeners  [lines 58-78]
+#### `constructor(sourceModelClass: ChildModel<Model>, targetModelClass: ChildModel<Model>, targetField: string, isMany: boolean)` [lines 58-78]
+- Initializes `config` with defaults (`embedKey: "embedData"`, `identifierField: "id"`, `maxSyncDepth: DEFAULT_MAX_SYNC_DEPTH`, `watchFields: []`, `unsetOnDelete: false`, `removeOnDelete: false`) then immediately calls `subscribe()` to register event listeners.
 
-#### `embed(method)`
-returns: `this` — sets embed key for data extraction  [lines 95-98]
+#### `embed(method: string | string[]): this` [lines 95-98]
+- Sets `config.embedKey` to the given method name or array of field names; returns `this` for chaining.
 
-#### `identifyBy(field)`
-returns: `this` — sets identifier field for array matching  [lines 112-115]
+#### `identifyBy(field: string): this` [lines 112-115]
+- Sets `config.identifierField` to the given field name (default `"id"`) for array element matching in `syncMany`; returns `this` for chaining.
 
-#### `maxDepth(depth)`
-returns: `this` — sets maximum chained sync depth  [lines 128-131]
+#### `maxDepth(depth: number): this` [lines 128-131]
+- Sets `config.maxSyncDepth` to the given depth value controlling chain depth; returns `this` for chaining.
 
-#### `watchFields(fields)`
-returns: `this` — limits sync trigger to specific fields  [lines 145-148]
+#### `watchFields(fields: string[]): this` [lines 145-148]
+- Sets `config.watchFields` to restrict sync triggers to specific changed fields; empty array means all fields trigger sync; returns `this` for chaining.
 
-#### `unsetOnDelete()`
-returns: `this` — flags target field unset on source delete  [lines 160-163]
+#### `unsetOnDelete(): this` [lines 160-163]
+- Sets `config.unsetOnDelete = true` so the target field is unset when source is deleted; returns `this` for chaining.
 
-#### `removeOnDelete()`
-returns: `this` — flags target document removal on source delete  [lines 175-178]
+#### `removeOnDelete(): this` [lines 175-178]
+- Sets `config.removeOnDelete = true` so matching target documents are removed when source is deleted; returns `this` for chaining.
 
-#### `unsubscribe()`
-side-effects: unsubscribes all event subscriptions, clears list  [lines 212-219]
+#### `unsubscribe(): void` [lines 212-219]
+- Iterates `subscriptions` and calls `unsubscribe()` on each `EventSubscription`, clears the array, and resets `isSubscribed = false`.
 
-#### `$cleanup()`
-side-effects: delegates to `unsubscribe()`  [lines 224-226]
+#### `$cleanup(): void` [lines 224-226]
+- Public alias for `unsubscribe()`; called by the framework during module cleanup / HMR.
 
-#### `getConfig()`
-returns: `Readonly<ModelSyncConfig>` — shallow copy of config  [lines 352-354]
+#### `getConfig(): Readonly<ModelSyncConfig>` [lines 352-354]
+- Returns a shallow spread copy of `config` typed as `Readonly<ModelSyncConfig>`; intended for debugging and testing.

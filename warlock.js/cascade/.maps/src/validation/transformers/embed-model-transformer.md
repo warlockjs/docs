@@ -1,22 +1,23 @@
 # embed-model-transformer
 source: validation/transformers/embed-model-transformer.ts
-description: Seal transformer extracting embed data from Model instances for storage.
+description: Transforms embedded model data for persistence and serialization
 complexity: simple
-first-mapped: 2026-04-17 03:34:41 PM
-last-mapped: 2026-04-17 03:34:41 PM
+first-mapped: 2026-04-17
+last-mapped: 2026-04-17
+created-by: claude-haiku-4-5
+last-updated-by: claude-haiku-4-5
 
 ## Imports
 - `TransformerCallback` from `@warlock.js/seal`
 - `Model` from `../../model/model`
 
 ## Exports
-- `databaseModelTransformer` — transforms Model(s) to embed data  [lines 4-26]
+- `databaseModelTransformer` — Callback function that transforms embedded model instances [lines 4-26]
 
-## Classes / Functions / Types / Constants
+## Functions
 
-### Constants
-- `databaseModelTransformer: TransformerCallback` — extracts embed field(s) from single or array Model value  [lines 4-26]
-  - Reads `context.options.embed` (default `"embedData"`)
-  - Returns raw value unchanged if not a Model or array
-  - For arrays: maps each item using string embed key or `item.only(embed)`
-  - For single Model: returns `value[embed]` or `value.only(embed)`
+### `databaseModelTransformer(value, context)` [lines 4-26]
+- Transforms model instances or arrays of models into embedded data format
+- Uses `embed` option from context (defaults to "embedData") to extract specific fields
+- Returns serialized data structure for database storage
+- Supports both string field names and array-based field selection
