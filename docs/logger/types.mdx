@@ -1,0 +1,248 @@
+---
+sidebar_position: 5
+---
+
+# Logger Types
+
+This page documents every public type and interface exported from `src/types.ts` in `@warlock.js/logger`. Use this as the definitive reference when writing custom channels, configuring the logger, or typing log data in your application code.
+
+## `LogLevel`
+
+```ts
+type LogLevel = "debug" | "info" | "warn" | "error" | "success";
+```
+
+**Import**
+
+```ts
+import { type LogLevel } from "@warlock.js/logger";
+```
+
+`LogLevel` is used wherever the logger needs to identify the severity of a log entry. The five values map directly to the five shorthand methods on the `Log` interface:
+
+| Value | When it applies |
+|---|---|
+| `"debug"` | Development diagnostics, variable dumps, flow tracing |
+| `"info"` | Normal operational events (user registered, job queued) |
+| `"warn"` | Unexpected but recoverable conditions (retry, fallback) |
+| `"error"` | Failures that need attention; accepts `Error` objects |
+| `"success"` | Explicit happy-path confirmation (payment completed) |
+
+---
+
+## `DebugMode`
+
+```ts
+type DebugMode = "daily" | "monthly" | "yearly" | "hourly";
+```
+
+`DebugMode` is the subset of `FileLogConfig.chunk` values that control **time-based log file rotation**. Each value tells the file channel to start a new log file at the corresponding time boundary:
+
+| Value | Rotation boundary |
+|---|---|
+| `"hourly"` | A new file every hour |
+| `"daily"` | A new file every day |
+| `"monthly"` | A new file every calendar month |
+| `"yearly"` | A new file every year |
+
+Note that `FileLogConfig.chunk` also accepts `"single"` (write everything to one file forever), but `"single"` is not part of `DebugMode` — `DebugMode` covers only the time-based rotation variants.
+
+---
+
+## `LoggingData`
+
+`LoggingData` is the shape callers pass into the logger. It is the primary input type for both the callable form (`log(data)`) and the object-argument overloads of the level methods.
+
+```ts
+type LoggingData = {
+  type: "info" | "debug" | "warn" | "error" | "success";
+  module: string;
+  action: string;
+  message: any;
+  context?: Record<string, any>;
+};
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `type` | yes | Log severity level |
+| `module` | yes | Feature area or source module identifier |
+| `action` | yes | Specific operation being performed |
+| `message` | yes | The log content — string, object, or `Error` |
+| `context` | no | Free-form metadata attached to this entry |
+
+**Example**
+
+```ts
+import { log, type LoggingData } from "@warlock.js/logger";
+
+const entry: LoggingData = {
+  type: "error",
+  module: "orders",
+  action: "checkout",
+  message: "Card declined",
+  context: {
+    orderId: "ord_9f2a",
+    userId: 101,
+    amount: 4999,
+  },
+};
+
+await log(entry);
+```
+
+---
+
+## `OmittedLoggingData`
+
+```ts
+type OmittedLoggingData = Omit<LoggingData, "type">;
+```
+
+`OmittedLoggingData` is `LoggingData` with the `type` field removed. It is used by the object-argument overloads of the shorthand level methods (`log.info(data)`, `log.error(data)`, etc.) so callers do not need to repeat the log level — the method name already carries it.
+
+---
+
+## `BasicLogConfigurations`
+
+`BasicLogConfigurations` is the optional configuration object accepted by logger initialization. All fields are optional.
+
+```ts
+interface BasicLogConfigurations {
+  levels?: LogLevel[];
+  dateFormat?: {
+    date?: string;
+    time?: string;
+  };
+  filter?: (data: LoggingData) => boolean;
+  context?: (data: LoggingData) => Promise<Record<string, any>>;
+}
+```
+
+| Field | Description |
+|---|---|
+| `levels` | Whitelist of log levels to process; entries at unlisted levels are dropped |
+| `dateFormat.date` | Custom date format string applied to every log entry |
+| `dateFormat.time` | Custom time format string applied to every log entry |
+| `filter` | Predicate called before writing; return `false` to suppress the entry |
+| `context` | Async function that merges extra fields into every log entry's context |
+
+**Using `context` for async enrichment**
+
+The `context` field is particularly useful for injecting request-scoped data — such as a trace ID or authenticated user — without threading it through every call site:
+
+```ts
+import { logger, type LoggingData } from "@warlock.js/logger";
+
+logger.configure({
+  context: async (data: LoggingData) => {
+    // Return any extra fields to merge into data.context
+    return {
+      requestId: AsyncLocalStorage.getStore()?.requestId ?? "n/a",
+      env: process.env.NODE_ENV,
+    };
+  },
+});
+```
+
+The returned object is merged into the `context` of every `LogMessage` before it is handed to channels.
+
+---
+
+## `LogMessage`
+
+`LogMessage` is the **internal formatted shape** produced by the logger after it processes a `LoggingData` entry. Channels receive a `LogMessage`, not a raw `LoggingData`.
+
+```ts
+interface LogMessage {
+  content: string;
+  level: LogLevel;
+  date: string;
+  module: string;
+  action: string;
+  stack?: string;
+  context?: Record<string, any>;
+  timestamp?: string;
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `content` | yes | Formatted log message text |
+| `level` | yes | Severity level of the entry |
+| `date` | yes | Date portion, formatted according to `dateFormat.date` |
+| `module` | yes | Source module identifier from the original `LoggingData` |
+| `action` | yes | Action name from the original `LoggingData` |
+| `stack` | no | Stack trace string, populated when `message` is an `Error` |
+| `context` | no | Merged context — combines caller-supplied data with `BasicLogConfigurations.context` output |
+| `timestamp` | no | ISO timestamp of when the entry was processed |
+
+This is the type you work with when implementing a custom channel via `LogContract` or extending `LogChannel`.
+
+---
+
+## `LogContract`
+
+`LogContract` is the interface every log channel must satisfy. Implement it directly when you need full control over the channel lifecycle, or extend `LogChannel` (which provides sensible defaults) for the common case.
+
+```ts
+interface LogContract {
+  name: string;
+  description?: string;
+  terminal?: boolean;
+  log(data: LoggingData): void | Promise<void>;
+  flushSync?(): void;
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | yes | Unique channel identifier used to look up the channel at runtime |
+| `description` | no | Human-readable description of what the channel does |
+| `terminal` | no | Set to `true` if this channel writes to a terminal (enables color formatting in the core) |
+| `log(data)` | yes | Entry point called by the logger for every log entry; may be async |
+| `flushSync()` | no | Synchronous flush; implement when the channel buffers entries in memory |
+
+**When to implement `LogContract` directly vs. extending `LogChannel`**
+
+Implement `LogContract` directly when you are integrating with an external system (e.g. a remote log aggregator or a database) and you do not need any of the built-in formatting helpers. Extend `LogChannel` when you want the pre-built date formatting, level filtering, and `BasicLogConfigurations` support for free.
+
+---
+
+## `Log`
+
+`Log` is the callable interface type of the `log` default export. It combines a direct call signature with the five level methods and two utility methods.
+
+```ts
+interface Log {
+  // Direct call — pass a full LoggingData object
+  (data: LoggingData): Promise<Logger>;
+
+  // Object-argument overloads
+  info(data: OmittedLoggingData): Promise<Logger>;
+  debug(data: OmittedLoggingData): Promise<Logger>;
+  warn(data: OmittedLoggingData): Promise<Logger>;
+  error(data: OmittedLoggingData): Promise<Logger>;
+  success(data: OmittedLoggingData): Promise<Logger>;
+
+  // Three-argument shorthand overloads
+  info(module: string, action: string, message: any): Promise<Logger>;
+  debug(module: string, action: string, message: any): Promise<Logger>;
+  warn(module: string, action: string, message: any): Promise<Logger>;
+  error(module: string, action: string, message: any): Promise<Logger>;
+  success(module: string, action: string, message: any): Promise<Logger>;
+
+  // Utilities
+  channel(name: string): LogChannel | undefined;
+  flushSync(): void;
+}
+```
+
+`log` — the package's default export — is of this type. It is a callable function that also carries the five level methods and two utility methods as properties.
+
+| Member | Description |
+|---|---|
+| `(data)` | Call `log` directly with a `LoggingData` object |
+| `log.info / debug / warn / error / success` | Shorthand methods; each accepts either an `OmittedLoggingData` object or `(module, action, message)` |
+| `log.channel(name)` | Retrieve a registered channel instance by its `name`; returns `undefined` if not found |
+| `log.flushSync()` | Synchronously drain all buffered entries across every registered channel |

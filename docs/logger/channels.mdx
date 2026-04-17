@@ -71,6 +71,23 @@ new ConsoleLog({
 
 `ConsoleLog` accepts the full `BasicLogConfigurations` shape: `levels`, `filter`, `dateFormat`, and `context`.
 
+### Context enrichment
+
+The `context` field on `BasicLogConfigurations` accepts an async callback that adds extra metadata to every log entry before it reaches the channel:
+
+```ts
+import { ConsoleLog } from "@warlock.js/logger";
+
+new ConsoleLog({
+  context: async (data) => ({
+    requestId: getCurrentRequestId(),
+    env: process.env.NODE_ENV,
+  }),
+});
+```
+
+The returned object is merged into the `LoggingData.context` field that your channel receives.
+
 ---
 
 ## FileLog
@@ -129,6 +146,8 @@ new FileLog({
    *   "single"  — one file for everything (e.g. app.log)
    *   "daily"   — one file per day      (e.g. 15-03-2024.log)
    *   "hourly"  — one file per hour     (e.g. 15-03-2024-10-00-00-am.log)
+   *   "monthly" — one file per month
+   *   "yearly"  — one file per year
    * @default "single"
    */
   chunk: "daily",
@@ -311,6 +330,14 @@ Key differences from `FileLog`:
 
 `JSONFileLog` inherits all `FileLog` options and supports the same rotation, chunking, and `groupBy` features.
 
+:::note Channel name
+`JSONFileLog` registers under the internal channel name `"fileJson"` (not `"json"`). Use this when retrieving the channel by name:
+
+```ts
+const jsonChannel = log.channel("fileJson");
+```
+:::
+
 ---
 
 ## Custom channels
@@ -407,6 +434,8 @@ export class DatabaseLog extends LogChannel {
 | `config(key)` | protected method | Type-safe accessor that merges provided options with channel defaults |
 | `getDateAndTimeFormat()` | protected method | Returns `{ date, time }` Day.js format strings from config |
 | `init()` | protected hook | Optional async setup called once after construction |
+| `defaultConfigurations` | protected field | Override in subclasses to provide option defaults (merged with user-supplied config) |
+| `withBasicConfigurations(config)` | protected method | Factory helper that merges a partial config with `filter: () => true` as baseline |
 
 ### The `clearMessage` utility
 

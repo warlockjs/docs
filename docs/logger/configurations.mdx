@@ -6,6 +6,10 @@ sidebar_position: 2
 
 Logger configuration lives in `src/config/log.ts`. The file exports a `LogConfigurations` object that Warlock picks up automatically.
 
+:::info
+`LogConfigurations` is defined in `@warlock.js/core`, not in `@warlock.js/logger`. The logger package provides the channel classes (`ConsoleLog`, `FileLog`, `JSONFileLog`) and the `Logger` runtime — Warlock's core defines the config schema and wires them together at startup.
+:::
+
 ## Minimal setup
 
 ```ts title="src/config/log.ts"
@@ -183,3 +187,37 @@ new FileLog({
 ```
 
 Format tokens follow [Day.js format strings](https://day.js.org/docs/en/display/format).
+
+## Programmatic configuration
+
+If you configure logging in code rather than via `src/config/log.ts`, use the `logger` singleton directly:
+
+```ts
+import { logger, ConsoleLog, FileLog } from "@warlock.js/logger";
+
+// Replace all channels at once
+logger.setChannels([
+  new ConsoleLog(),
+  new FileLog({ storagePath: "./logs", chunk: "daily" }),
+]);
+
+// Or add a single channel without removing existing ones
+logger.addChannel(new FileLog({ storagePath: "./logs/errors", levels: ["error"] }));
+
+// Or configure via an object (equivalent to setChannels)
+logger.configure({
+  channels: [new ConsoleLog()],
+});
+```
+
+Retrieve a specific channel by name to inspect or flush it individually:
+
+```ts
+import { log } from "@warlock.js/logger";
+
+// Built-in channel names: "console", "file", "fileJson"
+const fileChannel = log.channel("file");
+if (fileChannel) {
+  fileChannel.flushSync?.();
+}
+```

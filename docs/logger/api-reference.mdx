@@ -1,0 +1,122 @@
+---
+sidebar_position: 4
+---
+
+# Logger API Reference
+
+## `Logger` class
+
+`Logger` is the central logging orchestrator. It maintains a list of channels and forwards every log call to all of them.
+
+| Method | Signature | Description |
+|---|---|---|
+| `addChannel` | `(channel: LogChannel): this` | Register a new logging channel |
+| `configure` | `(config: { channels: LogChannel[] }): this` | Set base configuration including the initial channel list |
+| `setChannels` | `(channels: LogChannel[]): this` | Replace all currently registered channels |
+| `log` | `(data: LoggingData): Promise<this>` | Process a fully formed `LoggingData` object through all channels |
+| `debug` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at the `debug` level |
+| `info` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at the `info` level |
+| `warn` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at the `warn` level |
+| `error` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at the `error` level |
+| `success` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at the `success` level |
+| `channel` | `(name: string): LogChannel \| undefined` | Find a registered channel by its `name` property |
+| `flushSync` | `(): void` | Synchronously drain buffered data in every channel that supports it |
+
+---
+
+## `log` functional interface
+
+`log` is the same set of methods exposed as a standalone callable. It is bound to the `logger` singleton, so calling `log(data)` or `log.info(...)` is exactly equivalent to calling `logger.log(data)` or `logger.info(...)`.
+
+The `Log` interface shape:
+
+```ts
+interface Log {
+  // Call directly with a full LoggingData object
+  (data: LoggingData): Promise<Logger>;
+
+  // Per-level overloads — accept either a full OmittedLoggingData object
+  // or the three-argument (module, action, message) shorthand
+  info(data: OmittedLoggingData): Promise<Logger>;
+  info(module: string, action: string, message: any): Promise<Logger>;
+
+  debug(data: OmittedLoggingData): Promise<Logger>;
+  debug(module: string, action: string, message: any): Promise<Logger>;
+
+  warn(data: OmittedLoggingData): Promise<Logger>;
+  warn(module: string, action: string, message: any): Promise<Logger>;
+
+  error(data: OmittedLoggingData): Promise<Logger>;
+  error(module: string, action: string, message: any): Promise<Logger>;
+
+  success(data: OmittedLoggingData): Promise<Logger>;
+  success(module: string, action: string, message: any): Promise<Logger>;
+
+  channel(name: string): LogChannel | undefined;
+  flushSync(): void;
+}
+```
+
+---
+
+## `logger` singleton
+
+`logger` is the default `Logger` instance exported from the package. All built-in configuration helpers and the `log` functional interface operate on this same instance.
+
+```ts
+import { logger } from "@warlock.js/logger";
+```
+
+---
+
+## `LogContract` interface
+
+`LogContract` is the minimal interface a class must satisfy to act as a log channel. It is what the `Logger` works against internally.
+
+```ts
+interface LogContract {
+  /** Unique identifier used to look up this channel via logger.channel(name). */
+  name: string;
+
+  /** Optional human-readable description of the channel. */
+  description?: string;
+
+  /** Set to true when output targets a terminal (preserves ANSI colour codes). */
+  terminal?: boolean;
+
+  /** Receive a log entry and write/send it. May be async. */
+  log(data: LoggingData): void | Promise<void>;
+
+  /** Synchronously drain any buffered entries. Called by Logger.flushSync(). */
+  flushSync?(): void;
+}
+```
+
+### When to use `LogContract` vs. extending `LogChannel`
+
+Implement `LogContract` directly when you want full control over every aspect of the channel — configuration, filtering, and initialization — with no inherited behaviour.
+
+Extend `LogChannel` (the abstract base class) when you want the built-in handling of `levels` filtering, the `filter` predicate, `dateFormat` config merging, and the one-time `init()` hook. `LogChannel` already implements `LogContract`, so you only need to provide the `log()` method.
+
+---
+
+## `LogMessage` type
+
+`LogMessage` is the fully formatted log entry that channels receive after the logger has normalized and enriched the raw input.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `content` | `string` | yes | The log message text |
+| `level` | `LogLevel` | yes | Severity level (`"debug"`, `"info"`, `"warn"`, `"error"`, `"success"`) |
+| `date` | `string` | yes | Date portion of the timestamp, formatted by `dateFormat.date` |
+| `module` | `string` | yes | Source module identifier |
+| `action` | `string` | yes | Action or operation name |
+| `stack` | `string` | no | Stack trace, present when the message is an `Error` |
+| `context` | `Record<string, any>` | no | Arbitrary contextual metadata |
+| `timestamp` | `string` | no | ISO 8601 timestamp |
+
+---
+
+## `OmittedLoggingData` type
+
+`OmittedLoggingData` is a convenience alias for `Omit<LoggingData, "type">`. It is used in the level-shorthand method signatures (`log.info(...)`, `log.error(...)`, etc.) so callers do not need to repeat the level that is already implied by the method name.

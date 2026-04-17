@@ -93,25 +93,33 @@ The logger routes every call through one or more **channels**. Each channel deci
 
 You can also create custom channels by extending `LogChannel`. See the [Channels](./channels) page for full details and the [Configurations](./configurations) page to wire everything up.
 
+## The `logger` singleton and `log` interface
+
+The package exports two ways to interact with the default logger:
+
+| Export | Type | When to use |
+|---|---|---|
+| `log` | Functional `Log` interface | Recommended — call `log.info(...)`, `log.error(...)` etc. directly |
+| `logger` | `Logger` class instance | When you need to call `logger.addChannel()`, `logger.setChannels()`, or `logger.configure()` imperatively |
+
+Both `log` and `logger` target the same underlying instance. The `log` object is a callable function that also has the five level methods bound to it.
+
 ## Utilities
 
 Two utilities ship alongside the core logger:
 
 ```ts
-import {
-  captureAnyUnhandledRejection,
-  flushSync,
-} from "@warlock.js/logger";
+import { captureAnyUnhandledRejection, log } from "@warlock.js/logger";
 
 // Automatically log unhandledRejection and uncaughtException events
 captureAnyUnhandledRejection();
 
 // Force all buffered log entries to disk before the process exits
 process.on("beforeExit", () => {
-  flushSync();
+  log.flushSync();
 });
 ```
 
-`captureAnyUnhandledRejection()` hooks into Node.js's `unhandledRejection` and `uncaughtException` events and routes them through the error channel. Call it once during app startup.
+`captureAnyUnhandledRejection()` hooks into Node.js's `unhandledRejection` and `uncaughtException` process events and routes them through `log.error()`. Both events are logged with module `"app"` — rejections under action `"unhandledRejection"`, exceptions under action `"uncaughtException"`. Call it once during app startup.
 
-`flushSync()` is a synchronous flush that drains the in-memory buffer of file-based channels. Use it in `beforeExit` or shutdown hooks to make sure nothing is lost when the process stops.
+`log.flushSync()` is a synchronous flush that drains the in-memory buffer of file-based channels. Use it in `beforeExit` or shutdown hooks to make sure nothing is lost when the process stops.
