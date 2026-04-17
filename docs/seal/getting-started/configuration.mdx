@@ -1,0 +1,433 @@
+---
+sidebar_position: 4
+title: Global Configuration
+description: Configure Seal globally for internationalization, error handling, and translations
+---
+
+# ⚙️ Global Configuration
+
+Seal provides a global configuration API to customize how validation works across your entire application. This is where you configure internationalization (i18n), error collection behavior, and custom translation logic.
+
+## Overview
+
+Global configuration allows you to:
+
+- **🌍 Internationalization** - Translate validation rules and attribute names
+- **📊 Error Collection** - Collect all validation errors or stop at the first one
+- **🎯 Custom Messages** - Implement custom translation logic for different languages
+
+Configuration is typically set once at application startup and applies to all validation calls throughout your app.
+
+---
+
+## `configureSeal()` 
+
+Configure Seal's global behavior with the `configureSeal()` function. This function accepts a partial configuration object and merges it with existing settings.
+
+### Function Signature
+
+```ts
+export function configureSeal(options: Partial<SealConfig>): void
+```
+
+### Configuration Interface
+
+```ts
+export type SealConfig = {
+  // Custom translation function for validation rules
+  translateRule?: (ruleTranslation: RuleTranslation) => string;
+  
+  // Custom translation function for attribute names
+  translateAttribute?: (attributeTranslation: AttributeTranslation) => string;
+  
+  // Stop at first error (default: true) or collect all errors (false)
+  firstErrorOnly?: boolean;
+};
+```
+
+### Configuration Options
+
+#### `translateRule`
+
+A function that translates validation rule error messages.
+
+**Parameters:**
+- `ruleTranslation.rule.name` — the rule identifier (e.g., `"required"`, `"minLength"`, `"email"`)
+- `ruleTranslation.attributes` — an object with substitution values for the rule:
+  - `min` / `max` — for range validations
+  - `length` — for length validations
+  - `input` — the field name being validated
+  - Other rule-specific values
+
+**Returns:** The translated error message as a string
+
+#### `translateAttribute`
+
+A function that translates attribute-specific error messages (e.g., translating the word "password" to your language).
+
+**Parameters:**
+- `attributeTranslation.rule.name` — the rule identifier
+- `attributeTranslation.attribute` — which attribute is being translated (e.g., `"min"`, `"max"`)
+- `attributeTranslation.context.allValues` — the full data object being validated
+
+**Returns:** The translated attribute name or value as a string
+
+#### `firstErrorOnly`
+
+Controls how many errors are collected during validation.
+
+- `true` (default) — Stop validation at the first error for faster feedback
+- `false` — Continue validating and collect all errors across all fields
+
+---
+
+## `firstErrorOnly` Behavior
+
+By default, Seal stops validation at the first error it encounters. This is useful for fast feedback in interactive forms. However, you can change this to collect all validation errors at once.
+
+### Default Behavior (Single Error)
+
+```ts
+import { v, configureSeal } from "@warlock.js/seal";
+
+// Default is true
+const schema = v.object({
+  name: v.string().required().minLength(3),
+  email: v.string().required().email(),
+  age: v.int().required().min(18),
+});
+
+const result = await v.validate(schema, {
+  name: "", // ❌ Required error
+  email: "invalid", // ❌ Would fail, but not checked
+  age: 10, // ❌ Would fail, but not checked
+});
+
+console.log(result.errors);
+// Output: [{ type: "required", error: "The name is required", input: "name" }]
+```
+
+### Collect All Errors
+
+```ts
+import { v, configureSeal } from "@warlock.js/seal";
+
+configureSeal({ firstErrorOnly: false });
+
+const schema = v.object({
+  name: v.string().required().minLength(3),
+  email: v.string().required().email(),
+  age: v.int().required().min(18),
+});
+
+const result = await v.validate(schema, {
+  name: "", // ❌ Required error
+  email: "invalid", // ❌ Invalid email
+  age: 10, // ❌ Min value error
+});
+
+console.log(result.errors);
+// Output: [
+//   { type: "required", error: "The name is required", input: "name" },
+//   { type: "email", error: "The email must be a valid email", input: "email" },
+//   { type: "min", error: "The age must be at least 18", input: "age" },
+// ]
+```
+
+---
+
+## Translation & Internationalization
+
+Seal supports custom translation functions for implementing multi-language support. This allows you to:
+
+- Translate validation rule messages to any language
+- Translate field/attribute names
+- Format error messages according to your app's conventions
+
+### Basic i18n Setup
+
+Here's a realistic example using a generic `t()` translation function:
+
+```ts
+import { configureSeal } from "@warlock.js/seal";
+
+// Assuming you have a translation function like i18next or a custom one
+function t(key: string, values?: Record<string, any>): string {
+  // Implementation depends on your i18n library
+  // This is a simplified example
+  const translations: Record<string, string> = {
+    "validation.rules.required": "The {{input}} is required",
+    "validation.rules.email": "The {{input}} must be a valid email address",
+    "validation.rules.minLength": "The {{input}} must be at least {{min}} characters",
+    "validation.rules.min": "The {{input}} must be at least {{min}}",
+  };
+  
+  let message = translations[key] || key;
+  
+  if (values) {
+    Object.entries(values).forEach(([k, v]) => {
+      message = message.replace(`{{${k}}}`, String(v));
+    });
+  }
+  
+  return message;
+}
+
+// Configure Seal with translation functions
+configureSeal({
+  translateRule: ({ rule, attributes }) =>
+    t(`validation.rules.${rule.name}`, attributes),
+  
+  translateAttribute: ({ rule, attribute, context }) =>
+    t(`validation.attributes.${rule.name}.${attribute}`, context.allValues),
+});
+```
+
+### Translation Function Example
+
+```ts
+import { configureSeal } from "@warlock.js/seal";
+import i18n from "i18next"; // Your i18n library
+
+configureSeal({
+  translateRule: ({ rule, attributes }) => {
+    // Build the translation key based on rule name
+    const key = `validation.rules.${rule.name}`;
+    
+    // Pass attributes as values for interpolation
+    return i18n.t(key, {
+      defaultValue: `Validation failed: ${rule.name}`,
+      ...attributes,
+    });
+  },
+  
+  translateAttribute: ({ rule, attribute, context }) => {
+    const key = `validation.attributes.${rule.name}.${attribute}`;
+    
+    return i18n.t(key, {
+      defaultValue: attribute,
+      ...context.allValues,
+    });
+  },
+});
+```
+
+### Multi-Language Example
+
+```ts
+import { configureSeal } from "@warlock.js/seal";
+
+const translations = {
+  en: {
+    "validation.rules.required": "The {{input}} is required",
+    "validation.rules.email": "The {{input}} must be a valid email address",
+    "validation.rules.minLength": "The {{input}} must be at least {{min}} characters",
+    "validation.rules.min": "The {{input}} must be at least {{min}}",
+  },
+  fr: {
+    "validation.rules.required": "Le {{input}} est obligatoire",
+    "validation.rules.email": "Le {{input}} doit être une adresse e-mail valide",
+    "validation.rules.minLength": "Le {{input}} doit contenir au moins {{min}} caractères",
+    "validation.rules.min": "Le {{input}} doit être au moins {{min}}",
+  },
+  es: {
+    "validation.rules.required": "El {{input}} es obligatorio",
+    "validation.rules.email": "El {{input}} debe ser una dirección de correo válida",
+    "validation.rules.minLength": "El {{input}} debe tener al menos {{min}} caracteres",
+    "validation.rules.min": "El {{input}} debe ser al menos {{min}}",
+  },
+};
+
+let currentLanguage = "en";
+
+configureSeal({
+  translateRule: ({ rule, attributes }) => {
+    const key = `validation.rules.${rule.name}`;
+    let message = translations[currentLanguage]?.[key] || key;
+    
+    // Replace placeholders with actual values
+    Object.entries(attributes).forEach(([k, v]) => {
+      message = message.replace(`{{${k}}}`, String(v));
+    });
+    
+    return message;
+  },
+});
+
+// Change language at runtime
+function setLanguage(lang: string) {
+  currentLanguage = lang;
+}
+```
+
+---
+
+## `getSealConfig()`
+
+Read the current Seal configuration.
+
+### Function Signature
+
+```ts
+export function getSealConfig(): SealConfig
+```
+
+### Example Usage
+
+```ts
+import { getSealConfig } from "@warlock.js/seal";
+
+// Get the current configuration
+const config = getSealConfig();
+
+console.log(config.firstErrorOnly); // true or false
+console.log(typeof config.translateRule); // "function"
+```
+
+---
+
+## `resetSealConfig()`
+
+Reset Seal's configuration to defaults. Useful for testing to ensure each test starts with a clean configuration.
+
+### Function Signature
+
+```ts
+export function resetSealConfig(): void
+```
+
+### Example Usage
+
+```ts
+import { resetSealConfig, configureSeal } from "@warlock.js/seal";
+
+describe("Validation Tests", () => {
+  beforeEach(() => {
+    // Reset to default configuration before each test
+    resetSealConfig();
+  });
+
+  it("should validate with default configuration", async () => {
+    const schema = v.object({
+      email: v.string().required().email(),
+    });
+
+    const result = await v.validate(schema, { email: "" });
+    
+    // Only first error returned (default: firstErrorOnly = true)
+    expect(result.errors.length).toBe(1);
+  });
+
+  it("should collect all errors when configured", async () => {
+    configureSeal({ firstErrorOnly: false });
+    
+    const schema = v.object({
+      name: v.string().required(),
+      email: v.string().required().email(),
+    });
+
+    const result = await v.validate(schema, { name: "", email: "" });
+    
+    // All errors returned
+    expect(result.errors.length).toBe(2);
+    
+    // Reset for next test
+    resetSealConfig();
+  });
+});
+```
+
+---
+
+## Setup & Best Practices
+
+### Application Startup
+
+Configure Seal once at your application entry point. This ensures all validation calls use your custom configuration:
+
+```ts
+// main.ts or app.ts
+import { configureSeal } from "@warlock.js/seal";
+
+// Configure before any validation calls
+configureSeal({
+  firstErrorOnly: false, // Collect all errors
+  translateRule: ({ rule, attributes }) =>
+    t(`validation.rules.${rule.name}`, attributes),
+});
+
+// Rest of your app initialization...
+```
+
+### With Next.js or Similar Frameworks
+
+```ts
+// lib/validation-setup.ts
+import { configureSeal } from "@warlock.js/seal";
+
+export function setupValidation() {
+  configureSeal({
+    firstErrorOnly: false,
+    translateRule: ({ rule, attributes }) => {
+      // Your translation logic here
+      return defaultMessages[rule.name] || rule.name;
+    },
+  });
+}
+
+// app/layout.tsx or _app.tsx
+import { setupValidation } from "@/lib/validation-setup";
+
+setupValidation();
+
+export default function App() {
+  // Your app...
+}
+```
+
+### With Express or Node.js APIs
+
+```ts
+// server.ts
+import express from "express";
+import { configureSeal } from "@warlock.js/seal";
+
+const app = express();
+
+// Configure Seal before defining routes
+configureSeal({
+  firstErrorOnly: false,
+  translateRule: ({ rule, attributes }) => {
+    return getLocalizedMessage(rule.name, attributes);
+  },
+});
+
+// Define routes...
+app.post("/api/users", (req, res) => {
+  // Validation now uses your custom configuration
+});
+```
+
+### Testing Tip
+
+Always reset the configuration in test setup to avoid test pollution:
+
+```ts
+import { resetSealConfig } from "@warlock.js/seal";
+
+beforeEach(() => {
+  resetSealConfig();
+});
+
+afterEach(() => {
+  resetSealConfig();
+});
+```
+
+---
+
+## See Also
+
+- [Error Messages](../concepts/error-messages) - Understanding and customizing validation errors
+- [Introduction](./introduction) - Getting started with Seal
+- [Quick Start](./quick-start) - Your first validation

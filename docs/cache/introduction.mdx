@@ -1,0 +1,100 @@
+---
+sidebar_position: 1
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+# Introduction
+
+`@warlock.js/cache` is a standalone Node.js caching library with 6 interchangeable drivers, cache tags, an event system, atomic operations, and stampede prevention.
+
+:::info Standalone Package
+Works independently of the Warlock framework in any Node.js environment — Express, Fastify, NestJS, Next.js, Remix, or any other runtime that runs on Node.js.
+:::
+
+## Installation
+
+<Tabs>
+  <TabItem value="npm" label="npm" default>
+
+```bash
+npm install @warlock.js/cache
+```
+
+  </TabItem>
+  <TabItem value="yarn" label="yarn">
+
+```bash
+yarn add @warlock.js/cache
+```
+
+  </TabItem>
+  <TabItem value="pnpm" label="pnpm">
+
+```bash
+pnpm add @warlock.js/cache
+```
+
+  </TabItem>
+</Tabs>
+
+## Core Operations
+
+| Method | Description |
+|--------|-------------|
+| `set(key, value, ttl)` | Store a value with optional TTL |
+| `get(key)` | Retrieve a cached value |
+| `remove(key)` | Delete a cache entry |
+| `has(key)` | Check if a key exists |
+| `pull(key)` | Get a value and delete it |
+| `forever(key, value)` | Store a value without expiration |
+| `remember(key, ttl, callback)` | Get cached value or compute and cache it (with stampede prevention) |
+| `flush()` | Clear all cache entries |
+| `increment(key, amount)` | Atomically increment a numeric value |
+| `decrement(key, amount)` | Atomically decrement a numeric value |
+| `setNX(key, value, ttl)` | Set value only if key doesn't exist |
+| `many(keys)` | Retrieve multiple values at once |
+| `setMany(entries, ttl)` | Store multiple values at once |
+| `removeNamespace(namespace)` | Delete all keys matching a namespace pattern |
+
+## Drivers
+
+| Use Case | Recommended Driver |
+|----------|-------------------|
+| Production, multi-server, distributed | Redis |
+| Local development, simple persistence | File |
+| Fastest, ephemeral, single-process | Memory |
+| Need sliding expiration | Memory Extended |
+| Limited memory, want LRU eviction | LRU Memory |
+| Testing, disable cache | Null |
+
+## Advanced Features
+
+- [Cache Tags](./tags) — group related entries and invalidate them together
+- [Events](./events) — observe every cache operation with 9 event types
+- [Atomic Operations](./atomic-operations) — increment, decrement, and set-if-not-exists without race conditions
+- [Stampede Prevention](./stampede-prevention) — `remember()` ensures only one concurrent regeneration per key
+
+## Quick Example
+
+```ts
+import { cache, RedisCacheDriver, CACHE_FOR } from "@warlock.js/cache";
+
+cache.setCacheConfigurations({
+  default: "redis",
+  drivers: { redis: RedisCacheDriver },
+  options: { redis: { url: process.env.REDIS_URL, globalPrefix: "shop" } },
+});
+await cache.init();
+
+// Cache a product for 1 hour
+const product = await cache.remember(
+  `products.${productId}`,
+  CACHE_FOR.ONE_HOUR,
+  () => db.products.findById(productId),
+);
+
+// Invalidate all cached orders for a user after checkout
+await cache.removeNamespace(`orders.${userId}`);
+```

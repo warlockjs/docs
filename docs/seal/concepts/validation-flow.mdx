@@ -1,0 +1,126 @@
+---
+title: Validation Flow
+description: How validation works in Seal
+---
+
+# Validation Flow
+
+Understanding how validation works in Seal from input to output.
+
+:::info Architecture First
+This page covers the validation process. For the complete architecture overview, see [Three-Layer Architecture](./three-layer-architecture).
+:::
+
+---
+
+## Overview
+
+Seal validation follows a specific flow:
+
+1. **Input** → Raw data
+2. **Mutators** → Transform data  
+3. **Validators** → Check data
+4. **Output** → Validation result
+
+---
+
+## Basic Flow Example
+
+```typescript
+// Input: "  USER@EXAMPLE.COM  "
+const result = await v.validate(
+  v.string().trim().lowercase().email().maxLength(100),
+  "  USER@EXAMPLE.COM  "
+);
+
+// Output: { isValid: true, data: "user@example.com", errors: [] }
+```
+
+---
+
+## Validation Result Structure
+
+```typescript
+interface ValidationResult {
+  isValid: boolean;
+  data: any; // The validated (and potentially mutated) data
+  errors: ValidationError[]; // Array of validation errors
+}
+
+interface ValidationError {
+  type: string; // The rule that failed
+  error: string; // The error message
+  input: string; // The field path that failed
+}
+```
+
+---
+
+## Error Handling
+
+### Single Error Mode
+
+```typescript
+const config = { firstErrorOnly: true };
+const result = await validate(schema, data, config);
+
+// Returns only the first error found
+{
+  isValid: false,
+  errors: [{
+    type: "minLength",
+    error: "The :input must be at least 5 characters",
+    input: "hi"
+  }],
+  data: "hi"
+}
+```
+
+### Multiple Errors Mode
+
+```typescript
+const config = { firstErrorOnly: false };
+const result = await validate(schema, data, config);
+
+// Returns all validation errors
+{
+  isValid: false,
+  errors: [
+    { type: "minLength", error: "...", input: "hi123" },
+    { type: "alpha", error: "...", input: "hi123" }
+  ],
+  data: "hi123"
+}
+```
+
+---
+
+## Performance Considerations
+
+### Early Exit
+
+```typescript
+// ✅ Good: Check required fields first
+v.string()
+  .required()       // Check first
+  .email()          // Then format
+  .maxLength(100)   // Then length
+```
+
+### Efficient Order
+
+```typescript
+// ✅ Good: Mutators before validators
+v.string()
+  .trim()           // Clean first
+  .lowercase()      // Normalize
+  .email()          // Then validate
+```
+
+---
+
+## See Also
+
+- [Three-Layer Architecture](./three-layer-architecture) - Complete architecture overview
+- [Error Messages](./error-messages) - Handling validation errors
+- [Type Inference](./type-inference) - TypeScript integration

@@ -1,0 +1,382 @@
+---
+title: Standard Schema and JSON Schema
+description: Use Seal validators with Standard Schema and generate JSON Schema outputs
+---
+
+# Standard Schema and JSON Schema
+
+Learn how Seal validators provide Standard Schema v1 support and can be converted to JSON Schema for ecosystem interoperability.
+
+---
+
+## Overview
+
+Every Seal validator is compliant with the [Standard Schema v1 specification](https://standardschema.dev/), enabling seamless integration with modern frameworks and tools that consume Standard Schema. Additionally, Seal provides powerful JSON Schema generation capabilities supporting multiple schema versions.
+
+### Why This Matters
+
+Standard Schema enables you to:
+- Use the same validator across multiple frameworks (tRPC, Hono, etc.)
+- Leverage ecosystem tooling without duplicating validation logic
+- Generate API documentation automatically from your validators
+- Export schema specifications for client-side validation
+
+---
+
+## Standard Schema Support
+
+Every Seal validator has a `~standard` property that provides Standard Schema v1 compliance.
+
+### Basic Usage
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().required().email(),
+  age: v.int().optional(),
+});
+
+// Access Standard Schema
+const standardSchema = userSchema["~standard"];
+```
+
+### Using with tRPC
+
+```typescript
+import { initTRPC } from "@trpc/server";
+import { v } from "@warlock.js/seal";
+
+const t = initTRPC.create({
+  transformer: superjson,
+  // Register Standard Schema validator
+  isValidationEnabled: () => true,
+});
+
+const userSchema = v.object({
+  id: v.int().required(),
+  name: v.string().required(),
+  email: v.string().required().email(),
+});
+
+export const createUserProcedure = t.procedure
+  .input(userSchema["~standard"])
+  .mutation(async ({ input }) => {
+    // input is validated using Seal
+    return { success: true, user: input };
+  });
+```
+
+### Using with Hono
+
+```typescript
+import { Hono } from "hono";
+import { v } from "@warlock.js/seal";
+
+const app = new Hono();
+
+const createUserSchema = v.object({
+  name: v.string().required(),
+  email: v.string().required().email(),
+});
+
+app.post("/users", async (c) => {
+  const body = await c.req.json();
+  
+  // Validate using Standard Schema
+  const result = await createUserSchema["~standard"].validate(body);
+  
+  if (!result.success) {
+    return c.json({ errors: result.issues }, 400);
+  }
+  
+  return c.json({ user: result.data });
+});
+```
+
+---
+
+## JSON Schema Generation
+
+Convert any Seal validator to JSON Schema using the `toJsonSchema()` method.
+
+### Basic Conversion
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().required().email(),
+  age: v.int().optional(),
+});
+
+// Generate JSON Schema (Draft 2020-12 by default)
+const jsonSchema = userSchema.toJsonSchema();
+
+console.log(JSON.stringify(jsonSchema, null, 2));
+// Output:
+// {
+//   "type": "object",
+//   "properties": {
+//     "name": { "type": "string" },
+//     "email": { "type": "string", "format": "email" },
+//     "age": { "type": "integer" }
+//   },
+//   "required": ["name", "email"]
+// }
+```
+
+### Specifying Target Schema Version
+
+Seal supports three target JSON Schema versions:
+
+#### Draft 2020-12 (Latest - Default)
+
+```typescript
+const jsonSchema = userSchema.toJsonSchema("draft-2020-12");
+```
+
+The latest and most feature-rich JSON Schema specification. Best for new projects.
+
+#### Draft-07 (Widely Supported)
+
+```typescript
+const jsonSchema = userSchema.toJsonSchema("draft-07");
+```
+
+Compatible with older tools and validators. Use this if you need broad compatibility.
+
+#### OpenAPI 3.0
+
+```typescript
+const jsonSchema = userSchema.toJsonSchema("openapi-3.0");
+```
+
+Optimized for OpenAPI/Swagger API documentation. Essential for generating API specs.
+
+---
+
+## Type Mapping Reference
+
+The following table shows how Seal validators map to JSON Schema types:
+
+| Seal Validator | JSON Schema Output |
+|---|---|
+| `v.string()` | `{ "type": "string" }` |
+| `v.number()` | `{ "type": "number" }` |
+| `v.int()` | `{ "type": "integer" }` |
+| `v.boolean()` | `{ "type": "boolean" }` |
+| `v.object({ name: v.string() })` | `{ "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"] }` |
+| `v.array(v.string())` | `{ "type": "array", "items": { "type": "string" } }` |
+| `v.union([v.string(), v.number()])` | `{ "oneOf": [{ "type": "string" }, { "type": "number" }] }` |
+| `v.record(v.string())` | `{ "type": "object", "additionalProperties": { "type": "string" } }` |
+| `v.tuple([v.string(), v.int()])` | Depends on target (see below) |
+
+---
+
+## Tuple Handling
+
+Tuples generate different JSON Schema structures depending on the target version:
+
+### Draft 2020-12
+
+```typescript
+const tupleSchema = v.tuple([v.string(), v.int(), v.boolean()]);
+const jsonSchema = tupleSchema.toJsonSchema("draft-2020-12");
+
+// Output:
+// {
+//   "type": "array",
+//   "prefixItems": [
+//     { "type": "string" },
+//     { "type": "integer" },
+//     { "type": "boolean" }
+//   ],
+//   "items": false,
+//   "minItems": 3,
+//   "maxItems": 3
+// }
+```
+
+### Draft-07
+
+```typescript
+const jsonSchema = tupleSchema.toJsonSchema("draft-07");
+
+// Output:
+// {
+//   "type": "array",
+//   "items": [
+//     { "type": "string" },
+//     { "type": "integer" },
+//     { "type": "boolean" }
+//   ],
+//   "additionalItems": false,
+//   "minItems": 3,
+//   "maxItems": 3
+// }
+```
+
+---
+
+## Nullable Values
+
+When using `.nullable()`, the JSON Schema representation differs by target version.
+
+### Draft 2020-12
+
+```typescript
+const schema = v.string().nullable();
+const jsonSchema = schema.toJsonSchema("draft-2020-12");
+
+// Output:
+// {
+//   "anyOf": [
+//     { "type": "string" },
+//     { "type": "null" }
+//   ]
+// }
+```
+
+### Draft-07
+
+```typescript
+const jsonSchema = schema.toJsonSchema("draft-07");
+
+// Output:
+// {
+//   "type": ["string", "null"]
+// }
+```
+
+### Combined Example
+
+```typescript
+const userSchema = v.object({
+  name: v.string().required(),
+  bio: v.string().nullable().optional(), // Can be string, null, or undefined
+  age: v.int().optional(),
+});
+
+const jsonSchema = userSchema.toJsonSchema("draft-2020-12");
+
+console.log(JSON.stringify(jsonSchema, null, 2));
+// Output:
+// {
+//   "type": "object",
+//   "properties": {
+//     "name": { "type": "string" },
+//     "bio": {
+//       "anyOf": [
+//         { "type": "string" },
+//         { "type": "null" }
+//       ]
+//     },
+//     "age": { "type": "integer" }
+//   },
+//   "required": ["name"]
+// }
+```
+
+---
+
+## Real-World Example
+
+Generate an API schema for documentation:
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+// Define your data models
+const addressSchema = v.object({
+  street: v.string().required(),
+  city: v.string().required(),
+  country: v.string().required(),
+  zipCode: v.string().optional(),
+});
+
+const userSchema = v.object({
+  id: v.int().required(),
+  email: v.string().required().email(),
+  username: v.string().required().minLength(3).maxLength(20),
+  age: v.int().optional(),
+  address: addressSchema.nullable().optional(),
+  tags: v.array(v.string()).optional(),
+});
+
+// Generate OpenAPI-compatible JSON Schema
+const openApiSchema = userSchema.toJsonSchema("openapi-3.0");
+
+// Save to your API documentation
+fs.writeFileSync("schemas/user.json", JSON.stringify(openApiSchema, null, 2));
+```
+
+---
+
+## Limitations
+
+### Computed and Managed Validators
+
+`v.computed()` and `v.managed()` validators are **not supported** in JSON Schema generation:
+
+```typescript
+const schema = v.computed((context) => {
+  // This will throw an error if you call .toJsonSchema() on it
+  return v.string();
+});
+
+// Throws: "Computed validators are not supported in JSON Schema generation"
+schema.toJsonSchema(); // Error!
+
+// However, ObjectValidator automatically skips them:
+const userSchema = v.object({
+  name: v.string(),
+  computed: v.computed(() => v.string()),
+  other: v.string(),
+});
+
+// Works fine - computed field is skipped
+const jsonSchema = userSchema.toJsonSchema();
+```
+
+### Custom Rules
+
+Custom rules added via `.addRule()` or `.refine()` are **not reflected** in the JSON Schema output:
+
+```typescript
+const schema = v.string()
+  .required()
+  .refine((value) => {
+    return value.length > 5 ? undefined : "Must be longer than 5 characters";
+  });
+
+const jsonSchema = schema.toJsonSchema();
+
+// Output:
+// { "type": "string" }
+//
+// Note: The custom rule validation is NOT included in the schema
+// Clients using the JSON Schema won't know about the length > 5 requirement
+```
+
+**Best Practice:** Include custom validation requirements in error messages or API documentation separately:
+
+```typescript
+const schema = v.string()
+  .required()
+  .minLength(6) // Use standard method instead of refine
+  .email(); // Use built-in validators when possible
+
+// Now the minLength constraint IS in the JSON Schema
+const jsonSchema = schema.toJsonSchema();
+```
+
+---
+
+## See Also
+
+- [Type Inference](../concepts/type-inference) - Understanding inferred types from validators
+- [Custom Rules](./custom-rules) - Creating validation rules that won't be in JSON Schema
+- [Tuple Validator](../tuple-validator/index) - Learn about tuple-specific validation

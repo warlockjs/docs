@@ -1,0 +1,40 @@
+{
+    "name": "@warlock.js/cache",
+    "version": "4.0.165",
+    "description": "A Robust Cache Manager for Nodejs",
+    "main": "./cjs/index.js",
+    "dependencies": {
+        "@mongez/fs": "^3.0.5",
+        "@mongez/reinforcements": "^2.3.17",
+        "@warlock.js/logger": "4.0.165"
+    },
+    "peerDependencies": {
+        "redis": "^4.6.10 || ^5.0.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/warlockjs/cache"
+    },
+    "keywords": [
+        "nodejs",
+        "cache",
+        "redis",
+        "lru",
+        "memory",
+        "caching",
+        "warlockjs",
+        "warlock.js",
+        "cache-manager",
+        "cache-manager-nodejs",
+        "cache-manager-node",
+        "cache-manager-nodejs-redis",
+        "cache-manager-node-redis",
+        "cache-manager-nodejs-memory",
+        "cache-manager-node-memory",
+        "cache-manager-nodejs-memcached"
+    ],
+    "author": "hassanzohdy",
+    "license": "MIT",
+    "module": "./esm/index.js",
+    "typings": "./cjs/index.d.ts"
+}

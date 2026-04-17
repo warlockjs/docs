@@ -1,0 +1,424 @@
+---
+title: Migration
+description: Migration guide from other validation libraries
+---
+
+# Migration
+
+Migration guide from other validation libraries to Seal.
+
+---
+
+## From Zod
+
+### Basic Migration
+
+```typescript
+// Before (Zod)
+import { z } from "zod";
+
+const userSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  age: z.number().min(18)
+});
+
+// After (Seal)
+import { v, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  email: v.string().required().email(),
+  password: v.string().required().minLength(8),
+  age: v.number().required().min(18)
+});
+```
+
+### Advanced Migration
+
+```typescript
+// Before (Zod)
+const userSchema = z.object({
+  email: z.string().email().transform(val => val.toLowerCase().trim()),
+  password: z.string().min(8).refine(val => isStrongPassword(val)),
+  confirmPassword: z.string()
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords must match",
+  path: ["confirmPassword"]
+});
+
+// After (Seal)
+const userSchema = v.object({
+  email: v.string().required().email().lowercase().trim(),
+  password: v.string().required().minLength(8).strongPassword(),
+  confirmPassword: v.string().required().sameAs("password")
+});
+```
+
+---
+
+## From Joi
+
+### Basic Migration
+
+```typescript
+// Before (Joi)
+import Joi from "joi";
+
+const userSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().min(8).required(),
+  age: Joi.number().min(18).required()
+});
+
+// After (Seal)
+import { v, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  email: v.string().required().email(),
+  password: v.string().required().minLength(8),
+  age: v.number().required().min(18)
+});
+```
+
+### Advanced Migration
+
+```typescript
+// Before (Joi)
+const userSchema = Joi.object({
+  email: Joi.string().email().required().lowercase().trim(),
+  password: Joi.string().min(8).required().custom((value, helpers) => {
+    if (!isStrongPassword(value)) {
+      return helpers.error('password.weak');
+    }
+    return value;
+  }),
+  confirmPassword: Joi.string().required().valid(Joi.ref('password'))
+});
+
+// After (Seal)
+const userSchema = v.object({
+  email: v.string().required().email().lowercase().trim(),
+  password: v.string().required().minLength(8).strongPassword(),
+  confirmPassword: v.string().required().sameAs("password")
+});
+```
+
+---
+
+## From Yup
+
+### Basic Migration
+
+```typescript
+// Before (Yup)
+import * as yup from "yup";
+
+const userSchema = yup.object({
+  email: yup.string().email().required(),
+  password: yup.string().min(8).required(),
+  age: yup.number().min(18).required()
+});
+
+// After (Seal)
+import { v, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  email: v.string().required().email(),
+  password: v.string().required().minLength(8),
+  age: v.number().required().min(18)
+});
+```
+
+### Advanced Migration
+
+```typescript
+// Before (Yup)
+const userSchema = yup.object({
+  email: yup.string().email().required().lowercase().trim(),
+  password: yup.string().min(8).required().test('strong', 'Password must be strong', isStrongPassword),
+  confirmPassword: yup.string().required().oneOf([yup.ref('password')], 'Passwords must match')
+});
+
+// After (Seal)
+const userSchema = v.object({
+  email: v.string().required().email().lowercase().trim(),
+  password: v.string().required().minLength(8).strongPassword(),
+  confirmPassword: v.string().required().sameAs("password")
+});
+```
+
+---
+
+## From Ajv
+
+### Basic Migration
+
+```typescript
+// Before (Ajv)
+import Ajv from "ajv";
+
+const userSchema = {
+  type: "object",
+  properties: {
+    email: { type: "string", format: "email" },
+    password: { type: "string", minLength: 8 },
+    age: { type: "number", minimum: 18 }
+  },
+  required: ["email", "password", "age"],
+  additionalProperties: false
+};
+
+// After (Seal)
+import { v, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  email: v.string().required().email(),
+  password: v.string().required().minLength(8),
+  age: v.number().required().min(18)
+});
+```
+
+### Advanced Migration
+
+```typescript
+// Before (Ajv)
+const userSchema = {
+  type: "object",
+  properties: {
+    email: { type: "string", format: "email" },
+    password: { type: "string", minLength: 8 },
+    confirmPassword: { type: "string" }
+  },
+  required: ["email", "password", "confirmPassword"],
+  additionalProperties: false,
+  if: {
+    properties: { password: { type: "string" } }
+  },
+  then: {
+    properties: {
+      confirmPassword: { const: { $data: "1/password" } }
+    }
+  }
+};
+
+// After (Seal)
+const userSchema = v.object({
+  email: v.string().required().email(),
+  password: v.string().required().minLength(8),
+  confirmPassword: v.string().required().sameAs("password")
+});
+```
+
+---
+
+## From Class Validator
+
+### Basic Migration
+
+```typescript
+// Before (Class Validator)
+import { IsEmail, IsString, MinLength, IsNumber, Min } from "class-validator";
+
+class User {
+  @IsEmail()
+  @IsString()
+  email: string;
+
+  @IsString()
+  @MinLength(8)
+  password: string;
+
+  @IsNumber()
+  @Min(18)
+  age: number;
+}
+
+// After (Seal)
+import { v, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  email: v.string().required().email(),
+  password: v.string().required().minLength(8),
+  age: v.number().required().min(18)
+});
+```
+
+### Advanced Migration
+
+```typescript
+// Before (Class Validator)
+import { IsEmail, IsString, MinLength, Matches, ValidateIf } from "class-validator";
+
+class User {
+  @IsEmail()
+  @IsString()
+  email: string;
+
+  @IsString()
+  @MinLength(8)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
+    message: "Password must be strong"
+  })
+  password: string;
+
+  @IsString()
+  @ValidateIf(o => o.password)
+  @Matches('password')
+  confirmPassword: string;
+}
+
+// After (Seal)
+const userSchema = v.object({
+  email: v.string().required().email(),
+  password: v.string().required().minLength(8).strongPassword(),
+  confirmPassword: v.string().required().sameAs("password")
+});
+```
+
+---
+
+## Migration Checklist
+
+### 1. Install Seal
+
+```bash
+npm install @warlock.js/seal
+```
+
+### 2. Update Imports
+
+```typescript
+// Before
+import { z } from "zod";
+import Joi from "joi";
+import * as yup from "yup";
+
+// After
+import { v, type Infer } from "@warlock.js/seal";
+```
+
+### 3. Convert Schemas
+
+```typescript
+// Before
+const schema = z.object({
+  name: z.string().min(2),
+  email: z.string().email()
+});
+
+// After
+const schema = v.object({
+  name: v.string().required().minLength(2),
+  email: v.string().required().email()
+});
+```
+
+### 4. Update Type Inference
+
+```typescript
+// Before
+type User = z.infer<typeof userSchema>;
+
+// After
+type User = Infer<typeof userSchema>;
+```
+
+### 5. Update Validation Calls
+
+```typescript
+// Before
+const result = userSchema.parse(data);
+
+// After
+const result = await validate(userSchema, data);
+```
+
+---
+
+## Common Migration Issues
+
+### 1. Required Fields
+
+```typescript
+// Before (Zod)
+const schema = z.object({
+  name: z.string(), // Optional by default
+  email: z.string().email()
+});
+
+// After (Seal)
+const schema = v.object({
+  name: v.string().required(), // Explicitly required
+  email: v.string().required().email()
+});
+```
+
+### 2. Error Handling
+
+```typescript
+// Before (Zod)
+try {
+  const result = userSchema.parse(data);
+  return result;
+} catch (error) {
+  if (error instanceof z.ZodError) {
+    return { errors: error.errors };
+  }
+}
+
+// After (Seal)
+const result = await validate(userSchema, data);
+if (!result.isValid) {
+  return { errors: result.errors };
+}
+return result.data;
+```
+
+### 3. Custom Validation
+
+```typescript
+// Before (Zod)
+const schema = z.string().refine(val => val.length > 5, {
+  message: "Must be at least 6 characters"
+});
+
+// After (Seal)
+const schema = v.string().refine((value, context) => {
+  if (value.length < 6) {
+    return "Must be at least 6 characters";
+  }
+  return undefined;
+});
+```
+
+---
+
+## Performance Benefits
+
+### Bundle Size Reduction
+
+```typescript
+// Before (Zod)
+import { z } from "zod"; // ~25KB
+
+// After (Seal)
+import { v } from "@warlock.js/seal"; // ~15KB
+```
+
+### Validation Speed
+
+```typescript
+// Before (Zod)
+const result = userSchema.parse(data); // Slower
+
+// After (Seal)
+const result = await validate(userSchema, data); // Faster
+```
+
+---
+
+## See Also
+
+- [Cookbook](./cookbook) - Common validation patterns
+- [Best Practices](./best-practices) - Validation best practices
+- [Comparison](./comparison) - Compare with other libraries

@@ -1,0 +1,252 @@
+---
+sidebar_position: 6
+---
+
+# Redis Cache Driver
+
+[Redis](https://redis.io/) is a high-performance, in-memory data store. It is ideal for distributed, production-grade caching.
+
+## When to Use
+- Production environments
+- Multi-server or distributed systems
+- Need for persistence, high availability, or large cache sizes
+
+## Best For
+- Caching API/database responses
+- Session storage
+- Shared cache between multiple app instances
+
+## Limitations
+- Requires Redis server setup
+- Slightly more operational overhead than memory/file
+
+## Alternatives
+- [File Cache Driver](./file): Simpler, persistent, but not distributed
+- [Memory Cache Driver](./memory): Fastest, but not shared or persistent
+
+## Configuration
+
+Configure the Redis driver in your [cache configurations](./configurations):
+
+### Using Connection URL (Recommended)
+
+```ts title="src/config/cache.ts"
+import { env } from "@mongez/dotenv";
+import { CacheConfigurations, RedisCacheDriver } from "@warlock.js/cache";
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    redis: RedisCacheDriver,
+  },
+  default: env("CACHE_DRIVER", "redis"),
+  options: {
+    redis: {
+      url: env("REDIS_URL", "redis://localhost:6379"),
+      globalPrefix: "prod-app",
+      ttl: 60 * 60 * 24, // 24 hours
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+### Using Host and Port
+
+```ts title="src/config/cache.ts"
+import { env } from "@mongez/dotenv";
+import { CacheConfigurations, RedisCacheDriver } from "@warlock.js/cache";
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    redis: RedisCacheDriver,
+  },
+  default: env("CACHE_DRIVER", "redis"),
+  options: {
+    redis: {
+      host: env("REDIS_HOST", "localhost"),
+      port: env("REDIS_PORT", 6379),
+      username: env("REDIS_USERNAME"),
+      password: env("REDIS_PASSWORD"),
+      globalPrefix: "prod-app",
+      ttl: 60 * 60 * 24, // 24 hours
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+:::tip
+Ensure Redis is installed and running on your machine or server.
+:::
+
+## Options {#options}
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `host` | string | `"localhost"` | Redis server host |
+| `port` | number | `6379` | Redis server port |
+| `username` | string | `undefined` | Redis username for authentication |
+| `password` | string | `undefined` | Redis password for authentication |
+| `url` | string | `undefined` | Redis connection URL (overrides host/port) |
+| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys |
+| `ttl` | number | `Infinity` | Default TTL in seconds |
+| `clientOptions` | object | `{}` | Additional Redis client options |
+
+### Connection Options
+
+```ts
+{
+  host: "localhost",           // Redis host
+  port: 6379,                  // Redis port
+  username: "default",         // Redis username
+  password: "your-password",   // Redis password
+  url: "redis://user:pass@host:port", // Alternative: use URL
+}
+```
+
+### Global Prefix
+
+```ts
+{
+  globalPrefix: "myapp",       // Static prefix
+  // OR
+  globalPrefix: () => `app-${Date.now()}`, // Dynamic prefix
+}
+```
+
+### TTL Configuration
+
+```ts
+{
+  ttl: 3600,                   // 1 hour default TTL
+  // OR
+  ttl: 60 * 60 * 24,          // 24 hours
+  // OR
+  ttl: Infinity,               // Never expire (default)
+}
+```
+
+### Advanced Client Options
+
+```ts
+{
+  clientOptions: {
+    retry_strategy: (options) => {
+      if (options.total_retry_time > 1000 * 60 * 60) {
+        return new Error('Retry time exhausted');
+      }
+      if (options.attempt > 10) {
+        return undefined;
+      }
+      return Math.min(options.attempt * 100, 3000);
+    },
+    max_attempts: 3,
+    connect_timeout: 10000,
+  }
+}
+```
+
+## Example Usage
+
+## Storing and Retrieving Data
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+await cache.set("products.789", { name: "Keyboard", price: 129 }, CACHE_FOR.ONE_HOUR);
+const product = await cache.get("products.789");
+```
+
+## Atomic Operations
+
+The Redis driver provides native atomic operations using Redis commands. These are **race-condition free** even in distributed systems.
+
+### Atomic Increment and Decrement
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// Atomic increment using Redis INCRBY command
+const views = await cache.increment("page.views", 1);
+
+// Atomic decrement using Redis DECRBY command
+const remaining = await cache.decrement("api.quota", 10);
+```
+
+**Under the hood:**
+- `increment()` uses Redis `INCRBY` command
+- `decrement()` uses Redis `DECRBY` command
+- Both are atomic at Redis level - guaranteed race-free
+
+### Set If Not Exists (Distributed Locking)
+
+The `setNX()` method uses Redis `SET NX` command for atomic "set if not exists" operations. This is perfect for distributed locking:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// Try to acquire a lock
+const acquired = await cache.setNX("lock:critical-operation", "locked", 30);
+
+if (acquired) {
+  try {
+    // Lock acquired, perform operation
+    await performCriticalOperation();
+  } finally {
+    // Always release lock
+    await cache.remove("lock:critical-operation");
+  }
+} else {
+  // Lock already exists
+  throw new Error("Operation already in progress");
+}
+```
+
+**Use cases:**
+- Distributed locking across multiple servers
+- Idempotency keys (ensure operation runs only once)
+- Leader election
+- Preventing duplicate processing
+
+### Why Atomic Operations Matter
+
+In distributed systems, multiple servers might try to modify the same cache key simultaneously:
+
+```ts
+// ❌ WITHOUT ATOMIC OPERATIONS (Race condition)
+const views = await cache.get("page.views") || 0;
+await cache.set("page.views", views + 1);
+// Two servers both read 100, both write 101 → Wrong!
+
+// ✅ WITH ATOMIC OPERATIONS (Race-free)
+await cache.increment("page.views", 1);
+// Redis INCRBY is atomic → Always correct!
+```
+
+See [Atomic Operations](./atomic-operations) for comprehensive documentation and examples.
+
+## Accessing the Redis Client
+
+For advanced Redis operations, you can access the underlying Redis client:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+const redisClient = cache.client;
+
+// Use native Redis commands if needed
+await redisClient.zAdd("leaderboard", {
+  score: 100,
+  value: "player1"
+});
+```
+
+## Troubleshooting
+- **Connection errors?** Check your Redis server is running and credentials are correct.
+- **Data not shared between servers?** Make sure all instances use the same Redis server.
+- **setNX() throws error?** `setNX()` is only available on Redis driver - make sure you're using Redis, not memory/file drivers.
+- **Race conditions?** Use atomic operations (`increment()`, `decrement()`, `setNX()`) instead of manual get/set for counters and locks.
+
+:::note
+:::

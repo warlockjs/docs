@@ -1,0 +1,1077 @@
+---
+title: Date Validators
+description: Validate date and time values
+sidebar_position: 9
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Date Validators
+
+Date validators check date and time values after mutators have been applied. They validate ranges, times, ages, weekdays, and more.
+
+---
+
+## All Validators
+
+<div className="methods-grid">
+
+<MethodCard
+  name="min()"
+  description="Minimum date"
+  href="#min"
+/>
+
+<MethodCard
+  name="max()"
+  description="Maximum date"
+  href="#max"
+/>
+
+<MethodCard
+  name="before()"
+  description="Must be before date"
+  href="#before"
+/>
+
+<MethodCard
+  name="after()"
+  description="Must be after date"
+  href="#after"
+/>
+
+<MethodCard
+  name="between()"
+  description="Date between range"
+  href="#between"
+/>
+
+<MethodCard
+  name="today()"
+  description="Must be today"
+  href="#today"
+/>
+
+<MethodCard
+  name="fromToday()"
+  description="Today or future"
+  href="#fromtoday"
+/>
+
+<MethodCard
+  name="beforeToday()"
+  description="Must be before today"
+  href="#beforetoday"
+/>
+
+<MethodCard
+  name="afterToday()"
+  description="Must be after today"
+  href="#aftertoday"
+/>
+
+<MethodCard
+  name="past()"
+  description="Must be in past"
+  href="#past"
+/>
+
+<MethodCard
+  name="future()"
+  description="Must be in future"
+  href="#future"
+/>
+
+<MethodCard
+  name="fromHour()"
+  description="From specific hour"
+  href="#fromhour"
+/>
+
+<MethodCard
+  name="beforeHour()"
+  description="Before specific hour"
+  href="#beforehour"
+/>
+
+<MethodCard
+  name="betweenHours()"
+  description="Between hours"
+  href="#betweenhours"
+/>
+
+<MethodCard
+  name="fromMinute()"
+  description="From specific minute"
+  href="#fromminute"
+/>
+
+<MethodCard
+  name="beforeMinute()"
+  description="Before specific minute"
+  href="#beforeminute"
+/>
+
+<MethodCard
+  name="betweenMinutes()"
+  description="Between minutes"
+  href="#betweenminutes"
+/>
+
+<MethodCard
+  name="betweenTimes()"
+  description="Between times"
+  href="#betweentimes"
+/>
+
+<MethodCard
+  name="age()"
+  description="Exact age"
+  href="#age"
+/>
+
+<MethodCard
+  name="minAge()"
+  description="Minimum age"
+  href="#minage"
+/>
+
+<MethodCard
+  name="maxAge()"
+  description="Maximum age"
+  href="#maxage"
+/>
+
+<MethodCard
+  name="betweenAge()"
+  description="Age between range"
+  href="#betweenage"
+/>
+
+<MethodCard
+  name="birthday()"
+  description="Valid birthday"
+  href="#birthday"
+/>
+
+<MethodCard
+  name="weekDay()"
+  description="Specific weekday"
+  href="#weekday"
+/>
+
+<MethodCard
+  name="weekdays()"
+  description="One of weekdays"
+  href="#weekdays"
+/>
+
+<MethodCard
+  name="weekend()"
+  description="Must be weekend"
+  href="#weekend"
+/>
+
+<MethodCard
+  name="businessDay()"
+  description="Must be business day"
+  href="#businessday"
+/>
+
+<MethodCard
+  name="format()"
+  description="Match specific format"
+  href="#format"
+/>
+
+<MethodCard
+  name="month()"
+  description="Specific month"
+  href="#month"
+/>
+
+<MethodCard
+  name="year()"
+  description="Specific year"
+  href="#year"
+/>
+
+<MethodCard
+  name="betweenYears()"
+  description="Between years"
+  href="#betweenyears"
+/>
+
+<MethodCard
+  name="betweenMonths()"
+  description="Between months"
+  href="#betweenmonths"
+/>
+
+<MethodCard
+  name="betweenDays()"
+  description="Between days"
+  href="#betweendays"
+/>
+
+<MethodCard
+  name="minYear()"
+  description="Minimum year"
+  href="#minyear"
+/>
+
+<MethodCard
+  name="maxYear()"
+  description="Maximum year"
+  href="#maxyear"
+/>
+
+<MethodCard
+  name="minMonth()"
+  description="Minimum month"
+  href="#minmonth"
+/>
+
+<MethodCard
+  name="maxMonth()"
+  description="Maximum month"
+  href="#maxmonth"
+/>
+
+<MethodCard
+  name="minDay()"
+  description="Minimum day"
+  href="#minday"
+/>
+
+<MethodCard
+  name="maxDay()"
+  description="Maximum day"
+  href="#maxday"
+/>
+
+<MethodCard
+  name="quarter()"
+  description="Specific quarter"
+  href="#quarter"
+/>
+
+<MethodCard
+  name="leapYear()"
+  description="Must be leap year"
+  href="#leapyear"
+/>
+
+<MethodCard
+  name="withinDays()"
+  description="Within days from now"
+  href="#withindays"
+/>
+
+<MethodCard
+  name="withinPastDays()"
+  description="Within past days"
+  href="#withinpastdays"
+/>
+
+<MethodCard
+  name="withinFutureDays()"
+  description="Within future days"
+  href="#withinfuturedays"
+/>
+
+<MethodCard
+  name="sameAsField()"
+  description="Same as field"
+  href="#sameasfield"
+/>
+
+<MethodCard
+  name="sameAsFieldSibling()"
+  description="Same as sibling field"
+  href="#sameasfieldsibling"
+/>
+
+<MethodCard
+  name="minSibling()"
+  description="Min sibling field"
+  href="#minsibling"
+/>
+
+<MethodCard
+  name="maxSibling()"
+  description="Max sibling field"
+  href="#maxsibling"
+/>
+
+<MethodCard
+  name="beforeSibling()"
+  description="Before sibling field"
+  href="#beforesibling"
+/>
+
+<MethodCard
+  name="afterSibling()"
+  description="After sibling field"
+  href="#aftersibling"
+/>
+
+<MethodCard
+  name="betweenYearsSibling()"
+  description="Between sibling years"
+  href="#betweenyearssibling"
+/>
+
+<MethodCard
+  name="betweenMonthsSibling()"
+  description="Between sibling months"
+  href="#betweenmonthssibling"
+/>
+
+<MethodCard
+  name="betweenDaysSibling()"
+  description="Between sibling days"
+  href="#betweendayssibling"
+/>
+
+<MethodCard
+  name="minYearSibling()"
+  description="Min sibling year"
+  href="#minyearsibling"
+/>
+
+<MethodCard
+  name="maxYearSibling()"
+  description="Max sibling year"
+  href="#maxyearsibling"
+/>
+
+<MethodCard
+  name="minMonthSibling()"
+  description="Min sibling month"
+  href="#minmonthsibling"
+/>
+
+<MethodCard
+  name="maxMonthSibling()"
+  description="Max sibling month"
+  href="#maxmonthsibling"
+/>
+
+<MethodCard
+  name="minDaySibling()"
+  description="Min sibling day"
+  href="#mindaysibling"
+/>
+
+<MethodCard
+  name="maxDaySibling()"
+  description="Max sibling day"
+  href="#maxdaysibling"
+/>
+
+</div>
+
+---
+
+## Date Comparison
+
+### min(dateOrField) {#min}
+
+Date must be greater than or equal to the given date or field (inclusive)
+
+```typescript
+v.date().min('2024-01-01')     // Value comparison
+v.date().min(new Date())       // Value comparison
+v.date().min('startsAt')       // Field comparison
+// Input: "2024-12-25" → Valid ✅
+// Input: "2023-12-25" → Invalid ❌
+```
+
+### max(dateOrField) {#max}
+
+Date must be less than or equal to the given date or field (inclusive)
+
+```typescript
+v.date().max('2024-12-31')     // Value comparison
+v.date().max('endsAt')         // Field comparison
+// Input: "2024-12-25" → Valid ✅
+// Input: "2025-01-01" → Invalid ❌
+```
+
+### before(dateOrField) {#before}
+
+Date must be strictly less than the given date or field (exclusive)
+
+```typescript
+v.date().before('2024-12-31')
+// Input: "2024-12-30" → Valid ✅
+// Input: "2024-12-31" → Invalid ❌
+```
+
+### after(dateOrField) {#after}
+
+Date must be strictly greater than the given date or field (exclusive)
+
+```typescript
+v.date().after('2024-01-01')
+// Input: "2024-01-02" → Valid ✅
+// Input: "2024-01-01" → Invalid ❌
+```
+
+### between(startDate, endDate) {#between}
+
+Date must be between start and end dates
+
+```typescript
+v.date().between(new Date('2024-01-01'), new Date('2024-12-31'))
+// Input: "2024-06-15" → Valid ✅
+// Input: "2023-12-31" → Invalid ❌
+```
+
+### today() {#today}
+
+Date must be exactly today
+
+```typescript
+v.date().today()
+// Input: Today's date → Valid ✅
+// Input: Yesterday's date → Invalid ❌
+```
+
+### fromToday() {#fromtoday}
+
+Date must be today or in the future
+
+```typescript
+v.date().fromToday()
+// Input: Today or future date → Valid ✅
+// Input: Past date → Invalid ❌
+```
+
+### beforeToday() {#beforetoday}
+
+Date must be before today
+
+```typescript
+v.date().beforeToday()
+// Input: Past date → Valid ✅
+// Input: Today or future date → Invalid ❌
+```
+
+### afterToday() {#aftertoday}
+
+Date must be after today (not including today)
+
+```typescript
+v.date().afterToday()
+// Input: Future date → Valid ✅
+// Input: Today or past date → Invalid ❌
+```
+
+### past() {#past}
+
+Date must be in the past
+
+```typescript
+v.date().past()
+// Input: Past date → Valid ✅
+// Input: Today or future date → Invalid ❌
+```
+
+### future() {#future}
+
+Date must be in the future
+
+```typescript
+v.date().future()
+// Input: Future date → Valid ✅
+// Input: Today or past date → Invalid ❌
+```
+
+---
+
+## Time Validation
+
+### fromHour(hour) {#fromhour}
+
+Time must be from specific hour onwards (0-23)
+
+```typescript
+v.date().fromHour(9)
+// Input: "2024-12-25 09:00" → Valid ✅
+// Input: "2024-12-25 08:00" → Invalid ❌
+```
+
+### beforeHour(hour) {#beforehour}
+
+Time must be before specific hour (0-23)
+
+```typescript
+v.date().beforeHour(17)
+// Input: "2024-12-25 16:00" → Valid ✅
+// Input: "2024-12-25 17:00" → Invalid ❌
+```
+
+### betweenHours(startHour, endHour) {#betweenhours}
+
+Time must be between start and end hours (0-23)
+
+```typescript
+v.date().betweenHours(9, 17)
+// Input: "2024-12-25 14:00" → Valid ✅
+// Input: "2024-12-25 08:00" → Invalid ❌
+```
+
+### fromMinute(minute) {#fromminute}
+
+Time must be from specific minute onwards (0-59)
+
+```typescript
+v.date().fromMinute(30)
+// Input: "2024-12-25 14:30" → Valid ✅
+// Input: "2024-12-25 14:29" → Invalid ❌
+```
+
+### beforeMinute(minute) {#beforeminute}
+
+Time must be before specific minute (0-59)
+
+```typescript
+v.date().beforeMinute(45)
+// Input: "2024-12-25 14:44" → Valid ✅
+// Input: "2024-12-25 14:45" → Invalid ❌
+```
+
+### betweenMinutes(startMinute, endMinute) {#betweenminutes}
+
+Time must be between start and end minutes (0-59)
+
+```typescript
+v.date().betweenMinutes(30, 45)
+// Input: "2024-12-25 14:35" → Valid ✅
+// Input: "2024-12-25 14:20" → Invalid ❌
+```
+
+### betweenTimes(startTime, endTime) {#betweentimes}
+
+Time must be between start and end times (HH:MM format)
+
+```typescript
+v.date().betweenTimes('09:00', '17:00')
+// Input: "2024-12-25 14:30" → Valid ✅
+// Input: "2024-12-25 08:00" → Invalid ❌
+```
+
+---
+
+## Age Validation
+
+### age(years) {#age}
+
+Age must be exactly the given years
+
+```typescript
+v.date().age(18)
+// Input: Date 18 years ago → Valid ✅
+// Input: Date 17 years ago → Invalid ❌
+```
+
+### minAge(years) {#minage}
+
+Minimum age requirement
+
+```typescript
+v.date().minAge(18)
+// Input: Date 18+ years ago → Valid ✅
+// Input: Date 17 years ago → Invalid ❌
+```
+
+### maxAge(years) {#maxage}
+
+Maximum age requirement
+
+```typescript
+v.date().maxAge(65)
+// Input: Date 65 or less years ago → Valid ✅
+// Input: Date 66 years ago → Invalid ❌
+```
+
+### betweenAge(minAge, maxAge) {#betweenage}
+
+Age must be between min and max years
+
+```typescript
+v.date().betweenAge(18, 65)
+// Input: Date 18-65 years ago → Valid ✅
+// Input: Date 17 years ago → Invalid ❌
+```
+
+### birthday(minAge?, maxAge?) {#birthday}
+
+Valid birthday (not in future, reasonable age)
+
+```typescript
+v.date().birthday(18, 120)
+// Input: Valid birthday → Valid ✅
+// Input: Future date → Invalid ❌
+```
+
+---
+
+## Day Validation
+
+### weekDay(day) {#weekday}
+
+Date must be specific weekday
+
+```typescript
+v.date().weekDay('monday')
+// Input: Monday → Valid ✅
+// Input: Tuesday → Invalid ❌
+```
+
+### weekdays(days) {#weekdays}
+
+Date must be one of specified weekdays
+
+```typescript
+v.date().weekdays(['monday', 'wednesday', 'friday'])
+// Input: Monday → Valid ✅
+// Input: Tuesday → Invalid ❌
+```
+
+### weekend() {#weekend}
+
+Date must be a weekend (Saturday or Sunday)
+
+```typescript
+v.date().weekend()
+// Input: Saturday or Sunday → Valid ✅
+// Input: Monday → Invalid ❌
+```
+
+### businessDay() {#businessday}
+
+Date must be a business day (Monday-Friday)
+
+```typescript
+v.date().businessDay()
+// Input: Monday-Friday → Valid ✅
+// Input: Saturday → Invalid ❌
+```
+
+### format(format) {#format}
+
+Date must match specific format
+
+```typescript
+v.date().format('YYYY-MM-DD')
+// Input: "2024-12-25" → Valid ✅
+// Input: "25/12/2024" → Invalid ❌
+```
+
+---
+
+## Period Validation
+
+### month(month) {#month}
+
+Date must be in specific month (1-12)
+
+```typescript
+v.date().month(12)
+// Input: December → Valid ✅
+// Input: November → Invalid ❌
+```
+
+### year(year) {#year}
+
+Date must be in specific year
+
+```typescript
+v.date().year(2024)
+// Input: 2024 → Valid ✅
+// Input: 2023 → Invalid ❌
+```
+
+### betweenYears(startYear, endYear) {#betweenyears}
+
+Date must be between start and end years. Smart detection: number or field name.
+
+```typescript
+v.date().betweenYears(2020, 2030)           // Value comparison
+v.date().betweenYears('startYear', 'endYear') // Field comparison
+// Input: 2024 → Valid ✅
+// Input: 2019 → Invalid ❌
+```
+
+### betweenMonths(startMonth, endMonth) {#betweenmonths}
+
+Date must be between start and end months (1-12). Smart detection: number or field name.
+
+```typescript
+v.date().betweenMonths(6, 9)                    // Value comparison
+v.date().betweenMonths('startMonth', 'endMonth') // Field comparison
+// Input: July-August-September → Valid ✅
+// Input: May → Invalid ❌
+```
+
+### betweenDays(startDay, endDay) {#betweendays}
+
+Date must be between start and end days (1-31). Smart detection: number or field name.
+
+```typescript
+v.date().betweenDays(1, 15)                 // Value comparison
+v.date().betweenDays('startDay', 'endDay')  // Field comparison
+// Input: Day 10 → Valid ✅
+// Input: Day 20 → Invalid ❌
+```
+
+### minYear(yearOrField) {#minyear}
+
+Year must be greater than or equal to given year or field. Smart detection: number or field name.
+
+```typescript
+v.date().minYear(2024)           // Value comparison
+v.date().minYear('startYear')    // Field comparison
+// Input: 2024 or later → Valid ✅
+// Input: 2023 → Invalid ❌
+```
+
+### maxYear(yearOrField) {#maxyear}
+
+Year must be less than or equal to given year or field. Smart detection: number or field name.
+
+```typescript
+v.date().maxYear(2030)           // Value comparison
+v.date().maxYear('endYear')      // Field comparison
+// Input: 2030 or earlier → Valid ✅
+// Input: 2031 → Invalid ❌
+```
+
+### minMonth(monthOrField) {#minmonth}
+
+Month must be greater than or equal to given month or field (1-12). Smart detection: number or field name.
+
+```typescript
+v.date().minMonth(6)             // Value comparison
+v.date().minMonth('startMonth')  // Field comparison
+// Input: June or later → Valid ✅
+// Input: May → Invalid ❌
+```
+
+### maxMonth(monthOrField) {#maxmonth}
+
+Month must be less than or equal to given month or field (1-12). Smart detection: number or field name.
+
+```typescript
+v.date().maxMonth(9)             // Value comparison
+v.date().maxMonth('endMonth')    // Field comparison
+// Input: September or earlier → Valid ✅
+// Input: October → Invalid ❌
+```
+
+### minDay(dayOrField) {#minday}
+
+Day must be greater than or equal to given day or field (1-31). Smart detection: number or field name.
+
+```typescript
+v.date().minDay(1)               // Value comparison
+v.date().minDay('startDay')      // Field comparison
+// Input: Day 1 or later → Valid ✅
+// Input: Day 0 → Invalid ❌
+```
+
+### maxDay(dayOrField) {#maxday}
+
+Day must be less than or equal to given day or field (1-31). Smart detection: number or field name.
+
+```typescript
+v.date().maxDay(31)              // Value comparison
+v.date().maxDay('endDay')        // Field comparison
+// Input: Day 31 or earlier → Valid ✅
+// Input: Day 32 → Invalid ❌
+```
+
+### quarter(quarter) {#quarter}
+
+Date must be in specific quarter (1-4)
+
+```typescript
+v.date().quarter(4)
+// Input: Q4 (Oct-Dec) → Valid ✅
+// Input: Q1 (Jan-Mar) → Invalid ❌
+```
+
+### leapYear() {#leapyear}
+
+Date must be in a leap year
+
+```typescript
+v.date().leapYear()
+// Input: 2024 (leap year) → Valid ✅
+// Input: 2023 (not leap year) → Invalid ❌
+```
+
+---
+
+## Relative Date Validation
+
+### withinDays(days) {#withindays}
+
+Date must be within X days from now (past or future)
+
+```typescript
+v.date().withinDays(7)
+// Input: Within 7 days → Valid ✅
+// Input: 8+ days away → Invalid ❌
+```
+
+### withinPastDays(days) {#withinpastdays}
+
+Date must be within X days in the past
+
+```typescript
+v.date().withinPastDays(7)
+// Input: Within last 7 days → Valid ✅
+// Input: 8+ days ago → Invalid ❌
+```
+
+### withinFutureDays(days) {#withinfuturedays}
+
+Date must be within X days in the future
+
+```typescript
+v.date().withinFutureDays(7)
+// Input: Within next 7 days → Valid ✅
+// Input: 8+ days away → Invalid ❌
+```
+
+---
+
+## Field Comparison
+
+### sameAsField(field) {#sameasfield}
+
+Date must be the same as another field's date
+
+```typescript
+v.date().sameAsField('startDate')
+// Input: Same as startDate → Valid ✅
+// Input: Different from startDate → Invalid ❌
+```
+
+### sameAsFieldSibling(field) {#sameasfieldsibling}
+
+Date must be the same as another sibling field's date
+
+```typescript
+v.date().sameAsFieldSibling('startDate')
+// Input: Same as sibling startDate → Valid ✅
+// Input: Different from sibling startDate → Invalid ❌
+```
+
+### minSibling(field) {#minsibling}
+
+Date must be greater than or equal to sibling field value (inclusive)
+
+```typescript
+v.date().minSibling('startDate')
+// Input: greater than or equal to startDate → Valid ✅
+// Input: less than startDate → Invalid ❌
+```
+
+### maxSibling(field) {#maxsibling}
+
+Date must be less than or equal to sibling field value (inclusive)
+
+```typescript
+v.date().maxSibling('endDate')
+// Input: less than or equal to endDate → Valid ✅
+// Input: greater than endDate → Invalid ❌
+```
+
+### beforeSibling(field) {#beforesibling}
+
+Date must be less than sibling field value (exclusive)
+
+```typescript
+v.date().beforeSibling('endDate')
+// Input: less than endDate → Valid ✅
+// Input: greater than or equal to endDate → Invalid ❌
+```
+
+### afterSibling(field) {#aftersibling}
+
+Date must be greater than sibling field value (exclusive)
+
+```typescript
+v.date().afterSibling('startDate')
+// Input: greater than startDate → Valid ✅
+// Input: less than or equal to startDate → Invalid ❌
+```
+
+### betweenYearsSibling(startYearField, endYearField) {#betweenyearssibling}
+
+Date must be between sibling field years
+
+```typescript
+v.date().betweenYearsSibling('startYear', 'endYear')
+// Input: Year between sibling startYear and endYear → Valid ✅
+// Input: Year outside range → Invalid ❌
+```
+
+### betweenMonthsSibling(startMonthField, endMonthField) {#betweenmonthssibling}
+
+Date must be between sibling field months
+
+```typescript
+v.date().betweenMonthsSibling('startMonth', 'endMonth')
+// Input: Month between sibling startMonth and endMonth → Valid ✅
+// Input: Month outside range → Invalid ❌
+```
+
+### betweenDaysSibling(startDayField, endDayField) {#betweendayssibling}
+
+Date must be between sibling field days
+
+```typescript
+v.date().betweenDaysSibling('startDay', 'endDay')
+// Input: Day between sibling startDay and endDay → Valid ✅
+// Input: Day outside range → Invalid ❌
+```
+
+### minYearSibling(field) {#minyearsibling}
+
+Year must be greater than or equal to sibling field year
+
+```typescript
+v.date().minYearSibling('startYear')
+// Input: Year greater than or equal to sibling startYear → Valid ✅
+// Input: Year less than sibling startYear → Invalid ❌
+```
+
+### maxYearSibling(field) {#maxyearsibling}
+
+Year must be less than or equal to sibling field year
+
+```typescript
+v.date().maxYearSibling('endYear')
+// Input: Year less than or equal to sibling endYear → Valid ✅
+// Input: Year greater than sibling endYear → Invalid ❌
+```
+
+### minMonthSibling(field) {#minmonthsibling}
+
+Month must be greater than or equal to sibling field month
+
+```typescript
+v.date().minMonthSibling('startMonth')
+// Input: Month greater than or equal to sibling startMonth → Valid ✅
+// Input: Month less than sibling startMonth → Invalid ❌
+```
+
+### maxMonthSibling(field) {#maxmonthsibling}
+
+Month must be less than or equal to sibling field month
+
+```typescript
+v.date().maxMonthSibling('endMonth')
+// Input: Month less than or equal to sibling endMonth → Valid ✅
+// Input: Month greater than sibling endMonth → Invalid ❌
+```
+
+### minDaySibling(field) {#mindaysibling}
+
+Day must be greater than or equal to sibling field day
+
+```typescript
+v.date().minDaySibling('startDay')
+// Input: Day greater than or equal to sibling startDay → Valid ✅
+// Input: Day less than sibling startDay → Invalid ❌
+```
+
+### maxDaySibling(field) {#maxdaysibling}
+
+Day must be less than or equal to sibling field day
+
+```typescript
+v.date().maxDaySibling('endDay')
+// Input: Day less than or equal to sibling endDay → Valid ✅
+// Input: Day greater than sibling endDay → Invalid ❌
+```
+
+---
+
+## Examples
+
+### Birth Date Validation
+
+```typescript
+const birthDateSchema = v.date()
+  .required()
+  .beforeToday()
+  .maxAge(120);
+
+const result = await validate(birthDateSchema, '1990-01-01');
+// Result: { isValid: true, data: Date('1990-01-01') }
+```
+
+### Event Date Validation
+
+```typescript
+const eventDateSchema = v.date()
+  .required()
+  .fromToday()
+  .after('2024-01-01');
+
+const result = await validate(eventDateSchema, '2024-12-25');
+// Result: { isValid: true, data: Date('2024-12-25') }
+```
+
+### Appointment Time Validation
+
+```typescript
+const appointmentSchema = v.date()
+  .required()
+  .fromToday()
+  .betweenHours(9, 17);
+
+const result = await validate(appointmentSchema, '2024-12-25 14:30');
+// Result: { isValid: true, data: Date('2024-12-25 14:30') }
+```
+
+### Age Verification
+
+```typescript
+const ageSchema = v.date()
+  .required()
+  .beforeToday()
+  .minAge(18)
+  .maxAge(65);
+
+const result = await validate(ageSchema, '1990-01-01');
+// Result: { isValid: true, data: Date('1990-01-01') }
+```
+
+### Date Range Validation
+
+```typescript
+const dateRangeSchema = v.date()
+  .required()
+  .between(new Date('2024-01-01'), new Date('2024-12-31'));
+
+const result = await validate(dateRangeSchema, '2024-06-15');
+// Result: { isValid: true, data: Date('2024-06-15') }
+```
+
+---
+
+## See Also
+
+- [Date Validator Overview](./) - Return to overview
+- [Date Mutators](./mutators) - Data transformation methods
+- [Date Transformers](./transformers) - Output formatting
+- [Base Validator](../base-validator/) - Core validation methods
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding validators

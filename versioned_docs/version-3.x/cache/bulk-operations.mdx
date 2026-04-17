@@ -1,0 +1,268 @@
+---
+sidebar_position: 12
+---
+
+# Bulk Operations
+
+Bulk operations allow you to get and set multiple cache entries efficiently, reducing network round-trips and improving performance.
+
+## Why Bulk Operations?
+
+Instead of making multiple individual calls:
+
+```ts
+// ❌ INEFFICIENT
+const user1 = await cache.get("user.1");
+const user2 = await cache.get("user.2");
+const user3 = await cache.get("user.3");
+// 3 network round-trips (Redis) or 3 lookups (Memory)
+```
+
+Use bulk operations for better performance:
+
+```ts
+// ✅ EFFICIENT
+const [user1, user2, user3] = await cache.many(["user.1", "user.2", "user.3"]);
+// 1 network round-trip (Redis) or optimized batch lookup (Memory)
+```
+
+## Get Multiple Keys (many)
+
+The `many()` method retrieves multiple values at once.
+
+### Basic Usage
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+const keys = ["user.1", "user.2", "user.3"];
+const values = await cache.many(keys);
+
+// Returns: [user1Data, user2Data, user3Data]
+// null for keys that don't exist
+```
+
+### Processing Results
+
+`many()` returns an array of values in the same order as the input keys, with `null` for missing entries:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+const keys = ["user.1", "user.2", "user.3"];
+const values = await cache.many(keys);
+
+// Handle results: filter out nulls and process found values
+const found = values
+  .map((value, index) => value ? { key: keys[index], data: value } : null)
+  .filter(item => item !== null);
+
+// Identify missing keys
+const missing = keys.filter((key, index) => values[index] === null);
+```
+
+## Set Multiple Values (setMany)
+
+The `setMany()` method stores multiple key-value pairs at once with an optional shared TTL.
+
+### Basic Usage
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+await cache.setMany({
+  "user.1": { name: "Alice", email: "alice@example.com" },
+  "user.2": { name: "Bob", email: "bob@example.com" },
+  "user.3": { name: "Charlie", email: "charlie@example.com" }
+}, CACHE_FOR.ONE_HOUR); // All cached for 1 hour
+```
+
+### Without TTL
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+await cache.setMany({
+  "config.feature1": true,
+  "config.feature2": false,
+  "config.feature3": true
+});
+// Uses driver default TTL or Infinity
+```
+
+## Use Cases
+
+### Pre-loading Cache
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function preloadPopularUsers() {
+  const users = await db.users.findPopular(10);
+  
+  const cacheEntries: Record<string, any> = {};
+  users.forEach(user => {
+    cacheEntries[`user.${user.id}`] = user;
+  });
+
+  await cache.setMany(cacheEntries, CACHE_FOR.ONE_HOUR);
+}
+```
+
+### Cache Warming
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+async function warmCache() {
+  // Fetch data that's likely to be accessed soon
+  const [users, posts, categories] = await Promise.all([
+    db.users.findPopular(),
+    db.posts.findRecent(),
+    db.categories.findAll()
+  ]);
+
+  // Warm user cache
+  const userEntries: Record<string, any> = {};
+  users.forEach(user => {
+    userEntries[`user.${user.id}`] = user;
+  });
+  await cache.setMany(userEntries, CACHE_FOR.ONE_HOUR);
+
+  // Warm post cache
+  const postEntries: Record<string, any> = {};
+  posts.forEach(post => {
+    postEntries[`post.${post.id}`] = post;
+  });
+  await cache.setMany(postEntries, CACHE_FOR.ONE_HOUR);
+
+  // Warm category cache
+  const categoryEntries: Record<string, any> = {};
+  categories.forEach(category => {
+    categoryEntries[`category.${category.id}`] = category;
+  });
+  await cache.setMany(categoryEntries, CACHE_FOR.ONE_DAY);
+}
+```
+
+## Performance Considerations
+
+### Redis Driver
+
+- **many()**: Uses `MGET` command - single network round-trip
+- **setMany()**: Uses `MSET` or multiple `SET` commands - optimized batching
+- **Network efficiency**: Much faster than multiple individual requests
+
+### Memory Driver
+
+- **many()**: Performs parallel lookups (Promise.all)
+- **setMany()**: Performs parallel sets (Promise.all)
+- **CPU efficiency**: Reduced function call overhead
+
+### Best Practices
+
+1. **Batch size**: Don't batch more than 100-1000 keys at once
+2. **Error handling**: Some keys might fail - handle errors gracefully
+3. **TTL consistency**: Use `setMany()` when all values should have the same TTL
+4. **Partial results**: `many()` may return null for missing keys - always check
+
+## Error Handling
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function getUsersSafely(userIds: number[]) {
+  try {
+    const keys = userIds.map(id => `user.${id}`);
+    const values = await cache.many(keys);
+    
+    return values.map((value, index) => ({
+      id: userIds[index],
+      data: value,
+      cached: value !== null
+    }));
+  } catch (error) {
+    console.error("Failed to get users from cache:", error);
+    // Fallback to database
+    return await db.users.findByIds(userIds);
+  }
+}
+```
+
+## Real-World Example: Efficient Data Loading
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+class UserService {
+  async getUsersByIds(userIds: number[]) {
+    // Step 1: Try cache
+    const keys = userIds.map(id => `user.${id}`);
+    const cachedUsers = await cache.many(keys);
+
+    // Step 2: Identify what we need to fetch
+    const missingIds: number[] = [];
+    const users: User[] = [];
+
+    cachedUsers.forEach((user, index) => {
+      if (user !== null) {
+        users.push(user);
+      } else {
+        missingIds.push(userIds[index]);
+      }
+    });
+
+    // Step 3: Fetch missing from database
+    if (missingIds.length > 0) {
+      const dbUsers = await db.users.findByIds(missingIds);
+
+      // Step 4: Cache all fetched users
+      const cacheEntries: Record<string, any> = {};
+      dbUsers.forEach(user => {
+        cacheEntries[`user.${user.id}`] = user;
+        users.push(user);
+      });
+
+      await cache.setMany(cacheEntries, CACHE_FOR.ONE_HOUR);
+    }
+
+    return users;
+  }
+
+  async updateUsersCache(users: User[]) {
+    const cacheEntries: Record<string, any> = {};
+    
+    users.forEach(user => {
+      cacheEntries[`user.${user.id}`] = user;
+      cacheEntries[`user.${user.id}.profile`] = user.profile;
+    });
+
+    await cache.setMany(cacheEntries, CACHE_FOR.ONE_HOUR);
+  }
+}
+```
+
+## Comparison
+
+Bulk operations are significantly more efficient than individual calls:
+
+| Operation | Individual Calls | Bulk Operation | Improvement |
+|-----------|------------------|----------------|-------------|
+| Get 10 keys (Redis) | 10 network round-trips | 1 network round-trip | 10x faster |
+| Set 10 keys (Redis) | 10 network round-trips | 1 network round-trip | 10x faster |
+| Get 100 keys (Redis) | 100 network round-trips | 1 network round-trip | 100x faster |
+
+## Limitations
+
+1. **Batch size**: Very large batches (1000+ keys) may have performance implications
+2. **Partial failures**: Some operations might succeed while others fail
+3. **TTL**: `setMany()` uses a single TTL for all keys (use individual `set()` for different TTLs)
+
+## Troubleshooting
+
+- **Some values missing?** Check that keys were set correctly - `many()` returns `null` for missing keys
+- **Performance not improved?** Ensure you're batching enough keys (10+ for noticeable improvement)
+- **Errors in batch?** Handle errors gracefully - some operations may succeed while others fail
+
+See [Best Practices](./best-practices) for more bulk operation patterns.
+

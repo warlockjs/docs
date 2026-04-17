@@ -1,0 +1,122 @@
+---
+title: Number Validator
+description: Comprehensive number validation and transformation
+sidebar_position: 2
+---
+
+# Number Validator
+
+The Number Validator provides comprehensive number validation and transformation capabilities. It includes all methods from BaseValidator and ScalarValidator, plus number-specific validation rules and mutators.
+
+---
+
+## Quick Example
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const schema = v.object({
+  age: v.number().required().between(18, 120),
+  price: v.number().required().min(0).max(10000),
+  quantity: v.number().required().positive().integer()
+});
+```
+
+---
+
+## Overview
+
+This validator provides **15+ methods** organized into:
+
+### 🔧 Mutators (1 method)
+Transform values before validation:
+- **Number Conversion**: Auto-converts string values to numbers
+
+👉 [View All Mutators →](./mutators)
+
+### ✅ Validators (24+ methods)
+Validate number values:
+- **Range Validation**: `min()`, `max()`, `between()`, `greaterThan()`, `lessThan()`, `gt()`, `lt()`
+- **Sibling Comparison**: `minSibling()`, `maxSibling()`, `greaterThanSibling()`, `lessThanSibling()`, `gtSibling()`, `ltSibling()`, `betweenSibling()`
+- **Sign Validation**: `positive()`, `negative()`
+- **Parity Validation**: `odd()`, `even()`, `modulo()`
+- **Value Selection**: `enum()`, `oneOf()`, `in()`, `allowsOnly()`, `forbids()`, `notIn()`
+- **String Length Validation**: `length()`, `minLength()`, `maxLength()` (for stringified numbers)
+
+👉 [View All Validators →](./validators)
+
+---
+
+## Common Patterns
+
+### Age Validation
+```typescript
+const ageSchema = v.number()
+  .required()
+  .between(18, 120);
+
+const result = await validate(ageSchema, 25);
+// Result: { isValid: true, data: 25 }
+```
+
+### Price Validation
+```typescript
+const priceSchema = v.number()
+  .required()
+  .min(0)
+  .max(10000);
+
+const result = await validate(priceSchema, 99.99);
+// Result: { isValid: true, data: 99.99 }
+```
+
+### Percentage Validation
+```typescript
+const percentageSchema = v.number()
+  .required()
+  .between(0, 100);
+
+const result = await validate(percentageSchema, 85.5);
+// Result: { isValid: true, data: 85.5 }
+```
+
+### Quantity Validation
+```typescript
+const quantitySchema = v.number()
+  .required()
+  .positive()
+  .min(1);
+
+const result = await validate(quantitySchema, 5);
+// Result: { isValid: true, data: 5 }
+```
+
+---
+
+## Inherited Methods
+
+The Number Validator inherits all methods from [BaseValidator](../base-validator/) and [ScalarValidator](../scalar-validator), including:
+
+### From BaseValidator
+- **Core validation**: `required()`, `present()`, `optional()`, `forbidden()`
+- **Field comparison**: `equal()`, `sameAs()`, `differentFrom()`
+- **Conditional validation**: `when()`, `requiredIf()`, `presentIf()`, etc.
+- **Advanced methods**: `refine()`, `default()`, `label()`, `toJSON()`, `outputAs()`, etc.
+
+### From ScalarValidator
+- **Value selection**: `enum()`, `oneOf()`, `in()`, `allowsOnly()`, `forbids()`, `notIn()`
+
+### From StringValidator
+- **String length validation**: `length()`, `minLength()`, `maxLength()` (for stringified numbers)
+
+---
+
+## See Also
+
+- [Mutators](./mutators) - Data transformation methods
+- [Validators](./validators) - Validation rules
+- [Integer Validator](./integer) - Whole number validation
+- [Float Validator](./float) - Decimal number validation
+- [Base Validator](../base-validator/) - Core validation methods
+- [Scalar Validator](../scalar-validator) - Value selection methods
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding mutators, validators, and transformers

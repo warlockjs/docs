@@ -1,0 +1,165 @@
+---
+title: Extending Validators
+description: Create custom validators by extending base classes
+---
+
+# Extending Validators
+
+Create custom validators by extending base classes.
+
+---
+
+## Basic Extension
+
+### Extending BaseValidator
+
+```typescript
+import { BaseValidator } from "@warlock.js/seal";
+
+class CustomValidator extends BaseValidator {
+  constructor() {
+    super();
+    this.addRule(customRule);
+  }
+  
+  customMethod() {
+    // Custom validation logic
+    return this;
+  }
+}
+```
+
+### Using Custom Validator
+
+```typescript
+const customValidator = new CustomValidator();
+const result = await customValidator.validate(data, context);
+```
+
+---
+
+## Advanced Extension
+
+### Custom Validator with Methods
+
+```typescript
+class EmailValidator extends BaseValidator {
+  constructor() {
+    super();
+    this.addRule(emailRule);
+  }
+  
+  domain(domain: string) {
+    this.addRule(domainRule, { domain });
+    return this;
+  }
+  
+  notDisposable() {
+    this.addRule(notDisposableRule);
+    return this;
+  }
+}
+
+// Usage
+const emailSchema = new EmailValidator()
+  .domain("example.com")
+  .notDisposable();
+```
+
+### Custom Validator with Mutators
+
+```typescript
+class StringValidator extends BaseValidator {
+  constructor() {
+    super();
+    this.addRule(stringRule);
+  }
+  
+  trim() {
+    this.addMutator(trimMutator);
+    return this;
+  }
+  
+  lowercase() {
+    this.addMutator(lowercaseMutator);
+    return this;
+  }
+}
+
+// Usage
+const stringSchema = new StringValidator()
+  .trim()
+  .lowercase();
+```
+
+---
+
+## Real-World Examples
+
+### Custom Validator
+
+```typescript
+class UsernameValidator extends BaseValidator {
+  constructor() {
+    super();
+    this.addRule(requiredRule);
+    this.addRule(minLengthRule, { minLength: 3 });
+    this.addRule(maxLengthRule, { maxLength: 20 });
+    this.addRule(alphanumericRule);
+  }
+  
+  notReserved() {
+    this.addRule(notReservedRule);
+    return this;
+  }
+  
+  async notExists() {
+    this.addRule(notExistsRule);
+    return this;
+  }
+}
+
+// Usage
+const usernameSchema = new UsernameValidator()
+  .notReserved()
+  .notExists();
+```
+
+### Custom Mutator Validator
+
+```typescript
+class TextValidator extends BaseValidator {
+  constructor() {
+    super();
+    this.addRule(stringRule);
+  }
+  
+  trim() {
+    this.addMutator(trimMutator);
+    return this;
+  }
+  
+  titleCase() {
+    this.addMutator(titleCaseMutator);
+    return this;
+  }
+  
+  maxLength(length: number) {
+    this.addRule(maxLengthRule, { maxLength: length });
+    return this;
+  }
+}
+
+// Usage
+const textSchema = new TextValidator()
+  .trim()
+  .titleCase()
+  .maxLength(100);
+```
+
+---
+
+## See Also
+
+- [Custom Rules](./custom-rules) - Create custom rules
+- [Plugins](./plugins) - Extending validators with plugins

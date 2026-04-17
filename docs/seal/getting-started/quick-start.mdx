@@ -1,0 +1,139 @@
+---
+sidebar_position: 3
+---
+
+# ⚡ Quick Start
+
+Get up and running with Seal in just 5 minutes! This guide will walk you through the essential concepts and get you validating data right away.
+
+## Your First Validation
+
+```ts
+import { v } from "@warlock.js/seal";
+
+// 1. Define a schema
+const userSchema = v.object({
+  name: v.string().required().minLength(2),
+  email: v.string().email().required(),
+  age: v.int().min(18).max(120),
+});
+
+// 2. Validate data
+const result = await v.validate(userSchema, {
+  name: "John Doe",
+  email: "john@example.com",
+  age: 25,
+});
+
+// 3. Check the result
+if (result.isValid) {
+  console.log("✅ Valid data:", result.data);
+} else {
+  console.log("❌ Validation errors:", result.errors);
+}
+```
+
+## Understanding Results
+
+The `validate` function returns a `ValidationResult`:
+
+```ts
+interface ValidationResult {
+  isValid: boolean;
+  data: any; // The validated (and potentially mutated) data
+  errors: ValidationError[]; // Array of validation errors
+}
+```
+
+## Common Validators
+
+### String Validation
+```ts
+const emailSchema = v.string()
+  .required()
+  .trim()           // Remove whitespace
+  .lowercase()      // Convert to lowercase
+  .email()          // Validate email format
+  .maxLength(100);  // Check length
+```
+
+### Number Validation
+```ts
+const ageSchema = v.int()
+  .required()
+  .between(18, 120); // Age between 18 and 120
+```
+
+### Array Validation
+```ts
+const tagsSchema = v.array(v.string())
+  .minLength(1)     // At least 1 tag
+  .maxLength(10)    // At most 10 tags
+  .unique();        // All tags must be unique
+```
+
+## Data Transformation
+
+Seal can transform your data during validation:
+
+```ts
+const schema = v.object({
+  name: v.string()
+    .trim()           // Remove whitespace
+    .capitalize(),    // Capitalize first letter
+  email: v.string()
+    .lowercase()      // Convert to lowercase
+    .email(),         // Validate email
+});
+
+const result = await v.validate(schema, {
+  name: "  john doe  ",
+  email: "JOHN@EXAMPLE.COM",
+});
+
+console.log(result.data);
+// Output: { name: "John doe", email: "john@example.com" }
+```
+
+## TypeScript Integration
+
+Get full type safety:
+
+```ts
+import { v, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  age: v.int().min(18),
+});
+
+// TypeScript infers the exact type!
+type User = Infer<typeof userSchema>;
+// User = { name: string; email: string; age: number }
+```
+
+## Error Handling
+
+Handle validation errors gracefully:
+
+```ts
+const result = await v.validate(schema, invalidData);
+
+if (!result.isValid) {
+  result.errors.forEach((error) => {
+    console.log(`❌ ${error.input}: ${error.error}`);
+  });
+}
+```
+
+## What's Next?
+
+Now that you understand the basics, explore these topics:
+
+- [🧠 Core Concepts](../concepts/three-layer-architecture) - Understanding Seal's architecture
+- [📋 String Validator](../string-validator/) - Comprehensive string validation
+- [🔧 Base Validator](../base-validator/) - Common validation methods
+- [🍳 Cookbook](../guides/cookbook) - Real-world examples
+
+Ready to dive deeper? Let's explore the core concepts! 🚀

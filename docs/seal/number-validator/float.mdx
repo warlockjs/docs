@@ -1,0 +1,115 @@
+---
+title: Float Validator
+description: Validate decimal numbers (floats)
+sidebar_position: 6
+---
+
+# Float Validator
+
+The Float Validator validates that a value is a decimal number (float). It extends the Number Validator and inherits all its methods.
+
+---
+
+## Quick Example
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const schema = v.object({
+  price: v.float().required().min(0).max(10000),
+  percentage: v.float().required().between(0, 100)
+});
+```
+
+---
+
+## Overview
+
+The Float Validator extends [Number Validator](./) and adds one additional validation rule:
+
+- **Type Validation**: Ensures the value is a decimal number (float)
+
+---
+
+## Inherited Methods
+
+The Float Validator inherits **all methods** from [Number Validator](./), including:
+
+### Range Validation
+- `min()` - Minimum value
+- `max()` - Maximum value
+- `between()` - Value between range
+
+### Sign Validation
+- `positive()` - Must be positive
+- `negative()` - Must be negative
+
+### Parity Validation
+- `odd()` - Must be odd
+- `even()` - Must be even
+- `modulo()` - Must be divisible by
+
+### Value Selection
+- `enum()` - Must be one of enum values
+- `oneOf()` / `in()` - Must be one of values
+- `allowsOnly()` - Allow only specified values
+- `forbids()` / `notIn()` - Forbid specified values
+
+### From BaseValidator
+- **Core validation**: `required()`, `present()`, `optional()`, `forbidden()`
+- **Field comparison**: `equal()`, `sameAs()`, `differentFrom()`
+- **Conditional validation**: `when()`, `requiredIf()`, `presentIf()`, etc.
+- **Advanced methods**: `refine()`, `default()`, `label()`, `toJSON()`, `outputAs()`, etc.
+
+---
+
+## Examples
+
+### Price Validation
+```typescript
+const priceSchema = v.float()
+  .required()
+  .min(0)
+  .max(10000);
+
+const result = await validate(priceSchema, 99.99);
+// Result: { isValid: true, data: 99.99 }
+```
+
+### Percentage Validation
+```typescript
+const percentageSchema = v.float()
+  .required()
+  .between(0, 100);
+
+const result = await validate(percentageSchema, 85.5);
+// Result: { isValid: true, data: 85.5 }
+```
+
+### Temperature Validation
+```typescript
+const temperatureSchema = v.float()
+  .required()
+  .between(-273.15, 1000);
+
+const result = await validate(temperatureSchema, 25.5);
+// Result: { isValid: true, data: 25.5 }
+```
+
+### Coordinate Validation
+```typescript
+const coordinateSchema = v.float()
+  .required()
+  .between(-180, 180);
+
+const result = await validate(coordinateSchema, 40.712776);
+// Result: { isValid: true, data: 40.712776 }
+```
+
+---
+
+## See Also
+
+- [Number Validator](./) - Base number validation
+- [Integer Validator](./integer) - Whole number validation
+- [Base Validator](../base-validator/) - Core validation methods

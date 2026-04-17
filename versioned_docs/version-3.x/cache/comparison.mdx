@@ -1,0 +1,181 @@
+---
+sidebar_position: 13
+---
+
+# Comparison with Other Libraries
+
+How does @warlock.js/cache compare to other popular Node.js cache libraries?
+
+## Quick Comparison Table
+
+| Feature | @warlock.js/cache | node-cache | cache-manager | keyv | lru-cache | ioredis |
+|---------|-------------------|------------|---------------|------|-----------|---------|
+| **Multiple Drivers** | ✅ 6 built-in | ❌ Memory only | ✅ Via adapters | ✅ Via adapters | ❌ Memory only | ❌ Redis only |
+| **Cache Tags** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Event System** | ✅ 9 types | ⚠️ 4 basic | ❌ | ❌ | ❌ | ✅ Redis events only |
+| **Stampede Prevention** | ✅ Built-in | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Atomic Operations** | ✅ Redis native | ❌ | ❌ | ❌ | ❌ | ✅ Low-level |
+| **TypeScript** | ✅ First-class | ⚠️ Definitions | ⚠️ Definitions | ✅ Native | ✅ Native | ✅ Native |
+| **Memory Limits** | ✅ All memory drivers | ✅ | ❌ | ❌ | ✅ | N/A |
+| **Hierarchical Keys** | ✅ Namespaces | ❌ | ⚠️ Limited | ✅ | ❌ | ❌ |
+| **TTL Support** | ✅ All drivers | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **High-Level API** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Weekly Downloads** | New | ~2.5M | ~1M | ~500K | ~35M | ~8M |
+
+## Detailed Feature Comparison
+
+### Multiple Drivers
+
+**@warlock.js/cache:**
+- ✅ 6 built-in drivers: Memory, Redis, File, LRU, Memory Extended, Null
+- ✅ Switch drivers with zero code changes
+- ✅ Framework-agnostic
+
+**node-cache:**
+- ❌ Memory only
+
+**cache-manager:**
+- ✅ Multiple drivers via store adapters
+- ⚠️ Requires installing separate adapter packages
+
+**keyv:**
+- ✅ Multiple drivers via adapters
+- ⚠️ Requires installing separate adapter packages
+
+**lru-cache:**
+- ❌ Memory only
+
+**ioredis:**
+- ❌ Redis only
+
+### Cache Tags
+
+**@warlock.js/cache:** ✅ First Node.js cache library with comprehensive tag support
+```ts
+const tagged = cache.tags(['users', 'profiles']);
+await tagged.set('user.123', data);
+await tagged.invalidate(); // Clears all tagged entries
+```
+
+**All others:** ❌ No tag support
+
+### Event System
+
+**@warlock.js/cache:** ✅ 9 event types (hit, miss, set, removed, flushed, expired, connected, disconnected, error)
+
+**node-cache:** ⚠️ 4 basic events
+
+**Others:** ❌ No events or only Redis-specific events
+
+### Stampede Prevention
+
+**@warlock.js/cache:** ✅ Built-in with `remember()` method
+```ts
+await cache.remember('key', 3600, async () => {
+  return await expensiveOperation(); // Only called once even with concurrent requests
+});
+```
+
+**All others:** ❌ No stampede prevention
+
+### Atomic Operations
+
+**@warlock.js/cache:** ✅ Redis-native atomic operations
+```ts
+await cache.increment('counter'); // Uses Redis INCRBY
+await cache.setNX('lock', 'val', 30); // Uses Redis SET NX
+```
+
+**ioredis:** ✅ Low-level atomic commands (must use directly)
+
+**Others:** ❌ No atomic operations
+
+### TypeScript Support
+
+**@warlock.js/cache:** ✅ TypeScript-first design with full type safety
+
+**node-cache / cache-manager:** ⚠️ Community type definitions
+
+**keyv / lru-cache / ioredis:** ✅ Native TypeScript support
+
+## Use Case Recommendations
+
+### When to Choose @warlock.js/cache
+
+✅ You need **cache tags** for complex invalidation  
+✅ You want **observability** with events  
+✅ You need **stampede prevention** for high-traffic scenarios  
+✅ You want **atomic operations** without low-level Redis code  
+✅ You need **multiple drivers** with consistent API  
+✅ You're building a **TypeScript** application  
+
+### When to Choose node-cache
+
+✅ Simple memory caching only  
+✅ You don't need advanced features  
+✅ Maximum compatibility (2.5M weekly downloads)  
+
+### When to Choose cache-manager
+
+✅ You need multi-level caching  
+✅ You prefer adapter-based driver system  
+
+### When to Choose keyv
+
+✅ You want a simple, minimal API  
+✅ You need adapter-based driver system  
+✅ You don't need advanced features  
+
+### When to Choose lru-cache
+
+✅ You need optimized LRU algorithm  
+✅ Memory-only caching  
+✅ Maximum performance for LRU use case  
+
+### When to Choose ioredis (direct)
+
+✅ You need full Redis feature set  
+✅ You're comfortable with low-level Redis commands  
+✅ You don't need high-level cache abstractions  
+
+## Performance Comparison
+
+### Memory Operations
+
+| Library | Get (O complexity) | Set (O complexity) | Notes |
+|---------|-------------------|-------------------|-------|
+| @warlock.js/cache | O(1) | O(1) | With maxSize: LRU eviction |
+| node-cache | O(1) | O(1) | Simple Map-based |
+| lru-cache | O(1) | O(1) | Optimized LRU algorithm |
+| cache-manager | O(1) | O(1) | Depends on store |
+
+### Redis Operations
+
+| Library | Atomic Operations | Network Efficiency |
+|---------|------------------|-------------------|
+| @warlock.js/cache | ✅ Native (INCRBY, SET NX) | Optimized batching |
+| ioredis | ✅ Full Redis | Low-level control |
+| cache-manager | ❌ | Varies by store |
+| keyv | ❌ | Single operations |
+
+## Unique Features in @warlock.js/cache
+
+1. **Cache Tags** - First Node.js library with comprehensive tag support
+2. **Stampede Prevention** - Built-in `remember()` with automatic locking
+3. **Comprehensive Events** - 9 event types for full observability
+4. **Atomic Redis Operations** - High-level API with native Redis commands
+5. **6 Built-in Drivers** - More variety than most competitors
+6. **TypeScript-First** - Designed for TypeScript from the ground up
+
+## Summary
+
+@warlock.js/cache provides the **best combination** of:
+
+- ✅ Advanced features (tags, events, stampede prevention)
+- ✅ Multiple built-in drivers
+- ✅ TypeScript-first design
+- ✅ Atomic operations for distributed systems
+- ✅ Simple, consistent API
+
+If you need these advanced features or want to future-proof your caching strategy, @warlock.js/cache is the ideal choice.
+

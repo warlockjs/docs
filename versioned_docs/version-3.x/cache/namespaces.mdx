@@ -1,0 +1,218 @@
+---
+sidebar_position: 4
+---
+
+# Namespaces
+
+Namespaces are a powerful way to organize cache keys hierarchically using dot notation. They help you group related cache entries and invalidate them together.
+
+## What are Namespaces?
+
+A namespace is a prefix in your cache key that groups related entries. Instead of flat keys like `"user1"` and `"user2"`, you use hierarchical keys like `"users.1"` and `"users.2"`.
+
+## Basic Usage
+
+Use dot notation to create namespaces:
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+// Store items in a namespace
+await cache.set("users.1", { id: 1, name: "Alice" }, CACHE_FOR.ONE_HOUR);
+await cache.set("users.2", { id: 2, name: "Bob" }, CACHE_FOR.ONE_HOUR);
+await cache.set("users.list", [{ id: 1 }, { id: 2 }], CACHE_FOR.ONE_HOUR);
+```
+
+All three keys belong to the `users` namespace because they start with `"users."`.
+
+## Removing Namespaces
+
+Clear all keys in a namespace at once:
+
+```ts
+// Clear all user-related cache
+await cache.removeNamespace("users");
+// This removes: users.1, users.2, users.list, and any other key starting with "users."
+```
+
+This is much more efficient than removing keys individually, especially when you have many related entries.
+
+## Real-World Example
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+class UserService {
+  async getUser(id: number) {
+    // Cache individual user
+    return await cache.remember(`users.${id}`, CACHE_FOR.ONE_HOUR, async () => {
+      return await db.users.findById(id);
+    });
+  }
+
+  async getUserPosts(userId: number) {
+    // Cache user's posts
+    return await cache.remember(`users.${userId}.posts`, CACHE_FOR.ONE_HOUR, async () => {
+      return await db.posts.findByUserId(userId);
+    });
+  }
+
+  async getUserSettings(userId: number) {
+    // Cache user's settings
+    return await cache.remember(`users.${userId}.settings`, CACHE_FOR.ONE_DAY, async () => {
+      return await db.settings.findByUserId(userId);
+    });
+  }
+
+  async updateUser(id: number, data: any) {
+    // Update in database
+    await db.users.update(id, data);
+    
+    // Invalidate all user-related cache
+    await cache.removeNamespace(`users.${id}`);
+    // This removes: users.1, users.1.posts, users.1.settings, etc.
+    
+    // Also invalidate the users list if it exists
+    await cache.remove("users.list");
+  }
+}
+```
+
+## Nested Namespaces
+
+You can create nested namespaces for more granular organization:
+
+```ts
+// Top-level namespace: users
+await cache.set("users.1", user1);
+
+// Nested namespace: users.1.posts
+await cache.set("users.1.posts", posts1);
+await cache.set("users.1.posts.123", post123);
+
+// Nested namespace: users.1.settings
+await cache.set("users.1.settings", settings1);
+```
+
+When you remove `users.1`, it only removes keys starting with `users.1.`, not the entire `users` namespace.
+
+## Best Practices
+
+### ✅ Use Dot Notation
+
+```ts
+// Good: Clear namespace structure
+await cache.set("users.1", userData);
+await cache.set("posts.123", postData);
+await cache.set("posts.123.comments", comments);
+```
+
+### ❌ Avoid Colons or Other Separators
+
+```ts
+// Bad: Colons break namespace concept
+await cache.set("users:1", userData); // Not recommended
+await cache.set("users:1:posts", posts); // Confusing
+```
+
+### Organize by Resource Type
+
+```ts
+// Group related resources
+await cache.set("users.1", user);
+await cache.set("users.1.profile", profile);
+await cache.set("users.1.settings", settings);
+await cache.set("posts.123", post);
+await cache.set("posts.123.comments", comments);
+```
+
+### Invalidate Strategically
+
+```ts
+// When user updates, clear their namespace
+await cache.removeNamespace(`users.${userId}`);
+
+// When post is deleted, clear its namespace
+await cache.removeNamespace(`posts.${postId}`);
+
+// When all users need refresh, clear top-level namespace
+await cache.removeNamespace("users");
+```
+
+## Namespaces vs Cache Tags
+
+Both namespaces and [cache tags](./tags) help organize cache, but they serve different purposes:
+
+| Feature | Namespaces | Cache Tags |
+|---------|------------|------------|
+| **Purpose** | Hierarchical organization | Logical grouping |
+| **Structure** | Based on key prefix (`users.1`) | Independent labels (`["user", "posts"]`) |
+| **Invalidation** | `removeNamespace()` removes keys with prefix | `invalidate()` removes keys with matching tags |
+| **Use Case** | Organize by resource hierarchy | Group unrelated keys by concept |
+
+### When to Use Namespaces
+
+- Organizing by resource hierarchy (user → posts → comments)
+- When keys naturally follow a prefix pattern
+- Simple, predictable invalidation by prefix
+
+### When to Use Tags
+
+- Grouping unrelated keys by concept (all "user-related" cache)
+- Complex invalidation scenarios
+- Keys that don't share a prefix but are logically related
+
+## Examples
+
+### E-commerce Application
+
+```ts
+// Products
+await cache.set("products.123", product, CACHE_FOR.ONE_DAY);
+await cache.set("products.123.reviews", reviews, CACHE_FOR.ONE_HOUR);
+await cache.set("products.123.inventory", inventory, CACHE_FOR.HALF_HOUR);
+
+// Orders
+await cache.set("orders.456", order, CACHE_FOR.ONE_HOUR);
+await cache.set("orders.456.items", orderItems, CACHE_FOR.ONE_HOUR);
+
+// When product updates
+await cache.removeNamespace("products.123");
+
+// When order completes
+await cache.removeNamespace("orders.456");
+```
+
+### Blog Application
+
+```ts
+// Posts
+await cache.set("posts.789", post, CACHE_FOR.ONE_DAY);
+await cache.set("posts.789.author", author, CACHE_FOR.ONE_DAY);
+await cache.set("posts.789.comments", comments, CACHE_FOR.ONE_HOUR);
+
+// Categories
+await cache.set("categories.tech", category, CACHE_FOR.ONE_WEEK);
+await cache.set("categories.tech.posts", categoryPosts, CACHE_FOR.ONE_HOUR);
+```
+
+## Global Prefix vs Namespaces
+
+Both help organize keys, but serve different purposes:
+
+- **Global Prefix**: Separates your application's keys from other applications (e.g., `myapp.users.1`)
+- **Namespaces**: Organizes keys within your application (e.g., `users.1`, `users.2`)
+
+Use both together:
+```ts
+// With globalPrefix: "myapp"
+// Key "users.1" becomes "myapp.users.1"
+await cache.set("users.1", userData);
+```
+
+## Related Documentation
+
+- [Cache Manager](./cache-manager) - Basic operations and driver management
+- [Cache Tags](./tags) - Alternative grouping method with tags
+- [Cache Keys Best Practices](./cache-manager#cache-keys) - Key naming conventions
+

@@ -1,0 +1,170 @@
+---
+title: Error Messages
+description: Understanding and customizing validation errors
+---
+
+# Error Messages
+
+Understanding how validation errors work and how to customize them.
+
+---
+
+## Error Structure
+
+### Basic Error
+
+```typescript
+{
+  type: "required",
+  error: "The :input is required",
+  input: "fieldName"
+}
+```
+
+### Validation Result Structure
+
+```typescript
+interface ValidationResult {
+  isValid: boolean;
+  data: any; // The validated (and potentially mutated) data
+  errors: ValidationError[]; // Array of validation errors
+}
+
+interface ValidationError {
+  type: string; // Error type (e.g., "required", "minLength")
+  error: string; // Error message
+  input: string; // Field name that failed validation
+}
+```
+
+### Multiple Errors
+
+```typescript
+{
+  isValid: false,
+  errors: [
+    {
+      type: "minLength",
+      error: "The :input must be at least 5 characters",
+      input: "username"
+    },
+    {
+      type: "alpha",
+      error: "The :input must contain only alphabetic characters",
+      input: "username"
+    }
+  ],
+  data: "hi123"
+}
+```
+
+---
+
+## Custom Error Messages
+
+### Single Rule
+
+```typescript
+v.string().required("Username is required")
+v.string().minLength(5, "Username must be at least 5 characters")
+v.string().email("Please enter a valid email address")
+```
+
+### Multiple Rules
+
+```typescript
+v.string()
+  .required("Username is required")
+  .minLength(5, "Username must be at least 5 characters")
+  .maxLength(20, "Username must not exceed 20 characters")
+  .alphanumeric("Username must contain only letters and numbers")
+```
+
+---
+
+## Field Labels
+
+```typescript
+v.string().label("Username").required()
+// Error: "The Username is required"
+```
+
+---
+
+## Error Handling Patterns
+
+### Single Error Mode (Default)
+
+```typescript
+const result = await validate(schema, data);
+// Returns only the first error found
+```
+
+### All Errors Mode
+
+```typescript
+import { configureSeal } from "@warlock.js/seal";
+
+configureSeal({ firstErrorOnly: false });
+const result = await validate(schema, data);
+// Returns all validation errors
+```
+
+---
+
+## Real-World Example
+
+```typescript
+const userSchema = v.object({
+  email: v.string()
+    .required("Email is required")
+    .email("Please enter a valid email address"),
+  
+  username: v.string()
+    .required("Username is required")
+    .minLength(3, "Username must be at least 3 characters")
+    .alphanumeric("Username must contain only letters and numbers"),
+  
+  password: v.string()
+    .required("Password is required")
+    .minLength(8, "Password must be at least 8 characters")
+});
+```
+
+---
+
+## Global Configuration
+
+```typescript
+import { configureSeal } from "@warlock.js/seal";
+
+configureSeal({
+  firstErrorOnly: false, // Collect all errors instead of stopping at first
+  translateRule: (ruleTranslation) => {
+    // Custom translation logic
+    return `Custom: ${ruleTranslation.rule.name}`;
+  }
+});
+```
+
+---
+
+## Error Display
+
+```typescript
+const result = await validate(schema, data);
+
+if (!result.isValid) {
+  result.errors.forEach(error => {
+    console.log(`${error.input}: ${error.error}`);
+  });
+}
+```
+
+---
+
+## See Also
+
+- [Validation Flow](./validation-flow) - How validation works
+- [Type Inference](./type-inference) - TypeScript integration
+- [Conditional Validation](./conditional-validation) - Advanced validation

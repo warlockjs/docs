@@ -1,0 +1,124 @@
+---
+title: String Validator
+description: Comprehensive string validation and transformation
+sidebar_position: 1
+---
+
+# String Validator
+
+The String Validator provides comprehensive string validation and transformation capabilities. It includes all methods from BaseValidator and ScalarValidator, plus string-specific validation rules and built-in mutators.
+
+---
+
+## Quick Example
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const schema = v.object({
+  email: v.string().required().email().lowercase(),
+  username: v.string().required().lengthBetween(3, 20).alphanumeric(),
+  bio: v.string().maxLength(500).trim()
+});
+```
+
+---
+
+## Overview
+
+This validator provides **68 methods** organized into:
+
+### 🔧 Mutators (33 methods)
+Transform string values before validation:
+- **Case Conversion**: `lowercase()`, `uppercase()`, `camelCase()`, `snakeCase()`, `kebabCase()`, `slug()`, etc.
+- **Trimming & Padding**: `trim()`, `ltrim()`, `rtrim()`, `padStart()`, `padEnd()`, etc.
+- **Encoding & Decoding**: `base64Encode()`, `urlEncode()`, `htmlEscape()`, etc.
+- **String Manipulation**: `replace()`, `replaceAll()`, `append()`, `prepend()`, `truncate()`, `mask()`, etc.
+- **Advanced**: `toAlpha()`, `toAlphanumeric()`, `removeNumbers()`, `safeHtml()`, etc.
+
+👉 [View All Mutators →](./mutators)
+
+### ✅ Validators (35 methods)
+Validate string format and content:
+- **Format Validation**: `email()`, `url()`, `ip()`, `ip4()`, `ip6()`, `creditCard()`
+- **Length Validation**: `minLength()`, `maxLength()`, `length()`, `between()`, `minWords()`, `maxWords()`, `words()`
+- **Content Validation**: `contains()`, `startsWith()`, `endsWith()`, `pattern()`, `alpha()`, `alphanumeric()`, `numeric()`
+- **Color Validation**: `color()`, `hexColor()`, `rgbColor()`, `rgbaColor()`, `hslColor()`, `lightColor()`, `darkColor()`
+- **Password Validation**: `strongPassword()`
+- **Value Selection**: `enum()`, `oneOf()`, `in()`, `allowsOnly()`, `forbids()`, `notIn()`
+
+👉 [View All Validators →](./validators)
+
+---
+
+## Common Patterns
+
+### Email Validation
+```typescript
+v.string().required().lowercase().trim().email()
+```
+
+### email Schema
+```typescript
+const emailSchema = v.string()
+  .required()
+  .lowercase()
+  .trim()
+  .email();
+
+const result = await validate(emailSchema, "  USER@EXAMPLE.COM  ");
+// Result: { isValid: true, data: "user@example.com" }
+```
+
+### Username Validation  
+```typescript
+v.string().required().lengthBetween(3, 20).alphanumeric()
+```
+
+### URL Slug Generation
+```typescript
+const slugSchema = v.string()
+  .required()
+  .trim()
+  .lowercase()
+  .slug();
+
+const result = await validate(slugSchema, "  My Blog Post Title  ");
+// Result: { isValid: true, data: "my-blog-post-title" }
+```
+
+### Password with Multiple Rules
+```typescript
+const passwordSchema = v.string()
+  .required()
+  .minLength(8)
+  .strongPassword();
+
+const result = await validate(passwordSchema, "MyStr0ng!Pass");
+// Result: { isValid: true, data: "MyStr0ng!Pass" }
+```
+
+---
+
+## Inherited Methods
+
+The String Validator inherits all methods from [BaseValidator](../base-validator/) and [ScalarValidator](../scalar-validator), including:
+
+### From BaseValidator
+- **Core validation**: `required()`, `present()`, `optional()`, `forbidden()`
+- **Field comparison**: `equal()`, `sameAs()`, `differentFrom()`
+- **Conditional validation**: `when()`, `requiredIf()`, `presentIf()`, etc.
+- **Advanced methods**: `refine()`, `default()`, `label()`, `toJSON()`, `outputAs()`, etc.
+
+### From ScalarValidator
+- **Value selection**: `enum()`, `oneOf()`, `in()`, `allowsOnly()`, `forbids()`, `notIn()`
+
+---
+
+## See Also
+
+- [Mutators](./mutators) - All mutator methods
+- [Validators](./validators) - All validator methods
+- [Base Validator](../base-validator/) - Core validation methods
+- [Scalar Validator](../scalar-validator) - Value selection methods
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding mutators, validators, and transformers

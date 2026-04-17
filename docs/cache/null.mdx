@@ -1,0 +1,54 @@
+---
+sidebar_position: 10
+---
+
+# Null Cache Driver
+
+Disables caching entirely. Useful for testing, debugging, or temporarily turning off cache without code changes.
+
+## When to Use
+- Testing environments
+- Debugging cache-related issues
+- Measuring performance impact of caching
+
+## Configuration
+
+```ts title="src/config/cache.ts"
+import { NullCacheDriver } from "@warlock.js/cache";
+
+const cacheConfigurations = {
+  default: "null",
+  drivers: {
+    null: NullCacheDriver,
+  },
+  options: {
+    null: {},
+  },
+};
+```
+
+## Options {#options}
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `*` | any | `undefined` | All options are accepted but ignored |
+
+## Behavior
+
+All cache operations succeed but store nothing:
+
+- **`set()`**: Returns the value without storing
+- **`get()`**: Always returns `null`
+- **`remove()`**: Always succeeds
+- **`flush()`**: Always succeeds
+
+## Example Usage
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+await cache.set("products.101", data, 3600);  // Returns data without storing
+const result = await cache.get("products.101");  // Returns null
+await cache.remove("products.101");            // Succeeds
+await cache.flush();                           // Succeeds
+```

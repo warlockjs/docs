@@ -1,0 +1,284 @@
+---
+sidebar_position: 12
+---
+
+# Bulk Operations
+
+Bulk operations allow you to get and set multiple cache entries efficiently, reducing network round-trips and improving performance.
+
+## Why Bulk Operations?
+
+Instead of making multiple individual calls:
+
+```ts
+// ❌ INEFFICIENT
+const user1 = await cache.get("user.1");
+const user2 = await cache.get("user.2");
+const user3 = await cache.get("user.3");
+// 3 network round-trips (Redis) or 3 lookups (Memory)
+```
+
+Use bulk operations for better performance:
+
+```ts
+// ✅ EFFICIENT
+const [user1, user2, user3] = await cache.many(["user.1", "user.2", "user.3"]);
+// 1 network round-trip (Redis) or optimized batch lookup (Memory)
+```
+
+## Get Multiple Keys (many)
+
+The `many()` method retrieves multiple values at once, reducing network round-trips.
+
+### Basic Usage
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// Batch load multiple products
+const productIds = [1, 2, 3, 4, 5];
+const keys = productIds.map(id => `products.${id}`);
+const products = await cache.many(keys);
+
+// Returns: [productData1, productData2, productData3, null, productData5]
+// null for keys that don't exist
+```
+
+### Processing Results
+
+`many()` returns an array in the same order as input keys, with `null` for missing entries:
+
+```ts
+const productIds = [1, 2, 3, 4, 5];
+const keys = productIds.map(id => `products.${id}`);
+const cachedProducts = await cache.many(keys);
+
+// Find which products were cached
+const found = cachedProducts
+  .map((product, index) => product ? { id: productIds[index], data: product } : null)
+  .filter(item => item !== null);
+
+// Identify missing products (need to fetch from database)
+const missingIds = productIds.filter((id, index) => cachedProducts[index] === null);
+```
+
+## Set Multiple Values (setMany)
+
+The `setMany()` method stores multiple key-value pairs at once with an optional shared TTL.
+
+### Basic Usage
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+// Set multiple products at once
+const products = [
+  { id: 1, name: "Laptop", price: 999 },
+  { id: 2, name: "Phone", price: 599 },
+  { id: 3, name: "Tablet", price: 399 }
+];
+
+const cacheData = {};
+products.forEach(product => {
+  cacheData[`products.${product.id}`] = product;
+});
+
+await cache.setMany(cacheData, CACHE_FOR.ONE_HOUR);
+```
+
+### Without TTL
+
+```ts
+// Set configuration values (no expiration)
+await cache.setMany({
+  "config.tax.rate": 0.08,
+  "config.shipping.free.threshold": 50,
+  "config.return.days": 30
+});
+```
+
+## E-Commerce Examples
+
+### Batch Load Products
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function getProductsByIds(productIds: number[]) {
+  // Try cache first
+  const keys = productIds.map(id => `products.${id}`);
+  const cached = await cache.many(keys);
+
+  // Find missing products
+  const missing: number[] = [];
+  productIds.forEach((id, index) => {
+    if (cached[index] === null) {
+      missing.push(id);
+    }
+  });
+
+  // Fetch missing from database
+  if (missing.length > 0) {
+    const dbProducts = await db.products.findByIds(missing);
+    
+    // Cache the fetched products
+    const toCache: Record<string, any> = {};
+    dbProducts.forEach(product => {
+      toCache[`products.${product.id}`] = product;
+    });
+    
+    await cache.setMany(toCache, CACHE_FOR.ONE_HOUR);
+  }
+
+  // Return merged results
+  return productIds.map((id, index) => cached[index] || dbProducts.find(p => p.id === id));
+}
+```
+
+### Cache Warming on Startup
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+async function warmCache() {
+  const [featuredProducts, categories] = await Promise.all([
+    db.products.findFeatured(20),
+    db.categories.findAll()
+  ]);
+
+  const toCache: Record<string, any> = {};
+  
+  // Cache featured products
+  featuredProducts.forEach(product => {
+    toCache[`products.${product.id}`] = product;
+  });
+  
+  // Cache categories
+  categories.forEach(category => {
+    toCache[`categories.${category.id}`] = category;
+  });
+
+  await cache.setMany(toCache, CACHE_FOR.ONE_HOUR);
+}
+```
+
+## Performance Considerations
+
+### Redis Driver
+
+- **many()**: Uses `MGET` command - single network round-trip
+- **setMany()**: Uses `MSET` or multiple `SET` commands - optimized batching
+- **Network efficiency**: Much faster than multiple individual requests
+
+### Memory Driver
+
+- **many()**: Performs parallel lookups (Promise.all)
+- **setMany()**: Performs parallel sets (Promise.all)
+- **CPU efficiency**: Reduced function call overhead
+
+### Best Practices
+
+1. **Batch size**: Don't batch more than 100-1000 keys at once
+2. **Error handling**: Some keys might fail - handle errors gracefully
+3. **TTL consistency**: Use `setMany()` when all values should have the same TTL
+4. **Partial results**: `many()` may return null for missing keys - always check
+
+## Error Handling
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function getUsersSafely(userIds: number[]) {
+  try {
+    const keys = userIds.map(id => `user.${id}`);
+    const values = await cache.many(keys);
+    
+    return values.map((value, index) => ({
+      id: userIds[index],
+      data: value,
+      cached: value !== null
+    }));
+  } catch (error) {
+    console.error("Failed to get users from cache:", error);
+    // Fallback to database
+    return await db.users.findByIds(userIds);
+  }
+}
+```
+
+## Real-World Example: Product Details with Fallback
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+class ProductService {
+  async getDetailedProducts(productIds: number[]) {
+    // Step 1: Try cache
+    const keys = productIds.map(id => `products.${id}`);
+    const cached = await cache.many(keys);
+
+    // Step 2: Identify missing products
+    const missing: number[] = [];
+    const results: any[] = [];
+
+    cached.forEach((product, index) => {
+      if (product) {
+        results[index] = product;
+      } else {
+        missing.push(productIds[index]);
+      }
+    });
+
+    // Step 3: Fetch missing from database
+    if (missing.length > 0) {
+      const dbProducts = await db.products.findByIds(missing);
+      
+      // Step 4: Cache fetched products
+      const toCache: Record<string, any> = {};
+      dbProducts.forEach(product => {
+        toCache[`products.${product.id}`] = product;
+        results[productIds.indexOf(product.id)] = product;
+      });
+
+      await cache.setMany(toCache, CACHE_FOR.ONE_HOUR);
+    }
+
+    return results.filter(Boolean);
+  }
+
+  async updateProductsCache(products: any[]) {
+    const toCache: Record<string, any> = {};
+    products.forEach(product => {
+      toCache[`products.${product.id}`] = product;
+    });
+    await cache.setMany(toCache, CACHE_FOR.ONE_HOUR);
+  }
+}
+```
+
+## Comparison
+
+Bulk operations are significantly more efficient than individual calls:
+
+| Operation | Individual Calls | Bulk Operation | Improvement |
+|-----------|------------------|----------------|-------------|
+| Get 10 keys (Redis) | 10 network round-trips | 1 network round-trip | 10x faster |
+| Set 10 keys (Redis) | 10 network round-trips | 1 network round-trip | 10x faster |
+| Get 100 keys (Redis) | 100 network round-trips | 1 network round-trip | 100x faster |
+
+## Best Practices
+
+1. **Batch size**: Don't batch more than 100-1000 keys at once
+2. **Handle partial results**: `many()` may return null for missing keys — always check
+3. **Use consistent TTLs**: `setMany()` applies one TTL to all keys
+4. **Filter nulls**: When processing `many()` results, filter out nulls
+5. **Combine with tags**: Use tags with bulk operations for flexible invalidation
+
+## Troubleshooting
+
+- **Some values missing?** Verify keys were set correctly — `many()` returns `null` for missing keys
+- **Performance not improved?** Ensure you're batching enough keys (10+ for noticeable improvement)
+- **Errors in batch?** Handle errors gracefully — some operations may succeed while others fail
+
+See [Best Practices](./best-practices) for more bulk operation patterns.
+

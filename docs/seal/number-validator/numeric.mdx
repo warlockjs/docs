@@ -1,0 +1,237 @@
+---
+title: Numeric Validator
+description: Validate numeric values and numeric strings with automatic coercion
+sidebar_position: 4
+---
+
+# Numeric Validator
+
+The Numeric Validator validates that a value is either a number or a numeric string, automatically coercing numeric strings to actual numbers. It extends the Number Validator and inherits all its methods.
+
+---
+
+## Quick Example
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const schema = v.object({
+  age: v.numeric().required().between(18, 120),
+  price: v.numeric().required().min(0).max(10000),
+  quantity: v.numeric().required().positive().min(1)
+});
+
+// All of these pass validation:
+const result1 = await validate(schema, { age: 25, price: 99.99, quantity: 5 });
+const result2 = await validate(schema, { age: "25", price: "99.99", quantity: "5" });
+// Result: { isValid: true, data: { age: 25, price: 99.99, quantity: 5 } }
+```
+
+---
+
+## Overview
+
+The Numeric Validator extends [Number Validator](./) and adds two key features:
+
+- **Type Validation**: Accepts both actual numbers AND numeric strings (e.g., `"42"`, `"3.14"`)
+- **Automatic Coercion**: Converts numeric strings to numbers before validation (e.g., `"42"` → `42`)
+
+This is especially useful for form inputs, query parameters, and API fields that arrive as strings but should be treated as numbers.
+
+---
+
+## v.number() vs v.numeric() vs v.int() vs v.float()
+
+| Validator | Accepts Numbers | Accepts Numeric Strings | Coerces | Example Input | Result |
+|-----------|---|---|---|---|---|
+| **v.number()** | ✓ | ✗ | — | `42` | Valid: `42` |
+| **v.number()** | ✓ | ✗ | — | `"42"` | Invalid |
+| **v.numeric()** | ✓ | ✓ | ✓ | `42` | Valid: `42` |
+| **v.numeric()** | ✓ | ✓ | ✓ | `"42"` | Valid: `42` |
+| **v.integer()** | ✓ (integers only) | ✗ | — | `42` | Valid: `42` |
+| **v.integer()** | ✓ | ✗ | — | `42.5` | Invalid |
+| **v.float()** | ✓ (floats only) | ✗ | — | `42.5` | Valid: `42.5` |
+| **v.float()** | ✓ | ✗ | — | `"42.5"` | Invalid |
+
+---
+
+## Common Use Cases
+
+### Form Input Validation
+HTML form inputs always arrive as strings, even for numeric fields. Use `v.numeric()` to automatically coerce them:
+
+```typescript
+const form = v.object({
+  age: v.numeric().required().between(18, 120),
+  salary: v.numeric().required().min(0)
+});
+
+// Form data from <input type="number">
+const formData = {
+  age: "28",        // Always a string from HTML forms
+  salary: "75000"
+};
+
+const result = await validate(form, formData);
+// Result: { isValid: true, data: { age: 28, salary: 75000 } }
+```
+
+### Query Parameter Validation
+URL query parameters are always strings:
+
+```typescript
+const querySchema = v.object({
+  page: v.numeric().required().positive().min(1),
+  limit: v.numeric().required().between(1, 100)
+});
+
+// From URL: ?page=2&limit=10
+const queryParams = {
+  page: "2",
+  limit: "10"
+};
+
+const result = await validate(querySchema, queryParams);
+// Result: { isValid: true, data: { page: 2, limit: 10 } }
+```
+
+### API Request Bodies
+Some APIs may receive numeric values as strings:
+
+```typescript
+const apiSchema = v.object({
+  productId: v.numeric().required().positive(),
+  quantity: v.numeric().required().min(1).max(1000),
+  discount: v.numeric().required().between(0, 100)
+});
+
+// Data from external API
+const apiData = {
+  productId: "12345",
+  quantity: "5",
+  discount: "15"
+};
+
+const result = await validate(apiSchema, apiData);
+// Result: { isValid: true, data: { productId: 12345, quantity: 5, discount: 15 } }
+```
+
+### Mixed Input Types
+Handle both strings and numbers without separate validation logic:
+
+```typescript
+const schema = v.numeric().required().between(1, 100);
+
+// All of these pass validation and return the same coerced value:
+await validate(schema, 42);        // Valid: 42
+await validate(schema, "42");      // Valid: 42
+await validate(schema, 42.7);      // Valid: 42.7
+await validate(schema, "42.7");    // Valid: 42.7
+```
+
+---
+
+## Inherited Methods
+
+The Numeric Validator inherits **all methods** from [Number Validator](./), including:
+
+### Range Validation
+- `min()` - Minimum value
+- `max()` - Maximum value
+- `between()` - Value between range
+- `greaterThan()` / `gt()` - Greater than value
+- `lessThan()` / `lt()` - Less than value
+
+### Comparison Validation
+- `minSibling()` - Minimum compared to sibling field
+- `maxSibling()` - Maximum compared to sibling field
+- `betweenSibling()` - Between sibling field values
+
+### Sign Validation
+- `positive()` - Must be positive
+- `negative()` - Must be negative
+
+### Parity Validation
+- `odd()` - Must be odd
+- `even()` - Must be even
+- `modulo()` - Must be divisible by
+
+### Value Selection
+- `enum()` - Must be one of enum values
+- `oneOf()` / `in()` - Must be one of values
+- `allowsOnly()` - Allow only specified values
+- `forbids()` / `notIn()` - Forbid specified values
+
+### From BaseValidator
+- **Core validation**: `required()`, `present()`, `optional()`, `forbidden()`
+- **Field comparison**: `equal()`, `sameAs()`, `differentFrom()`
+- **Conditional validation**: `when()`, `requiredIf()`, `presentIf()`, etc.
+- **Advanced methods**: `refine()`, `default()`, `label()`, `toJSON()`, `outputAs()`, etc.
+
+---
+
+## Real-World Example: HTTP Request Validation
+
+```typescript
+import { v, validate } from "@warlock.js/seal";
+
+// Schema for an e-commerce order endpoint
+const orderSchema = v.object({
+  userId: v.numeric().required().positive(),
+  productId: v.numeric().required().positive(),
+  quantity: v.numeric().required().min(1).max(999),
+  discountPercent: v.numeric().optional().between(0, 100).default(0),
+  shippingDays: v.numeric().required().positive()
+});
+
+// Incoming request body (all numeric fields are strings)
+const requestBody = {
+  userId: "12345",
+  productId: "67890",
+  quantity: "3",
+  discountPercent: "10",
+  shippingDays: "5"
+};
+
+// Validation with automatic coercion
+const result = await validate(orderSchema, requestBody);
+
+if (result.isValid) {
+  console.log(result.data);
+  // Output: {
+  //   userId: 12345,
+  //   productId: 67890,
+  //   quantity: 3,
+  //   discountPercent: 10,
+  //   shippingDays: 5
+  // }
+} else {
+  console.error(result.errors);
+}
+```
+
+---
+
+## When to Use v.numeric() vs v.number()
+
+**Use `v.numeric()`** when:
+- Validating form inputs (always strings)
+- Validating query parameters (always strings)
+- Receiving data from external sources that might be strings
+- You want to handle both numbers and numeric strings without special logic
+
+**Use `v.number()`** when:
+- Working with strictly typed data (TypeScript objects with number fields)
+- You want to reject numeric strings explicitly
+- Validating internal application data where type safety is strict
+
+---
+
+## See Also
+
+- [Number Validator](./) - Base number validation and all available methods
+- [Integer Validator](./integer) - Validate whole numbers only
+- [Float Validator](./float) - Validate decimal numbers only
+- [Base Validator](../base-validator/) - Core validation methods
+- [Scalar Validator](../scalar-validator) - Value selection methods
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding mutators, validators, and transformers

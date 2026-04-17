@@ -1,0 +1,432 @@
+---
+title: Base Validator
+description: Foundation for all validators with 70+ methods
+sidebar_position: 1
+---
+
+# Base Validator
+
+The foundation class for all validators, providing comprehensive validation and conditional logic.
+
+## Quick Example
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const schema = v.object({
+  email: v.string().required().email(),
+  password: v.string().required().min(8),
+  confirmPassword: v.string().required().sameAs("password"),
+});
+```
+
+## Constructor
+
+```typescript
+// BaseValidator is abstract - use specific validators
+v.string() // StringValidator extends BaseValidator
+v.number() // NumberValidator extends BaseValidator
+v.date()   // DateValidator extends BaseValidator
+```
+
+All validators inherit from BaseValidator, providing a consistent API across all validation types.
+
+---
+
+## Methods Overview
+
+This validator provides **100+ methods** organized into:
+
+### Core Validation (3 methods)
+- **Basic Rules**: `required()`, `present()`, `optional()`
+
+### Field Comparison (8 methods)  
+- **Equality**: `sameAs()`, `sameAsSibling()`, `differentFrom()`, `differentFromSibling()`
+- **Value Comparison**: `equal()`
+
+### Conditional Validation (80+ methods)
+- **Required Rules** (40+ methods): `requiredWith()`, `requiredIf()`, `requiredUnless()`, etc.
+- **Present Rules** (40+ methods): `presentWith()`, `presentIf()`, `presentUnless()`, etc.
+- **All methods have sibling variants** for nested object validation
+
+### Advanced Methods (10+ methods)
+- **Conditional Logic**: `when()`, `whenSibling()`
+- **Custom Validation**: `refine()`, `useRule()`, `addRule()`
+- **Data Transformation**: `addTransformer()`, `outputAs()`, `toJSON()`
+- **Configuration**: `default()`, `allowsEmpty()`, `omit()`, `label()`, `describe()`, `attributes()`
+
+---
+
+## Core Validation
+
+### required()
+
+Field must be present and not empty.
+
+```typescript
+v.string().required()
+// ✅ "hello"
+// ❌ undefined, null, ""
+```
+
+### present()
+
+Field must be present (can be empty).
+
+```typescript
+v.string().present()
+// ✅ "hello", ""
+// ❌ undefined
+```
+
+### optional()
+
+Field is optional (default behavior).
+
+```typescript
+v.string().optional()
+// ✅ "hello", undefined, null
+```
+
+---
+
+## Field Comparison
+
+### sameAs()
+
+Value must equal another field's value.
+
+```typescript
+v.string().sameAs("password")
+// ✅ password: "secret", confirmPassword: "secret"
+// ❌ password: "secret", confirmPassword: "different"
+```
+
+### sameAsSibling()
+
+Value must equal another sibling field's value (for nested objects).
+
+```typescript
+v.string().sameAsSibling("password")
+// For nested object validation
+```
+
+### differentFrom()
+
+Value must NOT equal another field's value.
+
+```typescript
+v.string().differentFrom("oldPassword")
+// ✅ oldPassword: "old", newPassword: "new"
+// ❌ oldPassword: "same", newPassword: "same"
+```
+
+### differentFromSibling()
+
+Value must NOT equal another sibling field's value.
+
+```typescript
+v.string().differentFromSibling("oldPassword")
+// For nested object validation
+```
+
+---
+
+## Conditional Validation
+
+### Required Rules
+
+#### requiredWith()
+
+Value is required if another field exists.
+
+```typescript
+v.string().requiredWith("email")
+// ✅ email: "user@example.com", name: "John"
+// ❌ email: "user@example.com", name: undefined
+```
+
+#### requiredIf()
+
+Value is required if another field equals a specific value.
+
+```typescript
+v.string().requiredIf("type", "admin")
+// ✅ type: "admin", role: "super-admin"
+// ❌ type: "admin", role: undefined
+```
+
+#### requiredUnless()
+
+Value is required unless another field equals a specific value.
+
+```typescript
+v.string().requiredUnless("type", "guest")
+// ✅ type: "user", name: "John"
+// ❌ type: "guest", name: undefined
+```
+
+### Present Rules
+
+#### presentWith()
+
+Field must be present if another field exists.
+
+```typescript
+v.string().presentWith("email")
+// ✅ email: "user@example.com", name: "John"
+// ❌ email: "user@example.com", name: undefined
+```
+
+#### presentIf()
+
+Field must be present if another field equals a specific value.
+
+```typescript
+v.string().presentIf("type", "admin")
+// ✅ type: "admin", role: "super-admin"
+// ❌ type: "admin", role: undefined
+```
+
+#### presentUnless()
+
+Field must be present unless another field equals a specific value.
+
+```typescript
+v.string().presentUnless("type", "guest")
+// ✅ type: "user", name: "John"
+// ❌ type: "guest", name: undefined
+```
+
+---
+
+## Advanced Methods
+
+### equal()
+
+Value must equal a specific value.
+
+```typescript
+v.string().equal("admin")
+// ✅ "admin"
+// ❌ "user"
+```
+
+### forbidden()
+
+Value must not be present.
+
+```typescript
+v.string().forbidden()
+// ✅ undefined
+// ❌ "any value"
+```
+
+### when()
+
+Apply conditional validation based on another field value.
+
+```typescript
+v.string().when("type", {
+  is: {
+    admin: v.string().required().min(5),
+    user: v.string().required().min(3)
+  },
+  otherwise: v.string().optional()
+})
+```
+
+### refine()
+
+Define custom validation logic.
+
+```typescript
+v.string().refine((value, context) => {
+  if (value.includes("@")) {
+    return undefined; // Valid
+  }
+  return "Must contain @ symbol";
+})
+```
+
+### addRule()
+
+Add a custom validation rule.
+
+```typescript
+v.string().addRule(customRule, "Custom error message")
+```
+
+### useRule()
+
+Use a custom or pre-built validation rule.
+
+```typescript
+import { hexColorRule } from "@warlock.js/seal-plugins/colors";
+
+v.string().useRule(hexColorRule, { errorMessage: "Invalid color" })
+```
+
+---
+
+## Data Transformation
+
+### addTransformer()
+
+Add a data transformer to the validation pipeline.
+
+```typescript
+v.date().addTransformer((data, { options }) => 
+  dayjs(data).format(options.format), 
+  { format: 'YYYY-MM-DD' }
+)
+```
+
+### outputAs()
+
+Simple one-time transformation.
+
+```typescript
+v.string().outputAs(data => data.toUpperCase())
+```
+
+### toJSON()
+
+Transform output to JSON string.
+
+```typescript
+v.object({ name: v.string() }).toJSON(2) // Pretty-printed
+v.string().toJSON() // '"hello"'
+```
+
+## Utility Methods
+
+### default()
+
+Set default value for the field.
+
+```typescript
+v.string().default("anonymous")
+// undefined → "anonymous"
+```
+
+### allowsEmpty()
+
+Allow empty values and skip validation.
+
+```typescript
+v.string().allowsEmpty()
+// "" → Valid (skips other rules)
+```
+
+### omit()
+
+Omit field from validated data output.
+
+```typescript
+v.string().required().sameAs("password").omit()
+// Validates but excludes from result
+```
+
+### label()
+
+Set field label for error messages.
+
+```typescript
+v.string().label("User Name")
+// Error: "The User Name is required"
+```
+
+### describe()
+
+Add description to the validator.
+
+```typescript
+v.string().describe("User's full name")
+```
+
+### attributes()
+
+Set attributes for translations.
+
+```typescript
+v.string().attributes({
+  name: "Name",
+  email: "Email"
+})
+```
+
+---
+
+## Common Patterns
+
+### Password Confirmation
+
+```typescript
+v.object({
+  password: v.string().required().min(8),
+  confirmPassword: v.string().required().sameAs("password")
+})
+```
+
+### Conditional Fields
+
+```typescript
+v.object({
+  type: v.string().required().oneOf(["admin", "user"]),
+  role: v.string().requiredIf("type", "admin"),
+  permissions: v.array().presentIf("type", "admin")
+})
+```
+
+### Multi-Field Validation
+
+```typescript
+v.object({
+  email: v.string().required().email(),
+  phone: v.string().requiredWithAny(["email", "phone"]),
+  address: v.string().requiredWithAll(["email", "phone"])
+})
+```
+
+### Data Transformation
+
+```typescript
+v.object({
+  name: v.string().required().trim().capitalize(),
+  createdAt: v.date().required().toJSON(),
+  settings: v.object({ theme: v.string() }).toJSON(2)
+})
+```
+
+### Custom Validation
+
+```typescript
+v.string().refine((value, context) => {
+  const otherField = context.allValues.otherField;
+  return value !== otherField ? undefined : "Must be different";
+})
+```
+
+---
+
+## Inherited Methods
+
+All validators inherit these BaseValidator methods:
+
+- **Core Validation**: `required()`, `present()`, `optional()`
+- **Field Comparison**: `sameAs()`, `sameAsSibling()`, `differentFrom()`, `differentFromSibling()`, `equal()`
+- **Conditional Required**: `requiredWith()`, `requiredIf()`, `requiredUnless()`, etc. (40+ methods with sibling variants)
+- **Conditional Present**: `presentWith()`, `presentIf()`, `presentUnless()`, etc. (40+ methods with sibling variants)
+- **Advanced**: `forbidden()`, `when()`, `whenSibling()`, `refine()`, `useRule()`, `addRule()`
+- **Data Transformation**: `addTransformer()`, `outputAs()`, `toJSON()`
+- **Utilities**: `default()`, `allowsEmpty()`, `omit()`, `label()`, `describe()`, `attributes()`
+
+---
+
+## See Also
+
+- [String Validator](../string-validator/) - String-specific validation
+- [Date Validator](../date-validator/) - Date-specific validation
+- [Number Validator](../number-validator/) - Number-specific validation
+- [Custom Rules](../advanced/custom-rules) - Create custom validators

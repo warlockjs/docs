@@ -1,0 +1,99 @@
+---
+sidebar_position: 2
+---
+
+# 📦 Installation
+
+Get Seal up and running in your project in just a few steps!
+
+## Prerequisites
+
+- **Node.js** 16.0 or higher
+- **TypeScript** 4.5 or higher (optional but recommended)
+
+## Install Seal
+
+```bash
+# Using npm
+npm install @warlock.js/seal
+
+# Using yarn
+yarn add @warlock.js/seal
+
+# Using pnpm
+pnpm add @warlock.js/seal
+```
+
+## Quick Setup
+
+### 1. Import and Create Schema
+
+```ts
+import { v } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  age: v.int().min(18),
+});
+```
+
+### 2. Validate Data
+
+```ts
+const result = await v.validate(userSchema, {
+  name: "John Doe",
+  email: "john@example.com",
+  age: 25,
+});
+
+if (result.isValid) {
+  console.log("Valid data:", result.data);
+} else {
+  console.log("Errors:", result.errors);
+}
+```
+
+## Environment Support
+
+### Node.js
+Works in any Node.js environment (16.0+):
+- **APIs** - Express, Fastify, Koa
+- **CLI Tools** - Command line applications
+- **Scripts** - Build tools, automation
+
+### Browser
+Works in all modern browsers:
+- **Chrome** 60+
+- **Firefox** 55+
+- **Safari** 12+
+- **Edge** 79+
+
+### Frameworks
+Use with any framework:
+- **Frontend** - React, Vue, Angular, Svelte
+- **Full-Stack** - Next.js, Nuxt, SvelteKit
+- **Backend** - Express, Fastify, NestJS
+
+## TypeScript Setup
+
+For the best experience, use TypeScript:
+
+```ts
+import { v, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+});
+
+// TypeScript infers the exact type!
+type User = Infer<typeof userSchema>;
+// User = { name: string; email: string }
+```
+
+## Next Steps
+
+- [⚡ Quick Start](./quick-start) - Your first validation in 5 minutes
+- [🧠 Core Concepts](../concepts/three-layer-architecture) - Understanding Seal's architecture
+- [📚 String Validator](../string-validator/) - Comprehensive string validation

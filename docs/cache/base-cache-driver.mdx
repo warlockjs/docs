@@ -1,0 +1,258 @@
+---
+sidebar_position: 5
+---
+
+# Base Cache Driver
+
+Abstract class that all built-in drivers extend. Provides key parsing, TTL handling, logging, and default implementations of optional methods.
+
+## Example: Extending BaseCacheDriver
+```ts
+import { BaseCacheDriver } from "@warlock.js/cache";
+import type { CacheDriver } from "@warlock.js/cache";
+
+interface MyOptions {
+  globalPrefix?: string;
+  ttl?: number;
+}
+
+export class MyDriver extends BaseCacheDriver<MyDriver, MyOptions> 
+  implements CacheDriver<MyDriver, MyOptions> {
+  
+  public name = "myDriver";
+  
+  // Implement required abstract methods
+  public async removeNamespace(namespace: string) {
+    // Implementation
+  }
+  
+  public async set(key: string | GenericObject, value: any, ttl?: number) {
+    // Implementation
+  }
+  
+  public async get(key: string | GenericObject) {
+    // Implementation
+  }
+  
+  public async remove(key: string | GenericObject) {
+    // Implementation
+  }
+  
+  public async flush() {
+    // Implementation
+  }
+}
+```
+
+## Core Implemented Methods
+
+### setOptions(options)
+
+Update driver configuration.
+
+```ts
+setOptions(options: Options): any;
+```
+
+### parseKey(key)
+
+Normalize a cache key using internal [parseCacheKey](./utils#parse-cache-key) utility.
+
+```ts
+parseKey(key: string | GenericObject): string;
+```
+
+### connect()
+
+Default implementation logs "connecting" and "connected" events. Override to add backend-specific logic.
+
+```ts
+connect(): Promise<any>;
+```
+
+### disconnect()
+
+Default implementation logs "disconnecting" and "disconnected" events. Override to add backend-specific logic.
+
+```ts
+disconnect(): Promise<void>;
+```
+
+## TTL Management Methods
+
+### ttl (getter)
+
+Return the default TTL from driver options in seconds, or `undefined` if no default.
+
+```ts
+get ttl(): number | undefined;
+```
+
+### getExpiresAt(ttl)
+
+Calculate millisecond timestamp when a cache entry expires. Returns `undefined` if TTL is not set.
+
+```ts
+getExpiresAt(ttl?: number): number | undefined;
+```
+
+Example:
+```ts
+const expiresAt = driver.getExpiresAt(3600); // 1 hour from now
+```
+
+### prepareDataForStorage(data, ttl)
+
+Wrap a value with TTL and expiration metadata for backend storage.
+
+```ts
+prepareDataForStorage(data: any, ttl?: number): CacheData;
+```
+
+Example:
+```ts
+const wrapped = driver.prepareDataForStorage({ status: "active" }, 3600);
+// { data: { status: "active" }, ttl: 3600, expiresAt: 1713399600000 }
+```
+
+### parseCachedData(key, data)
+
+Unwrap stored data, check expiration, log expiry if needed, and return the value or null. Returns the original value if valid, `null` if expired.
+
+```ts
+parseCachedData(key: string | GenericObject, data: CacheData): any;
+```
+
+Example:
+```ts
+const value = driver.parseCachedData("product:123", storedData);
+// Returns value if not expired, null and logs error if expired
+```
+
+## Logging Method
+
+### log(operation, key?)
+
+Log a cache operation with consistent formatting. Uses the driver name as the log channel.
+
+```ts
+log(operation: string, key?: string): void;
+```
+
+Supported operations:
+
+| Operation | Level | Usage |
+|-----------|-------|-------|
+| `fetching` | info | Before getting a value |
+| `fetched` | success | After successfully retrieving a value |
+| `caching` | info | Before setting a value |
+| `cached` | success | After successfully storing a value |
+| `removing` | info | Before removing a key |
+| `removed` | success | After successfully removing a key |
+| `clearing` | info | Before clearing a namespace |
+| `cleared` | success | After successfully clearing a namespace |
+| `flushing` | info | Before flushing all cache |
+| `flushed` | success | After successfully flushing |
+| `expired` | error | When a cached entry has expired |
+| `notFound` | error | When a key is not found |
+| `connecting` | info | Before connecting to backend |
+| `connected` | success | After successful backend connection |
+| `disconnecting` | info | Before disconnecting from backend |
+| `disconnected` | success | After successful disconnection |
+| `error` | error | For operation failures |
+
+Example:
+```ts
+this.log("caching", "user:123");
+// Logs: "redis: caching user:123"
+```
+
+## Data Storage Format
+
+The base driver automatically wraps cached values with metadata:
+
+```ts
+interface CacheData {
+  data: any;           // The actual cached value
+  ttl?: number;        // Time to live in seconds
+  expiresAt?: number;  // Millisecond timestamp when entry expires
+}
+```
+
+Your driver's `set()` and `get()` implementations should use `prepareDataForStorage()` when storing and `parseCachedData()` when retrieving to handle this format transparently.
+
+## Example: Custom Driver with BaseCacheDriver
+
+```ts
+import { BaseCacheDriver } from "@warlock.js/cache";
+import type { CacheDriver } from "@warlock.js/cache";
+
+interface MyCacheOptions {
+  globalPrefix?: string;
+  ttl?: number;
+  storage: Map<string, any>;
+}
+
+export class MyCacheDriver extends BaseCacheDriver<MyCacheDriver, MyCacheOptions> 
+  implements CacheDriver<MyCacheDriver, MyCacheOptions> {
+  
+  public name = "myCache";
+  
+  public async removeNamespace(namespace: string) {
+    namespace = await this.parseKey(namespace);
+    
+    this.log("clearing", namespace);
+    
+    // Remove all keys starting with namespace
+    for (const key of this.options.storage.keys()) {
+      if (key.startsWith(namespace)) {
+        this.options.storage.delete(key);
+      }
+    }
+    
+    this.log("cleared", namespace);
+  }
+  
+  public async set(key: string | GenericObject, value: any, ttl?: number) {
+    key = await this.parseKey(key);
+    
+    this.log("caching", key);
+    
+    const data = this.prepareDataForStorage(value, ttl);
+    this.options.storage.set(key, data);
+    
+    this.log("cached", key);
+    return value;
+  }
+  
+  public async get(key: string | GenericObject) {
+    key = await this.parseKey(key);
+    
+    this.log("fetching", key);
+    
+    const data = this.options.storage.get(key);
+    if (!data) {
+      this.log("notFound", key);
+      return null;
+    }
+    
+    return this.parseCachedData(key, data);
+  }
+  
+  public async remove(key: string | GenericObject) {
+    key = await this.parseKey(key);
+    
+    this.log("removing", key);
+    this.options.storage.delete(key);
+    this.log("removed", key);
+  }
+  
+  public async flush() {
+    this.log("flushing");
+    this.options.storage.clear();
+    this.log("flushed");
+  }
+}
+```
+
+See [Cache Driver Interface](./cache-driver-interface) for the complete interface definition.

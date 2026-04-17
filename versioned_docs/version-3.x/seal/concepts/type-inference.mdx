@@ -1,0 +1,156 @@
+---
+title: Type Inference
+description: TypeScript integration and type safety
+---
+
+# Type Inference
+
+TypeScript integration and type safety with Seal.
+
+---
+
+## Basic Type Inference
+
+### Infer Schema Types
+
+```typescript
+import { v, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().required().email(),
+  age: v.number().required().min(18)
+});
+
+// Infer the type from schema
+type User = Infer<typeof userSchema>;
+// Result: { name: string; email: string; age: number }
+```
+
+### Usage
+
+```typescript
+// TypeScript knows the exact shape
+const user: User = {
+  name: "John Doe",
+  email: "john@example.com",
+  age: 25
+};
+
+// TypeScript will catch type errors
+const invalidUser: User = {
+  name: "John Doe",
+  email: "invalid-email", // ❌ TypeScript error
+  age: "25" // ❌ TypeScript error
+};
+```
+
+---
+
+## Complex Types
+
+### Nested Objects & Arrays
+
+```typescript
+const profileSchema = v.object({
+  user: v.object({
+    name: v.string().required(),
+    email: v.string().required().email()
+  }),
+  tags: v.array(v.string()).optional()
+});
+
+type Profile = Infer<typeof profileSchema>;
+// Result: { user: { name: string; email: string }; tags?: string[] }
+```
+
+---
+
+## Real-World Example
+
+```typescript
+const userSchema = v.object({
+  name: v.string().required().minLength(2),
+  email: v.string().required().email(),
+  age: v.int().required().between(18, 100)
+});
+
+type User = Infer<typeof userSchema>;
+
+// Type-safe API function
+async function createUser(data: User): Promise<User> {
+  const result = await validate(userSchema, data);
+  
+  if (!result.isValid) {
+    throw new Error("Invalid user data");
+  }
+  
+  return result.data; // TypeScript knows this is User
+}
+```
+
+---
+
+## Schema Composition
+
+```typescript
+const baseUserSchema = v.object({
+  name: v.string().required(),
+  email: v.string().required().email()
+});
+
+const adminSchema = v.object({
+  ...baseUserSchema,
+  permissions: v.array(v.string()).required()
+});
+
+type Admin = Infer<typeof adminSchema>;
+// Result: { name: string; email: string; permissions: string[] }
+```
+
+---
+
+## Type Guards
+
+```typescript
+function isUser(data: unknown): data is User {
+  const result = await validate(userSchema, data);
+  return result.isValid;
+}
+
+// Usage
+if (isUser(apiResponse)) {
+  // TypeScript knows this is User
+  console.log(apiResponse.name);
+}
+```
+
+---
+
+## Best Practices
+
+```typescript
+// ✅ Good: Let TypeScript infer types
+type User = Infer<typeof userSchema>;
+
+// ✅ Good: Validate at API boundaries
+async function getUser(id: string): Promise<User> {
+  const result = await validate(userSchema, await fetchUser(id));
+  if (!result.isValid) throw new Error("Invalid data");
+  return result.data;
+}
+
+// ✅ Good: Use type guards for runtime checking
+function isValidUser(data: unknown): data is User {
+  const result = await validate(userSchema, data);
+  return result.isValid;
+}
+```
+
+---
+
+## See Also
+
+- [Validation Flow](./validation-flow) - How validation works
+- [Error Messages](./error-messages) - Handling validation errors
+- [Conditional Validation](./conditional-validation) - Advanced validation

@@ -1,0 +1,187 @@
+---
+title: Computed Fields
+description: Derive a field's value from other validated fields at runtime.
+---
+
+# Computed Fields
+
+A **computed field** is a field whose value is **derived from other fields** rather than submitted by the client. The callback runs after all other fields have been validated and mutated, so it always receives clean, transformed data.
+
+```ts
+import { v } from "@warlock.js/seal";
+
+const articleSchema = v.object({
+  title:    v.string().required().trim(),
+  slug:     v.computed(data => slugify(data.title)),   // ← derived
+  content:  v.string().required(),
+  wordCount: v.computed(data => data.content.split(/\s+/).length),
+});
+```
+
+---
+
+## Creating a Computed Field
+
+Use `v.computed(callback, resultValidator?)`:
+
+```ts
+v.computed(data => data.firstName + " " + data.lastName)
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `callback` | `(data, context) => value \| Promise<value>` | Receives the full validated object |
+| `resultValidator` | `BaseValidator?` | Optionally validate the computed result |
+
+The `data` argument is the **full validated object** (all sibling fields after mutation). The `context` gives access to request-level metadata.
+
+---
+
+## Async Callbacks
+
+Computed fields fully support async operations:
+
+```ts
+const schema = v.object({
+  imageUrl: v.string().required().url(),
+  thumbnailUrl: v.computed(async (data) => {
+    return await generateThumbnail(data.imageUrl);
+  }),
+});
+```
+
+---
+
+## Validating the Computed Result
+
+Pass a second argument to validate the computed value:
+
+```ts
+const schema = v.object({
+  title: v.string().required(),
+  slug: v.computed(
+    data => slugify(data.title),
+    v.string().required().minLength(3).maxLength(120)
+  ),
+});
+```
+
+If the computed result fails the result validator, the field returns an error just like any other field.
+
+---
+
+## Usage Patterns
+
+### Slug generation
+
+```ts
+v.object({
+  title: v.string().required().trim(),
+  slug:  v.computed(data => slugify(data.title)),
+});
+```
+
+### Full name
+
+```ts
+v.object({
+  firstName: v.string().required().trim(),
+  lastName:  v.string().required().trim(),
+  fullName:  v.computed(data => `${data.firstName} ${data.lastName}`),
+});
+```
+
+### Total price
+
+```ts
+v.object({
+  unitPrice: v.number().required().positive(),
+  quantity:  v.int().required().min(1),
+  total:     v.computed(data => data.unitPrice * data.quantity),
+});
+```
+
+### Derived status
+
+```ts
+v.object({
+  stock:  v.int().required().min(0),
+  status: v.computed(data => (data.stock > 0 ? "in-stock" : "out-of-stock")),
+});
+```
+
+### Async: database lookup
+
+```ts
+v.object({
+  categoryId: v.string().required(),
+  category:   v.computed(async (data) => {
+    return await db.categories.findOne(data.categoryId);
+  }),
+});
+```
+
+---
+
+## Key Behaviours
+
+| Behaviour | Detail |
+|---|---|
+| **Execution order** | Runs after all sibling fields are validated & mutated |
+| **No client input** | The incoming value for this key is ignored |
+| **Async safe** | Awaits the callback automatically |
+| **JSON Schema** | Skipped — computed fields have no input schema |
+| **Error on callback throw** | Returns a validation error with the thrown message |
+
+:::info No JSON Schema output
+`toJsonSchema()` throws if called directly on a `ComputedValidator`. `ObjectValidator.toJsonSchema()` automatically skips computed fields — this is by design.
+:::
+
+---
+
+## Computed vs. Managed
+
+| | Computed | Managed |
+|---|---|---|
+| Callback receives | `(data, context)` | `(context)` |
+| Depends on other fields | Yes | No |
+| Typical use | slug, totals, formatted names | timestamps, auto-IDs |
+| Import | `v.computed(fn)` | `v.managed(fn)` |
+
+See [Managed Fields](../managed-validator/index) for the companion validator.
+
+---
+
+## Real-World Example
+
+### Blog post creation
+
+```ts
+import slugify from "slugify";
+
+const createPostSchema = v.object({
+  title:     v.string().required().trim().maxLength(200),
+  content:   v.string().required(),
+  authorId:  v.string().required(),
+
+  // Computed fields
+  slug:      v.computed(
+    data => slugify(data.title, { lower: true, strict: true }),
+    v.string().required().minLength(3)
+  ),
+  excerpt:   v.computed(
+    data => data.content.replace(/<[^>]+>/g, "").slice(0, 160) + "…"
+  ),
+  readTime:  v.computed(
+    data => Math.ceil(data.content.split(/\s+/).length / 200) // ~200 wpm
+  ),
+});
+```
+
+---
+
+## See Also
+
+- [Managed Fields](../managed-validator/index) — injected server-side values (timestamps, IDs)
+- [Object Validator](../object-validator/index) — how computed fields integrate into objects
+- [Base Validator Advanced](../base-validator/advanced) — `refine()`, `outputAs()`

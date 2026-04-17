@@ -1,0 +1,250 @@
+---
+title: Date Mutators
+description: Transform date values before validation
+sidebar_position: 8
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Date Mutators
+
+Date mutators transform the input data before validation. All mutators are executed first, then validators run on the transformed data.
+
+---
+
+## All Mutators
+
+<div className="methods-grid">
+
+<MethodCard
+  name="toStartOfDay()"
+  description="Set to start of day (00:00:00)"
+  href="#tostartofday"
+/>
+
+<MethodCard
+  name="toEndOfDay()"
+  description="Set to end of day (23:59:59)"
+  href="#toendofday"
+/>
+
+<MethodCard
+  name="addDays()"
+  description="Add or subtract days"
+  href="#adddays"
+/>
+
+<MethodCard
+  name="addMonths()"
+  description="Add or subtract months"
+  href="#addmonths"
+/>
+
+<MethodCard
+  name="addYears()"
+  description="Add or subtract years"
+  href="#addyears"
+/>
+
+<MethodCard
+  name="addHours()"
+  description="Add or subtract hours"
+  href="#addhours"
+/>
+
+<MethodCard
+  name="toUTC()"
+  description="Convert to UTC"
+  href="#toutc"
+/>
+
+<MethodCard
+  name="toStartOfMonth()"
+  description="Set to start of month"
+  href="#tostartofmonth"
+/>
+
+<MethodCard
+  name="toEndOfMonth()"
+  description="Set to end of month"
+  href="#toendofmonth"
+/>
+
+<MethodCard
+  name="toStartOfYear()"
+  description="Set to start of year"
+  href="#tostartofyear"
+/>
+
+<MethodCard
+  name="toEndOfYear()"
+  description="Set to end of year"
+  href="#toendofyear"
+/>
+
+</div>
+
+---
+
+## Time Adjustment
+
+### toStartOfDay() {#tostartofday}
+
+Set to start of day (00:00:00.000)
+
+```typescript
+v.date().toStartOfDay()
+// Input: "2024-12-25 14:30:00" → Output: Date("2024-12-25 00:00:00.000")
+```
+
+### toEndOfDay() {#toendofday}
+
+Set to end of day (23:59:59.999)
+
+```typescript
+v.date().toEndOfDay()
+// Input: "2024-12-25 14:30:00" → Output: Date("2024-12-25 23:59:59.999")
+```
+
+### toUTC() {#toutc}
+
+Convert date to UTC timezone
+
+```typescript
+v.date().toUTC()
+// Input: Date("2024-12-25 14:30:00") → Output: Date in UTC
+```
+
+---
+
+## Date Arithmetic
+
+### addDays(days) {#adddays}
+
+Add or subtract days from date
+
+```typescript
+v.date().addDays(7)     // Add 7 days
+v.date().addDays(-7)    // Subtract 7 days
+// Input: "2024-12-25" → Output: Date("2025-01-01")
+```
+
+### addMonths(months) {#addmonths}
+
+Add or subtract months from date
+
+```typescript
+v.date().addMonths(1)   // Add 1 month
+v.date().addMonths(-1)  // Subtract 1 month
+// Input: "2024-12-25" → Output: Date("2025-01-25")
+```
+
+### addYears(years) {#addyears}
+
+Add or subtract years from date
+
+```typescript
+v.date().addYears(1)    // Add 1 year
+v.date().addYears(-1)   // Subtract 1 year
+// Input: "2024-12-25" → Output: Date("2025-12-25")
+```
+
+### addHours(hours) {#addhours}
+
+Add or subtract hours from date
+
+```typescript
+v.date().addHours(2)    // Add 2 hours
+v.date().addHours(-2)   // Subtract 2 hours
+// Input: "2024-12-25 14:30:00" → Output: Date("2024-12-25 16:30:00")
+```
+
+---
+
+## Period Boundaries
+
+### toStartOfMonth() {#tostartofmonth}
+
+Set to start of month (first day, 00:00:00)
+
+```typescript
+v.date().toStartOfMonth()
+// Input: "2024-12-25" → Output: Date("2024-12-01 00:00:00")
+```
+
+### toEndOfMonth() {#toendofmonth}
+
+Set to end of month (last day, 23:59:59)
+
+```typescript
+v.date().toEndOfMonth()
+// Input: "2024-12-25" → Output: Date("2024-12-31 23:59:59")
+```
+
+### toStartOfYear() {#tostartofyear}
+
+Set to start of year (January 1st, 00:00:00)
+
+```typescript
+v.date().toStartOfYear()
+// Input: "2024-12-25" → Output: Date("2024-01-01 00:00:00")
+```
+
+### toEndOfYear() {#toendofyear}
+
+Set to end of year (December 31st, 23:59:59)
+
+```typescript
+v.date().toEndOfYear()
+// Input: "2024-12-25" → Output: Date("2024-12-31 23:59:59")
+```
+
+---
+
+## Examples
+
+### Normalize to Start of Day
+
+```typescript
+const dateSchema = v.date()
+  .required()
+  .toStartOfDay()
+  .fromToday();
+
+const result = await validate(dateSchema, "2024-12-25 14:30:00");
+// Result: { isValid: true, data: Date("2024-12-25 00:00:00") }
+```
+
+### Add Days for Expiry Date
+
+```typescript
+const expirySchema = v.date()
+  .required()
+  .toStartOfDay()
+  .addDays(30)
+  .fromToday();
+
+const result = await validate(expirySchema, "2024-12-25");
+// Result: { isValid: true, data: Date("2025-01-24 00:00:00") }
+```
+
+### First Day of Next Month
+
+```typescript
+const nextMonthSchema = v.date()
+  .required()
+  .toStartOfMonth()
+  .addMonths(1);
+
+const result = await validate(nextMonthSchema, "2024-12-25");
+// Result: { isValid: true, data: Date("2025-01-01 00:00:00") }
+```
+
+---
+
+## See Also
+
+- [Date Validator Overview](./) - Return to overview
+- [Date Validators](./validators) - Validation rules
+- [Date Transformers](./transformers) - Output formatting
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding mutators

@@ -1,0 +1,402 @@
+---
+title: Object Validators
+description: Validate objects using inherited BaseValidator methods
+sidebar_position: 19
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Object Validators
+
+The Object Validator inherits all validation methods from `BaseValidator`. These methods validate the object itself, while individual properties are validated by their own validators.
+
+---
+
+## All Validators
+
+<div className="methods-grid">
+
+<MethodCard
+  name="required()"
+  description="Object must be present"
+  href="#required"
+/>
+
+<MethodCard
+  name="optional()"
+  description="Object is optional"
+  href="#optional"
+/>
+
+<MethodCard
+  name="present()"
+  description="Object must be present (can be empty)"
+  href="#present"
+/>
+
+<MethodCard
+  name="nullable()"
+  description="Object can be null"
+  href="#nullable"
+/>
+
+<MethodCard
+  name="equal()"
+  description="Object must equal value"
+  href="#equal"
+/>
+
+<MethodCard
+  name="notEqual()"
+  description="Object must not equal value"
+  href="#notequal"
+/>
+
+<MethodCard
+  name="sameAs()"
+  description="Object must match field"
+  href="#sameas"
+/>
+
+<MethodCard
+  name="differentFrom()"
+  description="Object must differ from field"
+  href="#differentfrom"
+/>
+
+<MethodCard
+  name="when()"
+  description="Conditional validation"
+  href="#when"
+/>
+
+<MethodCard
+  name="refine()"
+  description="Custom validation"
+  href="#refine"
+/>
+
+<MethodCard
+  name="transform()"
+  description="Transform data"
+  href="#transform"
+/>
+
+</div>
+
+---
+
+## Basic Rules
+
+### required() {#required}
+
+Object must be present and not empty
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .required()
+
+// Input: { name: "John", email: "john@example.com" } → Valid ✅
+// Input: null → Invalid ❌
+// Input: undefined → Invalid ❌
+```
+
+### optional() {#optional}
+
+Object is optional (can be undefined)
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .optional()
+
+// Input: { name: "John", email: "john@example.com" } → Valid ✅
+// Input: undefined → Valid ✅
+// Input: null → Invalid ❌
+```
+
+### present() {#present}
+
+Object must be present but can be empty
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .present()
+
+// Input: { name: "John", email: "john@example.com" } → Valid ✅
+// Input: {} → Valid ✅
+// Input: null → Invalid ❌
+// Input: undefined → Invalid ❌
+```
+
+### nullable() {#nullable}
+
+Object can be null
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .nullable()
+
+// Input: { name: "John", email: "john@example.com" } → Valid ✅
+// Input: null → Valid ✅
+// Input: undefined → Invalid ❌
+```
+
+---
+
+## Comparison Rules
+
+### equal(value) {#equal}
+
+Object must equal the specified value
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .equal({ name: "John", email: "john@example.com" })
+
+// Input: { name: "John", email: "john@example.com" } → Valid ✅
+// Input: { name: "Jane", email: "jane@example.com" } → Invalid ❌
+```
+
+### notEqual(value) {#notequal}
+
+Object must not equal the specified value
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .notEqual({ name: "John", email: "john@example.com" })
+
+// Input: { name: "Jane", email: "jane@example.com" } → Valid ✅
+// Input: { name: "John", email: "john@example.com" } → Invalid ❌
+```
+
+### sameAs(field) {#sameas}
+
+Object must match another field's value
+
+```typescript
+v.object({
+  password: v.string().required(),
+  confirmPassword: v.string().required()
+})
+  .sameAs("password")
+
+// Input: { password: "secret", confirmPassword: "secret" } → Valid ✅
+// Input: { password: "secret", confirmPassword: "different" } → Invalid ❌
+```
+
+### differentFrom(field) {#differentfrom}
+
+Object must differ from another field's value
+
+```typescript
+v.object({
+  oldPassword: v.string().required(),
+  newPassword: v.string().required()
+})
+  .differentFrom("oldPassword")
+
+// Input: { oldPassword: "secret", newPassword: "newsecret" } → Valid ✅
+// Input: { oldPassword: "secret", newPassword: "secret" } → Invalid ❌
+```
+
+---
+
+## Advanced Rules
+
+### when(condition, validator) {#when}
+
+Apply validation conditionally
+
+```typescript
+v.object({
+  type: v.string().required(),
+  companyName: v.string().required()
+})
+  .when("type", "company", v.string().required())
+
+// Input: { type: "company", companyName: "Acme Corp" } → Valid ✅
+// Input: { type: "individual", companyName: "John" } → Valid ✅
+// Input: { type: "company" } → Invalid ❌ (companyName required)
+```
+
+### refine(validator) {#refine}
+
+Apply custom validation logic
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .refine((value) => {
+    if (value.name === "John" && value.email !== "john@example.com") {
+      return "John must have john@example.com email";
+    }
+    return undefined;
+  })
+
+// Input: { name: "John", email: "john@example.com" } → Valid ✅
+// Input: { name: "John", email: "jane@example.com" } → Invalid ❌
+```
+
+### transform(transformer) {#transform}
+
+Transform the object data
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .transform((value) => ({
+    ...value,
+    name: value.name.toUpperCase(),
+    email: value.email.toLowerCase()
+  }))
+
+// Input: { name: "john", email: "JOHN@EXAMPLE.COM" }
+// Output: { name: "JOHN", email: "john@example.com" }
+```
+
+---
+
+## Examples
+
+### Basic Object Validation
+
+```typescript
+const schema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  age: v.int().min(18)
+})
+  .required();
+
+const result = await validate(schema, {
+  name: "John Doe",
+  email: "john@example.com",
+  age: 25
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com", age: 25 } }
+```
+
+### Optional Object
+
+```typescript
+const schema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .optional();
+
+const result = await validate(schema, undefined);
+// Result: { isValid: true, data: undefined }
+```
+
+### Conditional Validation
+
+```typescript
+const schema = v.object({
+  type: v.string().oneOf(["individual", "company"]).required(),
+  name: v.string().required(),
+  companyName: v.string().required()
+})
+  .when("type", "company", v.string().required());
+
+const result = await validate(schema, {
+  type: "company",
+  name: "Acme Corp",
+  companyName: "Acme Corporation"
+});
+// Result: { isValid: true, data: { type: "company", name: "Acme Corp", companyName: "Acme Corporation" } }
+```
+
+### Custom Validation
+
+```typescript
+const schema = v.object({
+  password: v.string().required(),
+  confirmPassword: v.string().required()
+})
+  .refine((value) => {
+    if (value.password !== value.confirmPassword) {
+      return "Passwords must match";
+    }
+    return undefined;
+  });
+
+const result = await validate(schema, {
+  password: "secret123",
+  confirmPassword: "secret123"
+});
+// Result: { isValid: true, data: { password: "secret123", confirmPassword: "secret123" } }
+```
+
+### Data Transformation
+
+```typescript
+const schema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .transform((value) => ({
+    ...value,
+    name: value.name.trim().toUpperCase(),
+    email: value.email.trim().toLowerCase()
+  }));
+
+const result = await validate(schema, {
+  name: "  john doe  ",
+  email: "  JOHN@EXAMPLE.COM  "
+});
+// Result: { isValid: true, data: { name: "JOHN DOE", email: "john@example.com" } }
+```
+
+---
+
+## Property vs Object Validation
+
+| Level | Purpose | Methods |
+|-------|---------|---------|
+| **Object Level** | Validate the object itself | `required()`, `optional()`, `present()`, `nullable()` |
+| **Property Level** | Validate individual properties | Each property's own validators |
+
+**Example:**
+
+```typescript
+v.object({
+  name: v.string().required(),        // Property validation
+  email: v.string().email().required() // Property validation
+})
+  .required()                         // Object validation
+  .refine((value) => {                // Object validation
+    // Custom object-level logic
+    return undefined;
+  });
+```
+
+---
+
+## See Also
+
+- [Object Validator Overview](./) - Return to overview
+- [Object Mutators](./mutators) - Data transformation methods
+- [Base Validator](../base-validator/) - Complete method reference

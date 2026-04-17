@@ -1,0 +1,181 @@
+---
+title: Basic Rules
+description: Core validation rules for field presence and value requirements
+---
+
+# Basic Rules
+
+Essential validation rules that control field presence and value requirements.
+
+---
+
+## required()
+
+Field must be present and not empty (not `undefined`, `null`, or empty string).
+
+**Signature:**
+```typescript
+required(errorMessage?: string): this
+```
+
+**Parameters:**
+- `errorMessage` (optional) - Custom error message
+
+**Example:**
+```typescript
+v.string().required()
+
+// Input:  "hello"
+// Output: "hello" ✅
+
+// Input:  "0"
+// Output: "0" ✅
+
+// Input:  "false"
+// Output: "false" ✅
+
+// Input:  undefined
+// Output: Error: "The :input is required" ❌
+
+// Input:  null
+// Output: Error: "The :input is required" ❌
+
+// Input:  ""
+// Output: Error: "The :input is required" ❌
+```
+
+**Common Use:**
+```typescript
+// User registration form
+v.object({
+  email: v.string().required().email(),
+  password: v.string().required().min(8),
+  name: v.string().required().min(2)
+});
+```
+
+---
+
+## present()
+
+Field must be present with any value except `undefined`.
+
+**Signature:**
+```typescript
+present(errorMessage?: string): this
+```
+
+**Parameters:**
+- `errorMessage` (optional) - Custom error message
+
+**Example:**
+```typescript
+v.string().present()
+
+// Input:  "hello"
+// Output: "hello" ✅
+
+// Input:  ""
+// Output: "" ✅
+
+// Input:  null
+// Output: null ✅
+
+// Input:  false
+// Output: false ✅
+
+// Input:  0
+// Output: 0 ✅
+
+// Input:  undefined
+// Output: Error: "The :input field is required" ❌
+```
+
+**Common Use:**
+```typescript
+// Field that must be present in form (even if empty/null)
+v.object({
+  email: v.string().required().email(),
+  bio: v.string().present().max(500), // Must be present, can be empty
+  termsAccepted: v.boolean().present() // Must be present (true/false/null)
+});
+```
+
+---
+
+## optional()
+
+Field is optional (default behavior) - accepts any value including `undefined`.
+
+**Signature:**
+```typescript
+optional(): this
+```
+
+**Example:**
+```typescript
+v.string().optional()
+
+// Input:  "hello"
+// Output: "hello" ✅
+
+// Input:  undefined
+// Output: undefined ✅
+
+// Input:  null
+// Output: null ✅
+
+// Input:  ""
+// Output: "" ✅
+```
+
+**Common Use:**
+```typescript
+// Optional user profile fields
+v.object({
+  email: v.string().required().email(),
+  phone: v.string().optional().phone(), // Optional phone number
+  website: v.string().optional().url()  // Optional website
+});
+```
+
+---
+
+## Comparison
+
+| Method | `undefined` | `null` | `""` | `"hello"` | `0` | `false` |
+|--------|-------------|--------|------|-----------|-----|---------|
+| `required()` | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
+| `present()` | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `optional()` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+**Key Differences:**
+- **`required()`**: Field must exist and have a meaningful value (not `undefined`, `null`, or empty string)
+- **`present()`**: Field must exist with any value except `undefined` (including `null`, empty string, `0`, `false`)
+- **`optional()`**: Field can be missing (`undefined`) or have any value
+
+---
+
+## Chaining Examples
+
+```typescript
+// Required field with validation
+v.string().required().email().max(100)
+
+// Present field (can be empty)
+v.string().present().max(500)
+
+// Optional field with conditional validation
+v.string().optional().when("type", {
+  is: { admin: v.string().required() },
+  otherwise: v.string().optional()
+})
+```
+
+---
+
+## See Also
+
+- [Field Comparison](./field-comparison) - Compare with other fields
+- [Required Rules](./required-rules) - Conditional required validation
+- [Present Rules](./present-rules) - Conditional present validation

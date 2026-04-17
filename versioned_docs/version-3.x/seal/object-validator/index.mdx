@@ -1,0 +1,283 @@
+---
+title: Object Validator Overview
+description: Validate objects with defined schemas and flexible options
+sidebar_position: 17
+---
+
+# Object Validator
+
+The Object Validator validates objects against a defined schema. Each property is validated using its own validator, and the object can be configured for unknown properties, trimming, and more.
+
+---
+
+## Basic Usage
+
+```typescript
+import { v, validate } from "@warlock.js/seal";
+
+const schema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  age: v.int().min(18)
+});
+
+const result = await validate(schema, {
+  name: "John Doe",
+  email: "john@example.com",
+  age: 25
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com", age: 25 } }
+```
+
+---
+
+## What's Included
+
+### Mutators (4 methods)
+
+Transform objects before validation:
+- **Property Management**: `stripUnknown()`, `allow()`
+- **Data Cleaning**: `trim()`
+- **Unknown Handling**: `allowUnknown()`
+
+[View all mutators →](./mutators)
+
+### Validators (Inherited)
+
+Inherits all validation methods from `BaseValidator`:
+- **Basic Rules**: `required()`, `optional()`, `present()`, `nullable()`
+- **Comparison**: `equal()`, `notEqual()`, `sameAs()`, `differentFrom()`
+- **Advanced**: `when()`, `refine()`, `transform()`
+
+[View Base Validator →](../base-validator/)
+
+---
+
+## Common Patterns
+
+### Basic Object Schema
+
+```typescript
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  age: v.int().min(18)
+});
+
+const result = await validate(userSchema, {
+  name: "John Doe",
+  email: "john@example.com",
+  age: 25
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com", age: 25 } }
+```
+
+### Nested Objects
+
+```typescript
+const addressSchema = v.object({
+  street: v.string().required(),
+  city: v.string().required(),
+  country: v.string().required(),
+  zipCode: v.string().pattern(/^\d{5}$/).required()
+});
+
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  address: addressSchema
+});
+
+const result = await validate(userSchema, {
+  name: "John Doe",
+  email: "john@example.com",
+  address: {
+    street: "123 Main St",
+    city: "New York",
+    country: "USA",
+    zipCode: "10001"
+  }
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com", address: { street: "123 Main St", city: "New York", country: "USA", zipCode: "10001" } } }
+```
+
+### With Arrays
+
+```typescript
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  tags: v.array(v.string()),
+  preferences: v.object({
+    theme: v.string().enum(["light", "dark"]).default("light"),
+    notifications: v.boolean().default(true)
+  })
+});
+
+const result = await validate(userSchema, {
+  name: "John Doe",
+  email: "john@example.com",
+  tags: ["developer", "javascript"],
+  preferences: {
+    theme: "dark"
+  }
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com", tags: ["developer", "javascript"], preferences: { theme: "dark", notifications: true } } }
+```
+
+### Strip Unknown Properties
+
+```typescript
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .stripUnknown();
+
+const result = await validate(userSchema, {
+  name: "John Doe",
+  email: "john@example.com",
+  extraField: "This will be removed"
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com" } }
+```
+
+### Allow Unknown Properties
+
+```typescript
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .allowUnknown();
+
+const result = await validate(userSchema, {
+  name: "John Doe",
+  email: "john@example.com",
+  extraField: "This will be kept"
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com", extraField: "This will be kept" } }
+```
+
+### Trim String Values
+
+```typescript
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .trim();
+
+const result = await validate(userSchema, {
+  name: "  John Doe  ",
+  email: "  john@example.com  "
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com" } }
+```
+
+---
+
+## Key Features
+
+### Schema Definition
+
+Define object structure with nested validators:
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  age: v.int().min(18),
+  address: v.object({
+    street: v.string().required(),
+    city: v.string().required()
+  })
+})
+```
+
+### Unknown Property Handling
+
+Control how unknown properties are handled:
+
+```typescript
+v.object({...})
+  .stripUnknown()    // Remove unknown properties
+  .allowUnknown()    // Keep unknown properties
+  .allow("extra")    // Allow specific extra fields
+```
+
+### Data Transformation
+
+Transform object data before validation:
+
+```typescript
+v.object({...})
+  .trim()            // Trim all string values
+  .stripUnknown()    // Remove unknown properties
+```
+
+### Nested Validation
+
+Each property is validated independently:
+
+```typescript
+v.object({
+  name: v.string().email(),  // This will fail - name should be string, not email
+  email: v.string().email()  // This will pass
+})
+```
+
+---
+
+## Schema Structure
+
+### Required Properties
+
+```typescript
+v.object({
+  name: v.string().required(),     // Must be present
+  email: v.string().email().required(),
+  age: v.int().min(18).required()
+})
+```
+
+### Optional Properties
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  age: v.int().min(18)             // Optional
+})
+```
+
+### Default Values
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  theme: v.string().default("light"),
+  notifications: v.boolean().default(true)
+})
+```
+
+### Conditional Properties
+
+```typescript
+v.object({
+  type: v.string().oneOf(["individual", "company"]).required(),
+  name: v.string().required(),
+  companyName: v.string().requiredIfField("type", "company"),
+  taxId: v.string().requiredIfField("type", "company")
+})
+```
+
+---
+
+## See Also
+
+- [Object Mutators](./mutators) - Object transformation methods
+- [Base Validator](../base-validator/) - Inherited validation methods
+- [Array Validator](../array-validator/) - Array validation
+- [String Validator](../string-validator/) - String validation

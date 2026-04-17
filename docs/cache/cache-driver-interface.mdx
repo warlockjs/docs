@@ -1,0 +1,428 @@
+---
+sidebar_position: 4
+---
+
+# Cache Driver Interface
+
+Every custom cache driver must implement this interface. All built-in drivers follow this contract.
+
+## options
+
+Driver configuration object.
+
+```ts
+options: Options;
+```
+
+## name
+
+Unique driver identifier.
+
+```ts
+name: string;
+```
+
+Example:
+```ts
+const driver = cache.driver("redis");
+console.log(driver.name); // "redis"
+```
+
+## set(key, value, ttl?)
+
+Store a value in cache. Returns the stored value.
+
+```ts
+set(key: string | GenericObject, value: any, ttl?: number): Promise<any>;
+```
+
+Example:
+```ts
+await cache.set("product:123", { id: 123, name: "Widget" }, 3600);
+```
+
+## get(key)
+
+Retrieve a value from cache. Returns the value if found and not expired, otherwise `null`.
+
+```ts
+get(key: string | GenericObject): Promise<any | null>;
+```
+
+Example:
+```ts
+const product = await cache.get("product:123");
+if (product === null) {
+  console.log("Product not in cache");
+}
+```
+
+## has(key)
+
+Check if a key exists in cache without retrieving its value. Returns `true` if key exists and is not expired, `false` otherwise.
+
+```ts
+has(key: string | GenericObject): Promise<boolean>;
+```
+
+Example:
+```ts
+const exists = await cache.has("rate-limit:user:456");
+```
+
+## remove(key)
+
+Delete a single key from cache. Resolves with no value.
+
+```ts
+remove(key: string | GenericObject): Promise<void>;
+```
+
+Example:
+```ts
+await cache.remove("product:123");
+```
+
+## flush()
+
+Clear all cached data. Resolves with no value.
+
+```ts
+flush(): Promise<void>;
+```
+
+Example:
+```ts
+await cache.flush();
+```
+
+## removeNamespace(namespace)
+
+Delete all keys within a namespace. Namespace is the first segment of a key before the first dot. Resolves with no value.
+
+```ts
+removeNamespace(namespace: string): Promise<any>;
+```
+
+Example:
+```ts
+// Removes all keys like "product.123", "product.456", etc.
+await cache.removeNamespace("product");
+```
+
+## remember(key, ttl, callback)
+
+Get a value from cache. If not found or expired, execute the callback function and cache the result. Includes automatic stampede prevention. Returns the cached or newly computed value.
+
+```ts
+remember(
+  key: string | GenericObject,
+  ttl: number,
+  callback: () => Promise<any>
+): Promise<any>;
+```
+
+Example:
+```ts
+const user = await cache.remember("user:789", 3600, async () => {
+  return await database.users.find(789);
+});
+```
+
+## pull(key)
+
+Retrieve and delete a key in one atomic operation. Returns the value if found and not expired, otherwise `null`.
+
+```ts
+pull(key: string | GenericObject): Promise<any | null>;
+```
+
+Example:
+```ts
+const order = await cache.pull("order-session:abc123");
+```
+
+## forever(key, value)
+
+Store a value permanently with no expiration. Returns the stored value.
+
+```ts
+forever(key: string | GenericObject, value: any): Promise<any>;
+```
+
+Example:
+```ts
+await cache.forever("config:app", { version: "1.0.0" });
+```
+
+## increment(key, value?)
+
+Atomically increase a numeric value by the given amount (default 1). Returns the new value. Throws if the stored value is not numeric.
+
+```ts
+increment(key: string | GenericObject, value?: number): Promise<number>;
+```
+
+Example:
+```ts
+const count = await cache.increment("product:views:123", 1);
+```
+
+## decrement(key, value?)
+
+Atomically decrease a numeric value by the given amount (default 1). Returns the new value. Throws if the stored value is not numeric.
+
+```ts
+decrement(key: string | GenericObject, value?: number): Promise<number>;
+```
+
+Example:
+```ts
+const stock = await cache.decrement("inventory:widget", 5);
+```
+
+## many(keys)
+
+Retrieve multiple values in one operation. Returns an array in the same order as the input keys. Missing or expired keys return `null` in their positions.
+
+```ts
+many(keys: (string | GenericObject)[]): Promise<any[]>;
+```
+
+Example:
+```ts
+const [user, product, order] = await cache.many([
+  "user:123",
+  "product:456",
+  "order:789"
+]);
+```
+
+## setMany(items, ttl?)
+
+Store multiple key-value pairs in one operation. Resolves with no value.
+
+```ts
+setMany(items: Record<string, any>, ttl?: number): Promise<void>;
+```
+
+Example:
+```ts
+await cache.setMany({
+  "user:123": { id: 123, name: "Alice" },
+  "user:456": { id: 456, name: "Bob" }
+}, 3600);
+```
+
+## tags(tags)
+
+Create a tagged cache instance to group related keys. Useful for clearing cache by category. Returns a `TaggedCacheDriver` instance.
+
+```ts
+tags(tags: string[]): TaggedCacheDriver;
+```
+
+Example:
+```ts
+const tagged = cache.tags(["products", "featured"]);
+await tagged.set("item:1", product1);
+await tagged.flush(); // Clears all items tagged with "products" and "featured"
+```
+
+## setNX(key, value, ttl?)
+
+Atomically set a key only if it does not already exist. Returns `true` if set successfully, `false` if key already existed. Optional; Redis driver only.
+
+```ts
+setNX?(key: string | GenericObject, value: any, ttl?: number): Promise<boolean>;
+```
+
+Example:
+```ts
+const locked = await cache.setNX("lock:order:123", true, 30);
+if (locked) {
+  // Lock acquired, process order
+}
+```
+
+## parseKey(key)
+
+Normalize a cache key for driver storage. Sanitizes special characters and applies global prefix. Returns the parsed key string.
+
+```ts
+parseKey(key: string | GenericObject): string;
+```
+
+Key parsing rules:
+- String keys: remove `{}"`, replace `:` and `,` with `.`
+- Object keys: JSON stringify then apply string rules
+- Global prefix is prepended if configured
+
+Example:
+```ts
+const parsed = cache.parseKey({ namespace: "product", id: 123 });
+// Might return: "app:product.123"
+```
+
+## setOptions(options)
+
+Update driver configuration at runtime.
+
+```ts
+setOptions(options: Options): any;
+```
+
+## connect()
+
+Establish connection to the cache backend. Resolves with any backend-specific response.
+
+```ts
+connect(): Promise<any>;
+```
+
+## disconnect()
+
+Close connection to the cache backend. Resolves with no value.
+
+```ts
+disconnect(): Promise<void>;
+```
+
+## client
+
+Optional reference to the underlying backend client (Redis connection, Memcached instance, etc.).
+
+```ts
+client?: ClientType;
+```
+
+## on(event, handler)
+
+Register an event listener. Returns the driver instance for chaining.
+
+```ts
+on(event: CacheEventType, handler: CacheEventHandler): this;
+```
+
+## off(event, handler)
+
+Unregister an event listener. Returns the driver instance for chaining.
+
+```ts
+off(event: CacheEventType, handler: CacheEventHandler): this;
+```
+
+## once(event, handler)
+
+Register a one-time event listener that fires once then unregisters. Returns the driver instance for chaining.
+
+```ts
+once(event: CacheEventType, handler: CacheEventHandler): this;
+```
+
+## Complete Interface Definition
+
+```ts
+export interface CacheDriver<ClientType, Options> {
+  options: Options;
+  name: string;
+  removeNamespace(namespace: string): Promise<any>;
+  setOptions(options: Options): any;
+  parseKey(key: string | GenericObject): string;
+  set(key: string | GenericObject, value: any, ttl?: number): Promise<any>;
+  get(key: string | GenericObject): Promise<any | null>;
+  remove(key: string | GenericObject): Promise<void>;
+  flush(): Promise<void>;
+  connect(): Promise<any>;
+  client?: ClientType;
+  disconnect(): Promise<void>;
+  has(key: string | GenericObject): Promise<boolean>;
+  remember(
+    key: string | GenericObject,
+    ttl: number,
+    callback: () => Promise<any>
+  ): Promise<any>;
+  pull(key: string | GenericObject): Promise<any | null>;
+  forever(key: string | GenericObject, value: any): Promise<any>;
+  increment(key: string | GenericObject, value?: number): Promise<number>;
+  decrement(key: string | GenericObject, value?: number): Promise<number>;
+  many(keys: (string | GenericObject)[]): Promise<any[]>;
+  setMany(items: Record<string, any>, ttl?: number): Promise<void>;
+  tags(tags: string[]): TaggedCacheDriver;
+  setNX?(
+    key: string | GenericObject,
+    value: any,
+    ttl?: number
+  ): Promise<boolean>;
+  on(event: CacheEventType, handler: CacheEventHandler): this;
+  off(event: CacheEventType, handler: CacheEventHandler): this;
+  once(event: CacheEventType, handler: CacheEventHandler): this;
+}
+```
+
+## Optional Methods
+
+`setNX()` is optional and only available on the Redis driver. Other drivers throw an error if called.
+
+## Event Types
+
+The event system supports the following event types:
+
+- `hit` - Cache hit (value retrieved)
+- `miss` - Cache miss (value not found or expired)
+- `set` - Value stored in cache
+- `removed` - Key removed from cache
+- `flushed` - Entire cache cleared
+- `expired` - Key expired (TTL reached)
+- `connected` - Driver connected
+- `disconnected` - Driver disconnected
+- `error` - Error occurred during operation
+
+See [Event System](./events) for comprehensive event documentation.
+
+## Implementing a Custom Driver
+
+- Extend [BaseCacheDriver](./base-cache-driver) to reuse key parsing, logging, and TTL handling
+- Implement these required abstract methods: `set()`, `get()`, `remove()`, `flush()`, `removeNamespace()`
+- Override `log()` for custom logging behavior
+- BaseCacheDriver provides implementations for: `has()`, `remember()`, `pull()`, `forever()`, `increment()`, `decrement()`, `many()`, `setMany()`, `tags()`, and event methods
+
+## Example Implementation
+
+```ts
+import { BaseCacheDriver } from "@warlock.js/cache";
+import type { CacheDriver } from "@warlock.js/cache";
+
+interface MyCacheOptions {
+  globalPrefix?: string;
+  ttl?: number;
+}
+
+export class MyCacheDriver extends BaseCacheDriver<any, MyCacheOptions> 
+  implements CacheDriver<any, MyCacheOptions> {
+  
+  public name = "myCache";
+  
+  public async removeNamespace(namespace: string) {
+    // Implementation for removing namespace
+  }
+  
+  public async set(key: string | GenericObject, value: any, ttl?: number) {
+    // Implementation for setting value
+  }
+  
+  public async get(key: string | GenericObject) {
+    // Implementation for getting value
+  }
+  
+  public async remove(key: string | GenericObject) {
+    // Implementation for removing value
+  }
+  
+  public async flush() {
+    // Implementation for flushing cache
+  }
+}
+```
+
+See [Make Your Own Cache Driver](./make-your-own-cache-driver) for a complete example.

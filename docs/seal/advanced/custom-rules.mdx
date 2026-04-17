@@ -1,0 +1,240 @@
+---
+title: Custom Rules
+description: Create custom validation rules
+---
+
+# Custom Rules
+
+Create custom validation rules for specific business logic.
+
+---
+
+## Basic Custom Rules
+
+### Using refine()
+
+```typescript
+v.string().refine((value, context) => {
+  if (value.includes("@")) {
+    return; // Valid
+  }
+  return "Must contain @ symbol";
+})
+```
+
+### Creating Custom Rules
+
+```typescript
+import { VALID_RULE, invalidRule } from "@warlock.js/seal";
+
+const customRule = {
+  name: "containsAt",
+  defaultErrorMessage: "The :input must contain @ symbol",
+  requiresValue: true,
+  async validate(value: any, context) {
+    if (value.includes("@")) {
+      return VALID_RULE; // Valid
+    }
+    return invalidRule(this, context); // Invalid
+  }
+};
+
+// Usage
+v.string().useRule(customRule)
+```
+
+
+---
+
+## Advanced Custom Rules
+
+### Business Logic Validation
+
+```typescript
+// Using refine()
+v.string().refine(async (value, context) => {
+  const exists = await checkUsernameExists(value);
+  if (exists) {
+    return "Username already exists";
+  }
+  return;
+})
+
+// Using custom rule
+const usernameExistsRule = {
+  name: "usernameExists",
+  defaultErrorMessage: "The :input username already exists",
+  requiresValue: true,
+  async validate(value: any, context) {
+    const exists = await checkUsernameExists(value);
+    if (exists) {
+      return invalidRule(this, context);
+    }
+    return VALID_RULE;
+  }
+};
+
+v.string().useRule(usernameExistsRule)
+```
+
+### Cross-Field Validation
+
+```typescript
+// Using refine()
+v.string().refine((value, context) => {
+  const otherField = context.allValues.otherField;
+  if (value === otherField) {
+    return "Must be different from other field";
+  }
+  return;
+})
+
+// Using custom rule
+const differentFromFieldRule = {
+  name: "differentFromField",
+  defaultErrorMessage: "The :input must be different from :otherField",
+  requiresValue: true,
+  validate(value: any, context) {
+    const otherField = context.allValues.otherField;
+    if (value === otherField) {
+      return invalidRule(this, context);
+    }
+    return VALID_RULE;
+  }
+};
+
+v.string().useRule(differentFromFieldRule)
+```
+
+---
+
+## Real-World Examples
+
+### Username Validation
+
+```typescript
+// Using refine()
+const usernameSchema = v.string()
+  .required()
+  .minLength(3)
+  .maxLength(20)
+  .alphanumeric()
+  .refine(async (value, context) => {
+    const exists = await checkUsernameExists(value);
+    if (exists) {
+      return "Username already exists";
+    }
+    return;
+  });
+
+// Using custom rule
+const usernameExistsRule = {
+  name: "usernameExists",
+  defaultErrorMessage: "The :input username is already taken",
+  requiresValue: true,
+  async validate(value: any, context) {
+    const exists = await checkUsernameExists(value);
+    if (exists) {
+      return invalidRule(this, context);
+    }
+    return VALID_RULE;
+  }
+};
+
+const usernameSchemaWithRule = v.string()
+  .required()
+  .minLength(3)
+  .maxLength(20)
+  .alphanumeric()
+  .useRule(usernameExistsRule);
+```
+
+### Password Strength
+
+```typescript
+// Using refine()
+const passwordSchema = v.string()
+  .required()
+  .minLength(8)
+  .refine((value, context) => {
+    if (!/[A-Z]/.test(value)) {
+      return "Must contain at least one uppercase letter";
+    }
+    if (!/[a-z]/.test(value)) {
+      return "Must contain at least one lowercase letter";
+    }
+    if (!/\d/.test(value)) {
+      return "Must contain at least one number";
+    }
+    if (!/[!@#$%^&*]/.test(value)) {
+      return "Must contain at least one special character";
+    }
+    return;
+  });
+
+// Using custom rule
+const passwordStrengthRule = {
+  name: "passwordStrength",
+  defaultErrorMessage: "The :input password must contain uppercase, lowercase, number, and special character",
+  requiresValue: true,
+  validate(value: any, context) {
+    if (!/[A-Z]/.test(value) || !/[a-z]/.test(value) || !/\d/.test(value) || !/[!@#$%^&*]/.test(value)) {
+      return invalidRule(this, context);
+    }
+    return VALID_RULE;
+  }
+};
+
+const passwordSchemaWithRule = v.string()
+  .required()
+  .minLength(8)
+  .useRule(passwordStrengthRule);
+```
+
+### Email Domain Validation
+
+```typescript
+// Using refine()
+const emailSchema = v.string()
+  .required()
+  .email()
+  .refine((value, context) => {
+    const allowedDomains = ["example.com", "company.com"];
+    const domain = value.split("@")[1];
+    
+    if (!allowedDomains.includes(domain)) {
+      return "Email must be from allowed domains";
+    }
+    
+    return;
+  });
+
+// Using custom rule
+const emailDomainRule = {
+  name: "emailDomain",
+  defaultErrorMessage: "The :input email must be from allowed domains",
+  requiresValue: true,
+  validate(value: any, context) {
+    const allowedDomains = ["example.com", "company.com"];
+    const domain = value.split("@")[1];
+    
+    if (!allowedDomains.includes(domain)) {
+      return invalidRule(this, context);
+    }
+    
+    return VALID_RULE;
+  }
+};
+
+const emailSchemaWithRule = v.string()
+  .required()
+  .email()
+  .useRule(emailDomainRule);
+```
+
+---
+
+## See Also
+
+- [Plugins](./plugins) - Extending validators with plugins
+- [Extending Validators](./extending-validators) - Creating custom validators

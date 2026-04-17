@@ -1,0 +1,166 @@
+---
+sidebar_position: 1
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+# Introduction
+
+**@warlock.js/cache** is a powerful, standalone caching library for Node.js and TypeScript. It provides enterprise-grade caching capabilities with advanced features like cache tags, comprehensive event system, atomic operations, and built-in stampede prevention.
+
+:::info Standalone Package
+@warlock.js/cache is a **standalone npm package** that works independently of the Warlock framework. You can use it in any Node.js project, whether you're using Express, Fastify, NestJS, or any other framework. It's framework-agnostic and requires zero dependencies on other Warlock packages.
+:::
+
+## Package Overview
+
+**@warlock.js/cache** is a feature-rich caching solution designed for modern Node.js applications. Whether you're building a simple API or a complex distributed system, this library provides everything you need for efficient, reliable caching.
+
+- 📦 **Package Name**: `@warlock.js/cache`
+- 🎯 **Framework**: Framework-agnostic (works with any Node.js project)
+- 📘 **Language**: TypeScript-first with full type safety
+- 🔌 **Dependencies**: Minimal dependencies, lightweight footprint
+
+## What is @warlock.js/cache?
+
+@warlock.js/cache is a TypeScript-first caching library that offers:
+
+- **6 Production-Ready Drivers** - Memory, Redis, File, LRU, Memory Extended, and Null
+- **Cache Tags System** - Group and invalidate related cache entries effortlessly  
+- **Comprehensive Event System** - 9 event types for full observability
+- **Atomic Operations** - Race-condition free Redis operations
+- **Stampede Prevention** - Built-in protection against cache stampedes
+- **Framework-Agnostic** - Works with any Node.js application
+- **Zero Dependencies** - Lightweight and fast
+
+### Key Highlights
+
+🎯 **Built for Production** - Battle-tested drivers with proper error handling  
+🚀 **Developer Experience** - Intuitive API with full TypeScript support  
+📊 **Observable** - Complete visibility into cache operations via events  
+🔒 **Secure** - Automatic value cloning prevents cache mutation  
+⚡ **Performant** - Optimized operations with minimal overhead  
+
+Cache is a crucial part of any high-performance application. It stores frequently accessed data, reducing database or API calls and improving response times.
+
+## Why Use Cache?
+- **Speed**: Serve data instantly from memory or fast storage.
+- **Scalability**: Reduce load on databases and external services.
+- **Cost**: Lower infrastructure costs by reducing repeated expensive operations.
+
+## Cache Manager
+@warlock.js/cache provides a unified, developer-friendly API to interact with cache. The [`CacheManager`](./cache-manager) lets you use any cache driver with a consistent set of methods.
+
+## Available Cache Drivers
+@warlock.js/cache ships with **6 built-in drivers** out of the box:
+
+1. [Redis Cache Driver](./redis) — Best for distributed, production-grade caching with atomic operations.
+2. [File Cache Driver](./file) — Simple, persistent, file-based cache.
+3. [Memory Cache Driver](./memory) — Fast, in-memory cache with optional LRU eviction (resets on restart).
+4. [Memory Extended Cache Driver](./memory-extended) — Like memory, but resets TTL on every access (sliding expiration).
+5. [LRU Memory Cache Driver](./lru-memory) — In-memory cache with automatic Least Recently Used eviction.
+6. [Null Cache Driver](./null) — Disables caching (useful for testing).
+
+:::tip
+You can also [create custom drivers](./make-your-own-cache-driver) to extend the cache functionality for your specific needs.
+:::
+
+## Quick Guide: Which Driver Should I Use?
+| Use Case | Recommended Driver |
+|----------|-------------------|
+| Production, multi-server, distributed | Redis |
+| Local development, simple persistence | File |
+| Fastest, ephemeral, single-process | Memory |
+| Need sliding expiration | Memory Extended |
+| Limited memory, want LRU eviction | LRU Memory |
+| Testing, disable cache | Null |
+
+## Advanced Features
+
+### 🏷️ Cache Tags
+[Tag-based cache invalidation](./tags) — Group related cache entries and invalidate them together. Perfect for complex scenarios like "when user updates profile, clear all user-related cache entries."
+
+### 📡 Event System
+[Comprehensive observability](./events) — Monitor every cache operation with 9 event types (hit, miss, set, removed, expired, etc.). Perfect for metrics, monitoring, and debugging.
+
+### ⚡ Atomic Operations
+[Race-condition free operations](./atomic-operations) — Redis-native atomic increment, decrement, and set-if-not-exists operations. Essential for counters, rate limiting, and distributed locks.
+
+### 🛡️ Cache Stampede Prevention
+[Built-in protection](./stampede-prevention) — The `remember()` method prevents multiple concurrent cache regenerations using automatic locking. Only the first request computes, others wait.
+
+### 📦 Bulk Operations
+[Efficient batch processing](./bulk-operations) — Get and set multiple values at once with `many()` and `setMany()` methods.
+
+### 🔧 Core Features
+- **Namespaces** for grouping cache keys hierarchically
+- **Global Prefixes** (static or dynamic) to avoid key collisions
+- **Custom Drivers**: [Create your own](./make-your-own-cache-driver)
+- **Driver Switching**: Change drivers at runtime with zero code changes
+- **Built-in Logging**: All cache operations are automatically logged
+- **TTL Management**: Automatic expiration handling with configurable defaults
+
+## Why Choose @warlock.js/cache?
+
+Unlike other Node.js cache libraries, @warlock.js/cache provides:
+
+- ✅ **Cache Tags** - First Node.js cache library with comprehensive tag support
+- ✅ **Event System** - 9 event types vs 4 in node-cache, 0 in cache-manager
+- ✅ **Stampede Prevention** - Built-in protection against cache stampedes
+- ✅ **Atomic Operations** - Redis-native atomic commands for race-free operations
+- ✅ **TypeScript-First** - Full type safety with generics
+- ✅ **6 Built-in Drivers** - More variety than most competitors
+
+See [Comparison with Other Libraries](./comparison) for detailed feature comparison.
+
+## Quick Example
+
+Here's a quick example to get you started:
+
+```ts
+import { cache, MemoryCacheDriver, CACHE_FOR } from "@warlock.js/cache";
+
+// Configure and initialize
+cache.setCacheConfigurations({
+  default: "memory",
+  drivers: { memory: MemoryCacheDriver },
+  options: { memory: { ttl: CACHE_FOR.ONE_HOUR } }
+});
+
+await cache.init();
+
+// Use cache
+await cache.set("user.123", { name: "John" }, CACHE_FOR.HALF_HOUR);
+const user = await cache.get("user.123");
+```
+
+## Installation
+
+Install the package using your preferred package manager:
+
+<Tabs>
+  <TabItem value="npm" label="npm" default>
+
+```bash
+npm install @warlock.js/cache
+```
+
+  </TabItem>
+  <TabItem value="yarn" label="yarn">
+
+```bash
+yarn add @warlock.js/cache
+```
+
+  </TabItem>
+  <TabItem value="pnpm" label="pnpm">
+
+```bash
+pnpm add @warlock.js/cache
+```
+
+  </TabItem>
+</Tabs>
+
+Ready to get started? Check out the [Quick Start Guide](./quick-start) to get up and running in 30 seconds!

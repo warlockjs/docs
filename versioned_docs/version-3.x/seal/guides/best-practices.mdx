@@ -1,0 +1,369 @@
+---
+title: Best Practices
+description: Validation best practices and recommendations
+---
+
+# Best Practices
+
+Validation best practices and recommendations for effective use of Seal.
+
+---
+
+## Schema Design
+
+### 1. Start Simple, Add Complexity
+
+```typescript
+// ✅ Good: Start with basic validation
+const userSchema = v.object({
+  name: v.string().required().minLength(2),
+  email: v.string().required().email()
+});
+
+// ✅ Good: Add complexity gradually
+const advancedUserSchema = v.object({
+  name: v.string().required().minLength(2).maxLength(100).trim().titleCase(),
+  email: v.string().required().email().lowercase().trim(),
+  role: v.string().required().oneOf(["admin", "user"]),
+  permissions: v.array().presentIf("role", "admin")
+});
+```
+
+### 2. Use Descriptive Error Messages
+
+```typescript
+// ✅ Good: Clear, actionable error messages
+v.string()
+  .required("Username is required")
+  .minLength(3, "Username must be at least 3 characters")
+  .maxLength(20, "Username must not exceed 20 characters")
+  .alphanumeric("Username must contain only letters and numbers")
+
+// ❌ Avoid: Generic error messages
+v.string()
+  .required("Invalid")
+  .minLength(3, "Invalid")
+  .maxLength(20, "Invalid")
+```
+
+### 3. Group Related Validations
+
+```typescript
+// ✅ Good: Group related validations
+const userSchema = v.object({
+  // Personal information
+  name: v.string().required().minLength(2).maxLength(100).trim().titleCase(),
+  email: v.string().required().email().lowercase().trim(),
+  
+  // Authentication
+  password: v.string().required().minLength(8).strongPassword(),
+  confirmPassword: v.string().required().sameAs("password"),
+  
+  // Optional profile
+  bio: v.string().optional().maxLength(500).trim(),
+  website: v.string().optional().url().maxLength(200)
+});
+```
+
+---
+
+## Performance Optimization
+
+### 1. Order Validations Efficiently
+
+```typescript
+// ✅ Good: Check simple rules first
+v.string()
+  .required()           // Simple check first
+  .minLength(3)         // Then length
+  .email()              // Then format
+  .maxLength(100)       // Then maximum length
+
+// ❌ Avoid: Complex checks first
+v.string()
+  .email()              // Complex check first
+  .required()           // Simple check after
+  .minLength(3)
+```
+
+### 2. Use Early Exit
+
+```typescript
+// ✅ Good: Early exit for required fields
+v.string()
+  .required()           // Check required first
+  .minLength(3)         // Only if present
+  .email()              // Only if present
+  .maxLength(100)       // Only if present
+```
+
+### 3. Avoid Redundant Validations
+
+```typescript
+// ✅ Good: Efficient validation
+v.string()
+  .required()
+  .minLength(3)
+  .maxLength(20)
+  .alphanumeric()
+
+// ❌ Avoid: Redundant checks
+v.string()
+  .required()
+  .minLength(3)
+  .maxLength(20)
+  .alphanumeric()
+  .minLength(3)         // Redundant
+  .maxLength(20)        // Redundant
+```
+
+---
+
+## Error Handling
+
+### 1. Use Appropriate Error Modes
+
+```typescript
+// ✅ Good: Single error for user forms
+const config = { firstErrorOnly: true };
+const result = await validate(schema, data, config);
+
+// ✅ Good: All errors for debugging
+const config = { firstErrorOnly: false };
+const result = await validate(schema, data, config);
+```
+
+### 2. Handle Validation Errors Gracefully
+
+```typescript
+// ✅ Good: Graceful error handling
+try {
+  const result = await validate(schema, data);
+  
+  if (!result.isValid) {
+    const errors = result.errors.map(error => ({
+      field: error.input,
+      message: error.error
+    }));
+    
+    return { success: false, errors };
+  }
+  
+  return { success: true, data: result.data };
+} catch (error) {
+  return { success: false, error: "Validation failed" };
+}
+```
+
+### 3. Provide User-Friendly Messages
+
+```typescript
+// ✅ Good: User-friendly error messages
+v.string()
+  .required("Please enter your username")
+  .minLength(3, "Username must be at least 3 characters long")
+  .maxLength(20, "Username cannot exceed 20 characters")
+  .alphanumeric("Username can only contain letters and numbers")
+
+// ❌ Avoid: Technical error messages
+v.string()
+  .required("Field is required")
+  .minLength(3, "Minimum length validation failed")
+  .maxLength(20, "Maximum length validation failed")
+  .alphanumeric("Alphanumeric validation failed")
+```
+
+---
+
+## Type Safety
+
+### 1. Use Type Inference
+
+```typescript
+// ✅ Good: Let TypeScript infer types
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().required().email()
+});
+
+type User = Infer<typeof userSchema>;
+// TypeScript knows the exact shape
+
+// ❌ Avoid: Manual type definitions
+interface User {
+  name: string;
+  email: string;
+}
+```
+
+### 2. Validate at API Boundaries
+
+```typescript
+// ✅ Good: Validate at API boundaries
+async function createUser(data: unknown): Promise<User> {
+  const result = await validate(userSchema, data);
+  
+  if (!result.isValid) {
+    throw new Error("Invalid user data");
+  }
+  
+  return result.data; // TypeScript knows this is User
+}
+```
+
+### 3. Use Type Guards
+
+```typescript
+// ✅ Good: Runtime type checking
+function isValidUser(data: unknown): data is User {
+  const result = await validate(userSchema, data);
+  return result.isValid;
+}
+
+// Usage
+if (isValidUser(apiResponse)) {
+  // TypeScript knows this is User
+  console.log(apiResponse.name);
+}
+```
+
+---
+
+## Security Considerations
+
+### 1. Sanitize User Input
+
+```typescript
+// ✅ Good: Sanitize user input
+v.string()
+  .trim()                    // Remove whitespace
+  .htmlEscape()              // Escape HTML
+  .maxLength(1000)           // Limit length
+  .notContains("<script>")   // Prevent XSS
+```
+
+### 2. Validate File Uploads
+
+```typescript
+// ✅ Good: Validate file uploads
+v.string()
+  .required("File is required")
+  .endsWith(".txt", "Only text files are allowed")
+  .maxLength(1000000, "File size too large")
+```
+
+### 3. Use Strong Passwords
+
+```typescript
+// ✅ Good: Strong password requirements
+v.string()
+  .required("Password is required")
+  .minLength(8, "Password must be at least 8 characters")
+  .strongPassword("Password must be strong")
+  .notContains("password", "Password cannot contain 'password'")
+```
+
+---
+
+## Testing
+
+### 1. Test Validation Rules
+
+```typescript
+// ✅ Good: Test validation rules
+describe("User Schema", () => {
+  it("should validate valid user", async () => {
+    const validUser = {
+      name: "John Doe",
+      email: "john@example.com"
+    };
+    
+    const result = await validate(userSchema, validUser);
+    expect(result.isValid).toBe(true);
+  });
+  
+  it("should reject invalid email", async () => {
+    const invalidUser = {
+      name: "John Doe",
+      email: "invalid-email"
+    };
+    
+    const result = await validate(userSchema, invalidUser);
+    expect(result.isValid).toBe(false);
+    expect(result.errors[0].type).toBe("email");
+  });
+});
+```
+
+### 2. Test Error Messages
+
+```typescript
+// ✅ Good: Test error messages
+describe("Error Messages", () => {
+  it("should provide clear error messages", async () => {
+    const invalidUser = {
+      name: "J",
+      email: "invalid"
+    };
+    
+    const result = await validate(userSchema, invalidUser);
+    
+    expect(result.errors[0].error).toBe("Name must be at least 2 characters");
+    expect(result.errors[1].error).toBe("Please enter a valid email address");
+  });
+});
+```
+
+---
+
+## Common Pitfalls
+
+### 1. Don't Over-Validate
+
+```typescript
+// ❌ Avoid: Over-validation
+v.string()
+  .required()
+  .minLength(3)
+  .maxLength(20)
+  .alphanumeric()
+  .notContains("admin")
+  .notContains("user")
+  .notContains("guest")
+  .notContains("test")
+  .notContains("demo")
+  // ... too many rules
+```
+
+### 2. Don't Ignore Performance
+
+```typescript
+// ❌ Avoid: Inefficient validation
+v.string()
+  .email()              // Complex check first
+  .required()           // Simple check after
+  .minLength(3)         // Length check after
+```
+
+### 3. Don't Skip Error Handling
+
+```typescript
+// ❌ Avoid: No error handling
+const result = await validate(schema, data);
+// What if validation fails?
+
+// ✅ Good: Proper error handling
+const result = await validate(schema, data);
+if (!result.isValid) {
+  // Handle errors appropriately
+  return { success: false, errors: result.errors };
+}
+```
+
+---
+
+## See Also
+
+- [Cookbook](./cookbook) - Common validation patterns
+- [Comparison](./comparison) - Compare with other libraries
+- [Migration](./migration) - Migration guide

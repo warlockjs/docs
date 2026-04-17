@@ -1,0 +1,803 @@
+---
+title: Present Rules
+description: Conditional present validation based on other fields
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Present Rules
+
+Conditional present validation rules that make fields present (but not necessarily required) based on other field values or presence.
+
+---
+
+## All Methods
+
+<div className="methods-grid">
+
+<MethodCard
+  name="present()"
+  description="Field must be present with any value except undefined"
+  href="./basic-rules#present"
+/>
+
+<MethodCard
+  name="presentWith()"
+  description="Present if another field exists"
+  href="#presentwith"
+/>
+
+<MethodCard
+  name="presentWithSibling()"
+  description="Present if another sibling field exists"
+  href="#presentwithsibling"
+/>
+
+<MethodCard
+  name="presentWithout()"
+  description="Present if another field is missing"
+  href="#presentwithout"
+/>
+
+<MethodCard
+  name="presentWithoutSibling()"
+  description="Present if another sibling field is missing"
+  href="#presentwithoutsibling"
+/>
+
+<MethodCard
+  name="presentIf()"
+  description="Present if another field equals a value"
+  href="#presentif"
+/>
+
+<MethodCard
+  name="presentIfSibling()"
+  description="Present if another sibling field equals a value"
+  href="#presentifsibling"
+/>
+
+<MethodCard
+  name="presentUnless()"
+  description="Present unless another field equals a value"
+  href="#presentunless"
+/>
+
+<MethodCard
+  name="presentUnlessSibling()"
+  description="Present unless another sibling field equals a value"
+  href="#presentunlesssibling"
+/>
+
+<MethodCard
+  name="presentIfEmpty()"
+  description="Present if another field is empty"
+  href="#presentifempty"
+/>
+
+<MethodCard
+  name="presentIfEmptySibling()"
+  description="Present if another sibling field is empty"
+  href="#presentifemptysibling"
+/>
+
+<MethodCard
+  name="presentIfNotEmpty()"
+  description="Present if another field is not empty"
+  href="#presentifnotempty"
+/>
+
+<MethodCard
+  name="presentIfNotEmptySibling()"
+  description="Present if another sibling field is not empty"
+  href="#presentifnotemptysibling"
+/>
+
+<MethodCard
+  name="presentIfIn()"
+  description="Present if another field's value is in array"
+  href="#presentifin"
+/>
+
+<MethodCard
+  name="presentIfInSibling()"
+  description="Present if another sibling field's value is in array"
+  href="#presentifinsibling"
+/>
+
+<MethodCard
+  name="presentIfNotIn()"
+  description="Present if another field's value is not in array"
+  href="#presentifnotin"
+/>
+
+<MethodCard
+  name="presentIfNotInSibling()"
+  description="Present if another sibling field's value is not in array"
+  href="#presentifnotinsibling"
+/>
+
+<MethodCard
+  name="presentWithAll()"
+  description="Present if all specified fields exist"
+  href="#presentwithall"
+/>
+
+<MethodCard
+  name="presentWithAllSiblings()"
+  description="Present if all specified sibling fields exist"
+  href="#presentwithallsiblings"
+/>
+
+<MethodCard
+  name="presentWithoutAll()"
+  description="Present if all specified fields are missing"
+  href="#presentwithoutall"
+/>
+
+<MethodCard
+  name="presentWithoutAllSiblings()"
+  description="Present if all specified sibling fields are missing"
+  href="#presentwithoutallsiblings"
+/>
+
+<MethodCard
+  name="presentWithAny()"
+  description="Present if any of the specified fields exists"
+  href="#presentwithany"
+/>
+
+<MethodCard
+  name="presentWithAnySiblings()"
+  description="Present if any of the specified sibling fields exists"
+  href="#presentwithanysiblings"
+/>
+
+<MethodCard
+  name="presentWithoutAny()"
+  description="Present if any of the specified fields is missing"
+  href="#presentwithoutany"
+/>
+
+<MethodCard
+  name="presentWithoutAnySiblings()"
+  description="Present if any of the specified sibling fields is missing"
+  href="#presentwithoutanysiblings"
+/>
+
+</div>
+
+---
+
+## Based on Field Presence
+
+### presentWith()
+
+Field must be present if another field exists.
+
+**Signature:**
+```typescript
+presentWith(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentWith("email")
+
+// Input:  { email: "user@example.com", name: "John" }
+// Output: "John" ✅
+
+// Input:  { email: "user@example.com", name: undefined }
+// Output: Error: "The :input field must be present" ❌
+
+// Input:  { name: "John" }
+// Output: "John" ✅ (email not present, so name not required to be present)
+```
+
+**Common Use:**
+```typescript
+// Contact form - name must be present if email provided
+v.object({
+  email: v.string().optional().email(),
+  name: v.string().presentWith("email").max(100)
+});
+```
+
+### presentWithout()
+
+Field must be present if another field is missing.
+
+**Signature:**
+```typescript
+presentWithout(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentWithout("email")
+
+// Input:  { email: "user@example.com", phone: undefined }
+// Output: undefined ✅ (email present, so phone not required to be present)
+
+// Input:  { phone: "123-456-7890" }
+// Output: "123-456-7890" ✅ (email not present, so phone must be present)
+
+// Input:  { email: undefined, phone: undefined }
+// Output: Error: "The :input field must be present" ❌
+```
+
+**Common Use:**
+```typescript
+// Contact form - phone must be present if no email
+v.object({
+  email: v.string().optional().email(),
+  phone: v.string().presentWithout("email").phone()
+});
+```
+
+---
+
+## Based on Field Value
+
+### presentIf()
+
+Field must be present if another field equals a specific value.
+
+**Signature:**
+```typescript
+presentIf(field: string, value: any, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentIf("type", "admin")
+
+// Input:  { type: "admin", role: "super-admin" }
+// Output: "super-admin" ✅
+
+// Input:  { type: "admin", role: undefined }
+// Output: Error: "The :input field must be present" ❌
+
+// Input:  { type: "user", role: undefined }
+// Output: undefined ✅ (type not "admin", so role not required to be present)
+```
+
+**Common Use:**
+```typescript
+// User registration - role must be present for admin
+v.object({
+  type: v.string().required().oneOf(["admin", "user"]),
+  role: v.string().presentIf("type", "admin").max(50)
+});
+```
+
+### presentUnless()
+
+Field must be present unless another field equals a specific value.
+
+**Signature:**
+```typescript
+presentUnless(field: string, value: any, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentUnless("type", "guest")
+
+// Input:  { type: "user", name: "John" }
+// Output: "John" ✅
+
+// Input:  { type: "user", name: undefined }
+// Output: Error: "The :input field must be present" ❌
+
+// Input:  { type: "guest", name: undefined }
+// Output: undefined ✅ (type is "guest", so name not required to be present)
+```
+
+**Common Use:**
+```typescript
+// User registration - name must be present unless guest
+v.object({
+  type: v.string().required().oneOf(["admin", "user", "guest"]),
+  name: v.string().presentUnless("type", "guest").max(100)
+});
+```
+
+---
+
+## Based on Field Empty State
+
+### presentIfEmpty()
+
+Field must be present if another field is empty.
+
+**Signature:**
+```typescript
+presentIfEmpty(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentIfEmpty("email")
+
+// Input:  { email: "", phone: "123-456-7890" }
+// Output: "123-456-7890" ✅
+
+// Input:  { email: "", phone: undefined }
+// Output: Error: "The :input field must be present" ❌
+
+// Input:  { email: "user@example.com", phone: undefined }
+// Output: undefined ✅ (email not empty, so phone not required to be present)
+```
+
+**Common Use:**
+```typescript
+// Contact form - phone must be present if email empty
+v.object({
+  email: v.string().optional().email(),
+  phone: v.string().presentIfEmpty("email").phone()
+});
+```
+
+### presentIfNotEmpty()
+
+Field must be present if another field is not empty.
+
+**Signature:**
+```typescript
+presentIfNotEmpty(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentIfNotEmpty("email")
+
+// Input:  { email: "user@example.com", name: "John" }
+// Output: "John" ✅
+
+// Input:  { email: "user@example.com", name: undefined }
+// Output: Error: "The :input field must be present" ❌
+
+// Input:  { email: "", name: undefined }
+// Output: undefined ✅ (email empty, so name not required to be present)
+```
+
+**Common Use:**
+```typescript
+// Profile form - name must be present if email provided
+v.object({
+  email: v.string().optional().email(),
+  name: v.string().presentIfNotEmpty("email").max(100)
+});
+```
+
+---
+
+## Based on Field Value Arrays
+
+### presentIfIn()
+
+Field must be present if another field's value is in the given array.
+
+**Signature:**
+```typescript
+presentIfIn(field: string, values: any[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentIfIn("type", ["admin", "moderator"])
+
+// Input:  { type: "admin", role: "super-admin" }
+// Output: "super-admin" ✅
+
+// Input:  { type: "admin", role: undefined }
+// Output: Error: "The :input field must be present" ❌
+
+// Input:  { type: "user", role: undefined }
+// Output: undefined ✅ (type not in ["admin", "moderator"])
+```
+
+**Common Use:**
+```typescript
+// User roles - role must be present for admin/moderator
+v.object({
+  type: v.string().required().oneOf(["admin", "moderator", "user"]),
+  role: v.string().presentIfIn("type", ["admin", "moderator"]).max(50)
+});
+```
+
+### presentIfNotIn()
+
+Field must be present if another field's value is NOT in the given array.
+
+**Signature:**
+```typescript
+presentIfNotIn(field: string, values: any[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentIfNotIn("type", ["guest", "anonymous"])
+
+// Input:  { type: "user", name: "John" }
+// Output: "John" ✅
+
+// Input:  { type: "user", name: undefined }
+// Output: Error: "The :input field must be present" ❌
+
+// Input:  { type: "guest", name: undefined }
+// Output: undefined ✅ (type in ["guest", "anonymous"])
+```
+
+**Common Use:**
+```typescript
+// User registration - name must be present for registered users
+v.object({
+  type: v.string().required().oneOf(["admin", "user", "guest", "anonymous"]),
+  name: v.string().presentIfNotIn("type", ["guest", "anonymous"]).max(100)
+});
+```
+
+---
+
+## Multiple Field Rules
+
+### presentWithAll()
+
+Field must be present if all specified fields exist.
+
+**Signature:**
+```typescript
+presentWithAll(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentWithAll(["email", "phone"])
+
+// Input:  { email: "user@example.com", phone: "123-456-7890", name: "John" }
+// Output: "John" ✅
+
+// Input:  { email: "user@example.com", phone: "123-456-7890", name: undefined }
+// Output: Error: "The :input field must be present" ❌
+
+// Input:  { email: "user@example.com", name: "John" }
+// Output: "John" ✅ (phone not present, so name not required to be present)
+```
+
+**Common Use:**
+```typescript
+// Complete profile - name must be present if both email and phone provided
+v.object({
+  email: v.string().optional().email(),
+  phone: v.string().optional().phone(),
+  name: v.string().presentWithAll(["email", "phone"]).max(100)
+});
+```
+
+### presentWithAny()
+
+Field must be present if any of the specified fields exists.
+
+**Signature:**
+```typescript
+presentWithAny(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentWithAny(["email", "phone"])
+
+// Input:  { email: "user@example.com", name: "John" }
+// Output: "John" ✅
+
+// Input:  { email: "user@example.com", name: undefined }
+// Output: Error: "The :input field must be present" ❌
+
+// Input:  { name: "John" }
+// Output: "John" ✅ (neither email nor phone present)
+```
+
+**Common Use:**
+```typescript
+// Contact form - name must be present if any contact method provided
+v.object({
+  email: v.string().optional().email(),
+  phone: v.string().optional().phone(),
+  name: v.string().presentWithAny(["email", "phone"]).max(100)
+});
+```
+
+---
+
+## Sibling Field Rules
+
+### presentWithSibling()
+
+Field must be present if another sibling field exists (for nested objects).
+
+**Signature:**
+```typescript
+presentWithSibling(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentWithSibling("email")
+
+// Input:  { profile: { email: "user@example.com", name: "John" } }
+// Output: "John" ✅
+
+// Input:  { profile: { email: "user@example.com", name: undefined } }
+// Output: Error: "The :input field must be present" ❌
+```
+
+### presentWithoutSibling()
+
+Field must be present if another sibling field is missing (for nested objects).
+
+**Signature:**
+```typescript
+presentWithoutSibling(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentWithoutSibling("email")
+
+// Input:  { profile: { email: "user@example.com", phone: undefined } }
+// Output: undefined ✅ (email present, so phone not required to be present)
+
+// Input:  { profile: { phone: "123-456-7890" } }
+// Output: "123-456-7890" ✅ (email not present, so phone must be present)
+```
+
+### presentIfSibling()
+
+Field must be present if another sibling field equals a specific value (for nested objects).
+
+**Signature:**
+```typescript
+presentIfSibling(field: string, value: any, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentIfSibling("type", "admin")
+
+// Input:  { user: { type: "admin", role: "super-admin" } }
+// Output: "super-admin" ✅
+
+// Input:  { user: { type: "admin", role: undefined } }
+// Output: Error: "The :input field must be present" ❌
+```
+
+### presentUnlessSibling()
+
+Field must be present unless another sibling field equals a specific value (for nested objects).
+
+**Signature:**
+```typescript
+presentUnlessSibling(field: string, value: any, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentUnlessSibling("type", "guest")
+
+// Input:  { user: { type: "user", name: "John" } }
+// Output: "John" ✅
+
+// Input:  { user: { type: "guest", name: undefined } }
+// Output: undefined ✅ (type is "guest", so name not required to be present)
+```
+
+### presentIfEmptySibling()
+
+Field must be present if another sibling field is empty (for nested objects).
+
+**Signature:**
+```typescript
+presentIfEmptySibling(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentIfEmptySibling("email")
+
+// Input:  { profile: { email: "", phone: "123-456-7890" } }
+// Output: "123-456-7890" ✅
+
+// Input:  { profile: { email: "", phone: undefined } }
+// Output: Error: "The :input field must be present" ❌
+```
+
+### presentIfNotEmptySibling()
+
+Field must be present if another sibling field is not empty (for nested objects).
+
+**Signature:**
+```typescript
+presentIfNotEmptySibling(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentIfNotEmptySibling("email")
+
+// Input:  { profile: { email: "user@example.com", name: "John" } }
+// Output: "John" ✅
+
+// Input:  { profile: { email: "user@example.com", name: undefined } }
+// Output: Error: "The :input field must be present" ❌
+```
+
+### presentIfInSibling()
+
+Field must be present if another sibling field's value is in the given array (for nested objects).
+
+**Signature:**
+```typescript
+presentIfInSibling(field: string, values: any[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentIfInSibling("type", ["admin", "moderator"])
+
+// Input:  { user: { type: "admin", role: "super-admin" } }
+// Output: "super-admin" ✅
+
+// Input:  { user: { type: "admin", role: undefined } }
+// Output: Error: "The :input field must be present" ❌
+```
+
+### presentIfNotInSibling()
+
+Field must be present if another sibling field's value is NOT in the given array (for nested objects).
+
+**Signature:**
+```typescript
+presentIfNotInSibling(field: string, values: any[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentIfNotInSibling("type", ["guest", "anonymous"])
+
+// Input:  { user: { type: "user", name: "John" } }
+// Output: "John" ✅
+
+// Input:  { user: { type: "user", name: undefined } }
+// Output: Error: "The :input field must be present" ❌
+```
+
+### presentWithAllSiblings()
+
+Field must be present if all specified sibling fields exist (for nested objects).
+
+**Signature:**
+```typescript
+presentWithAllSiblings(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentWithAllSiblings(["email", "phone"])
+
+// Input:  { profile: { email: "user@example.com", phone: "123-456-7890", name: "John" } }
+// Output: "John" ✅
+
+// Input:  { profile: { email: "user@example.com", phone: "123-456-7890", name: undefined } }
+// Output: Error: "The :input field must be present" ❌
+```
+
+### presentWithAnySiblings()
+
+Field must be present if any of the specified sibling fields exists (for nested objects).
+
+**Signature:**
+```typescript
+presentWithAnySiblings(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentWithAnySiblings(["email", "phone"])
+
+// Input:  { profile: { email: "user@example.com", name: "John" } }
+// Output: "John" ✅
+
+// Input:  { profile: { email: "user@example.com", name: undefined } }
+// Output: Error: "The :input field must be present" ❌
+```
+
+### presentWithoutAllSiblings()
+
+Field must be present if all specified sibling fields are missing (for nested objects).
+
+**Signature:**
+```typescript
+presentWithoutAllSiblings(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentWithoutAllSiblings(["email", "phone"])
+
+// Input:  { profile: { name: "John" } }
+// Output: "John" ✅
+
+// Input:  { profile: { name: undefined } }
+// Output: Error: "The :input field must be present" ❌
+```
+
+### presentWithoutAnySiblings()
+
+Field must be present if any of the specified sibling fields is missing (for nested objects).
+
+**Signature:**
+```typescript
+presentWithoutAnySiblings(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().presentWithoutAnySiblings(["email", "phone"])
+
+// Input:  { profile: { email: "user@example.com", name: "John" } }
+// Output: "John" ✅ (phone is missing, so name must be present)
+
+// Input:  { profile: { email: "user@example.com", name: undefined } }
+// Output: Error: "The :input field must be present" ❌
+```
+
+---
+
+## Chaining Examples
+
+```typescript
+// Complex conditional validation
+v.string()
+  .presentIf("type", "admin")
+  .presentIfNotEmpty("email")
+  .presentWithAny(["phone", "address"])
+  .max(100)
+```
+
+---
+
+## Real-World Examples
+
+### User Registration Form
+
+```typescript
+const registrationSchema = v.object({
+  type: v.string().required().oneOf(["admin", "user", "guest"]),
+  email: v.string().optional().email(),
+  phone: v.string().optional().phone(),
+  name: v.string().presentUnless("type", "guest"),
+  role: v.string().presentIf("type", "admin"),
+  address: v.string().presentWithAll(["email", "phone"])
+});
+```
+
+### Contact Form
+
+```typescript
+const contactSchema = v.object({
+  email: v.string().optional().email(),
+  phone: v.string().optional().phone(),
+  name: v.string().presentWithAny(["email", "phone"]),
+  message: v.string().required().min(10)
+});
+```
+
+---
+
+## See Also
+
+- [Basic Rules](./basic-rules) - Core validation rules
+- [Field Comparison](./field-comparison) - Compare with other fields
+- [Required Rules](./required-rules) - Conditional required validation

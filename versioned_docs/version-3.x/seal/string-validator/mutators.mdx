@@ -1,0 +1,614 @@
+---
+title: String Mutators
+description: Transform string values before validation
+sidebar_position: 2
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# String Mutators
+
+String mutators transform the input data before validation. All mutators are executed first, then validators run on the transformed data.
+
+---
+
+## All Mutators
+
+<div className="methods-grid">
+
+<MethodCard
+  name="toString()"
+  description="Convert value to string"
+  href="#tostring"
+/>
+
+<MethodCard
+  name="uppercase()"
+  description="Convert to uppercase"
+  href="#uppercase"
+/>
+
+<MethodCard
+  name="lowercase()"
+  description="Convert to lowercase"
+  href="#lowercase"
+/>
+
+<MethodCard
+  name="capitalize()"
+  description="Capitalize first letter"
+  href="#capitalize"
+/>
+
+<MethodCard
+  name="titleCase()"
+  description="Convert to title case"
+  href="#titlecase"
+/>
+
+<MethodCard
+  name="camelCase()"
+  description="Convert to camelCase"
+  href="#camelcase"
+/>
+
+<MethodCard
+  name="pascalCase()"
+  description="Convert to PascalCase"
+  href="#pascalcase"
+/>
+
+<MethodCard
+  name="snakeCase()"
+  description="Convert to snake_case"
+  href="#snakecase"
+/>
+
+<MethodCard
+  name="kebabCase()"
+  description="Convert to kebab-case"
+  href="#kebabcase"
+/>
+
+<MethodCard
+  name="slug()"
+  description="Convert to URL-friendly slug"
+  href="#slug"
+/>
+
+<MethodCard
+  name="trim()"
+  description="Trim whitespace"
+  href="#trim"
+/>
+
+<MethodCard
+  name="ltrim()"
+  description="Trim from left"
+  href="#ltrim"
+/>
+
+<MethodCard
+  name="rtrim()"
+  description="Trim from right"
+  href="#rtrim"
+/>
+
+<MethodCard
+  name="trimMultipleWhitespace()"
+  description="Trim multiple whitespace"
+  href="#trimmultiplewhitespace"
+/>
+
+<MethodCard
+  name="padStart()"
+  description="Pad from start"
+  href="#padstart"
+/>
+
+<MethodCard
+  name="padEnd()"
+  description="Pad from end"
+  href="#padend"
+/>
+
+<MethodCard
+  name="base64Encode()"
+  description="Base64 encode"
+  href="#base64encode"
+/>
+
+<MethodCard
+  name="base64Decode()"
+  description="Base64 decode"
+  href="#base64decode"
+/>
+
+<MethodCard
+  name="urlEncode()"
+  description="URL encode"
+  href="#urlencode"
+/>
+
+<MethodCard
+  name="urlDecode()"
+  description="URL decode"
+  href="#urldecode"
+/>
+
+<MethodCard
+  name="htmlEscape()"
+  description="HTML escape"
+  href="#htmlescape"
+/>
+
+<MethodCard
+  name="unescapeHtml()"
+  description="Unescape HTML"
+  href="#unescapehtml"
+/>
+
+<MethodCard
+  name="reverse()"
+  description="Reverse string"
+  href="#reverse"
+/>
+
+<MethodCard
+  name="truncate()"
+  description="Truncate string"
+  href="#truncate"
+/>
+
+<MethodCard
+  name="repeat()"
+  description="Repeat string"
+  href="#repeat"
+/>
+
+<MethodCard
+  name="mask()"
+  description="Mask string"
+  href="#mask"
+/>
+
+<MethodCard
+  name="replace()"
+  description="Replace substring"
+  href="#replace"
+/>
+
+<MethodCard
+  name="replaceAll()"
+  description="Replace all occurrences"
+  href="#replaceall"
+/>
+
+<MethodCard
+  name="append()"
+  description="Append text"
+  href="#append"
+/>
+
+<MethodCard
+  name="prepend()"
+  description="Prepend text"
+  href="#prepend"
+/>
+
+<MethodCard
+  name="toAlpha()"
+  description="Keep only alphabetic characters"
+  href="#toalpha"
+/>
+
+<MethodCard
+  name="toAlphanumeric()"
+  description="Keep only alphanumeric characters"
+  href="#toalphanumeric"
+/>
+
+<MethodCard
+  name="removeNumbers()"
+  description="Remove numeric characters"
+  href="#removenumbers"
+/>
+
+<MethodCard
+  name="removeSpecialCharacters()"
+  description="Remove special characters"
+  href="#removespecialcharacters"
+/>
+
+<MethodCard
+  name="safeHtml()"
+  description="Remove HTML tags"
+  href="#safehtml"
+/>
+
+</div>
+
+---
+
+## Case Conversion
+
+### toString() {#tostring}
+
+Convert value to string
+
+```typescript
+v.string().toString()
+// Input: 123 → Output: "123"
+```
+
+### uppercase() {#uppercase}
+
+Convert to uppercase
+
+```typescript
+v.string().uppercase()
+// Input: "hello" → Output: "HELLO"
+```
+
+### lowercase() {#lowercase}
+
+Convert to lowercase
+
+```typescript
+v.string().lowercase()
+// Input: "HELLO" → Output: "hello"
+```
+
+### capitalize() {#capitalize}
+
+Capitalize first letter
+
+```typescript
+v.string().capitalize()
+// Input: "hello world" → Output: "Hello world"
+```
+
+### titleCase() {#titlecase}
+
+Convert to title case
+
+```typescript
+v.string().titleCase()
+// Input: "hello world" → Output: "Hello World"
+```
+
+### camelCase() {#camelcase}
+
+Convert to camelCase
+
+```typescript
+v.string().camelCase()
+// Input: "hello world" → Output: "helloWorld"
+```
+
+### pascalCase() {#pascalcase}
+
+Convert to PascalCase
+
+```typescript
+v.string().pascalCase()
+// Input: "hello world" → Output: "HelloWorld"
+```
+
+### snakeCase() {#snakecase}
+
+Convert to snake_case
+
+```typescript
+v.string().snakeCase()
+// Input: "hello world" → Output: "hello_world"
+```
+
+### kebabCase() {#kebabcase}
+
+Convert to kebab-case
+
+```typescript
+v.string().kebabCase()
+// Input: "hello world" → Output: "hello-world"
+```
+
+### slug() {#slug}
+
+Convert to URL-friendly slug
+
+```typescript
+v.string().slug()
+// Input: "Hello World!" → Output: "hello-world"
+```
+
+---
+
+## Trimming & Padding
+
+### trim(needle?) {#trim}
+
+Trim whitespace or specified character
+
+```typescript
+v.string().trim()        // Trim spaces
+v.string().trim('*')     // Trim asterisks
+// Input: "  hello  " → Output: "hello"
+```
+
+### ltrim(needle?) {#ltrim}
+
+Trim from left
+
+```typescript
+v.string().ltrim()
+// Input: "  hello" → Output: "hello"
+```
+
+### rtrim(needle?) {#rtrim}
+
+Trim from right
+
+```typescript
+v.string().rtrim()
+// Input: "hello  " → Output: "hello"
+```
+
+### trimMultipleWhitespace() {#trimmultiplewhitespace}
+
+Trim multiple whitespace into single space
+
+```typescript
+v.string().trimMultipleWhitespace()
+// Input: "hello    world" → Output: "hello world"
+```
+
+### padStart(length, char) {#padstart}
+
+Pad from start
+
+```typescript
+v.string().padStart(10, '0')
+// Input: "123" → Output: "0000000123"
+```
+
+### padEnd(length, char) {#padend}
+
+Pad from end
+
+```typescript
+v.string().padEnd(10, '0')
+// Input: "123" → Output: "1230000000"
+```
+
+---
+
+## Encoding & Decoding
+
+### base64Encode() {#base64encode}
+
+Base64 encode
+
+```typescript
+v.string().base64Encode()
+// Input: "hello" → Output: "aGVsbG8="
+```
+
+### base64Decode() {#base64decode}
+
+Base64 decode
+
+```typescript
+v.string().base64Decode()
+// Input: "aGVsbG8=" → Output: "hello"
+```
+
+### urlEncode() {#urlencode}
+
+URL encode
+
+```typescript
+v.string().urlEncode()
+// Input: "hello world" → Output: "hello%20world"
+```
+
+### urlDecode() {#urldecode}
+
+URL decode
+
+```typescript
+v.string().urlDecode()
+// Input: "hello%20world" → Output: "hello world"
+```
+
+### htmlEscape() {#htmlescape}
+
+HTML escape
+
+```typescript
+v.string().htmlEscape()
+// Input: "<script>" → Output: "&lt;script&gt;"
+```
+
+### unescapeHtml() {#unescapehtml}
+
+Unescape HTML
+
+```typescript
+v.string().unescapeHtml()
+// Input: "&lt;script&gt;" → Output: "<script>"
+```
+
+---
+
+## String Manipulation
+
+### reverse() {#reverse}
+
+Reverse string
+
+```typescript
+v.string().reverse()
+// Input: "hello" → Output: "olleh"
+```
+
+### truncate(maxLength, suffix) {#truncate}
+
+Truncate to maximum length
+
+```typescript
+v.string().truncate(10, "...")
+// Input: "This is a long string" → Output: "This is..."
+```
+
+### repeat(count) {#repeat}
+
+Repeat string N times
+
+```typescript
+v.string().repeat(3)
+// Input: "hello" → Output: "hellohellohello"
+```
+
+### mask(start, end?, char) {#mask}
+
+Mask part of string
+
+```typescript
+v.string().mask(2, 4, '*')
+// Input: "password" → Output: "pa****rd"
+```
+
+### replace(search, replace) {#replace}
+
+Replace substring or pattern
+
+```typescript
+v.string().replace('world', 'universe')
+// Input: "hello world" → Output: "hello universe"
+```
+
+### replaceAll(search, replace) {#replaceall}
+
+Replace all occurrences
+
+```typescript
+v.string().replaceAll('l', 'L')
+// Input: "hello" → Output: "heLLo"
+```
+
+### append(suffix) {#append}
+
+Append text to the end
+
+```typescript
+v.string().append('!')
+// Input: "hello" → Output: "hello!"
+```
+
+### prepend(prefix) {#prepend}
+
+Prepend text to the beginning
+
+```typescript
+v.string().prepend('Mr. ')
+// Input: "Smith" → Output: "Mr. Smith"
+```
+
+---
+
+## Advanced Mutators
+
+### toAlpha() {#toalpha}
+
+Keep only alphabetic characters
+
+```typescript
+v.string().toAlpha()
+// Input: "hello123world" → Output: "helloworld"
+```
+
+### toAlphanumeric() {#toalphanumeric}
+
+Keep only alphanumeric characters
+
+```typescript
+v.string().toAlphanumeric()
+// Input: "hello@#$world" → Output: "helloworld"
+```
+
+### removeNumbers() {#removenumbers}
+
+Remove numeric characters
+
+```typescript
+v.string().removeNumbers()
+// Input: "hello123world" → Output: "helloworld"
+```
+
+### removeSpecialCharacters() {#removespecialcharacters}
+
+Remove special characters
+
+```typescript
+v.string().removeSpecialCharacters()
+// Input: "hello@#$world" → Output: "hello world"
+```
+
+### safeHtml() {#safehtml}
+
+Remove HTML tags
+
+```typescript
+v.string().safeHtml()
+// Input: "<p>Hello</p>" → Output: "Hello"
+```
+
+---
+
+## Examples
+
+### Chaining Mutators
+
+```typescript
+const schema = v.string()
+  .trim()              // Remove whitespace
+  .lowercase()         // Convert to lowercase
+  .slug()              // Convert to slug
+  .minLength(3);       // Validate length
+
+const result = await validate(schema, "  Hello World!  ");
+// Result: { isValid: true, data: "hello-world" }
+```
+
+### Email Normalization
+
+```typescript
+const emailSchema = v.string()
+  .trim()
+  .lowercase()
+  .email();
+
+const result = await validate(emailSchema, "  USER@EXAMPLE.COM  ");
+// Result: { isValid: true, data: "user@example.com" }
+```
+
+### Text Sanitization
+
+```typescript
+const sanitizedSchema = v.string()
+  .trim()
+  .removeSpecialCharacters()
+  .titleCase();
+
+const result = await validate(sanitizedSchema, "  hello@#$world!  ");
+// Result: { isValid: true, data: "Hello World" }
+```
+
+---
+
+## See Also
+
+- [String Validator Overview](./) - Return to overview
+- [String Validators](./validators) - Validation rules
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding mutators

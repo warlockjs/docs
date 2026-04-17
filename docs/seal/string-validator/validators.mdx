@@ -1,0 +1,687 @@
+---
+title: String Validators
+description: Validate string format and content
+sidebar_position: 3
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# String Validators
+
+String validators check the data after mutators have been applied. They validate format, length, content, and more.
+
+---
+
+## All Validators
+
+<div className="methods-grid">
+
+<MethodCard
+  name="email()"
+  description="Validate email format"
+  href="#email"
+/>
+
+<MethodCard
+  name="url()"
+  description="Validate URL format"
+  href="#url"
+/>
+
+<MethodCard
+  name="ip()"
+  description="Validate IP address"
+  href="#ip"
+/>
+
+<MethodCard
+  name="ip4()"
+  description="Validate IPv4 address"
+  href="#ip4"
+/>
+
+<MethodCard
+  name="ip6()"
+  description="Validate IPv6 address"
+  href="#ip6"
+/>
+
+<MethodCard
+  name="creditCard()"
+  description="Validate credit card"
+  href="#creditcard"
+/>
+
+<MethodCard
+  name="minLength()"
+  description="Minimum length"
+  href="#minlength"
+/>
+
+<MethodCard
+  name="maxLength()"
+  description="Maximum length"
+  href="#maxlength"
+/>
+
+<MethodCard
+  name="length()"
+  description="Exact length"
+  href="#length"
+/>
+
+<MethodCard
+  name="between()"
+  description="Length between range"
+  href="#between"
+/>
+
+<MethodCard
+  name="minWords()"
+  description="Minimum words"
+  href="#minwords"
+/>
+
+<MethodCard
+  name="maxWords()"
+  description="Maximum words"
+  href="#maxwords"
+/>
+
+<MethodCard
+  name="words()"
+  description="Exact word count"
+  href="#words"
+/>
+
+<MethodCard
+  name="contains()"
+  description="Must contain substring"
+  href="#contains"
+/>
+
+<MethodCard
+  name="notContains()"
+  description="Must not contain substring"
+  href="#notcontains"
+/>
+
+<MethodCard
+  name="startsWith()"
+  description="Must start with"
+  href="#startswith"
+/>
+
+<MethodCard
+  name="endsWith()"
+  description="Must end with"
+  href="#endswith"
+/>
+
+<MethodCard
+  name="pattern()"
+  description="Must match regex pattern"
+  href="#pattern"
+/>
+
+<MethodCard
+  name="withoutWhitespace()"
+  description="Must not have whitespace"
+  href="#withoutwhitespace"
+/>
+
+<MethodCard
+  name="color()"
+  description="Validate color format"
+  href="#color"
+/>
+
+<MethodCard
+  name="hexColor()"
+  description="Validate hex color"
+  href="#hexcolor"
+/>
+
+<MethodCard
+  name="rgbColor()"
+  description="Validate RGB color"
+  href="#rgbcolor"
+/>
+
+<MethodCard
+  name="rgbaColor()"
+  description="Validate RGBA color"
+  href="#rgbacolor"
+/>
+
+<MethodCard
+  name="hslColor()"
+  description="Validate HSL color"
+  href="#hslcolor"
+/>
+
+<MethodCard
+  name="lightColor()"
+  description="Validate light color"
+  href="#lightcolor"
+/>
+
+<MethodCard
+  name="darkColor()"
+  description="Validate dark color"
+  href="#darkcolor"
+/>
+
+<MethodCard
+  name="strongPassword()"
+  description="Validate strong password"
+  href="#strongpassword"
+/>
+
+<MethodCard
+  name="alpha()"
+  description="Only alphabetic characters"
+  href="#alpha"
+/>
+
+<MethodCard
+  name="alphanumeric()"
+  description="Only alphanumeric characters"
+  href="#alphanumeric"
+/>
+
+<MethodCard
+  name="numeric()"
+  description="Only numeric characters"
+  href="#numeric"
+/>
+
+<MethodCard
+  name="enum()"
+  description="Must be one of enum values"
+  href="#enum"
+/>
+
+<MethodCard
+  name="oneOf()"
+  description="Must be one of values"
+  href="#oneof"
+/>
+
+<MethodCard
+  name="in()"
+  description="Must be in array"
+  href="#in"
+/>
+
+<MethodCard
+  name="allowsOnly()"
+  description="Allow only specified values"
+  href="#allowsonly"
+/>
+
+<MethodCard
+  name="forbids()"
+  description="Forbid specified values"
+  href="#forbids"
+/>
+
+<MethodCard
+  name="notIn()"
+  description="Must not be in array"
+  href="#notin"
+/>
+
+</div>
+
+---
+
+## Format Validation
+
+### email() {#email}
+
+Validate email format
+
+```typescript
+v.string().email()
+// Input: "user@example.com" → Valid ✅
+// Input: "invalid-email" → Invalid ❌
+```
+
+### url() {#url}
+
+Validate URL format
+
+```typescript
+v.string().url()
+// Input: "https://example.com" → Valid ✅
+// Input: "not-a-url" → Invalid ❌
+```
+
+### ip() {#ip}
+
+Validate IP address (IPv4 or IPv6)
+
+```typescript
+v.string().ip()
+// Input: "192.168.1.1" → Valid ✅
+// Input: "256.256.256.256" → Invalid ❌
+```
+
+### ip4() {#ip4}
+
+Validate IPv4 address
+
+```typescript
+v.string().ip4()
+// Input: "192.168.1.1" → Valid ✅
+// Input: "2001:db8::1" → Invalid ❌
+```
+
+### ip6() {#ip6}
+
+Validate IPv6 address
+
+```typescript
+v.string().ip6()
+// Input: "2001:db8::1" → Valid ✅
+// Input: "192.168.1.1" → Invalid ❌
+```
+
+### creditCard() {#creditcard}
+
+Validate credit card number
+
+```typescript
+v.string().creditCard()
+// Input: "4111111111111111" → Valid ✅
+// Input: "123456789" → Invalid ❌
+```
+
+---
+
+## Length Validation
+
+### minLength(length) / min(length) {#minlength}
+
+Minimum length
+
+```typescript
+v.string().minLength(5)
+// Input: "hello" → Valid ✅
+// Input: "hi" → Invalid ❌
+```
+
+### maxLength(length) / max(length) {#maxlength}
+
+Maximum length
+
+```typescript
+v.string().maxLength(10)
+// Input: "hello" → Valid ✅
+// Input: "very long string" → Invalid ❌
+```
+
+### length(length) {#length}
+
+Exact length
+
+```typescript
+v.string().length(5)
+// Input: "hello" → Valid ✅
+// Input: "hi" → Invalid ❌
+```
+
+### between(min, max) / lengthBetween(min, max) {#between}
+
+Length between range
+
+```typescript
+v.string().between(3, 10)
+// Input: "hello" → Valid ✅
+// Input: "hi" → Invalid ❌
+```
+
+### minWords(words) {#minwords}
+
+Minimum word count
+
+```typescript
+v.string().minWords(2)
+// Input: "hello world" → Valid ✅
+// Input: "hello" → Invalid ❌
+```
+
+### maxWords(words) {#maxwords}
+
+Maximum word count
+
+```typescript
+v.string().maxWords(3)
+// Input: "hello world" → Valid ✅
+// Input: "hello world test example" → Invalid ❌
+```
+
+### words(words) {#words}
+
+Exact word count
+
+```typescript
+v.string().words(2)
+// Input: "hello world" → Valid ✅
+// Input: "hello" → Invalid ❌
+```
+
+---
+
+## Content Validation
+
+### contains(value) {#contains}
+
+Must contain substring
+
+```typescript
+v.string().contains("world")
+// Input: "hello world" → Valid ✅
+// Input: "hello universe" → Invalid ❌
+```
+
+### notContains(value) {#notcontains}
+
+Must not contain substring
+
+```typescript
+v.string().notContains("test")
+// Input: "hello world" → Valid ✅
+// Input: "hello test" → Invalid ❌
+```
+
+### startsWith(value) {#startswith}
+
+Must start with
+
+```typescript
+v.string().startsWith("hello")
+// Input: "hello world" → Valid ✅
+// Input: "world hello" → Invalid ❌
+```
+
+### endsWith(value) {#endswith}
+
+Must end with
+
+```typescript
+v.string().endsWith("world")
+// Input: "hello world" → Valid ✅
+// Input: "world hello" → Invalid ❌
+```
+
+### pattern(regex) {#pattern}
+
+Must match regex pattern
+
+```typescript
+v.string().pattern(/^[A-Z]+$/)
+// Input: "HELLO" → Valid ✅
+// Input: "hello" → Invalid ❌
+```
+
+### withoutWhitespace() {#withoutwhitespace}
+
+Must not have whitespace
+
+```typescript
+v.string().withoutWhitespace()
+// Input: "hello" → Valid ✅
+// Input: "hello world" → Invalid ❌
+```
+
+### alpha() {#alpha}
+
+Only alphabetic characters
+
+```typescript
+v.string().alpha()
+// Input: "hello" → Valid ✅
+// Input: "hello123" → Invalid ❌
+```
+
+### alphanumeric() {#alphanumeric}
+
+Only alphanumeric characters
+
+```typescript
+v.string().alphanumeric()
+// Input: "hello123" → Valid ✅
+// Input: "hello@" → Invalid ❌
+```
+
+### numeric() {#numeric}
+
+Only numeric characters
+
+```typescript
+v.string().numeric()
+// Input: "123" → Valid ✅
+// Input: "123abc" → Invalid ❌
+```
+
+---
+
+## Color Validation
+
+### color() {#color}
+
+Validate any color format
+
+```typescript
+v.string().color()
+// Input: "#ff0000" → Valid ✅
+// Input: "rgb(255,0,0)" → Valid ✅
+// Input: "invalid" → Invalid ❌
+```
+
+### hexColor() {#hexcolor}
+
+Validate hex color
+
+```typescript
+v.string().hexColor()
+// Input: "#ff0000" → Valid ✅
+// Input: "rgb(255,0,0)" → Invalid ❌
+```
+
+### rgbColor() {#rgbcolor}
+
+Validate RGB color
+
+```typescript
+v.string().rgbColor()
+// Input: "rgb(255,0,0)" → Valid ✅
+// Input: "#ff0000" → Invalid ❌
+```
+
+### rgbaColor() {#rgbacolor}
+
+Validate RGBA color
+
+```typescript
+v.string().rgbaColor()
+// Input: "rgba(255,0,0,0.5)" → Valid ✅
+// Input: "rgb(255,0,0)" → Invalid ❌
+```
+
+### hslColor() {#hslcolor}
+
+Validate HSL color
+
+```typescript
+v.string().hslColor()
+// Input: "hsl(0,100%,50%)" → Valid ✅
+// Input: "#ff0000" → Invalid ❌
+```
+
+### lightColor() {#lightcolor}
+
+Validate light color
+
+```typescript
+v.string().lightColor()
+// Input: "#ffffff" → Valid ✅
+// Input: "#000000" → Invalid ❌
+```
+
+### darkColor() {#darkcolor}
+
+Validate dark color
+
+```typescript
+v.string().darkColor()
+// Input: "#000000" → Valid ✅
+// Input: "#ffffff" → Invalid ❌
+```
+
+---
+
+## Password Validation
+
+### strongPassword(minLength?) {#strongpassword}
+
+Validate strong password
+
+```typescript
+v.string().strongPassword(8)
+// Requirements: 8+ chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
+// Input: "MyStr0ng!Pass" → Valid ✅
+// Input: "weak" → Invalid ❌
+```
+
+---
+
+## Value Selection
+
+### enum(enumObject) {#enum}
+
+Must be one of enum values
+
+```typescript
+enum Status { ACTIVE = 'active', INACTIVE = 'inactive' }
+v.string().enum(Status)
+// Input: "active" → Valid ✅
+// Input: "pending" → Invalid ❌
+```
+
+### oneOf(values) / in(values) {#oneof}
+
+Must be one of values
+
+```typescript
+v.string().oneOf(['admin', 'user', 'guest'])
+// Input: "admin" → Valid ✅
+// Input: "moderator" → Invalid ❌
+```
+
+### allowsOnly(values) {#allowsonly}
+
+Allow only specified values
+
+```typescript
+v.string().allowsOnly(['yes', 'no'])
+// Input: "yes" → Valid ✅
+// Input: "maybe" → Invalid ❌
+```
+
+### forbids(values) / notIn(values) {#forbids}
+
+Forbid specified values
+
+```typescript
+v.string().forbids(['admin', 'root'])
+// Input: "user" → Valid ✅
+// Input: "admin" → Invalid ❌
+```
+
+---
+
+## Examples
+
+### Email Validation
+
+```typescript
+const emailSchema = v.string()
+  .required()
+  .lowercase()
+  .trim()
+  .email();
+
+const result = await validate(emailSchema, "  USER@EXAMPLE.COM  ");
+// Result: { isValid: true, data: "user@example.com" }
+```
+
+### Username Validation
+
+```typescript
+const usernameSchema = v.string()
+  .required()
+  .trim()
+  .minLength(3)
+  .maxLength(20)
+  .alphanumeric();
+
+const result = await validate(usernameSchema, "  john_doe123  ");
+// Result: { isValid: true, data: "john_doe123" }
+```
+
+### Password Validation
+
+```typescript
+const passwordSchema = v.string()
+  .required()
+  .minLength(8)
+  .strongPassword();
+
+const result = await validate(passwordSchema, "MyStr0ng!Pass");
+// Result: { isValid: true, data: "MyStr0ng!Pass" }
+```
+
+### Pattern Validation
+
+```typescript
+const phoneSchema = v.string()
+  .required()
+  .pattern(/^\+?[1-9]\d{1,14}$/);
+
+const result = await validate(phoneSchema, "+1234567890");
+// Result: { isValid: true, data: "+1234567890" }
+```
+
+### URL Validation
+
+```typescript
+const urlSchema = v.string()
+  .required()
+  .url();
+
+const result = await validate(urlSchema, "https://example.com");
+// Result: { isValid: true, data: "https://example.com" }
+```
+
+### Color Validation
+
+```typescript
+const colorSchema = v.string()
+  .required()
+  .hexColor();
+
+const result = await validate(colorSchema, "#ff0000");
+// Result: { isValid: true, data: "#ff0000" }
+```
+
+---
+
+## See Also
+
+- [String Validator Overview](./) - Return to overview
+- [String Mutators](./mutators) - Data transformation methods
+- [Base Validator](../base-validator/) - Core validation methods
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding validators

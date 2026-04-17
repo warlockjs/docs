@@ -1,0 +1,148 @@
+---
+title: Record Validator
+description: Validate objects with dynamic keys where all values share the same type.
+---
+
+# Record Validator
+
+The `RecordValidator` validates objects whose **keys are dynamic** but all **values must match a single validator**. Think of it as a typed dictionary or map.
+
+```ts
+import { v } from "@warlock.js/seal";
+
+// All values must be strings
+const translations = v.record(v.string());
+// Valid: { en: "Hello", ar: "مرحبا", fr: "Bonjour" }
+```
+
+---
+
+## Creating a Record
+
+Use `v.record(valueValidator, errorMessage?)`:
+
+```ts
+const field = v.record(v.string());
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `valueValidator` | `BaseValidator` | Validator applied to every value in the object |
+| `errorMessage` | `string?` | Custom error when the input is not an object |
+
+---
+
+## Methods
+
+### `plainObject(errorMessage?)`
+
+Ensures the value is a **plain object** (not a class instance, array, etc.):
+
+```ts
+v.record(v.string()).plainObject();
+// Valid:   { key: "value" }
+// Invalid: new Map()  |  []  |  new MyClass()
+```
+
+---
+
+## Usage Patterns
+
+### Translations / i18n
+
+```ts
+const translationSchema = v.object({
+  key:          v.string().required(),
+  translations: v.record(v.string().required()),
+});
+
+// Valid:
+// { key: "greeting", translations: { en: "Hello", ar: "مرحبا" } }
+```
+
+### User preferences
+
+```ts
+const preferencesSchema = v.record(
+  v.union([v.string(), v.number(), v.boolean()])
+);
+
+// Valid: { theme: "dark", fontSize: 16, notifications: true }
+```
+
+### Environment config
+
+```ts
+const envSchema = v.record(v.string().required())
+  .plainObject();
+
+// Valid: { NODE_ENV: "production", PORT: "3000" }
+```
+
+### Scores or counters
+
+```ts
+const scoresSchema = v.record(v.number().min(0).max(100));
+
+// Valid: { alice: 92, bob: 87, charlie: 75 }
+```
+
+---
+
+## Combining with `required` and `optional`
+
+```ts
+v.object({
+  metadata: v.record(v.string()).optional(),
+  tags:     v.record(v.boolean()).required(),
+});
+```
+
+---
+
+## Real-World Example
+
+### Multi-language product catalog
+
+```ts
+const productSchema = v.object({
+  sku:   v.string().required().uppercase(),
+  price: v.number().required().positive(),
+  name:  v.record(
+    v.string().required().minLength(2).maxLength(120)
+  ).required(),
+  description: v.record(
+    v.string().optional().maxLength(2000)
+  ).optional(),
+});
+
+// Valid:
+// {
+//   sku: "SHOE-001",
+//   price: 49.99,
+//   name: { en: "Running Shoes", ar: "حذاء رياضي" },
+//   description: { en: "Lightweight and durable." }
+// }
+```
+
+---
+
+## JSON Schema
+
+`toJsonSchema()` produces `additionalProperties`:
+
+```ts
+v.record(v.string()).toJsonSchema();
+// → { type: "object", additionalProperties: { type: "string" } }
+
+v.record(v.union([v.string(), v.number()])).toJsonSchema();
+// → { type: "object", additionalProperties: { oneOf: [{ type: "string" }, { type: "number" }] } }
+```
+
+---
+
+## See Also
+
+- [Object Validator](../object-validator/index) — fixed-key typed objects
+- [Union Validator](../union-validator/index) — value can be one of multiple types
+- [Array Validator](../array-validator/index) — ordered list of typed items

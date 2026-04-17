@@ -1,0 +1,286 @@
+---
+title: Object Mutators
+description: Transform objects before validation
+sidebar_position: 18
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Object Mutators
+
+Object mutators transform objects before validation. They handle unknown properties, trim values, and manage object structure.
+
+---
+
+## All Mutators
+
+<div className="methods-grid">
+
+<MethodCard
+  name="stripUnknown()"
+  description="Remove unknown properties"
+  href="#stripunknown"
+/>
+
+<MethodCard
+  name="allow()"
+  description="Allow specific extra fields"
+  href="#allow"
+/>
+
+<MethodCard
+  name="trim()"
+  description="Trim all string values"
+  href="#trim"
+/>
+
+<MethodCard
+  name="allowUnknown()"
+  description="Allow unknown properties"
+  href="#allowunknown"
+/>
+
+</div>
+
+---
+
+## Property Management
+
+### stripUnknown() {#stripunknown}
+
+Remove properties that are not defined in the schema
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .stripUnknown()
+
+// Input: { name: "John", email: "john@example.com", extra: "value" }
+// Output: { name: "John", email: "john@example.com" }
+```
+
+**Note:** This mutator removes unknown properties but doesn't validate them. Use with `allowUnknown()` to control behavior.
+
+### allow(...keys) {#allow}
+
+Allow specific properties that are not defined in the schema
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .allow("extraField", "anotherField")
+
+// Input: { name: "John", email: "john@example.com", extraField: "value", unknown: "removed" }
+// Output: { name: "John", email: "john@example.com", extraField: "value" }
+```
+
+**Parameters:**
+- `...keys`: Variable number of property names to allow
+
+---
+
+## Data Cleaning
+
+### trim(recursive?) {#trim}
+
+Trim whitespace from all string values in the object
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .trim()
+
+// Input: { name: "  John  ", email: "  john@example.com  " }
+// Output: { name: "John", email: "john@example.com" }
+```
+
+**Parameters:**
+- `recursive` (optional): Whether to trim nested objects (default: `true`)
+
+**Recursive trimming:**
+
+```typescript
+v.object({
+  name: v.string().required(),
+  address: v.object({
+    street: v.string().required(),
+    city: v.string().required()
+  })
+})
+  .trim()
+
+// Input: { name: "  John  ", address: { street: "  123 Main St  ", city: "  New York  " } }
+// Output: { name: "John", address: { street: "123 Main St", city: "New York" } }
+```
+
+---
+
+## Unknown Handling
+
+### allowUnknown(allow?) {#allowunknown}
+
+Control whether unknown properties are allowed
+
+```typescript
+v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .allowUnknown(true)
+
+// Input: { name: "John", email: "john@example.com", extra: "value" }
+// Output: { name: "John", email: "john@example.com", extra: "value" }
+```
+
+**Parameters:**
+- `allow` (optional): Whether to allow unknown properties (default: `true`)
+
+**Default behavior:**
+- `allowUnknown()` - Allow unknown properties
+- `allowUnknown(false)` - Reject unknown properties
+- `allowUnknown(true)` - Allow unknown properties
+
+---
+
+## Examples
+
+### Strip Unknown Properties
+
+```typescript
+const schema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .stripUnknown();
+
+const result = await validate(schema, {
+  name: "John Doe",
+  email: "john@example.com",
+  extraField: "This will be removed",
+  anotherExtra: "This too"
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com" } }
+```
+
+### Allow Specific Extra Fields
+
+```typescript
+const schema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .allow("extraField", "anotherField");
+
+const result = await validate(schema, {
+  name: "John Doe",
+  email: "john@example.com",
+  extraField: "This will be kept",
+  anotherField: "This too",
+  unknownField: "This will be removed"
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com", extraField: "This will be kept", anotherField: "This too" } }
+```
+
+### Trim String Values
+
+```typescript
+const schema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+  address: v.object({
+    street: v.string().required(),
+    city: v.string().required()
+  })
+})
+  .trim();
+
+const result = await validate(schema, {
+  name: "  John Doe  ",
+  email: "  john@example.com  ",
+  address: {
+    street: "  123 Main St  ",
+    city: "  New York  "
+  }
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com", address: { street: "123 Main St", city: "New York" } } }
+```
+
+### Allow Unknown Properties
+
+```typescript
+const schema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .allowUnknown();
+
+const result = await validate(schema, {
+  name: "John Doe",
+  email: "john@example.com",
+  extraField: "This will be kept",
+  anotherExtra: "This too"
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com", extraField: "This will be kept", anotherExtra: "This too" } }
+```
+
+### Mutator Chain
+
+```typescript
+const schema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required()
+})
+  .trim()                    // Trim string values
+  .stripUnknown()            // Remove unknown properties
+  .allow("extraField");      // But allow specific extra fields
+
+const result = await validate(schema, {
+  name: "  John Doe  ",
+  email: "  john@example.com  ",
+  extraField: "  This will be kept and trimmed  ",
+  unknownField: "This will be removed"
+});
+// Result: { isValid: true, data: { name: "John Doe", email: "john@example.com", extraField: "This will be kept and trimmed" } }
+```
+
+---
+
+## Important Notes
+
+### Mutators Run Before Validation
+
+```typescript
+v.object({...})
+  .trim()            // Mutator: Trim values
+  .stripUnknown()    // Mutator: Remove unknown properties
+  .required()        // Validator: Check object is present
+```
+
+### Unknown Property Behavior
+
+| Method | Behavior |
+|--------|----------|
+| `stripUnknown()` | Remove unknown properties |
+| `allowUnknown()` | Keep unknown properties |
+| `allow("field")` | Allow specific extra fields |
+
+### Recursive Trimming
+
+```typescript
+v.object({...}).trim()           // Trim all strings recursively
+v.object({...}).trim(false)      // Only trim top-level strings
+```
+
+---
+
+## See Also
+
+- [Object Validator Overview](./) - Return to overview
+- [Base Validator](../base-validator/) - Inherited methods
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding mutators

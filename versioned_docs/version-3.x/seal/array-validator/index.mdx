@@ -1,0 +1,173 @@
+---
+title: Array Validator Overview
+description: Validate arrays with flexible rules and transformations
+sidebar_position: 14
+---
+
+# Array Validator
+
+The Array Validator validates arrays of items. Each item is validated using a nested validator, and the array itself can be validated for length, uniqueness, and sorting.
+
+---
+
+## Basic Usage
+
+```typescript
+import { v, validate } from "@warlock.js/seal";
+
+const schema = v.array(v.string())
+  .required()
+  .minLength(1)
+  .maxLength(10);
+
+const result = await validate(schema, ["tag1", "tag2", "tag3"]);
+// Result: { isValid: true, data: ["tag1", "tag2", "tag3"] }
+```
+
+---
+
+## What's Included
+
+### Mutators (4 methods)
+
+Transform arrays before validation:
+- **Ordering**: `flip()`, `reverse()`, `sort()`
+- **Deduplication**: `onlyUnique()`
+
+[View all mutators →](./mutators)
+
+### Validators (7 methods)
+
+Validate array structure and content:
+- **Length**: `minLength()`, `maxLength()`, `length()`, `between()`, `lengthBetween()`
+- **Content**: `unique()`, `sorted()`
+
+[View all validators →](./validators)
+
+---
+
+## Common Patterns
+
+### String Array
+
+```typescript
+const tagsSchema = v.array(v.string())
+  .required()
+  .minLength(1)
+  .maxLength(10)
+  .unique();
+
+const result = await validate(tagsSchema, ["javascript", "typescript"]);
+// Result: { isValid: true, data: ["javascript", "typescript"] }
+```
+
+### Number Array
+
+```typescript
+const idsSchema = v.array(v.int())
+  .required()
+  .minLength(1)
+  .between(1, 100);
+
+const result = await validate(idsSchema, [1, 2, 3]);
+// Result: { isValid: true, data: [1, 2, 3] }
+```
+
+### Object Array
+
+```typescript
+const usersSchema = v.array(v.object({
+  name: v.string().required(),
+  age: v.int().required()
+}))
+  .required()
+  .minLength(1);
+
+const result = await validate(usersSchema, [
+  { name: "John", age: 25 },
+  { name: "Jane", age: 30 }
+]);
+// Result: { isValid: true, data: [{ name: "John", age: 25 }, { name: "Jane", age: 30 }] }
+```
+
+### Sorted Array
+
+```typescript
+const sortedSchema = v.array(v.int())
+  .required()
+  .sorted("asc")
+  .unique();
+
+const result = await validate(sortedSchema, [1, 2, 3, 4, 5]);
+// Result: { isValid: true, data: [1, 2, 3, 4, 5] }
+```
+
+### Unique Values Only
+
+```typescript
+const uniqueSchema = v.array(v.string())
+  .required()
+  .onlyUnique()  // Remove duplicates
+  .unique();     // Validate all are unique
+
+const result = await validate(uniqueSchema, ["a", "b", "c", "a"]);
+// Result: { isValid: true, data: ["a", "b", "c"] }
+```
+
+---
+
+## Key Features
+
+### Nested Validation
+
+Each array item is validated using the provided validator:
+
+```typescript
+v.array(v.string().email())  // Each item must be a valid email
+v.array(v.int().min(1))      // Each item must be >= 1
+v.array(v.object({...}))    // Each item must match object schema
+```
+
+### Mutators Transform Data
+
+Mutators modify the array before validation:
+
+```typescript
+v.array(v.string())
+  .sort("asc")      // Sort alphabetically
+  .onlyUnique()     // Remove duplicates
+  .flip()           // Reverse order
+```
+
+### Validators Check Structure
+
+Validators validate the array structure:
+
+```typescript
+v.array(v.string())
+  .minLength(1)     // At least 1 item
+  .maxLength(10)    // At most 10 items
+  .unique()         // All items must be unique
+  .sorted("asc")    // Must be sorted
+```
+
+---
+
+## Inherited Methods
+
+The Array Validator extends `BaseValidator` and inherits all base validation methods:
+
+- **Basic Rules**: `required()`, `optional()`, `present()`, `nullable()`
+- **Comparison**: `equal()`, `notEqual()`, `sameAs()`, `differentFrom()`
+- **Advanced**: `when()`, `refine()`, `transform()`
+
+[View Base Validator →](../base-validator/)
+
+---
+
+## See Also
+
+- [Array Mutators](./mutators) - Array transformation methods
+- [Array Validators](./validators) - Array validation rules
+- [Base Validator](../base-validator/) - Inherited methods
+- [Object Validator](../object-validator/) - Object validation

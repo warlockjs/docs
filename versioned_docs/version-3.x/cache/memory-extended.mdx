@@ -1,0 +1,121 @@
+---
+sidebar_position: 8
+---
+
+# Memory Extended Cache Driver
+
+The Memory Extended Cache Driver is similar to the [Memory Cache Driver](./memory), but with **sliding expiration**: every time you access a key, its TTL is reset.
+
+## When to Use
+
+- You want cache entries to stay alive as long as they're being used
+- Session-like or frequently accessed data
+
+## Best For
+
+- User sessions
+- Frequently accessed, but not permanent, data
+
+## Limitations
+
+- Data is lost on restart
+- Not shared between processes or servers
+- No eviction policy (see [LRU Memory Cache Driver](./lru-memory))
+
+## Configuration
+
+```ts title="src/config/cache.ts"
+import { MemoryExtendedCacheDriver } from "@warlock.js/cache";
+
+const cacheConfigurations = {
+  drivers: {
+    memoryExtended: MemoryExtendedCacheDriver,
+  },
+  default: "memoryExtended",
+  options: {
+    memoryExtended: {
+      globalPrefix: "sessions",
+      ttl: 600, // 10 minutes
+    },
+  },
+};
+```
+
+## Options {#options}
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys |
+| `ttl` | number | `Infinity` | Default TTL in seconds |
+
+### Global Prefix
+
+```ts
+{
+  globalPrefix: "sessions",    // Static prefix
+  // OR
+  globalPrefix: () => `app-${environment()}`, // Dynamic prefix
+}
+```
+
+### TTL Configuration
+
+```ts
+{
+  ttl: 600,                    // 10 minutes
+  // OR
+  ttl: 3600,                   // 1 hour
+  // OR
+  ttl: Infinity,               // Never expire (default)
+}
+```
+
+## Example Usage
+
+## Storing and Retrieving Data
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+await cache.set("session.abc", { userId: 1 }, CACHE_FOR.HALF_HOUR);
+const session = await cache.get("session.abc"); // TTL resets to 30 minutes
+```
+
+## Sliding Expiration Explained
+
+Unlike the regular Memory Cache Driver, the Memory Extended Driver implements **sliding expiration**:
+
+1. **Initial Set**: When you set a value with TTL, it's stored with an expiration time
+2. **Access Resets TTL**: Every time you access the value, the TTL is reset to the original duration
+3. **Continuous Access**: As long as the value is accessed within the TTL window, it never expires
+4. **Inactivity Expiration**: Only when the value is not accessed for the full TTL duration does it expire
+
+### Example Timeline
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+// TTL: 30 minutes
+await cache.set("session.123", data, CACHE_FOR.HALF_HOUR);
+
+// After 15 minutes
+await cache.get("session.123"); // TTL resets to 30 minutes
+
+// After another 20 minutes (35 minutes total)
+await cache.get("session.123"); // TTL resets to 30 minutes again
+
+// If not accessed for 30 minutes, it expires
+```
+
+## Use Cases
+
+- **User Sessions**: Keep sessions alive as long as users are active
+- **API Rate Limiting**: Reset counters on each request
+- **Frequently Accessed Data**: Keep hot data in cache longer
+- **Temporary State**: Maintain state that should persist during activity
+
+## Troubleshooting
+
+- **Data disappears after restart**: This is expected. Use [File](./file) or [Redis](./redis) for persistence.
+- **Cache not shared between processes**: Use [Redis](./redis) for distributed cache.
+- **Items expiring too quickly**: Increase the `ttl` value or access them more frequently.

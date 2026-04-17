@@ -1,0 +1,812 @@
+---
+title: Advanced Methods
+description: Advanced validation methods for complex scenarios
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Advanced Methods
+
+Advanced validation methods for complex scenarios including custom validation, conditional logic, and utility functions.
+
+---
+
+## All Methods
+
+<div className="methods-grid">
+
+<MethodCard
+  name="addRule()"
+  description="Add a custom validation rule"
+  href="#addrule"
+/>
+
+<MethodCard
+  name="addMutator()"
+  description="Add a custom mutator"
+  href="#addmutator"
+/>
+
+<MethodCard
+  name="addTransformer()"
+  description="Add a custom transformer"
+  href="#addtransformer"
+/>
+
+<MethodCard
+  name="useRule()"
+  description="Use a custom or pre-built validation rule"
+  href="#userule"
+/>
+
+<MethodCard
+  name="refine()"
+  description="Define custom validation logic"
+  href="#refine"
+/>
+
+<MethodCard
+  name="when()"
+  description="Apply conditional validation based on another field"
+  href="#when"
+/>
+
+<MethodCard
+  name="whenSibling()"
+  description="Apply conditional validation based on sibling field"
+  href="#whensibling"
+/>
+
+<MethodCard
+  name="default()"
+  description="Set default value for the field"
+  href="#default"
+/>
+
+<MethodCard
+  name="allowsEmpty()"
+  description="Allow empty values and skip validation"
+  href="#allowsempty"
+/>
+
+<MethodCard
+  name="label()"
+  description="Set field label for error messages"
+  href="#label"
+/>
+
+<MethodCard
+  name="describe()"
+  description="Add description to the validator"
+  href="#describe"
+/>
+
+<MethodCard
+  name="attributes()"
+  description="Set attributes for translations"
+  href="#attributes"
+/>
+
+<MethodCard
+  name="outputAs()"
+  description="Transform output using a callback"
+  href="#outputas"
+/>
+
+<MethodCard
+  name="toJSON()"
+  description="Convert output to JSON string"
+  href="#tojson"
+/>
+
+<MethodCard
+  name="omit()"
+  description="Omit field from output"
+  href="#omit"
+/>
+
+<MethodCard
+  name="exclude()"
+  description="Exclude field from output (alias for omit)"
+  href="#exclude"
+/>
+
+<MethodCard
+  name="equal()"
+  description="Value must equal a specific value"
+  href="#equal"
+/>
+
+<MethodCard
+  name="forbidden()"
+  description="Value must not be present"
+  href="#forbidden"
+/>
+
+</div>
+
+---
+
+## equal()
+
+Value must equal a specific value.
+
+**Signature:**
+```typescript
+equal(value: any, errorMessage?: string): this
+```
+
+**Parameters:**
+- `value` - The exact value to match
+- `errorMessage` (optional) - Custom error message
+
+**Example:**
+```typescript
+v.string().equal("admin")
+
+// Input:  "admin"
+// Output: "admin" ✅
+
+// Input:  "user"
+// Output: Error: "The :input must be equal to :value" ❌
+```
+
+**Common Use:**
+```typescript
+// User type validation
+v.object({
+  type: v.string().required().equal("admin"),
+  permissions: v.array().required()
+});
+```
+
+---
+
+## forbidden()
+
+Value must not be present.
+
+**Signature:**
+```typescript
+forbidden(errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().forbidden()
+
+// Input:  undefined
+// Output: undefined ✅
+
+// Input:  "any value"
+// Output: Error: "The :input is forbidden" ❌
+```
+
+**Common Use:**
+```typescript
+// Prevent certain fields from being present
+v.object({
+  email: v.string().required().email(),
+  // Prevent old email field
+  oldEmail: v.string().forbidden()
+});
+```
+
+---
+
+## when()
+
+Apply conditional validation based on another field value.
+
+**Signature:**
+```typescript
+when(field: string, options: Omit<WhenRuleOptions, "field">): this
+```
+
+**Parameters:**
+- `field` - Field name to check
+- `options` - Conditional validation options
+
+**Example:**
+```typescript
+v.string().when("type", {
+  is: {
+    admin: v.string().required().min(5),
+    user: v.string().required().min(3)
+  },
+  otherwise: v.string().optional()
+})
+
+// Input:  { type: "admin", role: "super-admin" }
+// Output: "super-admin" ✅
+
+// Input:  { type: "admin", role: "admin" }
+// Output: Error: "The :input must be at least 5 characters" ❌
+
+// Input:  { type: "user", role: "user" }
+// Output: "user" ✅
+
+// Input:  { type: "guest", role: undefined }
+// Output: undefined ✅
+```
+
+**Common Use:**
+```typescript
+// Conditional validation based on user type
+v.object({
+  type: v.string().required().oneOf(["admin", "user", "guest"]),
+  role: v.string().when("type", {
+    is: {
+      admin: v.string().required().min(5),
+      user: v.string().required().min(3)
+    },
+    otherwise: v.string().optional()
+  })
+});
+```
+
+---
+
+## refine()
+
+Define custom validation logic.
+
+**Signature:**
+```typescript
+refine(callback: (value: any, context: SchemaContext) => Promise<string | undefined> | string | undefined): this
+```
+
+**Parameters:**
+- `callback` - Custom validation function that returns error message or undefined
+
+**Example:**
+```typescript
+v.string().refine((value, context) => {
+  if (value.includes("@")) {
+    return undefined; // Valid
+  }
+  return "Must contain @ symbol";
+})
+
+// Input:  "user@example.com"
+// Output: "user@example.com" ✅
+
+// Input:  "username"
+// Output: Error: "Must contain @ symbol" ❌
+```
+
+**Common Use:**
+```typescript
+// Custom business logic validation
+v.string().refine((value, context) => {
+  const otherField = context.allValues.otherField;
+  if (value === otherField) {
+    return "Must be different from other field";
+  }
+  return undefined;
+});
+```
+
+---
+
+
+## useRule()
+
+Use a custom or pre-built validation rule.
+
+**Signature:**
+```typescript
+useRule<T extends SchemaRuleOptions = SchemaRuleOptions>(
+  rule: SchemaRule<T>,
+  options?: T & { errorMessage?: string }
+): this
+```
+
+**Parameters:**
+- `rule` - The validation rule to apply
+- `options` - Rule options including errorMessage and rule-specific options
+
+**Example:**
+```typescript
+import { hexColorRule } from "@warlock.js/seal-plugins/colors";
+
+v.string().useRule(hexColorRule, { errorMessage: "Invalid color" })
+
+// Input:  "#ff0000"
+// Output: "#ff0000" ✅
+
+// Input:  "red"
+// Output: Error: "Invalid color" ❌
+```
+
+**Common Use:**
+```typescript
+// Using custom rules with options
+v.string().useRule(myCustomRule, {
+  customOption: true,
+  errorMessage: "Custom validation failed"
+});
+```
+
+---
+
+## addRule()
+
+Add a custom validation rule to the validator.
+
+**Signature:**
+```typescript
+addRule<T extends SchemaRuleOptions = SchemaRuleOptions>(
+  rule: SchemaRule<T>,
+  errorMessage?: string
+): ContextualSchemaRule<T>
+```
+
+**Parameters:**
+- `rule` - The validation rule to add
+- `errorMessage` (optional) - Custom error message
+
+**Example:**
+```typescript
+import { customRule } from "./my-rules";
+
+v.string().addRule(customRule, "Custom validation failed")
+
+// Input:  "valid"
+// Output: "valid" ✅
+
+// Input:  "invalid"
+// Output: Error: "Custom validation failed" ❌
+```
+
+**Common Use:**
+```typescript
+// Add custom business rule
+v.string().addRule(myBusinessRule, "Business rule violation");
+```
+
+---
+
+## addMutator()
+
+Add a custom mutator to transform data before validation.
+
+**Signature:**
+```typescript
+addMutator(mutator: Mutator, options: any = {}): this
+```
+
+**Parameters:**
+- `mutator` - The mutator function to add
+- `options` (optional) - Mutator options
+
+**Example:**
+```typescript
+import { customMutator } from "./my-mutators";
+
+v.string().addMutator(customMutator)
+
+// Input:  "  hello  "
+// Output: "HELLO" (after custom transformation)
+```
+
+**Common Use:**
+```typescript
+// Add custom data transformation
+v.string().addMutator(myCustomMutator, { option: true });
+```
+
+---
+
+## addTransformer()
+
+Add a custom transformer to format data after validation.
+
+**Signature:**
+```typescript
+addTransformer(transform: TransformerCallback, options: any = {}): this
+```
+
+**Parameters:**
+- `transform` - The transformer function to add
+- `options` (optional) - Transformer options
+
+**Example:**
+```typescript
+v.string().addTransformer((data, { context }) => {
+  return data.toUpperCase();
+})
+
+// Input:  "hello"
+// Output: "HELLO" (after transformation)
+```
+
+**Common Use:**
+```typescript
+// Add custom output formatting
+v.string().addTransformer(myFormatter, { format: "uppercase" });
+```
+
+---
+
+## whenSibling()
+
+Apply conditional validation based on another sibling field value (for nested objects).
+
+**Signature:**
+```typescript
+whenSibling(
+  siblingField: string,
+  options: Omit<WhenRuleOptions, "field" | "scope">
+): this
+```
+
+**Parameters:**
+- `siblingField` - Sibling field name to check
+- `options` - Conditional validation options
+
+**Example:**
+```typescript
+v.string().whenSibling("type", {
+  is: {
+    admin: v.string().required().min(5),
+    user: v.string().required().min(3)
+  },
+  otherwise: v.string().optional()
+})
+
+// Input:  { user: { type: "admin", role: "super-admin" } }
+// Output: "super-admin" ✅
+
+// Input:  { user: { type: "admin", role: "admin" } }
+// Output: Error: "The :input must be at least 5 characters" ❌
+```
+
+**Common Use:**
+```typescript
+// Conditional validation in nested objects
+v.object({
+  user: v.object({
+    type: v.string().required().oneOf(["admin", "user"]),
+    role: v.string().whenSibling("type", {
+      is: {
+        admin: v.string().required().min(5),
+        user: v.string().required().min(3)
+      }
+    })
+  })
+});
+```
+
+---
+
+## outputAs()
+
+Transform output using a callback function.
+
+**Signature:**
+```typescript
+outputAs(callback: SimpleTransformerCallback): this
+```
+
+**Parameters:**
+- `callback` - Function to transform the output
+
+**Example:**
+```typescript
+v.string().outputAs((data, context) => {
+  return data.toUpperCase();
+})
+
+// Input:  "hello"
+// Output: "HELLO"
+```
+
+**Common Use:**
+```typescript
+// Format output data
+v.string().outputAs((data) => data.trim().toLowerCase());
+```
+
+---
+
+## toJSON()
+
+Convert output to JSON string.
+
+**Signature:**
+```typescript
+toJSON(indent?: number): this
+```
+
+**Parameters:**
+- `indent` (optional) - JSON indentation level
+
+**Example:**
+```typescript
+v.object({ name: "John" }).toJSON(2)
+
+// Input:  { name: "John" }
+// Output: '{\n  "name": "John"\n}'
+```
+
+**Common Use:**
+```typescript
+// Convert object to formatted JSON
+v.object(schema).toJSON(2);
+```
+
+---
+
+## omit()
+
+Omit field from output.
+
+**Signature:**
+```typescript
+omit(): this
+```
+
+**Example:**
+```typescript
+v.string().omit()
+
+// Input:  "secret"
+// Output: Field is excluded from final output
+```
+
+**Common Use:**
+```typescript
+// Hide sensitive fields
+v.object({
+  email: v.string().required().email(),
+  password: v.string().required().omit() // Won't appear in output
+});
+```
+
+---
+
+## exclude()
+
+Exclude field from output (alias for `omit()`).
+
+**Signature:**
+```typescript
+exclude(): this
+```
+
+**Example:**
+```typescript
+v.string().exclude()
+
+// Input:  "internal"
+// Output: Field is excluded from final output
+```
+
+**Common Use:**
+```typescript
+// Hide internal fields
+v.object({
+  public: v.string().required(),
+  internal: v.string().exclude() // Won't appear in output
+});
+```
+
+---
+
+## Utility Methods
+
+### default()
+
+Set default value for the field.
+
+**Signature:**
+```typescript
+default(value: any): this
+```
+
+**Example:**
+```typescript
+v.string().default("anonymous")
+
+// Input:  undefined
+// Output: "anonymous"
+
+// Input:  "John"
+// Output: "John"
+```
+
+**Common Use:**
+```typescript
+// User profile with defaults
+v.object({
+  name: v.string().required(),
+  bio: v.string().default("No bio provided"),
+  status: v.string().default("active")
+});
+```
+
+### allowsEmpty()
+
+Allow empty values and skip validation.
+
+**Signature:**
+```typescript
+allowsEmpty(): this
+```
+
+**Example:**
+```typescript
+v.string().allowsEmpty()
+
+// Input:  ""
+// Output: "" ✅ (skips other validation rules)
+
+// Input:  "hello"
+// Output: "hello" ✅ (applies other validation rules)
+```
+
+**Common Use:**
+```typescript
+// Optional field that can be empty
+v.string().allowsEmpty().email()
+// "" → Valid (skips email validation)
+// "user@example.com" → Valid (applies email validation)
+```
+
+### label()
+
+Set field label for error messages.
+
+**Signature:**
+```typescript
+label(label: string): this
+```
+
+**Example:**
+```typescript
+v.string().label("User Name")
+
+// Error: "The User Name is required"
+// Instead of: "The :input is required"
+```
+
+**Common Use:**
+```typescript
+// Custom field labels
+v.object({
+  email: v.string().required().email().label("Email Address"),
+  name: v.string().required().label("Full Name")
+});
+```
+
+### describe()
+
+Add description to the validator.
+
+**Signature:**
+```typescript
+describe(description: string): this
+```
+
+**Example:**
+```typescript
+v.string().describe("User's full name")
+```
+
+**Common Use:**
+```typescript
+// Document validator purpose
+v.string()
+  .required()
+  .min(2)
+  .max(100)
+  .describe("User's full name for display purposes");
+```
+
+### attributes()
+
+Set attributes for translations.
+
+**Signature:**
+```typescript
+attributes(attributes: Record<string, string | Record<string, string>>): this
+```
+
+**Example:**
+```typescript
+v.string().attributes({
+  name: "Name",
+  email: "Email"
+})
+```
+
+**Common Use:**
+```typescript
+// Custom attributes for translations
+v.string().attributes({
+  name: "Name",
+  email: "Email",
+  matches: {
+    confirmPassword: "Confirm Password"
+  }
+});
+```
+
+---
+
+## Chaining Examples
+
+```typescript
+// Complex conditional validation
+v.string()
+  .when("type", {
+    is: {
+      admin: v.string().required().min(5),
+      user: v.string().required().min(3)
+    },
+    otherwise: v.string().optional()
+  })
+  .refine((value, context) => {
+    // Custom business logic
+    return undefined;
+  })
+  .default("anonymous")
+  .label("User Role")
+  .describe("User's role in the system")
+```
+
+---
+
+## Real-World Examples
+
+### User Registration with Conditional Validation
+
+```typescript
+const registrationSchema = v.object({
+  type: v.string().required().oneOf(["admin", "user", "guest"]),
+  email: v.string().required().email(),
+  password: v.string().required().min(8),
+  confirmPassword: v.string().required().sameAs("password"),
+  role: v.string().when("type", {
+    is: {
+      admin: v.string().required().min(5),
+      user: v.string().required().min(3)
+    },
+    otherwise: v.string().optional()
+  }),
+  permissions: v.array().presentIf("type", "admin"),
+  bio: v.string().optional().max(500).default("No bio provided")
+});
+```
+
+### Custom Business Logic Validation
+
+```typescript
+const businessSchema = v.object({
+  email: v.string().required().email(),
+  username: v.string().required().min(3).custom(async (value, context) => {
+    const exists = await checkUsernameExists(value);
+    if (exists) {
+      return "Username already exists";
+    }
+    return undefined;
+  }),
+  age: v.number().required().min(18).refine((value, context) => {
+    const birthYear = new Date().getFullYear() - value;
+    if (birthYear < 1900) {
+      return "Invalid birth year";
+    }
+    return undefined;
+  })
+});
+```
+
+---
+
+## See Also
+
+- [Basic Rules](./basic-rules) - Core validation rules
+- [Field Comparison](./field-comparison) - Compare with other fields
+- [Required Rules](./required-rules) - Conditional required validation
+- [Present Rules](./present-rules) - Conditional present validation

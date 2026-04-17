@@ -1,0 +1,496 @@
+---
+sidebar_position: 15
+---
+
+# Best Practices
+
+Guidelines and recommendations for using @warlock.js/cache effectively.
+
+## Do's ✅
+
+### Use `remember()` for Expensive Operations
+
+Always use `remember()` for database queries, API calls, or expensive computations to prevent cache stampedes:
+
+```ts
+// ✅ GOOD: Prevents stampedes
+const posts = await cache.remember('posts.popular', 3600, async () => {
+  return await db.query('SELECT * FROM posts ORDER BY views DESC LIMIT 10');
+});
+
+// ❌ BAD: Vulnerable to stampedes
+let posts = await cache.get('posts.popular');
+if (!posts) {
+  posts = await db.query('SELECT * FROM posts ORDER BY views DESC LIMIT 10');
+  await cache.set('posts.popular', posts, 3600);
+}
+```
+
+### Use Tags for Related Data
+
+Group related cache entries with tags for easy invalidation:
+
+```ts
+// ✅ GOOD: Use tags for related data
+const tagged = cache.tags([`user.${userId}`, 'users']);
+await tagged.set(`user.${userId}.profile`, profileData);
+await tagged.set(`user.${userId}.posts`, postsData);
+
+// Invalidate all user data at once
+await cache.tags([`user.${userId}`]).invalidate();
+
+// ❌ BAD: Manual key tracking
+await cache.set(`user.${userId}.profile`, profileData);
+await cache.set(`user.${userId}.posts`, postsData);
+// Later: remember all keys to invalidate?
+```
+
+### Set Appropriate TTLs
+
+Choose TTLs based on data freshness requirements:
+
+```ts
+import { CACHE_FOR } from '@warlock.js/cache';
+
+// Frequently changing data: Short TTL
+await cache.set('current.stats', stats, CACHE_FOR.HALF_HOUR);
+
+// Semi-static data: Medium TTL
+await cache.set('user.profile', profile, CACHE_FOR.ONE_DAY);
+
+// Rarely changing data: Long TTL
+await cache.set('app.config', config, CACHE_FOR.ONE_WEEK);
+```
+
+### Use Atomic Operations for Counters
+
+Always use `increment()`/`decrement()` for counters instead of manual get/set:
+
+```ts
+// ✅ GOOD: Atomic, race-condition free
+await cache.increment('page.views', 1);
+
+// ❌ BAD: Race condition risk
+const views = await cache.get('page.views') || 0;
+await cache.set('page.views', views + 1);
+```
+
+### Monitor with Events
+
+Set up event listeners for monitoring and debugging:
+
+```ts
+// ✅ GOOD: Monitor cache performance
+cache.on('hit', () => metrics.increment('cache.hit'));
+cache.on('miss', () => metrics.increment('cache.miss'));
+cache.on('error', ({ error }) => logger.error('Cache error', error));
+```
+
+### Use Namespaces for Organization
+
+Organize cache keys hierarchically with namespaces:
+
+```ts
+// ✅ GOOD: Organized with namespaces
+await cache.set('users.profile.123', profileData);
+await cache.set('users.settings.123', settingsData);
+await cache.removeNamespace('users'); // Clears all user data
+
+// ❌ BAD: Flat keys, hard to manage
+await cache.set('user_123_profile', profileData);
+await cache.set('user_123_settings', settingsData);
+```
+
+### Set Memory Limits
+
+Use `maxSize` for memory driver to prevent unbounded growth:
+
+```ts
+// ✅ GOOD: Prevents memory leaks
+cache.setCacheConfigurations({
+  drivers: { memory: MemoryCacheDriver },
+  options: {
+    memory: {
+      maxSize: 1000, // Auto-evicts when full
+      ttl: 3600
+    }
+  }
+});
+```
+
+### Use Redis for Distributed Systems
+
+Always use Redis driver in production with multiple servers:
+
+```ts
+// ✅ GOOD: Shared cache across servers
+cache.setCacheConfigurations({
+  default: 'redis',
+  drivers: { redis: RedisCacheDriver },
+  options: {
+    redis: {
+      host: process.env.REDIS_HOST,
+      port: 6379
+    }
+  }
+});
+```
+
+## Don'ts ❌
+
+### Don't Cache Everything
+
+Only cache data that benefits from caching:
+
+```ts
+// ❌ BAD: Caching already fast operations
+await cache.set('simple.calculation', 1 + 1, 3600);
+
+// ✅ GOOD: Cache expensive operations
+await cache.remember('expensive.query', 3600, async () => {
+  return await db.complexAggregation();
+});
+```
+
+### Don't Use Infinite TTL Without Reason
+
+Avoid `forever()` unless data truly never changes:
+
+```ts
+// ❌ BAD: Infinite cache for changing data
+await cache.forever('user.stats', stats); // Stats change!
+
+// ✅ GOOD: Reasonable TTL
+await cache.set('user.stats', stats, CACHE_FOR.ONE_HOUR);
+
+// ✅ GOOD: Forever for truly static data
+await cache.forever('app.version', '1.0.0');
+```
+
+### Don't Ignore Memory Limits
+
+Set `maxSize` for memory driver in production:
+
+```ts
+// ❌ BAD: Unbounded memory growth
+cache.setCacheConfigurations({
+  options: {
+    memory: {
+      // No maxSize - can grow infinitely!
+    }
+  }
+});
+
+// ✅ GOOD: Bounded memory
+cache.setCacheConfigurations({
+  options: {
+    memory: {
+      maxSize: 1000 // Prevents memory leaks
+    }
+  }
+});
+```
+
+### Don't Cache User-Specific Data in Shared Drivers
+
+Be careful with user-specific data in Redis:
+
+```ts
+// ⚠️ CAUTION: User-specific data in shared Redis
+await cache.set(`user.${userId}.session`, sessionData);
+
+// ✅ GOOD: Use global prefix or namespaces
+// Configuration:
+options: {
+  redis: {
+    globalPrefix: () => `tenant.${getTenantId()}`
+  }
+}
+```
+
+### Don't Use File Driver in Distributed Setup
+
+File driver doesn't work across multiple servers:
+
+```ts
+// ❌ BAD: File driver for distributed app
+cache.setCacheConfigurations({
+  default: 'file', // Each server has its own cache!
+});
+
+// ✅ GOOD: Redis for distributed
+cache.setCacheConfigurations({
+  default: 'redis' // Shared across all servers
+});
+```
+
+
+## Performance Tips
+
+### Use `has()` Instead of `get()`
+
+When you only need to check existence:
+
+```ts
+// ✅ GOOD: More efficient
+if (await cache.has('key')) {
+  const value = await cache.get('key');
+}
+
+// ❌ BAD: Unnecessary value fetch
+const value = await cache.get('key');
+if (value !== null) {
+  // ...
+}
+```
+
+### Batch Operations
+
+Use `many()` and `setMany()` for multiple operations:
+
+```ts
+// ✅ GOOD: Single round-trip
+const values = await cache.many(['key1', 'key2', 'key3']);
+
+// ❌ BAD: Multiple round-trips
+const value1 = await cache.get('key1');
+const value2 = await cache.get('key2');
+const value3 = await cache.get('key3');
+```
+
+### Primitives are Fast
+
+Primitive values skip cloning overhead:
+
+```ts
+// ✅ GOOD: Fast (no cloning)
+await cache.set('count', 42);
+await cache.set('flag', true);
+await cache.set('name', 'John');
+
+// Objects/arrays are cloned (security), but still fast
+await cache.set('user', { name: 'John' });
+```
+
+### Choose the Right Driver
+
+| Use Case | Recommended Driver |
+|----------|-------------------|
+| Development | Memory |
+| Testing | Null |
+| Single server | Memory or File |
+| Distributed apps | Redis |
+| Memory-constrained | LRU Memory |
+| Sliding expiration | Memory Extended |
+
+## Tag Organization Strategies
+
+### Strategy 1: Hierarchical Tags
+
+```ts
+// User-specific + collection
+cache.tags([`user.${id}`, 'users']);
+
+// Resource-specific + collection
+cache.tags([`post.${id}`, 'posts', `category.${catId}`]);
+```
+
+### Strategy 2: Functional Tags
+
+```ts
+// By feature
+cache.tags(['dashboard', 'homepage']);
+
+// By data type
+cache.tags(['config', 'settings']);
+```
+
+### Strategy 3: Multi-Dimensional
+
+```ts
+// Multiple dimensions
+cache.tags([
+  `user.${userId}`,
+  `category.${catId}`,
+  'featured' // if applicable
+]);
+```
+
+## Event Monitoring Patterns
+
+### Pattern 1: Metrics Collection
+
+```ts
+let hits = 0, misses = 0;
+
+cache.on('hit', () => hits++);
+cache.on('miss', () => misses++);
+
+setInterval(() => {
+  const total = hits + misses;
+  const hitRate = total > 0 ? (hits / total) * 100 : 0;
+  metrics.set('cache.hit_rate', hitRate);
+  hits = misses = 0; // Reset
+}, 60000);
+```
+
+### Pattern 2: Debug Logging
+
+```ts
+if (process.env.DEBUG_CACHE) {
+  cache.on('set', ({ key, ttl }) => {
+    console.log(`[Cache] SET ${key} (TTL: ${ttl}s)`);
+  });
+  
+  cache.on('miss', ({ key }) => {
+    console.log(`[Cache] MISS ${key}`);
+  });
+}
+```
+
+### Pattern 3: Error Tracking
+
+```ts
+cache.on('error', ({ error, driver, key }) => {
+  sentry.captureException(error, {
+    tags: {
+      cache_driver: driver,
+      cache_key: key
+    }
+  });
+});
+```
+
+## Memory Management
+
+### Set maxSize Appropriately
+
+```ts
+options: {
+  memory: {
+    maxSize: 1000, // Prevents unbounded growth
+  }
+}
+```
+
+### Monitor Cache Size with Events
+
+```ts
+cache.on('set', () => {
+  // Track cache size
+});
+
+cache.on('removed', () => {
+  // Track cache size
+});
+```
+
+## Security Best Practices
+
+### Use Global Prefix
+
+Prevent key collisions between applications:
+
+```ts
+options: {
+  redis: {
+    globalPrefix: process.env.APP_NAME || 'myapp'
+  }
+}
+```
+
+### Sanitize Keys
+
+Keys are automatically sanitized, but be aware:
+
+```ts
+// Use dot notation directly instead of objects
+await cache.set("user.1.profile", userData);
+await cache.get("user.1.profile");
+```
+
+### Don't Cache Sensitive Data
+
+Avoid caching sensitive information without encryption:
+
+```ts
+// ❌ BAD: Caching sensitive data
+await cache.set('user.password', password);
+
+// ✅ GOOD: Cache only non-sensitive data
+await cache.set('user.profile', {
+  name: user.name,
+  email: user.email
+  // No password!
+});
+```
+
+## Common Patterns
+
+### Pattern 1: Cache-Aside
+
+```ts
+async function getUser(id: number) {
+  const cached = await cache.get(`user.${id}`);
+  if (cached) return cached;
+  
+  const user = await db.users.findById(id);
+  await cache.set(`user.${id}`, user, 3600);
+  return user;
+}
+```
+
+### Pattern 2: Cache-Aside with remember()
+
+```ts
+async function getUser(id: number) {
+  return await cache.remember(`user.${id}`, 3600, async () => {
+    return await db.users.findById(id);
+  });
+}
+```
+
+### Pattern 3: Write-Through
+
+```ts
+async function updateUser(id: number, data: any) {
+  const user = await db.users.update(id, data);
+  await cache.set(`user.${id}`, user, 3600);
+  await cache.tags([`user.${id}`]).invalidate(); // Also invalidate tags
+  return user;
+}
+```
+
+### Pattern 4: Tag-Based Invalidation
+
+```ts
+// Cache with tags
+const tagged = cache.tags([`user.${id}`, 'users']);
+await tagged.set(`user.${id}`, userData);
+
+// Invalidate on update
+async function updateUser(id: number, data: any) {
+  await db.users.update(id, data);
+  await cache.tags([`user.${id}`]).invalidate();
+}
+```
+
+## Troubleshooting
+
+- **High memory usage?** Set `maxSize` or use LRU driver
+- **Low hit rate?** Check TTLs are appropriate for your data
+- **Stampedes?** Use `remember()` instead of manual get/set
+- **Race conditions?** Use atomic operations (`increment()`, `setNX()`)
+- **Cache not shared?** Use Redis driver for distributed systems
+
+## Summary
+
+**Key patterns:**
+- Use `remember()` to prevent cache stampedes
+- Use tags for related data invalidation
+- Choose TTLs based on data freshness requirements
+- Use atomic operations for counters
+- Set memory limits on memory drivers
+- Avoid caching sensitive data without encryption
+- Use Redis for distributed systems
+

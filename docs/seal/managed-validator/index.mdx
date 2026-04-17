@@ -1,0 +1,155 @@
+---
+title: Managed Fields
+description: Inject framework-controlled values like timestamps and auto-generated IDs.
+---
+
+# Managed Fields
+
+A **managed field** is server-controlled: the framework injects its value and the client can never override it. Unlike [computed fields](../computed-validator/index), managed fields do **not** depend on other fields — the callback only receives the schema context.
+
+```ts
+import { v } from "@warlock.js/seal";
+
+const createUserSchema = v.object({
+  name:      v.string().required().trim(),
+  email:     v.string().required().email().lowercase(),
+
+  // Framework-managed — client input is ignored
+  createdAt: v.managed(() => new Date()),
+  updatedAt: v.managed(() => new Date()),
+});
+```
+
+No matter what the client sends in `createdAt` or `updatedAt`, those fields will always be set to the current timestamp.
+
+---
+
+## Creating a Managed Field
+
+Use `v.managed(callback, resultValidator?)`:
+
+```ts
+v.managed(() => new Date())
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `callback` | `(context) => value \| Promise<value>` | Receives only the schema context |
+| `resultValidator` | `BaseValidator?` | Optionally validate the generated value |
+
+The key difference from `v.computed` is that the callback receives **only the context**, not the data object. This signals that the value is purely framework-injected and has no field dependency.
+
+---
+
+## Async Callbacks
+
+```ts
+const schema = v.object({
+  id: v.managed(async (context) => {
+    return await db.generateId();
+  }),
+});
+```
+
+---
+
+## Usage Patterns
+
+### Timestamps
+
+```ts
+v.object({
+  name:      v.string().required(),
+  createdAt: v.managed(() => new Date()),
+  updatedAt: v.managed(() => new Date()),
+});
+```
+
+### Auto-generated slug or ID
+
+```ts
+v.object({
+  email: v.string().required().email(),
+  token: v.managed(() => crypto.randomUUID()),
+});
+```
+
+### User from request context
+
+If you pass request-scoped data through the context:
+
+```ts
+v.object({
+  name:    v.string().required(),
+  ownerId: v.managed((context) => context.allValues?.currentUserId),
+});
+```
+
+### Validation with generated result
+
+```ts
+v.object({
+  email: v.string().required().email(),
+  confirmToken: v.managed(
+    () => Math.floor(100000 + Math.random() * 900000).toString(),
+    v.string().pattern(/^\d{6}$/)
+  ),
+});
+```
+
+---
+
+## Key Behaviours
+
+| Behaviour | Detail |
+|---|---|
+| **Client input ignored** | Any incoming value for this key is discarded |
+| **Execution order** | Runs after all sibling fields are validated |
+| **Async safe** | Awaits the callback automatically |
+| **JSON Schema** | Skipped — same as computed fields |
+| **Extends ComputedValidator** | Shares all internal machinery; only the callback signature differs |
+
+:::info No JSON Schema output
+Like computed fields, `ManagedValidator` throws if `toJsonSchema()` is called directly. `ObjectValidator.toJsonSchema()` skips these fields automatically.
+:::
+
+---
+
+## Computed vs. Managed — quick reference
+
+| | `v.computed(fn)` | `v.managed(fn)` |
+|---|---|---|
+| Callback signature | `(data, context)` | `(context)` |
+| Accesses other fields | ✅ Yes | ❌ No |
+| Typical use | slug from title, total from qty | timestamps, UUIDs, injected IDs |
+
+---
+
+## Real-World Example
+
+### User signup schema
+
+```ts
+const signupSchema = v.object({
+  // User-supplied
+  name:     v.string().required().trim(),
+  email:    v.string().required().email().lowercase(),
+  password: v.string().required().minLength(8).strongPassword().omit(),
+
+  // Framework-managed
+  id:        v.managed(() => crypto.randomUUID()),
+  createdAt: v.managed(() => new Date()),
+  updatedAt: v.managed(() => new Date()),
+  role:      v.managed(() => "user" as const),
+  verified:  v.managed(() => false),
+});
+```
+
+After validation the output object always includes `id`, `createdAt`, `updatedAt`, `role`, and `verified` — regardless of what the client submitted.
+
+---
+
+## See Also
+
+- [Computed Fields](../computed-validator/index) — derive values from other fields
+- [Object Validator](../object-validator/index) — how managed fields integrate into objects

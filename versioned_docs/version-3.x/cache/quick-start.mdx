@@ -1,0 +1,73 @@
+---
+sidebar_position: 2
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+# Quick Start
+
+Get started with @warlock.js/cache in under 30 seconds!
+
+## Installation
+
+<Tabs>
+  <TabItem value="npm" label="npm" default>
+
+```bash
+npm install @warlock.js/cache
+```
+
+  </TabItem>
+  <TabItem value="yarn" label="yarn">
+
+```bash
+yarn add @warlock.js/cache
+```
+
+  </TabItem>
+  <TabItem value="pnpm" label="pnpm">
+
+```bash
+pnpm add @warlock.js/cache
+```
+
+  </TabItem>
+</Tabs>
+
+## 30-Second Example
+
+```ts
+import { cache, MemoryCacheDriver, CACHE_FOR } from "@warlock.js/cache";
+
+// Configure
+cache.setCacheConfigurations({
+  default: "memory",
+  drivers: { memory: MemoryCacheDriver },
+  options: { memory: { ttl: CACHE_FOR.ONE_HOUR } }
+});
+
+await cache.init();
+
+// Use
+await cache.set("user.123", { name: "John" }, CACHE_FOR.HALF_HOUR);
+const user = await cache.get("user.123");
+await cache.remove("user.123");
+```
+
+That's it! You're now caching data.
+
+## Key Concepts
+
+- **Drivers**: Interchangeable storage backends (Memory, Redis, File, etc.)
+- **TTL**: Time-to-live in seconds (how long values stay cached)
+- **Keys**: Dot notation strings (e.g., `"user.123"`, `"posts.456.comments"`)
+- **Namespaces**: Hierarchical organization (e.g., `users.profile.123`)
+
+## Next Steps
+
+- [Configure for Production](./configurations) - Set up Redis or other drivers
+- [Learn About Namespaces](./namespaces) - Organize cache keys hierarchically
+- [Learn Advanced Features](./tags) - Cache tags, events, and more
+- [Choose a Driver](./introduction#available-cache-drivers) - Find the right driver for your use case
+

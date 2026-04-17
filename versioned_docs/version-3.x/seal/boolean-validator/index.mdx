@@ -1,0 +1,294 @@
+---
+title: Boolean Validator Overview
+description: Validate boolean values with flexible rules
+sidebar_position: 12
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Boolean Validator
+
+The Boolean Validator validates boolean values (true/false) with support for accepted/declined patterns and strict boolean checks. Perfect for checkboxes, toggles, feature flags, and permission systems.
+
+---
+
+## Basic Usage
+
+```typescript
+import { v, validate } from "@warlock.js/seal";
+
+const schema = v.boolean()
+  .required()
+  .accepted();
+
+const result = await validate(schema, true);
+// Result: { isValid: true, data: true }
+```
+
+---
+
+## Available Methods
+
+### Boolean Validators (14 methods)
+
+<div className="methods-grid">
+
+<MethodCard
+  name="accepted()"
+  description="Must be accepted"
+  href="#accepted"
+/>
+
+<MethodCard
+  name="acceptedIf()"
+  description="Accepted if condition"
+  href="#acceptedif"
+/>
+
+<MethodCard
+  name="acceptedUnless()"
+  description="Accepted unless condition"
+  href="#acceptedunless"
+/>
+
+<MethodCard
+  name="acceptedIfRequired()"
+  description="Accepted if field required"
+  href="#acceptedifrequired"
+/>
+
+<MethodCard
+  name="acceptedIfPresent()"
+  description="Accepted if field present"
+  href="#acceptedifpresent"
+/>
+
+<MethodCard
+  name="acceptedWithout()"
+  description="Accepted without field"
+  href="#acceptedwithout"
+/>
+
+<MethodCard
+  name="declined()"
+  description="Must be declined"
+  href="#declined"
+/>
+
+<MethodCard
+  name="declinedIf()"
+  description="Declined if condition"
+  href="#declinedif"
+/>
+
+<MethodCard
+  name="declinedUnless()"
+  description="Declined unless condition"
+  href="#declinedunless"
+/>
+
+<MethodCard
+  name="declinedIfRequired()"
+  description="Declined if field required"
+  href="#declinedifrequired"
+/>
+
+<MethodCard
+  name="declinedIfPresent()"
+  description="Declined if field present"
+  href="#declinedifpresent"
+/>
+
+<MethodCard
+  name="declinedWithout()"
+  description="Declined without field"
+  href="#declinedwithout"
+/>
+
+<MethodCard
+  name="mustBeTrue()"
+  description="Must be strictly true"
+  href="#mustbetrue"
+/>
+
+<MethodCard
+  name="mustBeFalse()"
+  description="Must be strictly false"
+  href="#mustbefalse"
+/>
+
+</div>
+
+---
+
+## Accepted Values
+
+The `accepted()` method accepts flexible boolean-like values:
+- `true`, `"true"`, `"yes"`, `"y"`, `"on"`, `1`, `"1"`
+
+```typescript
+v.boolean().accepted()
+// Input: true, "yes", "1", "on" → Valid ✅
+// Input: false, "no", "0" → Invalid ❌
+```
+
+### Conditional Accepted
+
+```typescript
+// Accepted if another field equals a value
+v.boolean().acceptedIf("subscribe", true)
+
+// Accepted unless another field equals a value
+v.boolean().acceptedUnless("premium", false)
+
+// Accepted if another field is required
+v.boolean().acceptedIfRequired("newsletter")
+
+// Accepted if another field is present
+v.boolean().acceptedIfPresent("newsletter")
+
+// Accepted if another field is missing
+v.boolean().acceptedWithout("newsletter")
+```
+
+---
+
+## Declined Values
+
+The `declined()` method accepts flexible boolean-like values:
+- `false`, `"false"`, `"no"`, `"n"`, `"off"`, `0`, `"0"`
+
+```typescript
+v.boolean().declined()
+// Input: false, "no", "0", "off" → Valid ✅
+// Input: true, "yes", "1" → Invalid ❌
+```
+
+### Conditional Declined
+
+```typescript
+// Declined if another field equals a value
+v.boolean().declinedIf("subscribe", false)
+
+// Declined unless another field equals a value
+v.boolean().declinedUnless("premium", true)
+
+// Declined if another field is required
+v.boolean().declinedIfRequired("newsletter")
+
+// Declined if another field is present
+v.boolean().declinedIfPresent("newsletter")
+
+// Declined if another field is missing
+v.boolean().declinedWithout("newsletter")
+```
+
+---
+
+## Strict Boolean Checks
+
+### mustBeTrue() {#mustbetrue}
+
+Value must be strictly `true` (not "yes", "on", 1, etc.)
+
+```typescript
+v.boolean().mustBeTrue()
+// Input: true → Valid ✅
+// Input: "yes", "on", 1 → Invalid ❌
+```
+
+### mustBeFalse() {#mustbefalse}
+
+Value must be strictly `false` (not "no", "off", 0, etc.)
+
+```typescript
+v.boolean().mustBeFalse()
+// Input: false → Valid ✅
+// Input: "no", "off", 0 → Invalid ❌
+```
+
+---
+
+## Common Patterns
+
+### Terms Acceptance (Checkbox)
+
+```typescript
+const termsSchema = v.boolean()
+  .required()
+  .accepted();
+
+const result = await validate(termsSchema, "yes");
+// Result: { isValid: true, data: "yes" }
+```
+
+### Feature Flag
+
+```typescript
+const featureSchema = v.boolean()
+  .required()
+  .mustBeTrue();
+
+const result = await validate(featureSchema, true);
+// Result: { isValid: true, data: true }
+```
+
+### Conditional Newsletter
+
+```typescript
+const newsletterSchema = v.boolean()
+  .acceptedIf("subscribe", true);
+
+const result = await validate(newsletterSchema, "yes", {
+  subscribe: true
+});
+// Result: { isValid: true, data: "yes" }
+```
+
+### Strict Toggle
+
+```typescript
+const toggleSchema = v.boolean()
+  .required()
+  .mustBeFalse();
+
+const result = await validate(toggleSchema, false);
+// Result: { isValid: true, data: false }
+```
+
+---
+
+## Inherited Methods
+
+The Boolean Validator extends `BaseValidator` and inherits all base validation methods:
+
+- **Basic Rules**: `required()`, `optional()`, `present()`, `nullable()`
+- **Comparison**: `equal()`, `notEqual()`, `sameAs()`, `differentFrom()`
+- **Type Checking**: `typeOf()`, `instanceOf()`
+- **Advanced**: `when()`, `custom()`, `transform()`
+
+[View Base Validator →](../base-validator/)
+
+---
+
+## Accepted vs MustBeTrue
+
+| Method | Input Types Accepted | Use Case |
+|--------|---------------------|----------|
+| `accepted()` | `true`, `"true"`, `"yes"`, `"on"`, `1`, `"1"` | Flexible form inputs |
+| `mustBeTrue()` | `true` only | Strict boolean values |
+
+## Declined vs MustBeFalse
+
+| Method | Input Types Accepted | Use Case |
+|--------|---------------------|----------|
+| `declined()` | `false`, `"false"`, `"no"`, `"off"`, `0`, `"0"` | Flexible form inputs |
+| `mustBeFalse()` | `false` only | Strict boolean values |
+
+---
+
+## See Also
+
+- [Scalar Validator](../scalar-validator/) - Where accepted/declined methods come from
+- [Base Validator](../base-validator/) - Inherited methods
+- [Conditional Validation](../concepts/conditional-validation) - Understanding conditional rules

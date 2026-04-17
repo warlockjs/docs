@@ -1,0 +1,290 @@
+---
+sidebar_position: 4
+---
+
+# Cache Driver Interface
+
+Any custom cache driver must implement this interface. All built-in drivers follow this contract.
+
+## Required Methods
+
+### Core Methods
+
+| Method                       | Description                            | Return Type |
+| ---------------------------- | -------------------------------------- | ----------- |
+| `options`                    | Driver options object                  | `Options` |
+| `name`                       | Driver name (string)                   | `string` |
+| `removeNamespace(namespace)` | Remove all cached items by namespace   | `Promise<any>` |
+| `setOptions(options)`        | Set the driver options                 | `any` |
+| `parseKey(key)`              | Parse the cache key (string or object) | `string` |
+| `set(key, value, ttl?)`      | Set a value in the cache               | `Promise<any>` |
+| `get(key)`                   | Get a value from the cache             | `Promise<any \| null>` |
+| `remove(key)`                | Remove a value from the cache          | `Promise<void>` |
+| `flush()`                    | Flush the entire cache                 | `Promise<void>` |
+| `connect()`                  | Connect to the cache backend           | `Promise<any>` |
+| `client`                     | (optional) Underlying client instance  | `ClientType \| undefined` |
+| `disconnect()`               | (optional) Disconnect from backend     | `Promise<void>` |
+
+### Extended Methods
+
+| Method | Description | Return Type |
+|--------|-------------|-------------|
+| `has(key)` | Check if a key exists without fetching value | `Promise<boolean>` |
+| `remember(key, ttl, callback)` | Get from cache or execute callback and cache result (with stampede prevention) | `Promise<any>` |
+| `pull(key)` | Get value and remove it from cache (atomic) | `Promise<any \| null>` |
+| `forever(key, value)` | Set a value permanently (no expiration) | `Promise<any>` |
+| `increment(key, value?)` | Atomically increment a numeric value | `Promise<number>` |
+| `decrement(key, value?)` | Atomically decrement a numeric value | `Promise<number>` |
+| `many(keys)` | Get multiple values at once | `Promise<any[]>` |
+| `setMany(items, ttl?)` | Set multiple key-value pairs at once | `Promise<void>` |
+| `tags(tags)` | Create a tagged cache instance | `TaggedCacheDriver` |
+| `setNX?(key, value, ttl?)` | Set if not exists (atomic lock) - **Optional, Redis-specific** | `Promise<boolean>` |
+
+### Event System Methods
+
+| Method | Description | Return Type |
+|--------|-------------|-------------|
+| `on(event, handler)` | Register an event listener | `this` |
+| `off(event, handler)` | Remove an event listener | `this` |
+| `once(event, handler)` | Register a one-time event listener | `this` |
+
+## Interface Definition
+
+```ts
+export interface CacheDriver<ClientType, Options> {
+  /**
+   * The cache driver options
+   */
+  options: Options;
+  
+  /**
+   * Cache driver name
+   */
+  name: string;
+  
+  /**
+   * Remove all cached items by namespace
+   */
+  removeNamespace(namespace: string): Promise<any>;
+  
+  /**
+   * Set the cache driver options
+   */
+  setOptions(options: Options): any;
+  
+  /**
+   * Parse the key to be used in the cache
+   */
+  parseKey(key: string | GenericObject): string;
+  
+  /**
+   * Set a value in the cache
+   * @param key The cache key, could be an object or string
+   * @param value The value to be stored in the cache
+   * @param ttl The time to live in seconds
+   */
+  set(key: string | GenericObject, value: any, ttl?: number): Promise<any>;
+  
+  /**
+   * Get a value from the cache
+   */
+  get(key: string | GenericObject): Promise<any | null>;
+  
+  /**
+   * Remove a value from the cache
+   */
+  remove(key: string | GenericObject): Promise<void>;
+  
+  /**
+   * Flush the entire cache
+   */
+  flush(): Promise<void>;
+  
+  /**
+   * Connect to the cache driver
+   */
+  connect(): Promise<any>;
+  
+  /**
+   * The cache client
+   */
+  client?: ClientType;
+  
+  /**
+   * Disconnect the cache driver
+   */
+  disconnect(): Promise<void>;
+  
+  /**
+   * Check if a key exists in the cache without fetching its value
+   */
+  has(key: string | GenericObject): Promise<boolean>;
+  
+  /**
+   * Get value from cache or execute callback and cache the result
+   * Prevents cache stampedes with automatic locking
+   */
+  remember(
+    key: string | GenericObject,
+    ttl: number,
+    callback: () => Promise<any>
+  ): Promise<any>;
+  
+  /**
+   * Get value and remove it from cache (atomic operation)
+   */
+  pull(key: string | GenericObject): Promise<any | null>;
+  
+  /**
+   * Set a value in cache permanently (no expiration)
+   */
+  forever(key: string | GenericObject, value: any): Promise<any>;
+  
+  /**
+   * Increment a numeric value in cache
+   * @param value The value to increment by (default 1)
+   */
+  increment(key: string | GenericObject, value?: number): Promise<number>;
+  
+  /**
+   * Decrement a numeric value in cache
+   * @param value The value to decrement by (default 1)
+   */
+  decrement(key: string | GenericObject, value?: number): Promise<number>;
+  
+  /**
+   * Get multiple values from cache at once
+   */
+  many(keys: (string | GenericObject)[]): Promise<any[]>;
+  
+  /**
+   * Set multiple values in cache at once
+   */
+  setMany(items: Record<string, any>, ttl?: number): Promise<void>;
+  
+  /**
+   * Create a tagged cache instance for the given tags
+   */
+  tags(tags: string[]): TaggedCacheDriver;
+  
+  /**
+   * Set if not exists (atomic operation)
+   * Returns true if key was set, false if key already existed
+   * Note: Not all drivers support this operation (Redis only)
+   */
+  setNX?(
+    key: string | GenericObject,
+    value: any,
+    ttl?: number
+  ): Promise<boolean>;
+  
+  /**
+   * Register an event listener
+   */
+  on(event: CacheEventType, handler: CacheEventHandler): this;
+  
+  /**
+   * Remove an event listener
+   */
+  off(event: CacheEventType, handler: CacheEventHandler): this;
+  
+  /**
+   * Register a one-time event listener
+   */
+  once(event: CacheEventType, handler: CacheEventHandler): this;
+}
+```
+
+## Key Features
+
+### Key Parsing
+All drivers automatically parse keys using the `parseKey` method:
+- String keys are sanitized (removes `{}"` characters, replaces `:` and `,` with `.`)
+- Object keys are JSON stringified and then sanitized
+- Global prefix is automatically applied if configured
+
+### TTL Handling
+- TTL is specified in seconds
+- Drivers automatically handle expiration
+- If no TTL is provided, uses the driver's default TTL
+- If no default TTL is set, cache entries never expire
+
+### Namespace Support
+- Namespaces allow grouping related cache entries
+- Use `removeNamespace()` to clear all entries in a namespace
+- Namespaces are the first part of the key before the first dot
+
+### Built-in Logging
+All drivers automatically log operations:
+- Success operations (cached, fetched, removed, etc.)
+- Error operations (notFound, expired, error)
+- Connection operations (connecting, connected, disconnecting, disconnected)
+
+## Optional Methods
+
+Some methods are optional and driver-specific:
+
+- **`setNX()`**: Only available on Redis driver. Other drivers will throw an error if called.
+
+## Event Types
+
+The event system supports the following event types:
+
+- `hit` - Cache hit (value retrieved)
+- `miss` - Cache miss (value not found or expired)
+- `set` - Value stored in cache
+- `removed` - Key removed from cache
+- `flushed` - Entire cache cleared
+- `expired` - Key expired (TTL reached)
+- `connected` - Driver connected
+- `disconnected` - Driver disconnected
+- `error` - Error occurred during operation
+
+See [Event System](./events) for comprehensive event documentation.
+
+## Extension Points
+
+- Extend [BaseCacheDriver](./base-cache-driver) for common logic
+- Use [parseCacheKey](./utils#parse-cache-key) for key normalization
+- Implement custom logging by overriding the `log()` method
+- BaseCacheDriver provides default implementations for: `has()`, `remember()`, `pull()`, `forever()`, `increment()`, `decrement()`, `many()`, `setMany()`, `tags()`, and event methods
+
+## Example Implementation
+
+```ts
+import { BaseCacheDriver } from "@warlock.js/cache";
+import type { CacheDriver } from "@warlock.js/cache";
+
+interface MyCacheOptions {
+  globalPrefix?: string;
+  ttl?: number;
+}
+
+export class MyCacheDriver extends BaseCacheDriver<any, MyCacheOptions> 
+  implements CacheDriver<any, MyCacheOptions> {
+  
+  public name = "myCache";
+  
+  public async removeNamespace(namespace: string) {
+    // Implementation for removing namespace
+  }
+  
+  public async set(key: string | GenericObject, value: any, ttl?: number) {
+    // Implementation for setting value
+  }
+  
+  public async get(key: string | GenericObject) {
+    // Implementation for getting value
+  }
+  
+  public async remove(key: string | GenericObject) {
+    // Implementation for removing value
+  }
+  
+  public async flush() {
+    // Implementation for flushing cache
+  }
+}
+```
+
+See [Make Your Own Cache Driver](./make-your-own-cache-driver) for a complete example.

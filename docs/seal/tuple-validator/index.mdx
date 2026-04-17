@@ -1,0 +1,171 @@
+---
+title: Tuple Validator
+description: Validate fixed-length arrays where each position has its own type.
+---
+
+# Tuple Validator
+
+The `TupleValidator` validates **fixed-length arrays** where each index has its own specific validator. Unlike `ArrayValidator` (all items the same type), a tuple enforces both **length** and **per-position types**.
+
+```ts
+import { v } from "@warlock.js/seal";
+
+// RGB color: [red, green, blue]
+const rgb = v.tuple([
+  v.number().min(0).max(255),
+  v.number().min(0).max(255),
+  v.number().min(0).max(255),
+]);
+
+// Valid:   [255, 128, 0]
+// Invalid: [255, 128]        →  wrong length
+// Invalid: [255, "128", 0]   →  wrong type at index 1
+```
+
+---
+
+## Creating a Tuple
+
+Use `v.tuple(validators, errorMessage?)`:
+
+```ts
+const point = v.tuple([v.number(), v.number()]);
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `validators` | `BaseValidator[]` | One validator per position, in order |
+| `errorMessage` | `string?` | Custom error when the input is not an array |
+
+### Length is always enforced
+
+The array must contain **exactly** as many items as there are validators. Extra or missing items cause an error:
+
+```
+Expected exactly 3 items, but got 2
+```
+
+---
+
+## Mixed-type tuples
+
+```ts
+// [name: string, age: number, active: boolean]
+const userRow = v.tuple([
+  v.string().required().trim(),
+  v.int().min(0).max(150),
+  v.boolean(),
+]);
+
+// Valid: ["Alice", 30, true]
+```
+
+---
+
+## Usage Patterns
+
+### Geographic coordinate
+
+```ts
+const coordinate = v.tuple([
+  v.number().min(-90).max(90),    // latitude
+  v.number().min(-180).max(180),  // longitude
+]);
+
+// Valid: [48.8566, 2.3522]  (Paris)
+```
+
+### Date range
+
+```ts
+const dateRange = v.tuple([
+  v.date().required(),  // start
+  v.date().required(),  // end
+]);
+```
+
+### CSV row import
+
+```ts
+const csvRow = v.tuple([
+  v.string().required().trim(),   // name
+  v.string().required().email(),  // email
+  v.string().required().pattern(/^\+?[0-9]{7,15}$/), // phone
+]);
+```
+
+### Optional with default
+
+Individual positions can use `.optional()` or `.default()`:
+
+```ts
+const config = v.tuple([
+  v.string().required(),       // host
+  v.int().default(3000),       // port — defaults to 3000 if omitted position isn't possible in a tuple, but default applies to the value
+]);
+```
+
+---
+
+## Real-World Example
+
+### Bulk user import endpoint
+
+```ts
+const bulkImportSchema = v.object({
+  rows: v.array(
+    v.tuple([
+      v.string().required().trim().label("Name"),
+      v.string().required().email().lowercase().label("Email"),
+      v.string().required().oneOf(["admin", "editor", "viewer"]).label("Role"),
+    ])
+  ).minLength(1).maxLength(500),
+});
+
+// Valid:
+// { rows: [
+//   ["Alice", "alice@example.com", "admin"],
+//   ["Bob",   "bob@example.com",   "editor"],
+// ]}
+```
+
+---
+
+## JSON Schema
+
+`toJsonSchema()` output varies by target:
+
+```ts
+v.tuple([v.string(), v.int(), v.boolean()]).toJsonSchema("draft-2020-12");
+// → {
+//   type: "array",
+//   prefixItems: [{ type: "string" }, { type: "integer" }, { type: "boolean" }],
+//   items: false,
+//   minItems: 3,
+//   maxItems: 3
+// }
+
+v.tuple([v.string(), v.int()]).toJsonSchema("draft-07");
+// → {
+//   type: "array",
+//   items: [{ type: "string" }, { type: "integer" }],
+//   additionalItems: false,
+//   minItems: 2,
+//   maxItems: 2
+// }
+```
+
+| Target | Keyword used |
+|---|---|
+| `draft-2020-12` (default) | `prefixItems` + `items: false` |
+| `draft-07` | `items` (array) + `additionalItems: false` |
+| `openapi-3.0` | same as `draft-07` |
+
+---
+
+## See Also
+
+- [Array Validator](../array-validator/index) — variable-length list of items all sharing one type
+- [Union Validator](../union-validator/index) — value matches one of multiple types
+- [Record Validator](../record-validator/index) — dynamic-key typed dictionary
+- [Standard Schema](../advanced/standard-schema) — JSON Schema generation details

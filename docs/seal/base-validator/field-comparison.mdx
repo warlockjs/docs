@@ -1,0 +1,240 @@
+---
+title: Field Comparison
+description: Compare field values with other fields
+---
+
+# Field Comparison
+
+Compare field values with other fields in the same object or globally.
+
+---
+
+## equal()
+
+Value must equal a specific value.
+
+**Signature:**
+```typescript
+equal(value: any, errorMessage?: string): this
+```
+
+**Parameters:**
+- `value` - Specific value to compare with
+- `errorMessage` (optional) - Custom error message
+
+**Example:**
+```typescript
+v.string().equal("admin")
+
+// Input:  "admin"
+// Output: "admin" ✅
+
+// Input:  "user"
+// Output: Error: "The :input must equal :value" ❌
+```
+
+**Common Use:**
+```typescript
+// User type validation
+v.object({
+  type: v.string().required().equal("admin"),
+  role: v.string().required()
+});
+```
+
+---
+
+## sameAs()
+
+Value must equal another field's value.
+
+**Signature:**
+```typescript
+sameAs(field: string, errorMessage?: string): this
+```
+
+**Parameters:**
+- `field` - Field name to compare with
+- `errorMessage` (optional) - Custom error message
+
+**Example:**
+```typescript
+v.string().sameAs("password")
+
+// Input:  { password: "secret", confirmPassword: "secret" }
+// Output: "secret" ✅
+
+// Input:  { password: "secret", confirmPassword: "different" }
+// Output: Error: "The :input must match the :field field" ❌
+```
+
+**Common Use:**
+```typescript
+// Password confirmation
+v.object({
+  password: v.string().required().min(8),
+  confirmPassword: v.string().required().sameAs("password")
+});
+```
+
+---
+
+## differentFrom()
+
+Value must NOT equal another field's value.
+
+**Signature:**
+```typescript
+differentFrom(field: string, errorMessage?: string): this
+```
+
+**Parameters:**
+- `field` - Field name to compare with
+- `errorMessage` (optional) - Custom error message
+
+**Example:**
+```typescript
+v.string().differentFrom("oldPassword")
+
+// Input:  { oldPassword: "old", newPassword: "new" }
+// Output: "new" ✅
+
+// Input:  { oldPassword: "same", newPassword: "same" }
+// Output: Error: "The :input must not match the :field field" ❌
+```
+
+**Common Use:**
+```typescript
+// Password change - new password must be different
+v.object({
+  oldPassword: v.string().required(),
+  newPassword: v.string().required().differentFrom("oldPassword")
+});
+```
+
+---
+
+## Sibling Field Comparison
+
+Field comparison methods have sibling versions for nested object validation.
+
+### sameAsSibling()
+
+Value must equal another sibling field's value (for nested objects).
+
+**Signature:**
+```typescript
+sameAsSibling(field: string, errorMessage?: string): this
+```
+
+**Parameters:**
+- `field` - Sibling field name to compare with
+- `errorMessage` (optional) - Custom error message
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    password: v.string().required(),
+    confirmPassword: v.string().required().sameAsSibling("password")
+  })
+});
+```
+
+### differentFromSibling()
+
+Value must NOT equal another sibling field's value (for nested objects).
+
+**Signature:**
+```typescript
+differentFromSibling(field: string, errorMessage?: string): this
+```
+
+**Parameters:**
+- `field` - Sibling field name to compare with
+- `errorMessage` (optional) - Custom error message
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    oldPassword: v.string().required(),
+    newPassword: v.string().required().differentFromSibling("oldPassword")
+  })
+});
+```
+
+---
+
+## Chaining Examples
+
+```typescript
+// Password confirmation with validation
+v.string()
+  .required()
+  .minLength(8)
+  .sameAs("password")
+  .differentFrom("oldPassword")
+
+// Email confirmation
+v.string()
+  .required()
+  .email()
+  .sameAs("email")
+
+// Username change
+v.string()
+  .required()
+  .minLength(3)
+  .differentFrom("oldUsername")
+
+// Value equality
+v.string()
+  .required()
+  .equal("admin")
+```
+
+---
+
+## Real-World Examples
+
+### User Registration
+
+```typescript
+const registrationSchema = v.object({
+  email: v.string().required().email(),
+  confirmEmail: v.string().required().sameAs("email"),
+  password: v.string().required().minLength(8),
+  confirmPassword: v.string().required().sameAs("password")
+});
+```
+
+### Password Change
+
+```typescript
+const passwordChangeSchema = v.object({
+  currentPassword: v.string().required(),
+  newPassword: v.string().required().minLength(8).differentFrom("currentPassword"),
+  confirmPassword: v.string().required().sameAs("newPassword")
+});
+```
+
+### Admin User Creation
+
+```typescript
+const adminSchema = v.object({
+  type: v.string().required().equal("admin"),
+  role: v.string().required().oneOf(["super", "moderator"]),
+  permissions: v.array().required()
+});
+```
+
+---
+
+## See Also
+
+- [Basic Rules](./basic-rules) - Core validation rules
+- [Required Rules](./required-rules) - Conditional required validation
+- [Present Rules](./present-rules) - Conditional present validation

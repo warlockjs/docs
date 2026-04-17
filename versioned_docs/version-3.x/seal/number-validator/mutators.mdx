@@ -1,0 +1,83 @@
+---
+title: Number Mutators
+description: Transform number values before validation
+sidebar_position: 3
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Number Mutators
+
+Number mutators transform the input data before validation. The number mutator automatically converts string values to numbers.
+
+---
+
+## All Mutators
+
+<div className="methods-grid">
+
+<MethodCard
+  name="Auto Number Conversion"
+  description="Convert string to number"
+  href="#auto-number-conversion"
+/>
+
+</div>
+
+---
+
+## Auto Number Conversion {#auto-number-conversion}
+
+The Number Validator automatically converts string values to numbers using the `numberMutator`. This mutator is applied automatically when you create a `v.number()` validator.
+
+### How It Works
+
+```typescript
+v.number()
+// Input: "123" → Output: 123
+// Input: "45.67" → Output: 45.67
+// Input: "0" → Output: 0
+// Input: 123 → Output: 123 (unchanged)
+```
+
+### Examples
+
+**String to Number**
+```typescript
+const numberSchema = v.number()
+  .required()
+  .min(0)
+  .max(100);
+
+const result = await validate(numberSchema, "50");
+// Result: { isValid: true, data: 50 }
+```
+
+**Decimal String to Number**
+```typescript
+const priceSchema = v.number()
+  .required()
+  .min(0);
+
+const result = await validate(priceSchema, "99.99");
+// Result: { isValid: true, data: 99.99 }
+```
+
+**Form Input Handling**
+```typescript
+// HTML form inputs are always strings
+const formSchema = v.number()
+  .required()
+  .between(1, 100);
+
+const result = await validate(formSchema, "25"); // From form input
+// Result: { isValid: true, data: 25 }
+```
+
+---
+
+## See Also
+
+- [Number Validator Overview](./) - Return to overview
+- [Number Validators](./validators) - Validation rules
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding mutators

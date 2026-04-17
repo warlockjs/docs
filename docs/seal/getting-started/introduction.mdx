@@ -1,0 +1,93 @@
+---
+sidebar_position: 1
+---
+
+# 🛡️ Welcome to Seal!
+
+**Seal** is a powerful, standalone validation library with full TypeScript support. Cast validation seals on your schemas to protect your data! 🎯
+
+## ✨ What is Seal?
+
+Seal is a modern validation library that combines the best of type safety, performance, and developer experience. Built with TypeScript from the ground up, it provides:
+
+- **🔒 Type-Safe**: Full TypeScript support with intelligent type inference
+- **⚡ Fast**: Optimized for performance with async validation support
+- **🎨 Flexible**: Three-layer architecture (Mutators → Validators → Transformers)
+- **🧩 Extensible**: Plugin system for custom functionality
+- **🌍 Internationalized**: Built-in translation support
+- **🔗 Framework-Agnostic**: Works with any JavaScript/TypeScript project
+
+## 🚀 Quick Example
+
+```ts
+import { v } from "@warlock.js/seal";
+
+// Define a schema
+const userSchema = v.object({
+  name: v.string().required().minLength(2).trim(),
+  email: v.string().email().required().lowercase(),
+  age: v.int().min(18).max(120),
+});
+
+// Validate data
+const result = await v.validate(userSchema, {
+  name: "  John Doe  ",
+  email: "JOHN@EXAMPLE.COM", 
+  age: 25,
+});
+
+if (result.isValid) {
+  console.log("Valid data:", result.data);
+  // Output: { name: "John Doe", email: "john@example.com", age: 25 }
+} else {
+  console.log("Validation errors:", result.errors);
+}
+```
+
+## 🎯 Why Seal?
+
+### **Three-Layer Architecture**
+Seal's unique architecture separates concerns for maximum clarity:
+
+- **🔧 Mutators**: Transform and clean data
+- **✅ Validators**: Check data against rules  
+- **🎨 Transformers**: Format final output
+
+### **TypeScript First**
+```ts
+import { v, type Infer } from "@warlock.js/seal";
+
+const userSchema = v.object({
+  name: v.string().required(),
+  email: v.string().email().required(),
+});
+
+// TypeScript knows the exact shape!
+type User = Infer<typeof userSchema>;
+// User = { name: string; email: string }
+```
+
+### **Framework Agnostic**
+Use Seal anywhere:
+- **Node.js APIs** - Express, Fastify, Koa
+- **Frontend Apps** - React, Vue, Angular
+- **Full-Stack** - Next.js, Nuxt, SvelteKit
+- **Warlock.js** - Deep integration available
+
+## 🆚 Comparison
+
+| Feature | Seal | Zod | Yup | Joi |
+|---------|------|-----|-----|-----|
+| TypeScript | ✅ Native | ✅ | ✅ | ❌ |
+| Data Transformation | ✅ | ❌ | ❌ | ❌ |
+| Plugin System | ✅ | ❌ | ❌ | ❌ |
+| Async Validation | ✅ | ❌ | ❌ | ✅ |
+| Bundle Size | 🟢 Small | 🟡 Medium | 🟡 Medium | 🟡 Medium |
+
+## 🌟 What's Next?
+
+- [📦 Installation](./installation) - Get started in minutes
+- [⚡ Quick Start](./quick-start) - Your first validation
+- [🧠 Core Concepts](../concepts/three-layer-architecture) - Understanding the architecture
+
+Ready to start validating? Let's go! 🚀

@@ -1,0 +1,140 @@
+---
+title: Plugins
+description: Extending validators with plugins
+---
+
+# Plugins
+
+Extending validators with plugins for additional functionality.
+
+---
+
+## Basic Plugin Usage
+
+### Using Built-in Plugins
+
+```typescript
+import { hexColorRule } from "@warlock.js/seal-plugins/colors";
+
+v.string().useRule(hexColorRule, { errorMessage: "Invalid hex color" })
+```
+
+### Using Custom Plugins
+
+```typescript
+import { VALID_RULE, invalidRule } from "@warlock.js/seal";
+
+const customPlugin = {
+  name: "customPlugin",
+  defaultErrorMessage: "The :input must be at least 5 characters",
+  requiresValue: true,
+  validate(value, context) {
+    if (value.length < 5) {
+      return invalidRule(this, context);
+    }
+    return VALID_RULE;
+  }
+};
+
+v.string().useRule(customPlugin)
+```
+
+---
+
+## Advanced Plugin Usage
+
+### Plugin with Options
+
+```typescript
+import { VALID_RULE, invalidRule } from "@warlock.js/seal";
+
+const pluginWithOptions = {
+  name: "minLength",
+  defaultErrorMessage: "The :input must be at least :minLength characters",
+  requiresValue: true,
+  validate(value, context) {
+    const minLength = context.options.minLength;
+    if (value.length < minLength) {
+      return invalidRule(this, context);
+    }
+    return VALID_RULE;
+  }
+};
+
+v.string().useRule(pluginWithOptions, {
+  minLength: 5
+})
+```
+
+### Async Plugins
+
+```typescript
+import { VALID_RULE, invalidRule } from "@warlock.js/seal";
+
+const asyncPlugin = {
+  name: "asyncPlugin",
+  defaultErrorMessage: "The :input value already exists",
+  requiresValue: true,
+  async validate(value, context) {
+    const exists = await checkValueExists(value);
+    if (exists) {
+      return invalidRule(this, context);
+    }
+    return VALID_RULE;
+  }
+};
+
+v.string().useRule(asyncPlugin)
+```
+
+---
+
+## Real-World Examples
+
+### Color Validation Plugin
+
+```typescript
+import { hexColorRule, rgbColorRule } from "@warlock.js/seal-plugins/colors";
+
+const colorSchema = v.string().useRule(hexColorRule, {
+  errorMessage: "Must be a valid hex color"
+});
+
+// Or RGB color
+const rgbColorSchema = v.string().useRule(rgbColorRule, {
+  errorMessage: "Must be a valid RGB color"
+});
+```
+
+### Custom Business Logic Plugin
+
+```typescript
+import { VALID_RULE, invalidRule } from "@warlock.js/seal";
+
+const businessRule = {
+  name: "businessRule",
+  defaultErrorMessage: "The :input must meet business requirements",
+  requiresValue: true,
+  validate(value, context) {
+    // Check business rules
+    if (value.includes("admin")) {
+      return invalidRule(this, context);
+    }
+    
+    if (value.length < 3) {
+      return invalidRule(this, context);
+    }
+    
+    return VALID_RULE;
+  }
+};
+
+v.string().useRule(businessRule)
+```
+
+---
+
+## See Also
+
+- [Custom Rules](./custom-rules) - Create custom rules
+- [Extending Validators](./extending-validators) - Creating custom validators

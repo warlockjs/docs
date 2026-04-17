@@ -1,0 +1,211 @@
+---
+title: Date Transformers
+description: Format validated dates for output
+sidebar_position: 10
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Date Transformers
+
+Date transformers format validated dates for final output. They run after validation passes and typically change the data type (Date → String/Number).
+
+---
+
+## All Transformers
+
+<div className="methods-grid">
+
+<MethodCard
+  name="toISOString()"
+  description="Convert to ISO string"
+  href="#toisostring"
+/>
+
+<MethodCard
+  name="toTimestamp()"
+  description="Convert to Unix timestamp"
+  href="#totimestamp"
+/>
+
+<MethodCard
+  name="toFormat()"
+  description="Convert to custom format"
+  href="#toformat"
+/>
+
+<MethodCard
+  name="toDateOnly()"
+  description="Convert to date only (YYYY-MM-DD)"
+  href="#todateonly"
+/>
+
+<MethodCard
+  name="toTimeOnly()"
+  description="Convert to time only (HH:MM:SS)"
+  href="#totimeonly"
+/>
+
+</div>
+
+---
+
+## ISO Format
+
+### toISOString() {#toisostring}
+
+Convert date to ISO string format
+
+```typescript
+v.date().toISOString()
+// Input: Date("2024-12-25") → Output: "2024-12-25T00:00:00.000Z"
+```
+
+---
+
+## Timestamp
+
+### toTimestamp() {#totimestamp}
+
+Convert date to Unix timestamp (milliseconds)
+
+```typescript
+v.date().toTimestamp()
+// Input: Date("2024-12-25") → Output: 1735084800000
+```
+
+---
+
+## Custom Format
+
+### toFormat(format) {#toformat}
+
+Convert date to specific format using dayjs
+
+```typescript
+v.date().toFormat('YYYY-MM-DD')
+// Input: Date("2024-12-25") → Output: "2024-12-25"
+
+v.date().toFormat('DD/MM/YYYY')
+// Input: Date("2024-12-25") → Output: "25/12/2024"
+
+v.date().toFormat('YYYY-MM-DD HH:mm:ss')
+// Input: Date("2024-12-25 14:30:00") → Output: "2024-12-25 14:30:00"
+```
+
+### toDateOnly() {#todateonly}
+
+Convert to date only (remove time, returns YYYY-MM-DD)
+
+```typescript
+v.date().toDateOnly()
+// Input: Date("2024-12-25 14:30:00") → Output: "2024-12-25"
+```
+
+### toTimeOnly() {#totimeonly}
+
+Convert to time only (returns HH:MM:SS)
+
+```typescript
+v.date().toTimeOnly()
+// Input: Date("2024-12-25 14:30:00") → Output: "14:30:00"
+```
+
+---
+
+## Examples
+
+### ISO String Output
+
+```typescript
+const dateSchema = v.date()
+  .required()
+  .fromToday()
+  .toISOString();
+
+const result = await validate(dateSchema, '2024-12-25');
+// Result: { isValid: true, data: "2024-12-25T00:00:00.000Z" }
+```
+
+### Timestamp Output
+
+```typescript
+const timestampSchema = v.date()
+  .required()
+  .fromToday()
+  .toTimestamp();
+
+const result = await validate(timestampSchema, '2024-12-25');
+// Result: { isValid: true, data: 1735084800000 }
+```
+
+### Custom Format Output
+
+```typescript
+const formattedSchema = v.date()
+  .required()
+  .fromToday()
+  .toFormat('YYYY-MM-DD');
+
+const result = await validate(formattedSchema, '2024-12-25');
+// Result: { isValid: true, data: "2024-12-25" }
+```
+
+### Date Only Output
+
+```typescript
+const dateOnlySchema = v.date()
+  .required()
+  .fromToday()
+  .toDateOnly();
+
+const result = await validate(dateOnlySchema, '2024-12-25 14:30:00');
+// Result: { isValid: true, data: "2024-12-25" }
+```
+
+### Time Only Output
+
+```typescript
+const timeOnlySchema = v.date()
+  .required()
+  .toTimeOnly();
+
+const result = await validate(timeOnlySchema, '2024-12-25 14:30:00');
+// Result: { isValid: true, data: "14:30:00" }
+```
+
+---
+
+## Important Notes
+
+### Transformers are Final Output
+
+Transformers change the data type and are typically used as the final step:
+
+```typescript
+// ✅ Correct - Transformer as final output
+v.date().required().fromToday().toISOString()
+
+// ❌ Incorrect - Don't chain transformers
+v.date().toISOString().toFormat('YYYY-MM-DD') // Won't work!
+```
+
+### Order Matters
+
+Mutators → Validators → Transformers
+
+```typescript
+v.date()
+  .toStartOfDay()      // Mutator: Transform date
+  .fromToday()         // Validator: Check if valid
+  .toISOString()       // Transformer: Format output
+```
+
+---
+
+## See Also
+
+- [Date Validator Overview](./) - Return to overview
+- [Date Mutators](./mutators) - Data transformation methods
+- [Date Validators](./validators) - Validation rules
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding transformers

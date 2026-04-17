@@ -1,0 +1,254 @@
+---
+sidebar_position: 11
+---
+
+# Cache Stampede Prevention
+
+A cache stampede occurs when multiple concurrent requests all miss the cache simultaneously, causing all to execute the same expensive operation. The `remember()` method prevents this with automatic locking.
+
+When a cached value expires and 100s or 1000s of requests arrive at once, they all execute the expensive operation (database query, API call, computation) instead of waiting for one request to compute and cache the result.
+
+## The Solution: remember()
+
+The `remember()` method prevents stampedes by using automatic locking:
+
+```ts
+// ✅ STAMPEDE-PROTECTED
+import { cache } from "@warlock.js/cache";
+
+async function getPopularPosts() {
+  return await cache.remember("posts.popular", 3600, async () => {
+    // Only ONE request executes this, even with 1000 concurrent requests
+    return await db.query("SELECT * FROM posts ORDER BY views DESC LIMIT 10");
+  });
+}
+```
+
+## How It Works
+
+When multiple requests call `remember()` for the same key simultaneously:
+
+1. **First request**: Cache miss → Creates lock → Executes callback → Stores result → Releases lock
+2. **Concurrent requests**: Cache miss → See existing lock → Wait for lock → Get cached result (don't execute callback)
+
+### Lock Mechanism
+
+Internally, `remember()` uses a Promise-based locking mechanism:
+
+```ts
+// Simplified internal logic
+protected locks: Map<string, Promise<any>> = new Map();
+
+public async remember(key, ttl, callback) {
+  // Check cache first
+  const cached = await this.get(key);
+  if (cached !== null) return cached;
+
+  // Check if another request is already computing
+  const existingLock = this.locks.get(key);
+  if (existingLock) {
+    return existingLock; // Wait for the other request
+  }
+
+  // Create lock and compute
+  const promise = callback()
+    .then(async result => {
+      await this.set(key, result, ttl);
+      this.locks.delete(key);
+      return result;
+    })
+    .catch(err => {
+      this.locks.delete(key);
+      throw err;
+    });
+
+  this.locks.set(key, promise);
+  return promise;
+}
+```
+
+## Primary Example: Product Catalog
+
+The `remember()` pattern with a product catalog fetch is the most common real-world scenario:
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+async function getProductsByCategory(categoryId: number) {
+  return await cache.remember(
+    `products.category.${categoryId}`,
+    CACHE_FOR.HALF_HOUR,
+    async () => {
+      // Only ONE request executes this, even with 1000 concurrent requests
+      return await db.products.findByCategory(categoryId);
+    }
+  );
+}
+```
+
+When multiple requests arrive for the same cache key simultaneously:
+1. First request: Cache miss → Creates lock → Fetches products → Caches result
+2. Concurrent requests: Cache miss → See existing lock → Wait → Get cached result
+
+### Other Usage Examples
+
+```ts
+// Featured products
+async function getFeaturedProducts() {
+  return await cache.remember("products.featured", CACHE_FOR.ONE_HOUR, async () => {
+    return await db.products.findFeatured();
+  });
+}
+
+// Product details
+async function getProduct(productId: number) {
+  return await cache.remember(`products.${productId}`, CACHE_FOR.ONE_DAY, async () => {
+    return await db.products.findById(productId);
+  });
+}
+
+// Category metadata
+async function getCategory(categoryId: number) {
+  return await cache.remember(`categories.${categoryId}`, CACHE_FOR.ONE_DAY, async () => {
+    return await db.categories.findById(categoryId);
+  });
+}
+```
+
+### With Cache Tags
+
+```ts
+async function getProductsByCategory(categoryId: number) {
+  const tagged = cache.tags([`category.${categoryId}`, "products"]);
+  
+  return await tagged.remember(
+    `products.category.${categoryId}`,
+    CACHE_FOR.HALF_HOUR,
+    async () => {
+      return await db.products.findByCategory(categoryId);
+    }
+  );
+}
+
+// Invalidate when category is updated
+async function updateCategory(categoryId: number, data: any) {
+  await db.categories.update(categoryId, data);
+  await cache.tags([`category.${categoryId}`]).invalidate();
+}
+```
+
+## Single-Process vs Distributed
+
+### Single-Process Locking (Memory, File Drivers)
+
+For memory and file drivers, locking works within a single Node.js process:
+
+- ✅ Prevents stampedes within the same process
+- ⚠️ Multiple processes can still cause stampedes (each has its own locks)
+- ✅ Perfect for single-server applications
+
+### Distributed Locking (Redis Driver)
+
+For Redis driver, you can implement distributed locking using `setNX()`:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function getDataWithDistributedLock(key: string) {
+  // Check cache first
+  const cached = await cache.get(key);
+  if (cached !== null) return cached;
+
+  // Try to acquire distributed lock (only works on Redis)
+  const lockKey = `lock:${key}`;
+  const acquired = await cache.setNX(lockKey, "1", 30);
+
+  if (!acquired) {
+    // Another process is computing, wait a bit and retry
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return await cache.get(key); // Should be cached now
+  }
+
+  try {
+    // We have the lock, compute the value
+    const result = await expensiveOperation();
+    await cache.set(key, result, 3600);
+    return result;
+  } finally {
+    await cache.remove(lockKey);
+  }
+}
+```
+
+## Error Handling
+
+The `remember()` method properly handles errors:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function getData() {
+  try {
+    return await cache.remember("key", 3600, async () => {
+      // If this throws, the lock is released and error is propagated
+      return await riskyOperation();
+    });
+  } catch (error) {
+    // Handle error
+    console.error("Failed to get data:", error);
+    throw error;
+  }
+}
+```
+
+If the callback throws an error:
+- The lock is automatically released
+- Waiting requests will see the error
+- The cache is not updated
+
+## Performance Benefits
+
+### Without Stampede Prevention
+
+```
+1000 concurrent requests → 1000 database queries → Database overloaded
+```
+
+### With Stampede Prevention
+
+```
+1000 concurrent requests → 1 database query → 999 requests wait → All get cached result
+```
+
+## Best Practices
+
+1. **Always use `remember()` for expensive operations**: Database queries, API calls, computations
+2. **Set appropriate TTLs**: Balance between freshness and cache efficiency
+3. **Handle errors gracefully**: Ensure callbacks don't fail silently
+4. **Use for frequently accessed data**: `remember()` is most valuable for hot paths
+5. **Consider distributed systems**: Use Redis with distributed locking for multi-server setups
+
+## When NOT to Use remember()
+
+- **Simple get/set operations**: Just use `get()` and `set()` directly
+- **Operations that must always execute**: If you need every request to trigger the operation
+- **Very short TTLs**: If cache expires every few seconds, stampedes are less likely
+- **Idempotent operations**: If the operation is safe to execute multiple times
+
+## Best Practices
+
+1. **Always use `remember()` for expensive operations**: Database queries, API calls, computations
+2. **Set appropriate TTLs**: Balance between freshness and cache efficiency
+3. **Handle errors gracefully**: Ensure callbacks don't fail silently
+4. **Use for frequently accessed data**: `remember()` is most valuable for hot paths
+5. **Combine with tags**: Use tags for flexible invalidation with `remember()`
+
+## Troubleshooting
+
+- **Still seeing stampedes?** Ensure you're using `remember()` consistently, not manual get/set
+- **Locks not working?** Check that you're not bypassing `remember()` with direct `get()` calls
+- **Errors in callback?** Errors release locks but don't cache values — handle them appropriately
+- **Distributed systems?** Use Redis driver with `setNX()` for true distributed locking
+
+See [Best Practices](./best-practices) for more caching patterns.
+

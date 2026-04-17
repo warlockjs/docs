@@ -1,0 +1,149 @@
+---
+sidebar_position: 8
+---
+
+# File Cache Driver
+
+The File Cache Driver stores cached data as files on disk. Each cache key is a directory containing a `cache.json` file.
+
+## When to Use
+- Local development
+- Need persistence across restarts, but don't want to set up Redis
+- Small to medium-sized cache needs
+
+## Best For
+- Caching API responses, config, or data that should survive restarts
+- Environments where Redis is not available
+
+## Limitations
+- Slower than memory or Redis for large caches
+- Not suitable for distributed/multi-server setups
+- Manual cleanup of expired files only happens on access
+
+## Alternatives
+- [Memory Cache Driver](./memory): Fast, but not persistent
+- [Redis Cache Driver](./redis): Distributed, production-grade
+
+## Configuration
+
+```ts title="src/config/cache.ts"
+import { env } from "@mongez/dotenv";
+import { join } from "path";
+import { CacheConfigurations, FileCacheDriver, CACHE_FOR } from "@warlock.js/cache";
+
+const cacheConfigurations: CacheConfigurations = {
+  drivers: {
+    file: FileCacheDriver,
+  },
+  default: env("CACHE_DRIVER", "file"),
+  options: {
+    file: {
+      globalPrefix: "my-app",
+      ttl: CACHE_FOR.ONE_DAY,
+      directory: join(process.cwd(), "storage", "cache"), // Absolute path
+      fileName: "data.json",
+    },
+  },
+};
+
+export default cacheConfigurations;
+```
+
+## Options {#options}
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `directory` | string \| Function | `storagePath("cache")` | Directory for cache files |
+| `fileName` | string \| Function | `"cache.json"` | File name for cache data |
+| `globalPrefix` | string \| Function | `undefined` | Global prefix for all cache keys |
+| `ttl` | number | `0` | Default TTL in seconds (0 = no expiration) |
+
+### Directory Configuration
+
+The `directory` option should be an **absolute path** to ensure consistent behavior regardless of where the process is started:
+
+```ts
+import { join } from "path";
+
+{
+  directory: join(process.cwd(), "storage", "cache"), // Absolute path
+  // OR
+  directory: join(__dirname, "..", "storage", "cache"), // From project root
+  // OR
+  directory: "/var/cache/myapp", // Explicit absolute path
+  // OR
+  directory: () => join(process.cwd(), "cache", environment()), // Dynamic absolute path
+}
+```
+
+:::tip
+Always use absolute paths for the `directory` option. Relative paths can cause issues depending on where your process is started.
+:::
+
+### File Name Configuration
+
+```ts
+{
+  fileName: "data.json",       // Custom file name
+  // OR
+  fileName: () => `cache-${Date.now()}.json`, // Dynamic file name
+}
+```
+
+### Global Prefix
+
+```ts
+{
+  globalPrefix: "myapp",       // Static prefix
+  // OR
+  globalPrefix: () => `app-${environment()}`, // Dynamic prefix
+}
+```
+
+### TTL Configuration
+
+```ts
+import { CACHE_FOR } from "@warlock.js/cache";
+
+{
+  ttl: 0,                      // No expiration (default)
+  // OR
+  ttl: CACHE_FOR.ONE_HOUR,     // 1 hour
+  // OR
+  ttl: CACHE_FOR.ONE_DAY,      // 24 hours
+}
+```
+
+## Example Usage
+
+## Storing and Retrieving Data
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+await cache.set("products.555.details", { name: "Monitor", specs: { size: "27inch" } }, CACHE_FOR.ONE_HOUR);
+const details = await cache.get("products.555.details");
+```
+
+## File Structure
+
+The file driver creates a directory structure like this:
+
+```
+/var/cache/myapp/                 (or your specified directory)
+├── myapp.products.555.details/
+│   └── cache.json
+├── myapp.users.42.profile/
+│   └── cache.json
+└── myapp.cart.session-xyz/
+    └── cache.json
+```
+
+Each cache entry is stored in its own directory with a JSON file containing the data and metadata.
+
+## Expired Cache
+- Expired cache is only removed when accessed.
+- For automatic cleanup, consider a background job or use Redis.
+
+## Troubleshooting
+- **Cache not persistent?** Check your `directory` path and permissions.
+- **Performance issues?** For large caches, use [Redis](./redis) or [Memory](./memory) drivers.

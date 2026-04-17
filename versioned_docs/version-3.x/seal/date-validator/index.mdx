@@ -1,0 +1,139 @@
+---
+title: Date Validator
+description: Comprehensive date and time validation and transformation
+sidebar_position: 7
+---
+
+# Date Validator
+
+The Date Validator provides comprehensive date and time validation and transformation capabilities. It includes all methods from BaseValidator, plus date-specific validation rules, mutators, and transformers.
+
+---
+
+## Quick Example
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const schema = v.object({
+  birthDate: v.date().required().beforeToday().maxAge(120),
+  eventDate: v.date().required().fromToday().after('2024-01-01'),
+  appointmentTime: v.date().required().betweenHours(9, 17)
+});
+```
+
+---
+
+## Overview
+
+This validator provides **80+ methods** organized into:
+
+### 🔧 Mutators (13 methods)
+Transform date values before validation:
+- **Time Adjustment**: `toStartOfDay()`, `toEndOfDay()`, `toUTC()`
+- **Date Arithmetic**: `addDays()`, `addMonths()`, `addYears()`, `addHours()`
+- **Period Boundaries**: `toStartOfMonth()`, `toEndOfMonth()`, `toStartOfYear()`, `toEndOfYear()`
+
+👉 [View All Mutators →](./mutators)
+
+### ✅ Validators (50+ methods)
+Validate date values and ranges:
+- **Date Comparison**: `min()`, `max()`, `before()`, `after()`, `between()`, `today()`, `fromToday()`, `beforeToday()`, `afterToday()`, `past()`, `future()`
+- **Time Validation**: `fromHour()`, `beforeHour()`, `betweenHours()`, `fromMinute()`, `beforeMinute()`, `betweenMinutes()`, `betweenTimes()`
+- **Age Validation**: `age()`, `minAge()`, `maxAge()`, `betweenAge()`, `birthday()`
+- **Day Validation**: `weekDay()`, `weekdays()`, `weekend()`, `businessDay()`
+- **Period Validation**: `month()`, `year()`, `betweenYears()`, `quarter()`, `leapYear()`
+- **Relative Dates**: `withinDays()`, `withinPastDays()`, `withinFutureDays()`
+- **Field Comparison**: `sameAsField()`, `minSibling()`, `maxSibling()`, `beforeSibling()`, `afterSibling()`
+
+👉 [View All Validators →](./validators)
+
+### 🎨 Transformers (5 methods)
+Format validated dates for output:
+- **ISO Format**: `toISOString()`
+- **Timestamp**: `toTimestamp()`
+- **Custom Format**: `toFormat()`, `toDateOnly()`, `toTimeOnly()`
+
+👉 [View All Transformers →](./transformers)
+
+---
+
+## Common Patterns
+
+### Birth Date Validation
+```typescript
+const birthDateSchema = v.date()
+  .required()
+  .beforeToday()
+  .maxAge(120);
+
+const result = await validate(birthDateSchema, '1990-01-01');
+// Result: { isValid: true, data: Date('1990-01-01') }
+```
+
+### Event Date Validation
+```typescript
+const eventDateSchema = v.date()
+  .required()
+  .fromToday()
+  .after('2024-01-01');
+
+const result = await validate(eventDateSchema, '2024-12-25');
+// Result: { isValid: true, data: Date('2024-12-25') }
+```
+
+### Appointment Time Validation
+```typescript
+const appointmentSchema = v.date()
+  .required()
+  .fromToday()
+  .betweenHours(9, 17);
+
+const result = await validate(appointmentSchema, '2024-12-25 14:30');
+// Result: { isValid: true, data: Date('2024-12-25 14:30') }
+```
+
+### Age Verification
+```typescript
+const ageSchema = v.date()
+  .required()
+  .beforeToday()
+  .minAge(18)
+  .maxAge(65);
+
+const result = await validate(ageSchema, '1990-01-01');
+// Result: { isValid: true, data: Date('1990-01-01') }
+```
+
+### Date with Transformation
+```typescript
+const dateSchema = v.date()
+  .required()
+  .fromToday()
+  .toISOString();
+
+const result = await validate(dateSchema, '2024-12-25');
+// Result: { isValid: true, data: '2024-12-25T00:00:00.000Z' }
+```
+
+---
+
+## Inherited Methods
+
+The Date Validator inherits all methods from [BaseValidator](../base-validator/), including:
+
+### From BaseValidator
+- **Core validation**: `required()`, `present()`, `optional()`, `forbidden()`
+- **Field comparison**: `equal()`, `sameAs()`, `differentFrom()`
+- **Conditional validation**: `when()`, `requiredIf()`, `presentIf()`, etc.
+- **Advanced methods**: `refine()`, `default()`, `label()`, `toJSON()`, `outputAs()`, etc.
+
+---
+
+## See Also
+
+- [Mutators](./mutators) - Data transformation methods
+- [Validators](./validators) - Validation rules
+- [Transformers](./transformers) - Output formatting methods
+- [Base Validator](../base-validator/) - Core validation methods
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding mutators, validators, and transformers

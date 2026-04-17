@@ -1,0 +1,190 @@
+---
+title: Any Validator Overview
+description: Validate any value type with BaseValidator methods
+sidebar_position: 13
+---
+
+# Any Validator
+
+The Any Validator is a minimal validator that accepts any value type. It extends `BaseValidator` and provides access to all base validation methods without type-specific constraints.
+
+---
+
+## Basic Usage
+
+```typescript
+import { v, validate } from "@warlock.js/seal";
+
+const schema = v.any()
+  .required()
+  .equal("hello");
+
+const result = await validate(schema, "hello");
+// Result: { isValid: true, data: "hello" }
+```
+
+---
+
+## What's Included
+
+The Any Validator extends `BaseValidator` and provides access to all base validation methods:
+
+- **Basic Rules**: `required()`, `optional()`, `present()`, `nullable()`
+- **Comparison**: `equal()`, `notEqual()`, `sameAs()`, `differentFrom()`
+- **Type Checking**: `typeOf()`, `instanceOf()`
+- **Advanced**: `when()`, `refine()`, `transform()`
+
+Since `AnyValidator` has no type-specific methods, it's perfect for when you need flexible validation that doesn't enforce a specific data type upfront.
+
+---
+
+## Common Patterns
+
+### Basic Validation
+
+```typescript
+const schema = v.any()
+  .required()
+  .refine((value) => {
+    // Return undefined if valid, error message if invalid
+    if (value === null) {
+      return "Value cannot be null";
+    }
+    return undefined;
+  });
+
+const result = await validate(schema, "value");
+// Result: { isValid: true, data: "value" }
+```
+
+### Value Comparison
+
+```typescript
+const schema = v.any()
+  .required()
+  .equal("expected-value");
+
+const result = await validate(schema, "expected-value");
+// Result: { isValid: true, data: "expected-value" }
+```
+
+### Conditional Validation
+
+```typescript
+const schema = v.any()
+  .required()
+  .when("status", "active", (validator) => {
+    return validator.equal("enabled");
+  });
+
+const result = await validate(schema, "enabled", {
+  status: "active"
+});
+// Result: { isValid: true, data: "enabled" }
+```
+
+### Type Checking
+
+```typescript
+const schema = v.any()
+  .required()
+  .typeOf("string");
+
+const result = await validate(schema, "hello");
+// Result: { isValid: true, data: "hello" }
+```
+
+---
+
+## When to Use
+
+Use `v.any()` when you need:
+
+1. **Flexible validation** - No type constraints upfront
+2. **Custom validation logic** - Using `refine()` or `when()` methods
+3. **Generic schemas** - Validating dynamic or unknown structures
+4. **Base methods only** - Access to BaseValidator methods without type-specific rules
+
+## When NOT to Use
+
+Avoid `v.any()` when you need:
+
+1. **Type-specific validation** - Use `v.string()`, `v.number()`, `v.date()`, etc.
+2. **Mutators** - Use type-specific validators like `v.string()` for string operations
+3. **Transformers** - Use type-specific validators like `v.date()` for date formatting
+
+---
+
+## Examples
+
+### Dynamic Type Validation
+
+```typescript
+function createValidator(type: string) {
+  const baseSchema = v.any().required();
+  
+  switch (type) {
+    case "string":
+      return baseSchema.typeOf("string");
+    case "number":
+      return baseSchema.typeOf("number");
+    default:
+      return baseSchema;
+  }
+}
+
+const stringSchema = createValidator("string");
+const result = await validate(stringSchema, "hello");
+// Result: { isValid: true, data: "hello" }
+```
+
+### Custom Validation Logic
+
+```typescript
+const schema = v.any()
+  .required()
+  .refine((value, context) => {
+    // Return undefined if valid, error message if invalid
+    if (typeof value === "string" && value.length > 10) {
+      return undefined; // Valid
+    }
+    return "Value must be a string longer than 10 characters";
+  });
+
+const result = await validate(schema, "hello world");
+// Result: { isValid: true, data: "hello world" }
+```
+
+### Flexible Conditional Rules
+
+```typescript
+const schema = v.any()
+  .when("role", "admin", (validator) => {
+    return validator.equal("full-access");
+  })
+  .when("role", "user", (validator) => {
+    return validator.equal("limited-access");
+  });
+
+const result = await validate(schema, "full-access", {
+  role: "admin"
+});
+// Result: { isValid: true, data: "full-access" }
+```
+
+---
+
+## Inherited Methods
+
+The Any Validator extends `BaseValidator` and inherits all base validation methods:
+
+[View Base Validator →](../base-validator/)
+
+---
+
+## See Also
+
+- [Base Validator](../base-validator/) - All inherited methods
+- [String Validator](../string-validator/) - String-specific validation
+- [Number Validator](../number-validator/) - Number-specific validation
+- [Scalar Validator](../scalar-validator/) - Scalar value validation

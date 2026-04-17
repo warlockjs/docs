@@ -1,0 +1,849 @@
+---
+title: Required Rules
+description: Conditional required validation based on other fields
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Required Rules
+
+Conditional required validation rules that make fields required based on other field values or presence.
+
+---
+
+## All Methods
+
+<div className="methods-grid">
+<MethodCard
+  name="required()"
+  description="Field must be present and not empty"
+  href="./basic-rules#required"
+/>
+
+<MethodCard
+  name="requiredWith()"
+  description="Required if another field exists"
+  href="#requiredwith"
+/>
+
+<MethodCard
+  name="requiredWithSibling()"
+  description="Required if sibling field exists"
+  href="#requiredwithsibling"
+/>
+
+<MethodCard
+  name="requiredWithout()"
+  description="Required if another field is missing"
+  href="#requiredwithout"
+/>
+
+<MethodCard
+  name="requiredWithoutSibling()"
+  description="Required if sibling field is missing"
+  href="#requiredwithoutsibling"
+/>
+
+<MethodCard
+  name="requiredIf()"
+  description="Required if field equals value"
+  href="#requiredif"
+/>
+
+<MethodCard
+  name="requiredIfSibling()"
+  description="Required if sibling field equals value"
+  href="#requiredifsibling"
+/>
+
+<MethodCard
+  name="requiredUnless()"
+  description="Required unless field equals value"
+  href="#requiredunless"
+/>
+
+<MethodCard
+  name="requiredUnlessSibling()"
+  description="Required unless sibling field equals value"
+  href="#requiredunlesssibling"
+/>
+
+<MethodCard
+  name="requiredIfEmpty()"
+  description="Required if another field is empty"
+  href="#requiredifempty"
+/>
+
+<MethodCard
+  name="requiredIfEmptySibling()"
+  description="Required if sibling field is empty"
+  href="#requiredifemptysibling"
+/>
+
+<MethodCard
+  name="requiredIfNotEmpty()"
+  description="Required if another field is not empty"
+  href="#requiredifnotempty"
+/>
+
+<MethodCard
+  name="requiredIfNotEmptySibling()"
+  description="Required if sibling field is not empty"
+  href="#requiredifnotemptysibling"
+/>
+
+<MethodCard
+  name="requiredIfIn()"
+  description="Required if field value is in array"
+  href="#requiredifin"
+/>
+
+<MethodCard
+  name="requiredIfInSibling()"
+  description="Required if sibling field value is in array"
+  href="#requiredifinsibling"
+/>
+
+<MethodCard
+  name="requiredIfNotIn()"
+  description="Required if field value is not in array"
+  href="#requiredifnotin"
+/>
+
+<MethodCard
+  name="requiredIfNotInSibling()"
+  description="Required if sibling field value is not in array"
+  href="#requiredifnotinsibling"
+/>
+
+<MethodCard
+  name="requiredWithAll()"
+  description="Required if all fields exist"
+  href="#requiredwithall"
+/>
+
+<MethodCard
+  name="requiredWithAllSiblings()"
+  description="Required if all sibling fields exist"
+  href="#requiredwithallsiblings"
+/>
+
+<MethodCard
+  name="requiredWithoutAll()"
+  description="Required if all fields are missing"
+  href="#requiredwithoutall"
+/>
+
+<MethodCard
+  name="requiredWithoutAllSiblings()"
+  description="Required if all sibling fields are missing"
+  href="#requiredwithoutallsiblings"
+/>
+
+<MethodCard
+  name="requiredWithAny()"
+  description="Required if any field exists"
+  href="#requiredwithany"
+/>
+
+<MethodCard
+  name="requiredWithAnySiblings()"
+  description="Required if any sibling field exists"
+  href="#requiredwithanysiblings"
+/>
+
+<MethodCard
+  name="requiredWithoutAny()"
+  description="Required if any field is missing"
+  href="#requiredwithoutany"
+/>
+
+<MethodCard
+  name="requiredWithoutAnySiblings()"
+  description="Required if any sibling field is missing"
+  href="#requiredwithoutanysiblings"
+/>
+
+</div>
+
+---
+
+## Based on Field Presence
+
+### requiredWith()
+
+Value is required if another field exists.
+
+**Signature:**
+```typescript
+requiredWith(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().requiredWith("email")
+
+// Input:  { email: "user@example.com", name: "John" }
+// Output: "John" ✅
+
+// Input:  { email: "user@example.com", name: undefined }
+// Output: Error: "The :input is required" ❌
+
+// Input:  { name: "John" }
+// Output: "John" ✅ (email not present, so name not required)
+```
+
+**Common Use:**
+```typescript
+// Contact form - name required if email provided
+v.object({
+  email: v.string().optional().email(),
+  name: v.string().requiredWith("email")
+});
+```
+
+### requiredWithout()
+
+Value is required if another field is missing.
+
+**Signature:**
+```typescript
+requiredWithout(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().requiredWithout("email")
+
+// Input:  { email: "user@example.com", phone: undefined }
+// Output: undefined ✅ (email present, so phone not required)
+
+// Input:  { phone: "123-456-7890" }
+// Output: "123-456-7890" ✅ (email not present, so phone required)
+
+// Input:  { email: undefined, phone: undefined }
+// Output: Error: "The :input is required" ❌
+```
+
+**Common Use:**
+```typescript
+// Contact form - phone required if no email
+v.object({
+  email: v.string().optional().email(),
+  phone: v.string().requiredWithout("email").phone()
+});
+```
+
+### requiredWithSibling()
+
+Value is required if another sibling field exists (for nested objects).
+
+**Signature:**
+```typescript
+requiredWithSibling(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    email: v.string().optional().email(),
+    name: v.string().requiredWithSibling("email")
+  })
+});
+```
+
+### requiredWithoutSibling()
+
+Value is required if another sibling field is missing (for nested objects).
+
+**Signature:**
+```typescript
+requiredWithoutSibling(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    email: v.string().optional().email(),
+    phone: v.string().requiredWithoutSibling("email")
+  })
+});
+```
+
+---
+
+## Based on Field Value
+
+### requiredIf()
+
+Value is required if another field equals a specific value.
+
+**Signature:**
+```typescript
+requiredIf(field: string, value: any, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().requiredIf("type", "admin")
+
+// Input:  { type: "admin", role: "super-admin" }
+// Output: "super-admin" ✅
+
+// Input:  { type: "admin", role: undefined }
+// Output: Error: "The :input is required" ❌
+
+// Input:  { type: "user", role: undefined }
+// Output: undefined ✅ (type not "admin", so role not required)
+```
+
+**Common Use:**
+```typescript
+// User registration - role required for admin
+v.object({
+  type: v.string().required().oneOf(["admin", "user"]),
+  role: v.string().requiredIf("type", "admin")
+});
+```
+
+### requiredUnless()
+
+Value is required unless another field equals a specific value.
+
+**Signature:**
+```typescript
+requiredUnless(field: string, value: any, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().requiredUnless("type", "guest")
+
+// Input:  { type: "user", name: "John" }
+// Output: "John" ✅
+
+// Input:  { type: "user", name: undefined }
+// Output: Error: "The :input is required" ❌
+
+// Input:  { type: "guest", name: undefined }
+// Output: undefined ✅ (type is "guest", so name not required)
+```
+
+**Common Use:**
+```typescript
+// User registration - name required unless guest
+v.object({
+  type: v.string().required().oneOf(["admin", "user", "guest"]),
+  name: v.string().requiredUnless("type", "guest")
+});
+```
+
+### requiredIfSibling()
+
+Value is required if another sibling field equals a specific value (for nested objects).
+
+**Signature:**
+```typescript
+requiredIfSibling(field: string, value: any, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    type: v.string().required().oneOf(["admin", "user"]),
+    role: v.string().requiredIfSibling("type", "admin")
+  })
+});
+```
+
+### requiredUnlessSibling()
+
+Value is required unless another sibling field equals a specific value (for nested objects).
+
+**Signature:**
+```typescript
+requiredUnlessSibling(field: string, value: any, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    type: v.string().required().oneOf(["admin", "user", "guest"]),
+    name: v.string().requiredUnlessSibling("type", "guest")
+  })
+});
+```
+
+---
+
+## Based on Field Empty State
+
+### requiredIfEmpty()
+
+Value is required if another field is empty.
+
+**Signature:**
+```typescript
+requiredIfEmpty(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().requiredIfEmpty("email")
+
+// Input:  { email: "", phone: "123-456-7890" }
+// Output: "123-456-7890" ✅
+
+// Input:  { email: "", phone: undefined }
+// Output: Error: "The :input is required" ❌
+
+// Input:  { email: "user@example.com", phone: undefined }
+// Output: undefined ✅ (email not empty, so phone not required)
+```
+
+**Common Use:**
+```typescript
+// Contact form - phone required if email empty
+v.object({
+  email: v.string().optional().email(),
+  phone: v.string().requiredIfEmpty("email").phone()
+});
+```
+
+### requiredIfNotEmpty()
+
+Value is required if another field is not empty.
+
+**Signature:**
+```typescript
+requiredIfNotEmpty(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().requiredIfNotEmpty("email")
+
+// Input:  { email: "user@example.com", name: "John" }
+// Output: "John" ✅
+
+// Input:  { email: "user@example.com", name: undefined }
+// Output: Error: "The :input is required" ❌
+
+// Input:  { email: "", name: undefined }
+// Output: undefined ✅ (email empty, so name not required)
+```
+
+**Common Use:**
+```typescript
+// Profile form - name required if email provided
+v.object({
+  email: v.string().optional().email(),
+  name: v.string().requiredIfNotEmpty("email")
+});
+```
+
+### requiredIfEmptySibling()
+
+Value is required if another sibling field is empty (for nested objects).
+
+**Signature:**
+```typescript
+requiredIfEmptySibling(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    email: v.string().optional().email(),
+    phone: v.string().requiredIfEmptySibling("email")
+  })
+});
+```
+
+### requiredIfNotEmptySibling()
+
+Value is required if another sibling field is not empty (for nested objects).
+
+**Signature:**
+```typescript
+requiredIfNotEmptySibling(field: string, errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    email: v.string().optional().email(),
+    name: v.string().requiredIfNotEmptySibling("email")
+  })
+});
+```
+
+---
+
+## Based on Field Value Arrays
+
+### requiredIfIn()
+
+Value is required if another field's value is in the given array.
+
+**Signature:**
+```typescript
+requiredIfIn(field: string, values: any[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().requiredIfIn("type", ["admin", "moderator"])
+
+// Input:  { type: "admin", role: "super-admin" }
+// Output: "super-admin" ✅
+
+// Input:  { type: "admin", role: undefined }
+// Output: Error: "The :input is required" ❌
+
+// Input:  { type: "user", role: undefined }
+// Output: undefined ✅ (type not in ["admin", "moderator"])
+```
+
+**Common Use:**
+```typescript
+// User roles - role required for admin/moderator
+v.object({
+  type: v.string().required().oneOf(["admin", "moderator", "user"]),
+  role: v.string().requiredIfIn("type", ["admin", "moderator"])
+});
+```
+
+### requiredIfNotIn()
+
+Value is required if another field's value is NOT in the given array.
+
+**Signature:**
+```typescript
+requiredIfNotIn(field: string, values: any[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().requiredIfNotIn("type", ["guest", "anonymous"])
+
+// Input:  { type: "user", name: "John" }
+// Output: "John" ✅
+
+// Input:  { type: "user", name: undefined }
+// Output: Error: "The :input is required" ❌
+
+// Input:  { type: "guest", name: undefined }
+// Output: undefined ✅ (type in ["guest", "anonymous"])
+```
+
+**Common Use:**
+```typescript
+// User registration - name required for registered users
+v.object({
+  type: v.string().required().oneOf(["admin", "user", "guest", "anonymous"]),
+  name: v.string().requiredIfNotIn("type", ["guest", "anonymous"])
+});
+```
+
+### requiredIfInSibling()
+
+Value is required if another sibling field's value is in the given array (for nested objects).
+
+**Signature:**
+```typescript
+requiredIfInSibling(field: string, values: any[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    type: v.string().required().oneOf(["admin", "moderator", "user"]),
+    role: v.string().requiredIfInSibling("type", ["admin", "moderator"])
+  })
+});
+```
+
+### requiredIfNotInSibling()
+
+Value is required if another sibling field's value is NOT in the given array (for nested objects).
+
+**Signature:**
+```typescript
+requiredIfNotInSibling(field: string, values: any[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    type: v.string().required().oneOf(["admin", "user", "guest", "anonymous"]),
+    name: v.string().requiredIfNotInSibling("type", ["guest", "anonymous"])
+  })
+});
+```
+
+---
+
+## Multiple Field Rules
+
+### requiredWithAll()
+
+Value is required if all specified fields exist.
+
+**Signature:**
+```typescript
+requiredWithAll(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().requiredWithAll(["email", "phone"])
+
+// Input:  { email: "user@example.com", phone: "123-456-7890", name: "John" }
+// Output: "John" ✅
+
+// Input:  { email: "user@example.com", phone: "123-456-7890", name: undefined }
+// Output: Error: "The :input is required" ❌
+
+// Input:  { email: "user@example.com", name: "John" }
+// Output: "John" ✅ (phone not present, so name not required)
+```
+
+**Common Use:**
+```typescript
+// Complete profile - name required if both email and phone provided
+v.object({
+  email: v.string().optional().email(),
+  phone: v.string().optional().phone(),
+  name: v.string().requiredWithAll(["email", "phone"])
+});
+```
+
+### requiredWithAny()
+
+Value is required if any of the specified fields exists.
+
+**Signature:**
+```typescript
+requiredWithAny(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().requiredWithAny(["email", "phone"])
+
+// Input:  { email: "user@example.com", name: "John" }
+// Output: "John" ✅
+
+// Input:  { email: "user@example.com", name: undefined }
+// Output: Error: "The :input is required" ❌
+
+// Input:  { name: "John" }
+// Output: "John" ✅ (neither email nor phone present)
+```
+
+**Common Use:**
+```typescript
+// Contact form - name required if any contact method provided
+v.object({
+  email: v.string().optional().email(),
+  phone: v.string().optional().phone(),
+  name: v.string().requiredWithAny(["email", "phone"])
+});
+```
+
+### requiredWithAllSiblings()
+
+Value is required if all specified sibling fields exist (for nested objects).
+
+**Signature:**
+```typescript
+requiredWithAllSiblings(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    email: v.string().optional().email(),
+    phone: v.string().optional().phone(),
+    name: v.string().requiredWithAllSiblings(["email", "phone"])
+  })
+});
+```
+
+### requiredWithoutAll()
+
+Value is required if all specified fields are missing.
+
+**Signature:**
+```typescript
+requiredWithoutAll(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().requiredWithoutAll(["email", "phone"])
+
+// Input:  { name: "John" }
+// Output: "John" ✅ (both email and phone missing)
+
+// Input:  { email: "user@example.com", name: undefined }
+// Output: undefined ✅ (email present, so name not required)
+
+// Input:  { name: undefined }
+// Output: Error: "The :input is required" ❌
+```
+
+### requiredWithoutAllSiblings()
+
+Value is required if all specified sibling fields are missing (for nested objects).
+
+**Signature:**
+```typescript
+requiredWithoutAllSiblings(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    email: v.string().optional().email(),
+    phone: v.string().optional().phone(),
+    name: v.string().requiredWithoutAllSiblings(["email", "phone"])
+  })
+});
+```
+
+### requiredWithAnySiblings()
+
+Value is required if any of the specified sibling fields exists (for nested objects).
+
+**Signature:**
+```typescript
+requiredWithAnySiblings(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    email: v.string().optional().email(),
+    phone: v.string().optional().phone(),
+    name: v.string().requiredWithAnySiblings(["email", "phone"])
+  })
+});
+```
+
+### requiredWithoutAny()
+
+Value is required if any of the specified fields is missing.
+
+**Signature:**
+```typescript
+requiredWithoutAny(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+v.string().requiredWithoutAny(["email", "phone"])
+
+// Input:  { email: "user@example.com", name: "John" }
+// Output: "John" ✅ (phone missing)
+
+// Input:  { email: "user@example.com", phone: "123-456-7890", name: undefined }
+// Output: undefined ✅ (both email and phone present)
+
+// Input:  { name: undefined }
+// Output: Error: "The :input is required" ❌
+```
+
+### requiredWithoutAnySiblings()
+
+Value is required if any of the specified sibling fields is missing (for nested objects).
+
+**Signature:**
+```typescript
+requiredWithoutAnySiblings(fields: string[], errorMessage?: string): this
+```
+
+**Example:**
+```typescript
+// Nested object validation
+v.object({
+  user: v.object({
+    email: v.string().optional().email(),
+    phone: v.string().optional().phone(),
+    name: v.string().requiredWithoutAnySiblings(["email", "phone"])
+  })
+});
+```
+
+---
+
+## Chaining Examples
+
+```typescript
+// Complex conditional validation
+v.string()
+  .requiredIf("type", "admin")
+  .requiredIfNotEmpty("email")
+  .requiredWithAny(["phone", "address"])
+  .min(3)
+  .max(50)
+```
+
+---
+
+## Real-World Examples
+
+### User Registration Form
+
+```typescript
+const registrationSchema = v.object({
+  type: v.string().required().oneOf(["admin", "user", "guest"]),
+  email: v.string().optional().email(),
+  phone: v.string().optional().phone(),
+  name: v.string().requiredUnless("type", "guest"),
+  role: v.string().requiredIf("type", "admin"),
+  address: v.string().requiredWithAll(["email", "phone"])
+});
+```
+
+### Contact Form
+
+```typescript
+const contactSchema = v.object({
+  email: v.string().optional().email(),
+  phone: v.string().optional().phone(),
+  name: v.string().requiredWithAny(["email", "phone"]),
+  message: v.string().required().min(10)
+});
+```
+
+---
+
+## See Also
+
+- [Basic Rules](./basic-rules) - Core validation rules
+- [Field Comparison](./field-comparison) - Compare with other fields
+- [Present Rules](./present-rules) - Conditional present validation

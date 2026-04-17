@@ -1,0 +1,281 @@
+---
+sidebar_position: 9
+---
+
+# Event System
+
+The cache event system provides comprehensive observability into every cache operation. Listen to hit, miss, set, removed, and other events to monitor cache behavior.
+
+## Available Events
+
+| Event | When Fired | Event Data |
+|-------|-----------|------------|
+| `hit` | Value retrieved from cache | `{ key, value, driver }` |
+| `miss` | Value not found or expired | `{ key, driver }` |
+| `set` | Value stored in cache | `{ key, value, ttl, driver }` |
+| `removed` | Key removed from cache | `{ key, driver }` |
+| `flushed` | Entire cache cleared | `{ driver }` |
+| `expired` | Key expired (TTL reached) | `{ key, driver }` |
+| `connected` | Driver connected | `{ driver }` |
+| `disconnected` | Driver disconnected | `{ driver }` |
+| `error` | Error occurred | `{ error, driver, key? }` |
+
+## Monitoring and Metrics
+
+Listen to `hit` and `miss` events to track cache performance:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+let hitCount = 0;
+let missCount = 0;
+
+cache.on("hit", ({ key }) => {
+  hitCount++;
+  console.log(`Cache hit: ${key}`);
+});
+
+cache.on("miss", ({ key }) => {
+  missCount++;
+  console.log(`Cache miss: ${key}`);
+});
+
+// Log metrics periodically
+setInterval(() => {
+  const total = hitCount + missCount;
+  const hitRate = total > 0 ? (hitCount / total * 100).toFixed(2) : 0;
+  console.log(`Hit rate: ${hitRate}% (${hitCount} hits, ${missCount} misses)`);
+}, 60000);
+```
+
+For external metrics services:
+
+```ts
+cache.on("hit", ({ key }) => {
+  metricsService.increment("cache.hits", { key });
+});
+
+cache.on("miss", ({ key }) => {
+  metricsService.increment("cache.misses", { key });
+});
+```
+
+### Global vs Driver-Specific Listeners
+
+```ts
+// Global listeners (listen to all drivers)
+cache.on("hit", () => {
+  console.log("Hit on any driver");
+});
+
+// Driver-specific listeners
+const redisDriver = await cache.driver("redis");
+redisDriver.on("hit", () => {
+  console.log("Hit only on Redis driver");
+});
+```
+
+Global listeners are automatically attached to all drivers when they're loaded or switched.
+
+## E-Commerce Monitoring Examples
+
+### Product Cache Metrics
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+const metrics = {
+  productHits: 0,
+  productMisses: 0,
+  cartHits: 0,
+  cartMisses: 0
+};
+
+cache.on("hit", ({ key }) => {
+  if (key.startsWith("products.")) metrics.productHits++;
+  if (key.startsWith("cart.")) metrics.cartHits++;
+});
+
+cache.on("miss", ({ key }) => {
+  if (key.startsWith("products.")) metrics.productMisses++;
+  if (key.startsWith("cart.")) metrics.cartMisses++;
+});
+
+// Report metrics every minute
+setInterval(() => {
+  console.log("Product Cache:", {
+    hits: metrics.productHits,
+    misses: metrics.productMisses,
+    hitRate: (metrics.productHits / (metrics.productHits + metrics.productMisses) * 100).toFixed(2) + "%"
+  });
+}, 60000);
+```
+
+### Error Tracking
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+cache.on("error", ({ error, driver, key }) => {
+  console.error(`Cache error on ${driver}:`, {
+    key,
+    error: error.message
+  });
+  
+  // Send to error tracking service
+  errorTracker.report(error, { driver, key });
+});
+```
+
+### Development Debugging
+
+```ts
+if (process.env.NODE_ENV === "development") {
+  cache.on("hit", ({ key }) => {
+    console.log(`[Cache] HIT: ${key}`);
+  });
+
+  cache.on("miss", ({ key }) => {
+    console.log(`[Cache] MISS: ${key}`);
+  });
+
+  cache.on("set", ({ key, ttl }) => {
+    console.log(`[Cache] SET: ${key} (expires in ${ttl}s)`);
+  });
+}
+```
+
+## Advanced Event Handling
+
+### One-Time Listeners
+
+Listen to an event once, then automatically remove the listener:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// Wait for cache to connect
+cache.once("connected", () => {
+  console.log("Cache connected! Ready to use.");
+  // This listener is automatically removed after firing
+});
+```
+
+### Remove Listeners
+
+Remove specific event listeners:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+const handler = ({ key }) => {
+  console.log(`Key accessed: ${key}`);
+};
+
+// Register
+cache.on("hit", handler);
+cache.on("miss", handler);
+
+// Later, remove
+cache.off("hit", handler);
+cache.off("miss", handler);
+```
+
+### Async Event Handlers
+
+Event handlers can be async - the cache waits for them to complete:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+cache.on("set", async ({ key, value, ttl }) => {
+  // Async operation in event handler
+  await analytics.trackAsync("cache_write", { key, ttl });
+  await updateCacheMetrics({ key, ttl });
+});
+```
+
+## Comprehensive Monitoring Class
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+class CacheMonitor {
+  private stats = {
+    hits: 0,
+    misses: 0,
+    sets: 0,
+    errors: 0
+  };
+
+  constructor() {
+    cache.on("hit", () => this.stats.hits++);
+    cache.on("miss", () => this.stats.misses++);
+    cache.on("set", () => this.stats.sets++);
+    cache.on("error", () => this.stats.errors++);
+  }
+
+  getStats() {
+    const total = this.stats.hits + this.stats.misses;
+    return {
+      hits: this.stats.hits,
+      misses: this.stats.misses,
+      sets: this.stats.sets,
+      errors: this.stats.errors,
+      hitRate: total > 0 ? (this.stats.hits / total * 100).toFixed(2) + "%" : "0%",
+      totalRequests: total
+    };
+  }
+
+  reset() {
+    this.stats = { hits: 0, misses: 0, sets: 0, errors: 0 };
+  }
+}
+
+const monitor = new CacheMonitor();
+setInterval(() => {
+  console.log("Cache Stats:", monitor.getStats());
+}, 60000);
+```
+
+## Event Data Types
+
+All events provide a `driver` field indicating which driver emitted the event:
+
+```ts
+import type { CacheEventData } from "@warlock.js/cache";
+
+cache.on("hit", (data: CacheEventData) => {
+  console.log(`Driver: ${data.driver}`);
+  console.log(`Key: ${data.key}`);
+  console.log(`Value: ${data.value}`);
+});
+
+cache.on("error", (data: CacheEventData) => {
+  console.error(`Error on ${data.driver}:`, data.error);
+});
+```
+
+## Performance Considerations
+
+- **Event handlers are non-blocking**: They run asynchronously and don't block cache operations
+- **Multiple handlers**: You can register multiple handlers for the same event
+- **Error handling**: Errors in event handlers are caught and logged, but don't affect cache operations
+- **Overhead**: Minimal - events are emitted efficiently with minimal performance impact
+
+## Best Practices
+
+1. **Register listeners early**: Set up event listeners before cache operations
+2. **Keep handlers fast**: Event handlers should complete quickly — offload heavy work to background jobs
+3. **Handle errors**: Always handle errors in event handlers gracefully
+4. **Use once() for one-time operations**: Use `once()` instead of manually removing listeners
+5. **Filter by key pattern**: Listen to specific key patterns to reduce noise in production
+
+## Troubleshooting
+
+- **Events not firing?** Ensure listeners are registered before cache operations occur
+- **Too many events?** Filter events in your handlers or register listeners only in development
+- **Performance issues?** Ensure event handlers are fast — consider using a message queue for heavy operations
+
+See [Best Practices](./best-practices) for more monitoring patterns.
+

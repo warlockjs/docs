@@ -1,0 +1,372 @@
+---
+sidebar_position: 10
+---
+
+# Atomic Operations
+
+Atomic operations prevent race conditions in concurrent environments. @warlock.js/cache provides atomic increment, decrement, and set-if-not-exists operations, especially powerful when using the Redis driver.
+
+## The Problem: Race Conditions
+
+Without atomic operations, concurrent requests can cause race conditions:
+
+```ts
+// ❌ RACE CONDITION
+const views = await cache.get("page.views") || 0;
+await cache.set("page.views", views + 1);
+
+// If two requests execute simultaneously:
+// Request 1: reads 100, writes 101
+// Request 2: reads 100, writes 101
+// Result: 101 (should be 102!)
+```
+
+## The Solution: Atomic Operations
+
+With atomic operations, Redis uses native commands that are guaranteed to be atomic:
+
+```ts
+// ✅ ATOMIC (No race condition)
+await cache.increment("page.views", 1);
+
+// Redis uses INCRBY command - guaranteed atomicity
+// Result: Always correct, even with 1000 concurrent requests
+```
+
+## Increment
+
+The `increment()` method atomically increases a numeric value in cache.
+
+### Basic Usage
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// Increment by 1 (default)
+const views = await cache.increment("page.views");
+
+// Increment by specific amount
+const score = await cache.increment("player.score", 10);
+```
+
+### Redis Implementation
+
+When using Redis driver, `increment()` uses the native `INCRBY` command:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// Redis: Uses INCRBY command (atomic at Redis level)
+const count = await cache.increment("counter", 5);
+// Always atomic, even across distributed systems
+```
+
+### Memory Driver Implementation
+
+On memory driver, `increment()` performs get+set operation. While not distributed-atomic, it works correctly for single-process scenarios.
+
+```ts
+// Memory driver: get + set (atomic within single process)
+const count = await cache.increment("counter", 5);
+```
+
+### Use Cases
+
+#### Page View Counters
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function trackPageView(pageId: string) {
+  const views = await cache.increment(`page.${pageId}.views`);
+  return views;
+}
+```
+
+#### API Rate Limiting
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function checkRateLimit(userId: string, limit: number = 100) {
+  const key = `rate_limit.${userId}`;
+  const requests = await cache.increment(key, 1);
+
+  // Set TTL on first request
+  if (requests === 1) {
+    await cache.expire?.(key, 60); // 1-minute window
+  }
+
+  if (requests > limit) {
+    throw new Error("Rate limit exceeded");
+  }
+
+  return { remaining: limit - requests };
+}
+```
+
+#### Voting Systems
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function vote(postId: string, userId: string) {
+  // Check if user already voted (using setNX)
+  const voted = await cache.setNX(`vote.${postId}.${userId}`, "1", 86400);
+  
+  if (!voted) {
+    throw new Error("Already voted");
+  }
+
+  // Increment vote count atomically
+  const votes = await cache.increment(`post.${postId}.votes`);
+  return votes;
+}
+```
+
+## Decrement
+
+The `decrement()` method atomically decreases a numeric value in cache.
+
+### Basic Usage
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// Decrement by 1 (default)
+const remaining = await cache.decrement("api.quota");
+
+// Decrement by specific amount
+const balance = await cache.decrement("user.balance", 50);
+```
+
+### Redis Implementation
+
+When using Redis driver, `decrement()` uses the native `DECRBY` command:
+
+```ts
+// Redis: Uses DECRBY command (atomic at Redis level)
+const remaining = await cache.decrement("quota", 10);
+```
+
+### Use Cases
+
+#### Quota Tracking
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function useQuota(userId: string, amount: number) {
+  const key = `quota.${userId}`;
+  const remaining = await cache.decrement(key, amount);
+
+  if (remaining < 0) {
+    // Restore the quota
+    await cache.increment(key, amount);
+    throw new Error("Insufficient quota");
+  }
+
+  return remaining;
+}
+```
+
+#### Inventory Management
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function reserveItem(itemId: string) {
+  const stock = await cache.decrement(`inventory.${itemId}.stock`);
+
+  if (stock < 0) {
+    // Restore stock
+    await cache.increment(`inventory.${itemId}.stock`);
+    throw new Error("Out of stock");
+  }
+
+  return stock;
+}
+```
+
+## Set If Not Exists (setNX)
+
+The `setNX()` method sets a value only if the key doesn't already exist. This is useful for distributed locking and ensuring idempotency.
+
+:::danger
+`setNX()` is only available when using the Redis driver. It will throw an error if called on other drivers.
+:::
+
+### Basic Usage
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+// Try to set if not exists (Redis uses SET NX command)
+const locked = await cache.setNX("lock:operation", "locked", 30);
+
+if (locked) {
+  // Lock acquired
+  try {
+    await performOperation();
+  } finally {
+    await cache.remove("lock:operation");
+  }
+} else {
+  // Lock already exists
+  throw new Error("Operation already in progress");
+}
+```
+
+### Redis Implementation
+
+When using Redis driver, `setNX()` uses the native `SET NX` command:
+
+```ts
+// Redis: Uses SET with NX option (atomic at Redis level)
+const wasSet = await cache.setNX("key", "value", 60);
+// Returns true if key was set, false if key already existed
+```
+
+### Use Cases
+
+#### Distributed Locks
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function performWithLock(operationId: string) {
+  const lockKey = `lock:${operationId}`;
+  const acquired = await cache.setNX(lockKey, "locked", 300); // 5 minutes
+
+  if (!acquired) {
+    throw new Error("Operation already in progress");
+  }
+
+  try {
+    // Perform critical operation
+    await criticalOperation();
+  } finally {
+    // Always release lock
+    await cache.remove(lockKey);
+  }
+}
+```
+
+#### Idempotency Keys
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function processPayment(paymentId: string, amount: number) {
+  // Ensure payment is only processed once
+  const processed = await cache.setNX(`payment.processed.${paymentId}`, "1", 86400);
+
+  if (!processed) {
+    throw new Error("Payment already processed");
+  }
+
+  // Process payment...
+  await processPaymentLogic(paymentId, amount);
+}
+```
+
+#### Unique Job Processing
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+async function processJob(jobId: string) {
+  // Ensure job is only processed once
+  const processing = await cache.setNX(`job.processing.${jobId}`, "1", 3600);
+
+  if (!processing) {
+    console.log(`Job ${jobId} already being processed`);
+    return;
+  }
+
+  try {
+    await executeJob(jobId);
+    await cache.set(`job.completed.${jobId}`, "1", 86400);
+  } finally {
+    await cache.remove(`job.processing.${jobId}`);
+  }
+}
+```
+
+## Complete Example: Rate Limiting with Atomic Operations
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+class RateLimiter {
+  async checkLimit(userId: string, limit: number, windowSeconds: number) {
+    const key = `rate_limit.${userId}`;
+    
+    // Atomic increment
+    const count = await cache.increment(key, 1);
+
+    // Set expiration on first request
+    if (count === 1) {
+      await cache.set(key, 1, windowSeconds);
+    }
+
+    if (count > limit) {
+      throw new Error(`Rate limit exceeded. Limit: ${limit} per ${windowSeconds}s`);
+    }
+
+    return {
+      allowed: true,
+      remaining: limit - count,
+      resetIn: windowSeconds
+    };
+  }
+
+  async reset(userId: string) {
+    await cache.remove(`rate_limit.${userId}`);
+  }
+}
+```
+
+## Performance Considerations
+
+### Redis Atomic Operations
+
+- **INCRBY/DECRBY**: O(1) operation, extremely fast
+- **SET NX**: O(1) operation, atomic at Redis level
+- **Network overhead**: Minimal - single command per operation
+- **Distributed safety**: Guaranteed atomic even across multiple Redis instances (with proper configuration)
+
+### Memory Driver Operations
+
+- **Get + Set**: Two operations, not distributed-atomic
+- **Single process**: Works correctly for single-process scenarios
+- **Concurrent requests**: May have race conditions if multiple processes access same cache
+
+## Best Practices
+
+1. **Use Redis for distributed systems**: Atomic operations are only truly atomic on Redis in distributed environments
+2. **Set appropriate TTLs**: When using increment/decrement for counters, set TTL to prevent unbounded growth
+3. **Handle negative values**: Consider what happens when decrementing below zero
+4. **Release locks properly**: Always use try/finally when using setNX for locking
+5. **Check return values**: `setNX()` returns boolean indicating success - always check it
+
+## Comparison with Other Libraries
+
+| Feature | @warlock.js/cache | node-cache | cache-manager | keyv | ioredis |
+|---------|-------------------|------------|---------------|------|---------|
+| **Atomic Increment** | ✅ (Redis native) | ❌ | ❌ | ❌ | ✅ (low-level) |
+| **Atomic Decrement** | ✅ (Redis native) | ❌ | ❌ | ❌ | ✅ (low-level) |
+| **Set If Not Exists** | ✅ (Redis native) | ❌ | ❌ | ❌ | ✅ (low-level) |
+| **High-Level API** | ✅ | ❌ | ❌ | ❌ | ❌ |
+
+@warlock.js/cache provides both atomic Redis commands AND a simple, high-level API.
+
+## Troubleshooting
+
+- **setNX() throws error?** Make sure you're using the Redis driver - `setNX()` is Redis-specific
+- **Race conditions still happening?** Ensure you're using the Redis driver for true atomicity in distributed systems
+- **Counters growing unbounded?** Set TTL on counter keys to prevent memory leaks
+- **Negative values?** Handle negative results when decrementing - you may need to check bounds before decrementing
+
+See [Best Practices](./best-practices) for more atomic operation patterns.
+

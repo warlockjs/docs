@@ -1,0 +1,108 @@
+---
+title: Integer Validator
+description: Validate whole numbers (integers)
+sidebar_position: 5
+---
+
+# Integer Validator
+
+The Integer Validator validates that a value is a whole number (integer). It extends the Number Validator and inherits all its methods.
+
+---
+
+## Quick Example
+
+```typescript
+import { v } from "@warlock.js/seal";
+
+const schema = v.object({
+  age: v.integer().required().between(18, 120),
+  quantity: v.integer().required().positive().min(1)
+});
+```
+
+---
+
+## Overview
+
+The Integer Validator extends [Number Validator](./) and adds one additional validation rule:
+
+- **Type Validation**: Ensures the value is a whole number (integer)
+
+---
+
+## Inherited Methods
+
+The Integer Validator inherits **all methods** from [Number Validator](./), including:
+
+### Range Validation
+- `min()` - Minimum value
+- `max()` - Maximum value
+- `between()` - Value between range
+
+### Sign Validation
+- `positive()` - Must be positive
+- `negative()` - Must be negative
+
+### Parity Validation
+- `odd()` - Must be odd
+- `even()` - Must be even
+- `modulo()` - Must be divisible by
+
+### Value Selection
+- `enum()` - Must be one of enum values
+- `oneOf()` / `in()` - Must be one of values
+- `allowsOnly()` - Allow only specified values
+- `forbids()` / `notIn()` - Forbid specified values
+
+### From BaseValidator
+- **Core validation**: `required()`, `present()`, `optional()`, `forbidden()`
+- **Field comparison**: `equal()`, `sameAs()`, `differentFrom()`
+- **Conditional validation**: `when()`, `requiredIf()`, `presentIf()`, etc.
+- **Advanced methods**: `refine()`, `default()`, `label()`, `toJSON()`, `outputAs()`, etc.
+
+---
+
+## Examples
+
+### Age Validation
+```typescript
+const ageSchema = v.integer()
+  .required()
+  .between(18, 120);
+
+const result = await validate(ageSchema, 25);
+// Result: { isValid: true, data: 25 }
+
+const invalidResult = await validate(ageSchema, 25.5);
+// Result: { isValid: false, errors: [...] } // Not an integer
+```
+
+### Quantity Validation
+```typescript
+const quantitySchema = v.integer()
+  .required()
+  .positive()
+  .min(1);
+
+const result = await validate(quantitySchema, 5);
+// Result: { isValid: true, data: 5 }
+```
+
+### Even Number Validation
+```typescript
+const evenSchema = v.integer()
+  .required()
+  .even();
+
+const result = await validate(evenSchema, 6);
+// Result: { isValid: true, data: 6 }
+```
+
+---
+
+## See Also
+
+- [Number Validator](./) - Base number validation
+- [Float Validator](./float) - Decimal number validation
+- [Base Validator](../base-validator/) - Core validation methods

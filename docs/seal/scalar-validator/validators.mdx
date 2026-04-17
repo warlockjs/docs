@@ -1,0 +1,399 @@
+---
+title: Scalar Validators
+description: All scalar validation methods
+sidebar_position: 11
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Scalar Validators
+
+Scalar validators check value membership, acceptance, and conditional validation for scalar values.
+
+---
+
+## All Validators
+
+<div className="methods-grid">
+
+<MethodCard
+  name="enum()"
+  description="Must be enum value"
+  href="#enum"
+/>
+
+<MethodCard
+  name="in()"
+  description="Must be in array"
+  href="#in"
+/>
+
+<MethodCard
+  name="oneOf()"
+  description="Must be one of values"
+  href="#oneof"
+/>
+
+<MethodCard
+  name="allowsOnly()"
+  description="Allowed values only"
+  href="#allowsonly"
+/>
+
+<MethodCard
+  name="forbids()"
+  description="Forbidden values"
+  href="#forbids"
+/>
+
+<MethodCard
+  name="notIn()"
+  description="Must not be in array"
+  href="#notin"
+/>
+
+<MethodCard
+  name="accepted()"
+  description="Must be accepted"
+  href="#accepted"
+/>
+
+<MethodCard
+  name="acceptedIf()"
+  description="Accepted if condition"
+  href="#acceptedif"
+/>
+
+<MethodCard
+  name="acceptedUnless()"
+  description="Accepted unless condition"
+  href="#acceptedunless"
+/>
+
+<MethodCard
+  name="acceptedIfRequired()"
+  description="Accepted if field required"
+  href="#acceptedifrequired"
+/>
+
+<MethodCard
+  name="acceptedIfPresent()"
+  description="Accepted if field present"
+  href="#acceptedifpresent"
+/>
+
+<MethodCard
+  name="acceptedWithout()"
+  description="Accepted without field"
+  href="#acceptedwithout"
+/>
+
+<MethodCard
+  name="declined()"
+  description="Must be declined"
+  href="#declined"
+/>
+
+<MethodCard
+  name="declinedIf()"
+  description="Declined if condition"
+  href="#declinedif"
+/>
+
+<MethodCard
+  name="declinedUnless()"
+  description="Declined unless condition"
+  href="#declinedunless"
+/>
+
+<MethodCard
+  name="declinedIfRequired()"
+  description="Declined if field required"
+  href="#declinedifrequired"
+/>
+
+<MethodCard
+  name="declinedIfPresent()"
+  description="Declined if field present"
+  href="#declinedifpresent"
+/>
+
+<MethodCard
+  name="declinedWithout()"
+  description="Declined without field"
+  href="#declinedwithout"
+/>
+
+</div>
+
+---
+
+## Value Selection
+
+### enum(enumObject) {#enum}
+
+Value must be one of the given enum values. Accepts a TypeScript enum object.
+
+```typescript
+enum Status {
+  Active = "active",
+  Inactive = "inactive",
+  Pending = "pending"
+}
+
+v.scalar().enum(Status)
+// Input: "active" → Valid ✅
+// Input: "unknown" → Invalid ❌
+```
+
+### in(values) {#in}
+
+Value must be in the given array
+
+```typescript
+v.scalar().in(["admin", "user", "guest"])
+// Input: "admin" → Valid ✅
+// Input: "unknown" → Invalid ❌
+```
+
+### oneOf(values) {#oneof}
+
+Alias for `in()`. Value must be one of the given values
+
+```typescript
+v.scalar().oneOf(["option1", "option2", "option3"])
+// Input: "option1" → Valid ✅
+// Input: "option4" → Invalid ❌
+```
+
+### allowsOnly(values) {#allowsonly}
+
+Value must be one of the allowed values
+
+```typescript
+v.scalar().allowsOnly(["value1", "value2", "value3"])
+// Input: "value1" → Valid ✅
+// Input: "value4" → Invalid ❌
+```
+
+### forbids(values) {#forbids}
+
+Value must not be one of the forbidden values
+
+```typescript
+v.scalar().forbids(["spam", "test", "admin"])
+// Input: "user" → Valid ✅
+// Input: "spam" → Invalid ❌
+```
+
+### notIn(values) {#notin}
+
+Alias for `forbids()`. Value must not be in the given array
+
+```typescript
+v.scalar().notIn(["spam", "test"])
+// Input: "user" → Valid ✅
+// Input: "spam" → Invalid ❌
+```
+
+---
+
+## Accepted Values
+
+### accepted() {#accepted}
+
+Value must be accepted (1, "1", true, "true", "yes", "y", "on")
+
+```typescript
+v.scalar().accepted()
+// Input: true, "yes", "1", "on" → Valid ✅
+// Input: false, "no", "0" → Invalid ❌
+```
+
+### acceptedIf(field, value) {#acceptedif}
+
+Accepted if another field equals a specific value
+
+```typescript
+v.scalar().acceptedIf("subscribe", true)
+// If subscribe === true: accepts "yes" → Valid ✅
+// If subscribe === false: any value → Valid ✅
+```
+
+### acceptedUnless(field, value) {#acceptedunless}
+
+Accepted unless another field equals a specific value
+
+```typescript
+v.scalar().acceptedUnless("premium", true)
+// If premium !== true: accepts "yes" → Valid ✅
+// If premium === true: any value → Valid ✅
+```
+
+### acceptedIfRequired(field) {#acceptedifrequired}
+
+Accepted if another field is required
+
+```typescript
+v.scalar().acceptedIfRequired("newsletter")
+// If newsletter is required: accepts "yes" → Valid ✅
+// If newsletter is optional: any value → Valid ✅
+```
+
+### acceptedIfPresent(field) {#acceptedifpresent}
+
+Accepted if another field is present
+
+```typescript
+v.scalar().acceptedIfPresent("newsletter")
+// If newsletter exists: accepts "yes" → Valid ✅
+// If newsletter missing: any value → Valid ✅
+```
+
+### acceptedWithout(field) {#acceptedwithout}
+
+Accepted if another field is missing
+
+```typescript
+v.scalar().acceptedWithout("newsletter")
+// If newsletter missing: accepts "yes" → Valid ✅
+// If newsletter exists: any value → Valid ✅
+```
+
+---
+
+## Declined Values
+
+### declined() {#declined}
+
+Value must be declined (0, "0", false, "false", "no", "n", "off")
+
+```typescript
+v.scalar().declined()
+// Input: false, "no", "0", "off" → Valid ✅
+// Input: true, "yes", "1" → Invalid ❌
+```
+
+### declinedIf(field, value) {#declinedif}
+
+Declined if another field equals a specific value
+
+```typescript
+v.scalar().declinedIf("subscribe", false)
+// If subscribe === false: declines "yes" → Valid ✅
+// If subscribe === true: any value → Valid ✅
+```
+
+### declinedUnless(field, value) {#declinedunless}
+
+Declined unless another field equals a specific value
+
+```typescript
+v.scalar().declinedUnless("premium", false)
+// If premium !== false: declines "yes" → Valid ✅
+// If premium === false: any value → Valid ✅
+```
+
+### declinedIfRequired(field) {#declinedifrequired}
+
+Declined if another field is required
+
+```typescript
+v.scalar().declinedIfRequired("newsletter")
+// If newsletter is required: declines "yes" → Valid ✅
+// If newsletter is optional: any value → Valid ✅
+```
+
+### declinedIfPresent(field) {#declinedifpresent}
+
+Declined if another field is present
+
+```typescript
+v.scalar().declinedIfPresent("newsletter")
+// If newsletter exists: declines "yes" → Valid ✅
+// If newsletter missing: any value → Valid ✅
+```
+
+### declinedWithout(field) {#declinedwithout}
+
+Declined if another field is missing
+
+```typescript
+v.scalar().declinedWithout("newsletter")
+// If newsletter missing: declines "yes" → Valid ✅
+// If newsletter exists: any value → Valid ✅
+```
+
+---
+
+## Examples
+
+### Status Selection
+
+```typescript
+enum Status {
+  Active = "active",
+  Inactive = "inactive",
+  Pending = "pending"
+}
+
+const statusSchema = v.scalar()
+  .required()
+  .enum(Status);
+
+const result = await validate(statusSchema, "active");
+// Result: { isValid: true, data: "active" }
+```
+
+### Role Validation
+
+```typescript
+const roleSchema = v.scalar()
+  .required()
+  .in(["admin", "user", "guest"]);
+
+const result = await validate(roleSchema, "admin");
+// Result: { isValid: true, data: "admin" }
+```
+
+### Terms Acceptance
+
+```typescript
+const termsSchema = v.scalar()
+  .required()
+  .accepted();
+
+const result = await validate(termsSchema, "yes");
+// Result: { isValid: true, data: "yes" }
+```
+
+### Conditional Newsletter
+
+```typescript
+const newsletterSchema = v.scalar()
+  .acceptedIf("subscribe", true);
+
+const result = await validate(newsletterSchema, "yes", {
+  subscribe: true
+});
+// Result: { isValid: true, data: "yes" }
+```
+
+### Forbidden Values
+
+```typescript
+const usernameSchema = v.scalar()
+  .required()
+  .forbids(["admin", "root", "system"]);
+
+const result = await validate(usernameSchema, "john");
+// Result: { isValid: true, data: "john" }
+```
+
+---
+
+## See Also
+
+- [Scalar Validator Overview](./) - Return to overview
+- [Base Validator](../base-validator/) - Inherited methods
+- [Conditional Validation](../concepts/conditional-validation) - Understanding conditional rules

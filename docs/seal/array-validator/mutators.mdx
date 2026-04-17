@@ -1,0 +1,189 @@
+---
+title: Array Mutators
+description: Transform arrays before validation
+sidebar_position: 15
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Array Mutators
+
+Array mutators transform arrays before validation. They modify the array structure and order without changing the data type.
+
+---
+
+## All Mutators
+
+<div className="methods-grid">
+
+<MethodCard
+  name="flip()"
+  description="Reverse array order"
+  href="#flip"
+/>
+
+<MethodCard
+  name="reverse()"
+  description="Reverse array order (alias)"
+  href="#reverse"
+/>
+
+<MethodCard
+  name="sort()"
+  description="Sort array"
+  href="#sort"
+/>
+
+<MethodCard
+  name="onlyUnique()"
+  description="Remove duplicates"
+  href="#onlyunique"
+/>
+
+</div>
+
+---
+
+## Ordering
+
+### flip() {#flip}
+
+Reverse the order of array elements
+
+```typescript
+v.array(v.string()).flip()
+// Input: ["a", "b", "c"] → Output: ["c", "b", "a"]
+```
+
+### reverse() {#reverse}
+
+Alias for `flip()`. Reverse the order of array elements
+
+```typescript
+v.array(v.string()).reverse()
+// Input: ["a", "b", "c"] → Output: ["c", "b", "a"]
+```
+
+### sort(direction?, key?) {#sort}
+
+Sort array elements. For objects, specify a key to sort by.
+
+```typescript
+// Sort strings/numbers
+v.array(v.string()).sort("asc")
+// Input: ["c", "a", "b"] → Output: ["a", "b", "c"]
+
+v.array(v.int()).sort("desc")
+// Input: [3, 1, 2] → Output: [3, 2, 1]
+
+// Sort objects by key
+v.array(v.object({ name: v.string() })).sort("asc", "name")
+// Input: [{ name: "Zoe" }, { name: "Alice" }] → Output: [{ name: "Alice" }, { name: "Zoe" }]
+```
+
+**Parameters:**
+- `direction` (optional): `"asc"` or `"desc"` (default: `"asc"`)
+- `key` (optional): Key to sort by for object arrays
+
+---
+
+## Deduplication
+
+### onlyUnique() {#onlyunique}
+
+Remove duplicate values from the array
+
+```typescript
+v.array(v.string()).onlyUnique()
+// Input: ["a", "b", "c", "a", "b"] → Output: ["a", "b", "c"]
+```
+
+**Note:** This removes duplicates but doesn't validate uniqueness. Use `unique()` validator to ensure all items are unique.
+
+---
+
+## Examples
+
+### Sort and Deduplicate
+
+```typescript
+const schema = v.array(v.string())
+  .sort("asc")
+  .onlyUnique();
+
+const result = await validate(schema, ["c", "a", "b", "a", "c"]);
+// Result: { isValid: true, data: ["a", "b", "c"] }
+```
+
+### Reverse Order
+
+```typescript
+const schema = v.array(v.int())
+  .flip();
+
+const result = await validate(schema, [1, 2, 3]);
+// Result: { isValid: true, data: [3, 2, 1] }
+```
+
+### Sort Objects
+
+```typescript
+const schema = v.array(v.object({
+  name: v.string(),
+  age: v.int()
+}))
+  .sort("asc", "age");
+
+const result = await validate(schema, [
+  { name: "John", age: 30 },
+  { name: "Jane", age: 25 }
+]);
+// Result: { isValid: true, data: [{ name: "Jane", age: 25 }, { name: "John", age: 30 }] }
+```
+
+### Mutator Chain
+
+```typescript
+const schema = v.array(v.string())
+  .sort("asc")      // Sort first
+  .onlyUnique()     // Then remove duplicates
+  .flip();          // Finally reverse
+
+const result = await validate(schema, ["c", "a", "b", "a", "c"]);
+// Result: { isValid: true, data: ["c", "b", "a"] }
+```
+
+---
+
+## Important Notes
+
+### Mutators Run Before Validation
+
+```typescript
+v.array(v.string())
+  .onlyUnique()     // Mutator: Remove duplicates
+  .unique()         // Validator: Check all are unique
+```
+
+### Sort Direction
+
+```typescript
+v.array(v.int()).sort("asc")   // Ascending: 1, 2, 3
+v.array(v.int()).sort("desc")  // Descending: 3, 2, 1
+```
+
+### Object Sorting
+
+When sorting object arrays, provide the key:
+
+```typescript
+v.array(v.object({ age: v.int() })).sort("asc", "age")
+```
+
+---
+
+## See Also
+
+- [Array Validator Overview](./) - Return to overview
+- [Array Validators](./validators) - Validation rules
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding mutators

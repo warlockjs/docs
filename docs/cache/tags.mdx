@@ -1,0 +1,225 @@
+---
+sidebar_position: 8
+---
+
+# Cache Tags
+
+Cache tags allow you to group related cache entries and invalidate them together. This makes complex invalidation scenarios simple and error-free.
+
+## Why Tags Matter?
+
+**Without Tags:**
+```ts
+// When user updates profile, you need to manually track all cache keys
+await cache.remove("users.123.profile");
+await cache.remove("users.123.posts");
+await cache.remove("users.123.comments");
+await cache.remove("feed.homepage"); // if user is featured
+// Easy to miss keys, error-prone, hard to maintain
+```
+
+**With Tags:**
+```ts
+// One line invalidates everything
+await cache.tags([`user.123`]).invalidate();
+// All related cache entries cleared automatically
+```
+
+## Primary Example: User Profile Updates
+
+When a user updates their profile, invalidate all related cache with a single operation:
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+// Store user data with tags
+const userId = 123;
+const userCache = cache.tags(["user", `user.${userId}`]);
+
+await userCache.set(`user.${userId}.profile`, profileData, CACHE_FOR.ONE_HOUR);
+await userCache.set(`user.${userId}.preferences`, settingsData, CACHE_FOR.ONE_HOUR);
+
+// When user updates their profile
+async function updateUserProfile(userId: number, data: any) {
+  await db.users.update(userId, data);
+  
+  // Invalidate all user-related cache
+  await cache.tags(["user", `user.${userId}`]).invalidate();
+}
+```
+
+All keys stored with these tags are invalidated together. Any cache entries tagged with `"user"` or `user.${userId}` are removed immediately.
+
+## E-Commerce Examples
+
+### Cart Cache with User Tags
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+const userId = 123;
+const cartCache = cache.tags(["cart", `user.${userId}`]);
+
+// Store cart items
+await cartCache.set(`cart.${userId}.items`, cartItems, CACHE_FOR.HALF_HOUR);
+await cartCache.set(`cart.${userId}.total`, cartTotal, CACHE_FOR.HALF_HOUR);
+
+// Invalidate cart when user updates it
+await cache.tags([`user.${userId}`]).invalidate();
+```
+
+### Product Cache with Category Tags
+
+```ts
+const categoryId = 5;
+const productCache = cache.tags(["products", `category.${categoryId}`]);
+
+await productCache.set(`products.category.${categoryId}`, products, CACHE_FOR.ONE_HOUR);
+await productCache.set(`products.featured.${categoryId}`, featured, CACHE_FOR.ONE_HOUR);
+
+// Invalidate all products in category when catalog updates
+await cache.tags([`category.${categoryId}`]).invalidate();
+```
+
+## Complex Tagging Patterns
+
+### Multi-dimensional User + Product Tags
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+// User wishlists tagged by user and products
+const userId = 123;
+const productId = 456;
+
+const wishlistCache = cache.tags([
+  `user.${userId}`,
+  `product.${productId}`,
+  "wishlists"
+]);
+
+await wishlistCache.set(
+  `wishlist.${userId}.${productId}`,
+  wishlistData,
+  CACHE_FOR.ONE_WEEK
+);
+
+// Invalidate by user (clear all user's wishlists)
+await cache.tags([`user.${userId}`]).invalidate();
+
+// OR invalidate by product (clear all wishlists containing this product)
+await cache.tags([`product.${productId}`]).invalidate();
+
+// OR invalidate all wishlists
+await cache.tags(["wishlists"]).invalidate();
+```
+
+## Tag Patterns and Best Practices
+
+### Use Hierarchical Tags
+
+```ts
+// Good: Hierarchical tags
+cache.tags([`user.${id}`, "users"]);
+
+// Good: Resource-based tags
+cache.tags([`post.${postId}`, "posts", `category.${categoryId}`]);
+
+// Avoid: Overly specific tags that duplicate key information
+cache.tags([`user.${id}.profile`, `user.${id}.posts`]); // Too specific
+```
+
+### Combine Multiple Tag Levels
+
+```ts
+const tagged = cache.tags([
+  `user.${userId}`,      // User-specific
+  "users",              // All users
+  `category.${catId}`,  // Category-specific
+  "posts"               // All posts
+]);
+
+// When user updates: invalidate user-specific cache
+await cache.tags([`user.${userId}`]).invalidate();
+
+// When category updates: invalidate category-specific cache
+await cache.tags([`category.${catId}`]).invalidate();
+
+// When all posts need refresh: invalidate all posts
+await cache.tags(["posts"]).invalidate();
+```
+
+## Tagged Cache Operations
+
+All standard cache operations work with tagged cache:
+
+```ts
+import { cache } from "@warlock.js/cache";
+
+const tagged = cache.tags(["users"]);
+
+// Get
+const user = await tagged.get("user.123");
+
+// Set
+await tagged.set("user.123", userData, 3600);
+
+// Remove (removes key and tag relationships)
+await tagged.remove("user.123");
+
+// Has
+const exists = await tagged.has("user.123");
+
+// Remember (with stampede prevention)
+const user = await tagged.remember("user.123", 3600, async () => {
+  return await fetchUser(123);
+});
+
+// Pull (get and remove)
+const temp = await tagged.pull("temp.data");
+
+// Forever (no expiration)
+await tagged.forever("config", configData);
+
+// Increment/Decrement
+await tagged.increment("user.123.views");
+```
+
+## Performance Considerations
+
+### How Tags Work Internally
+
+1. When you store a key with tags, the cache also stores tag-to-key relationships
+2. Each tag maintains a list of all keys associated with it
+3. When you invalidate tags, the cache looks up all keys for those tags and removes them
+4. Tag relationship keys are stored permanently (no TTL)
+
+### Performance Impact
+
+- **Storage**: Minimal overhead - one additional key per tag per unique key
+- **Invalidation**: Efficient - O(n) where n is the number of keys per tag
+- **Reads**: No performance impact - tagged cache reads are as fast as regular cache
+- **Memory**: Tag relationships stored in cache (uses same driver)
+
+### Best Practices for Performance
+
+1. **Don't over-tag**: Use 2-4 tags per cache entry, not 10+
+2. **Use specific tags**: `user.123` is better than `users` when invalidating one user
+3. **Group invalidation**: Invalidate multiple tags together when possible
+4. **Monitor tag counts**: If a tag has thousands of keys, invalidation will take longer
+
+
+## Limitations
+
+1. **Tag relationships stored in cache**: Uses the same driver as your cache data
+2. **No tag hierarchy**: Tags are flat (no parent-child relationships)
+3. **Synchronous tag lookup**: Tag relationships must be readable for invalidation to work
+
+## Troubleshooting
+
+- **Tags not invalidating?** Ensure you're using the same tag names when storing and invalidating
+- **Performance issues?** Check if tags have too many keys associated — consider using more specific tags
+- **Missing keys after invalidation?** Tags invalidate based on stored relationships — ensure keys were stored through tagged cache instances
+
+See [Best Practices](./best-practices) for more tag organization strategies.
+

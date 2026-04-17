@@ -1,0 +1,395 @@
+---
+title: Cookbook
+description: Common validation patterns and recipes
+---
+
+# Cookbook
+
+Common validation patterns and recipes for real-world scenarios.
+
+---
+
+## User Registration
+
+### Basic Registration
+
+```typescript
+const registrationSchema = v.object({
+  email: v.string()
+    .required("Email is required")
+    .email("Please enter a valid email address")
+    .lowercase()
+    .trim(),
+  
+  password: v.string()
+    .required("Password is required")
+    .minLength(8, "Password must be at least 8 characters")
+    .strongPassword("Password must be strong"),
+  
+  confirmPassword: v.string()
+    .required("Password confirmation is required")
+    .sameAs("password", "Passwords must match"),
+  
+  name: v.string()
+    .required("Name is required")
+    .minLength(2, "Name must be at least 2 characters")
+    .maxLength(100, "Name must not exceed 100 characters")
+    .trim()
+    .titleCase()
+});
+```
+
+### Advanced Registration
+
+```typescript
+const advancedRegistrationSchema = v.object({
+  type: v.string()
+    .required("User type is required")
+    .oneOf(["admin", "user", "guest"]),
+  
+  email: v.string()
+    .required("Email is required")
+    .email("Please enter a valid email address")
+    .lowercase()
+    .trim(),
+  
+  password: v.string()
+    .required("Password is required")
+    .minLength(8, "Password must be at least 8 characters")
+    .strongPassword("Password must be strong"),
+  
+  confirmPassword: v.string()
+    .required("Password confirmation is required")
+    .sameAs("password", "Passwords must match"),
+  
+  name: v.string()
+    .required("Name is required")
+    .minLength(2, "Name must be at least 2 characters")
+    .maxLength(100, "Name must not exceed 100 characters")
+    .trim()
+    .titleCase(),
+  
+  role: v.string()
+    .requiredIf("type", "admin", "Admin role is required")
+    .oneOf(["super", "moderator"]),
+  
+  permissions: v.array()
+    .presentIf("type", "admin")
+    .minLength(1, "At least one permission is required")
+});
+```
+
+---
+
+## Contact Forms
+
+### Basic Contact Form
+
+```typescript
+const contactSchema = v.object({
+  name: v.string()
+    .required("Name is required")
+    .minLength(2, "Name must be at least 2 characters")
+    .maxLength(100, "Name must not exceed 100 characters")
+    .trim()
+    .titleCase(),
+  
+  email: v.string()
+    .required("Email is required")
+    .email("Please enter a valid email address")
+    .lowercase()
+    .trim(),
+  
+  phone: v.string()
+    .optional()
+    .phone("Please enter a valid phone number")
+    .trim(),
+  
+  message: v.string()
+    .required("Message is required")
+    .minLength(10, "Message must be at least 10 characters")
+    .maxLength(1000, "Message must not exceed 1000 characters")
+    .trim()
+});
+```
+
+### Advanced Contact Form
+
+```typescript
+const advancedContactSchema = v.object({
+  type: v.string()
+    .required("Contact type is required")
+    .oneOf(["support", "sales", "general"]),
+  
+  name: v.string()
+    .required("Name is required")
+    .minLength(2, "Name must be at least 2 characters")
+    .maxLength(100, "Name must not exceed 100 characters")
+    .trim()
+    .titleCase(),
+  
+  email: v.string()
+    .required("Email is required")
+    .email("Please enter a valid email address")
+    .lowercase()
+    .trim(),
+  
+  phone: v.string()
+    .requiredIf("type", "sales", "Phone is required for sales inquiries")
+    .phone("Please enter a valid phone number")
+    .trim(),
+  
+  company: v.string()
+    .presentIf("type", "sales")
+    .minLength(2, "Company name must be at least 2 characters")
+    .maxLength(100, "Company name must not exceed 100 characters")
+    .trim(),
+  
+  message: v.string()
+    .required("Message is required")
+    .minLength(10, "Message must be at least 10 characters")
+    .maxLength(1000, "Message must not exceed 1000 characters")
+    .trim()
+});
+```
+
+---
+
+## Content Management
+
+### Article Creation
+
+```typescript
+const articleSchema = v.object({
+  title: v.string()
+    .required("Title is required")
+    .minLength(5, "Title must be at least 5 characters")
+    .maxLength(200, "Title must not exceed 200 characters")
+    .trim()
+    .titleCase(),
+  
+  slug: v.string()
+    .required("Slug is required")
+    .minLength(5, "Slug must be at least 5 characters")
+    .maxLength(100, "Slug must not exceed 100 characters")
+    .trim()
+    .lowercase()
+    .slug(),
+  
+  content: v.string()
+    .required("Content is required")
+    .minLength(100, "Content must be at least 100 characters")
+    .maxLength(10000, "Content must not exceed 10000 characters")
+    .trim(),
+  
+  excerpt: v.string()
+    .optional()
+    .maxLength(500, "Excerpt must not exceed 500 characters")
+    .trim(),
+  
+  tags: v.array()
+    .optional()
+    .minLength(1, "At least one tag is required")
+    .maxLength(10, "Maximum 10 tags allowed"),
+  
+  published: v.boolean()
+    .required("Published status is required")
+});
+```
+
+### Page Management
+
+```typescript
+const pageSchema = v.object({
+  title: v.string()
+    .required("Title is required")
+    .minLength(5, "Title must be at least 5 characters")
+    .maxLength(200, "Title must not exceed 200 characters")
+    .trim()
+    .titleCase(),
+  
+  slug: v.string()
+    .required("Slug is required")
+    .minLength(5, "Slug must be at least 5 characters")
+    .maxLength(100, "Slug must not exceed 100 characters")
+    .trim()
+    .lowercase()
+    .slug(),
+  
+  content: v.string()
+    .required("Content is required")
+    .minLength(100, "Content must be at least 100 characters")
+    .maxLength(10000, "Content must not exceed 10000 characters")
+    .trim(),
+  
+  metaTitle: v.string()
+    .optional()
+    .maxLength(60, "Meta title must not exceed 60 characters")
+    .trim(),
+  
+  metaDescription: v.string()
+    .optional()
+    .maxLength(160, "Meta description must not exceed 160 characters")
+    .trim(),
+  
+  published: v.boolean()
+    .required("Published status is required")
+});
+```
+
+---
+
+## E-commerce
+
+### Product Creation
+
+```typescript
+const productSchema = v.object({
+  name: v.string()
+    .required("Product name is required")
+    .minLength(5, "Product name must be at least 5 characters")
+    .maxLength(200, "Product name must not exceed 200 characters")
+    .trim()
+    .titleCase(),
+  
+  description: v.string()
+    .required("Product description is required")
+    .minLength(50, "Description must be at least 50 characters")
+    .maxLength(2000, "Description must not exceed 2000 characters")
+    .trim(),
+  
+  price: v.number()
+    .required("Price is required")
+    .min(0.01, "Price must be greater than 0")
+    .max(999999.99, "Price must not exceed 999999.99"),
+  
+  category: v.string()
+    .required("Category is required")
+    .oneOf(["electronics", "clothing", "books", "home", "sports"]),
+  
+  sku: v.string()
+    .required("SKU is required")
+    .minLength(3, "SKU must be at least 3 characters")
+    .maxLength(50, "SKU must not exceed 50 characters")
+    .trim()
+    .uppercase(),
+  
+  inStock: v.boolean()
+    .required("Stock status is required"),
+  
+  images: v.array()
+    .optional()
+    .minLength(1, "At least one image is required")
+    .maxLength(10, "Maximum 10 images allowed")
+});
+```
+
+### Order Processing
+
+```typescript
+const orderSchema = v.object({
+  customer: v.object({
+    name: v.string()
+      .required("Customer name is required")
+      .minLength(2, "Name must be at least 2 characters")
+      .maxLength(100, "Name must not exceed 100 characters")
+      .trim()
+      .titleCase(),
+    
+    email: v.string()
+      .required("Customer email is required")
+      .email("Please enter a valid email address")
+      .lowercase()
+      .trim(),
+    
+    phone: v.string()
+      .required("Customer phone is required")
+      .phone("Please enter a valid phone number")
+      .trim()
+  }),
+  
+  shipping: v.object({
+    address: v.string()
+      .required("Shipping address is required")
+      .minLength(10, "Address must be at least 10 characters")
+      .maxLength(200, "Address must not exceed 200 characters")
+      .trim(),
+    
+    city: v.string()
+      .required("City is required")
+      .minLength(2, "City must be at least 2 characters")
+      .maxLength(100, "City must not exceed 100 characters")
+      .trim()
+      .titleCase(),
+    
+    postalCode: v.string()
+      .required("Postal code is required")
+      .minLength(5, "Postal code must be at least 5 characters")
+      .maxLength(10, "Postal code must not exceed 10 characters")
+      .trim()
+      .uppercase()
+  }),
+  
+  items: v.array()
+    .required("Order items are required")
+    .minLength(1, "At least one item is required")
+    .maxLength(50, "Maximum 50 items allowed")
+});
+```
+
+---
+
+## API Validation
+
+### Request Validation
+
+```typescript
+const apiRequestSchema = v.object({
+  method: v.string()
+    .required("HTTP method is required")
+    .oneOf(["GET", "POST", "PUT", "DELETE", "PATCH"]),
+  
+  path: v.string()
+    .required("API path is required")
+    .minLength(1, "Path must not be empty")
+    .maxLength(200, "Path must not exceed 200 characters")
+    .trim(),
+  
+  headers: v.object()
+    .optional(),
+  
+  body: v.object()
+    .optional()
+});
+```
+
+### Response Validation
+
+```typescript
+const apiResponseSchema = v.object({
+  status: v.number()
+    .required("HTTP status is required")
+    .min(100, "Status must be at least 100")
+    .max(599, "Status must not exceed 599"),
+  
+  data: v.object()
+    .optional(),
+  
+  message: v.string()
+    .optional()
+    .maxLength(500, "Message must not exceed 500 characters")
+    .trim(),
+  
+  errors: v.array()
+    .optional()
+    .maxLength(10, "Maximum 10 errors allowed")
+});
+```
+
+---
+
+## See Also
+
+- [Best Practices](./best-practices) - Validation best practices
+- [Comparison](./comparison) - Compare with other libraries
+- [Migration](./migration) - Migration guide

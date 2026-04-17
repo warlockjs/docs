@@ -1,0 +1,322 @@
+---
+title: Three-Layer Architecture
+description: Understanding Seal's unique three-layer validation pipeline
+---
+
+# Three-Layer Architecture
+
+Seal uses a unique **three-layer architecture** that separates concerns for maximum clarity and flexibility.
+
+---
+
+## Overview
+
+Seal's validation pipeline consists of three distinct phases:
+
+```
+Input Data
+    ↓
+🔧 MUTATORS (Prep for Validation)
+    - Normalize data before validation
+    - Examples: trim(), lowercase(), toStartOfDay()
+    - Run BEFORE validation rules
+    ↓
+✅ VALIDATORS (Check Constraints)
+    - Validate against rules
+    - Examples: email(), min(), after()
+    - Return errors if validation fails
+    ↓
+🎨 TRANSFORMERS (Format Output)
+    - Format validated data for output
+    - Examples: toISOString(), outputAs()
+    - Run AFTER validation passes
+    ↓
+Output Data
+```
+
+---
+
+## Layer 1: Mutators 🔧
+
+**Purpose**: Prepare and normalize data before validation
+
+### Characteristics
+- **Transform** data values
+- **Clean** and normalize input
+- **Run first** in the pipeline
+- **Don't validate** - just transform
+
+### Examples
+```typescript
+// String mutators
+v.string()
+  .trim()           // Remove whitespace
+  .lowercase()      // Normalize case
+  .slug()           // Convert to URL slug
+
+// Date mutators
+v.date()
+  .toStartOfDay()   // Set to 00:00:00
+  .addDays(1)       // Add one day
+  .toUTC()          // Convert to UTC
+```
+
+### Common Use Cases
+- **Data cleaning**: Remove whitespace, normalize case
+- **Format conversion**: Convert between formats
+- **Data preparation**: Set defaults, adjust values
+
+---
+
+## Layer 2: Validators ✅
+
+**Purpose**: Check if data meets specific criteria
+
+### Characteristics
+- **Validate** against rules
+- **Return errors** if validation fails
+- **Run after** mutators
+- **Don't modify** data
+
+### Examples
+```typescript
+// String validators
+v.string()
+  .required()       // Must be present
+  .email()          // Must be valid email
+  .minLength(5)     // Must be at least 5 chars
+
+// Date validators
+v.date()
+  .required()       // Must be present
+  .after('2024-01-01') // Must be after date
+  .before('2025-01-01') // Must be before date
+```
+
+### Common Use Cases
+- **Format validation**: Email, URL, phone formats
+- **Range validation**: Min/max values, lengths
+- **Content validation**: Required fields, patterns
+
+---
+
+## Layer 3: Transformers 🎨
+
+**Purpose**: Format validated data for output
+
+### Characteristics
+- **Format** data for output
+- **Run after** validation passes
+- **Transform** final result
+- **Don't validate** - just format
+- **Single final output** - typically one transformer per chain
+- **Change data type** - often convert to different format (Date → String)
+
+### Examples
+```typescript
+// Date transformers (final output only)
+v.date()
+  .toISOString()    // Convert to ISO string (final output)
+
+// String transformers (final output only)  
+v.string()
+  .toSlug()         // Convert to slug (final output)
+  .toJSON()         // Convert to JSON (final output)
+```
+
+### Common Use Cases
+- **Output formatting**: Convert to specific formats
+- **API responses**: Format for client consumption
+- **Database storage**: Convert to storage format
+- **Final data type**: Convert Date to String, Object to JSON, etc.
+
+---
+
+## Key Differences
+
+| Aspect | Mutators 🔧 | Validators ✅ | Transformers 🎨 |
+|--------|-------------|---------------|------------------|
+| **Purpose** | Transform data | Check validity | Format output |
+| **Data** | Modifies data | Read-only | Changes type |
+| **Result** | Transformed value | Boolean + errors | Final output |
+| **Order** | Before validators | After mutators | After validation |
+| **Chainable** | Yes (same type) | Yes (same type) | No (final output) |
+| **Usage** | Data cleaning | Validation rules | Output formatting |
+
+### Mutators vs Transformers
+
+#### Mutators (Chainable)
+```typescript
+// ✅ Mutators can be chained - they return the same type
+v.date()
+  .toStartOfDay()   // Date → Date
+  .addDays(1)       // Date → Date  
+  .toUTC()          // Date → Date
+  .after('2024-01-01') // Still a Date for validation
+```
+
+#### Transformers (Final Output)
+```typescript
+// ❌ Transformers change the type - can't chain more transformers
+v.date()
+  .toISOString()    // Date → String (final output)
+  .toFormat('YYYY-MM-DD') // ❌ ERROR! Can't format a string
+
+// ✅ Correct: One transformer per chain
+v.date()
+  .toStartOfDay()   // 🔧 Mutator: Date → Date
+  .after('2024-01-01') // ✅ Validator: Check Date
+  .toISOString()    // 🎨 Transformer: Date → String (final)
+```
+
+---
+
+## Why This Architecture Matters
+
+### 1. Clear Separation of Concerns
+
+```typescript
+// ❌ OLD WAY (mixed concerns)
+v.date()
+  .toISOString()     // Converts to string
+  .after('2024-01-01') // ERROR! Can't compare strings
+
+// ✅ NEW WAY (clear separation)
+v.date()
+  .toStartOfDay()    // 🔧 Mutator: normalize to 00:00:00
+  .after('2024-01-01') // ✅ Validator: check Date object
+  .toISOString()     // 🎨 Transformer: output as string
+```
+
+### 2. Predictable Execution Order
+
+```typescript
+v.string()
+  .trim()           // 🔧 Mutator: "  hello  " → "hello"
+  .lowercase()      // 🔧 Mutator: "hello" → "hello"
+  .email()          // ✅ Validator: check email format
+  .maxLength(100)   // ✅ Validator: check length
+  .toSlug()         // 🎨 Transformer: final output format
+```
+
+**Execution Flow:**
+1. **All Mutators**: `trim()` → `lowercase()`
+2. **All Validators**: `email()` → `maxLength(100)`
+3. **Final Transformer**: `toSlug()` (single final output)
+
+### Execution Order Details
+
+**Important**: All mutators are executed first, then all validators are executed, regardless of the order they appear in the chain.
+
+```typescript
+// Input: "  USER@EXAMPLE.COM  "
+v.string()
+  .trim()           // 🔧 Mutator: Clean whitespace
+  .lowercase()      // 🔧 Mutator: Normalize case
+  .email()          // ✅ Validator: Check email format
+  .maxLength(100)   // ✅ Validator: Check length
+```
+
+**Step-by-step execution:**
+1. **Phase 1 - All Mutators**: 
+   - `trim()` → `"USER@EXAMPLE.COM"`
+   - `lowercase()` → `"user@example.com"`
+2. **Phase 2 - All Validators**:
+   - `email()` → ✅ Valid
+   - `maxLength(100)` → ✅ Valid
+3. **Output**: `"user@example.com"`
+
+### 3. Flexible and Extensible
+
+```typescript
+// Easy to add new mutators
+v.string().addMutator(customMutator)
+
+// Easy to add new validators
+v.string().addRule(customRule)
+
+// Easy to add new transformers
+v.string().addTransformer(customTransformer)
+```
+
+---
+
+## Real-World Example
+
+### User Registration Form
+
+```typescript
+const registrationSchema = v.object({
+  email: v.string()
+    .trim()           // 🔧 Clean whitespace
+    .lowercase()      // 🔧 Normalize case
+    .email()          // ✅ Validate format
+    .maxLength(100)   // ✅ Check length
+    .toSlug(),        // 🎨 Format for storage
+  
+  birthDate: v.date()
+    .toStartOfDay()   // 🔧 Normalize to 00:00:00
+    .after('1900-01-01') // ✅ Must be after 1900
+    .toISOString()    // 🎨 Format for database
+});
+```
+
+---
+
+## Best Practices
+
+### 1. Use Appropriate Layer for Task
+
+```typescript
+// ✅ Good: Use mutators for data cleaning
+v.string().trim().lowercase()
+
+// ✅ Good: Use validators for checking
+v.string().email().required()
+
+// ✅ Good: Use transformers for final output
+v.date().toISOString()
+```
+
+### 2. Chain Related Operations
+
+```typescript
+// ✅ Good: Group related operations
+v.string()
+  .trim()           // 🔧 Clean
+  .lowercase()      // 🔧 Normalize
+  .email()          // ✅ Validate
+  .maxLength(100)   // ✅ Check
+  .toSlug()         // 🎨 Final output format
+```
+
+---
+
+## Advanced Patterns
+
+### Conditional Mutators
+
+```typescript
+v.string().when('type', {
+  is: {
+    email: v.string().trim().lowercase().email(),
+    phone: v.string().trim().phone()
+  }
+})
+```
+
+### Pipeline Composition
+
+```typescript
+const baseString = v.string().trim().lowercase();
+const emailString = baseString.email().maxLength(100);
+const phoneString = baseString.phone().maxLength(20);
+```
+
+---
+
+## See Also
+
+- [Validation Flow](./validation-flow) - How validation works
+- [Custom Rules](../advanced/custom-rules) - Creating custom validators
+- [Plugins](../advanced/plugins) - Extending Seal functionality

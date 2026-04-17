@@ -1,0 +1,244 @@
+---
+title: Array Validators
+description: Validate array structure and content
+sidebar_position: 16
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Array Validators
+
+Array validators check array structure (length) and content (uniqueness, sorting) after mutators have been applied.
+
+---
+
+## All Validators
+
+<div className="methods-grid">
+
+<MethodCard
+  name="minLength()"
+  description="Minimum length"
+  href="#minlength"
+/>
+
+<MethodCard
+  name="maxLength()"
+  description="Maximum length"
+  href="#maxlength"
+/>
+
+<MethodCard
+  name="length()"
+  description="Exact length"
+  href="#length"
+/>
+
+<MethodCard
+  name="between()"
+  description="Length between range"
+  href="#between"
+/>
+
+<MethodCard
+  name="lengthBetween()"
+  description="Length between range (alias)"
+  href="#lengthbetween"
+/>
+
+<MethodCard
+  name="unique()"
+  description="All items unique"
+  href="#unique"
+/>
+
+<MethodCard
+  name="sorted()"
+  description="Must be sorted"
+  href="#sorted"
+/>
+
+</div>
+
+---
+
+## Length Validation
+
+### minLength(length) {#minlength}
+
+Array must have at least the given number of items
+
+```typescript
+v.array(v.string()).minLength(1)
+// Input: ["tag1", "tag2"] → Valid ✅
+// Input: [] → Invalid ❌
+```
+
+### maxLength(length) {#maxlength}
+
+Array must have at most the given number of items
+
+```typescript
+v.array(v.string()).maxLength(10)
+// Input: ["tag1", "tag2"] → Valid ✅
+// Input: Array with 11+ items → Invalid ❌
+```
+
+### length(length) {#length}
+
+Array must have exactly the given number of items
+
+```typescript
+v.array(v.string()).length(5)
+// Input: Array with 5 items → Valid ✅
+// Input: Array with 4 or 6 items → Invalid ❌
+```
+
+### between(min, max) {#between}
+
+Array length must be between min and max (inclusive)
+
+```typescript
+v.array(v.string()).between(1, 10)
+// Input: Array with 1-10 items → Valid ✅
+// Input: Empty array or 11+ items → Invalid ❌
+```
+
+### lengthBetween(min, max) {#lengthbetween}
+
+Alias for `between()`. Array length must be between min and max (inclusive)
+
+```typescript
+v.array(v.string()).lengthBetween(1, 10)
+// Input: Array with 1-10 items → Valid ✅
+// Input: Empty array or 11+ items → Invalid ❌
+```
+
+---
+
+## Content Validation
+
+### unique() {#unique}
+
+All array items must be unique
+
+```typescript
+v.array(v.string()).unique()
+// Input: ["a", "b", "c"] → Valid ✅
+// Input: ["a", "b", "a"] → Invalid ❌
+```
+
+**Note:** Use `onlyUnique()` mutator to remove duplicates, or `unique()` validator to ensure all items are unique.
+
+### sorted(direction?) {#sorted}
+
+Array must be sorted in the specified direction
+
+```typescript
+v.array(v.int()).sorted("asc")
+// Input: [1, 2, 3, 4, 5] → Valid ✅
+// Input: [1, 3, 2, 4, 5] → Invalid ❌
+
+v.array(v.int()).sorted("desc")
+// Input: [5, 4, 3, 2, 1] → Valid ✅
+// Input: [5, 3, 4, 2, 1] → Invalid ❌
+```
+
+**Parameters:**
+- `direction` (optional): `"asc"` or `"desc"` (default: `"asc"`)
+
+---
+
+## Examples
+
+### Tag Validation
+
+```typescript
+const tagsSchema = v.array(v.string())
+  .required()
+  .minLength(1)
+  .maxLength(10)
+  .unique();
+
+const result = await validate(tagsSchema, ["javascript", "typescript"]);
+// Result: { isValid: true, data: ["javascript", "typescript"] }
+```
+
+### ID Array Validation
+
+```typescript
+const idsSchema = v.array(v.int())
+  .required()
+  .between(1, 100)
+  .unique();
+
+const result = await validate(idsSchema, [1, 2, 3]);
+// Result: { isValid: true, data: [1, 2, 3] }
+```
+
+### Exact Length Validation
+
+```typescript
+const exactSchema = v.array(v.string())
+  .required()
+  .length(5);
+
+const result = await validate(exactSchema, ["a", "b", "c", "d", "e"]);
+// Result: { isValid: true, data: ["a", "b", "c", "d", "e"] }
+```
+
+### Sorted Array Validation
+
+```typescript
+const sortedSchema = v.array(v.int())
+  .required()
+  .sorted("asc")
+  .unique();
+
+const result = await validate(sortedSchema, [1, 2, 3, 4, 5]);
+// Result: { isValid: true, data: [1, 2, 3, 4, 5] }
+```
+
+### Combined Validation
+
+```typescript
+const combinedSchema = v.array(v.string())
+  .required()
+  .minLength(1)
+  .maxLength(10)
+  .unique()
+  .sorted("asc");
+
+const result = await validate(combinedSchema, ["a", "b", "c"]);
+// Result: { isValid: true, data: ["a", "b", "c"] }
+```
+
+---
+
+## Unique vs OnlyUnique
+
+| Method | Type | Purpose |
+|--------|------|---------|
+| `onlyUnique()` | Mutator | Remove duplicate values |
+| `unique()` | Validator | Ensure all values are unique |
+
+**Usage:**
+
+```typescript
+// Option 1: Remove duplicates with mutator
+v.array(v.string()).onlyUnique()
+
+// Option 2: Validate uniqueness with validator
+v.array(v.string()).unique()
+
+// Option 3: Both - remove duplicates then validate
+v.array(v.string()).onlyUnique().unique()
+```
+
+---
+
+## See Also
+
+- [Array Validator Overview](./) - Return to overview
+- [Array Mutators](./mutators) - Data transformation methods
+- [Base Validator](../base-validator/) - Inherited methods

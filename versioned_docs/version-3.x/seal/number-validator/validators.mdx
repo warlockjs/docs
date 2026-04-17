@@ -1,0 +1,663 @@
+---
+title: Number Validators
+description: Validate number values and ranges
+sidebar_position: 4
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Number Validators
+
+Number validators check numeric values after mutators have been applied. They validate ranges, signs, parity, and more.
+
+---
+
+## All Validators
+
+<div className="methods-grid">
+
+<MethodCard
+  name="min()"
+  description="Minimum value"
+  href="#min"
+/>
+
+<MethodCard
+  name="max()"
+  description="Maximum value"
+  href="#max"
+/>
+
+<MethodCard
+  name="between()"
+  description="Value between range"
+  href="#between"
+/>
+
+<MethodCard
+  name="greaterThan()"
+  description="Strictly greater than"
+  href="#greaterthan"
+/>
+
+<MethodCard
+  name="lessThan()"
+  description="Strictly less than"
+  href="#lessthan"
+/>
+
+<MethodCard
+  name="gt()"
+  description="Greater than (alias)"
+  href="#gt"
+/>
+
+<MethodCard
+  name="lt()"
+  description="Less than (alias)"
+  href="#lt"
+/>
+
+<MethodCard
+  name="minSibling()"
+  description="Min value from sibling"
+  href="#minsibling"
+/>
+
+<MethodCard
+  name="maxSibling()"
+  description="Max value from sibling"
+  href="#maxsibling"
+/>
+
+<MethodCard
+  name="greaterThanSibling()"
+  description="Greater than sibling"
+  href="#greaterthansibling"
+/>
+
+<MethodCard
+  name="lessThanSibling()"
+  description="Less than sibling"
+  href="#lessthansibling"
+/>
+
+<MethodCard
+  name="gtSibling()"
+  description="Greater than sibling (alias)"
+  href="#gtsibling"
+/>
+
+<MethodCard
+  name="ltSibling()"
+  description="Less than sibling (alias)"
+  href="#ltsibling"
+/>
+
+<MethodCard
+  name="betweenSibling()"
+  description="Between sibling fields"
+  href="#betweensibling"
+/>
+
+<MethodCard
+  name="positive()"
+  description="Must be positive"
+  href="#positive"
+/>
+
+<MethodCard
+  name="negative()"
+  description="Must be negative"
+  href="#negative"
+/>
+
+<MethodCard
+  name="odd()"
+  description="Must be odd"
+  href="#odd"
+/>
+
+<MethodCard
+  name="even()"
+  description="Must be even"
+  href="#even"
+/>
+
+<MethodCard
+  name="modulo()"
+  description="Must be divisible by"
+  href="#modulo"
+/>
+
+<MethodCard
+  name="enum()"
+  description="Must be one of enum values"
+  href="#enum"
+/>
+
+<MethodCard
+  name="oneOf()"
+  description="Must be one of values"
+  href="#oneof"
+/>
+
+<MethodCard
+  name="in()"
+  description="Must be in array"
+  href="#in"
+/>
+
+<MethodCard
+  name="allowsOnly()"
+  description="Allow only specified values"
+  href="#allowsonly"
+/>
+
+<MethodCard
+  name="forbids()"
+  description="Forbid specified values"
+  href="#forbids"
+/>
+
+<MethodCard
+  name="notIn()"
+  description="Must not be in array"
+  href="#notin"
+/>
+
+<MethodCard
+  name="length()"
+  description="Exact string length"
+  href="#length"
+/>
+
+<MethodCard
+  name="minLength()"
+  description="Minimum string length"
+  href="#minlength"
+/>
+
+<MethodCard
+  name="maxLength()"
+  description="Maximum string length"
+  href="#maxlength"
+/>
+
+</div>
+
+---
+
+## Range Validation
+
+### min(min)
+
+Minimum value (inclusive). Can accept a number or field name.
+
+```typescript
+v.number().min(0)
+// Input: 5 → Valid ✅
+// Input: -1 → Invalid ❌
+
+// With field name
+v.number().min("minValue")
+```
+
+### max(max)
+
+Maximum value (inclusive). Can accept a number or field name.
+
+```typescript
+v.number().max(100)
+// Input: 50 → Valid ✅
+// Input: 150 → Invalid ❌
+
+// With field name
+v.number().max("maxValue")
+```
+
+### between(min, max)
+
+Value between range (inclusive). Can accept numbers or field names.
+
+```typescript
+v.number().between(10, 90)
+// Input: 50 → Valid ✅
+// Input: 5 → Invalid ❌
+// Input: 100 → Invalid ❌
+
+// With field names
+v.number().between("minPrice", "maxPrice")
+```
+
+### greaterThan() {#greaterthan}
+
+Value must be strictly greater than the given number or field.
+
+**Parameters:**
+- `value`: The number or field name to compare against
+
+```typescript
+v.number().greaterThan(10)
+// Input: 11 → Valid ✅
+// Input: 10 → Invalid ❌
+// Input: 9 → Invalid ❌
+
+// With field name
+v.number().greaterThan("minValue")
+```
+
+### lessThan() {#lessthan}
+
+Value must be strictly less than the given number or field
+
+```typescript
+v.number().lessThan(100)
+// Input: 99 → Valid ✅
+// Input: 100 → Invalid ❌
+// Input: 101 → Invalid ❌
+
+// With field name
+v.number().lessThan("maxValue")
+```
+
+### gt(value) {#gt}
+
+Alias for `greaterThan()`. Shorter syntax for strict greater than
+
+```typescript
+v.number().gt(10)
+// Same as: v.number().greaterThan(10)
+```
+
+### lt(value) {#lt}
+
+Alias for `lessThan()`. Shorter syntax for strict less than
+
+```typescript
+v.number().lt(100)
+// Same as: v.number().lessThan(100)
+```
+
+---
+
+## Sibling Comparison
+
+These methods compare the current field's value with sibling fields in the same object.
+
+### minSibling(field) {#minsibling}
+
+Value must be greater than or equal to sibling field value
+
+```typescript
+v.object({
+  minAge: v.number().required(),
+  maxAge: v.number().required(),
+  age: v.number().minSibling("minAge")
+})
+
+// Input: { minAge: 18, maxAge: 65, age: 20 } → Valid ✅
+// Input: { minAge: 18, maxAge: 65, age: 16 } → Invalid ❌
+```
+
+### maxSibling(field) {#maxsibling}
+
+Value must be less than or equal to sibling field value
+
+```typescript
+v.object({
+  minAge: v.number().required(),
+  maxAge: v.number().required(),
+  age: v.number().maxSibling("maxAge")
+})
+
+// Input: { minAge: 18, maxAge: 65, age: 60 } → Valid ✅
+// Input: { minAge: 18, maxAge: 65, age: 70 } → Invalid ❌
+```
+
+### greaterThanSibling(field) {#greaterthansibling}
+
+Value must be strictly greater than sibling field value
+
+```typescript
+v.object({
+  minAge: v.number().required(),
+  age: v.number().greaterThanSibling("minAge")
+})
+
+// Input: { minAge: 18, age: 20 } → Valid ✅
+// Input: { minAge: 18, age: 18 } → Invalid ❌
+```
+
+### lessThanSibling(field) {#lessthansibling}
+
+Value must be strictly less than sibling field value
+
+```typescript
+v.object({
+  maxAge: v.number().required(),
+  age: v.number().lessThanSibling("maxAge")
+})
+
+// Input: { maxAge: 65, age: 60 } → Valid ✅
+// Input: { maxAge: 65, age: 65 } → Invalid ❌
+```
+
+### gtSibling(field) {#gtsibling}
+
+Alias for `greaterThanSibling()`. Shorter syntax
+
+```typescript
+v.number().gtSibling("minAge")
+// Same as: v.number().greaterThanSibling("minAge")
+```
+
+### ltSibling(field) {#ltsibling}
+
+Alias for `lessThanSibling()`. Shorter syntax
+
+```typescript
+v.number().ltSibling("maxAge")
+// Same as: v.number().lessThanSibling("maxAge")
+```
+
+### betweenSibling(minField, maxField) {#betweensibling}
+
+Value must be between sibling field values (inclusive)
+
+```typescript
+v.object({
+  minAge: v.number().required(),
+  maxAge: v.number().required(),
+  age: v.number().betweenSibling("minAge", "maxAge")
+})
+
+// Input: { minAge: 18, maxAge: 65, age: 30 } → Valid ✅
+// Input: { minAge: 18, maxAge: 65, age: 16 } → Invalid ❌
+// Input: { minAge: 18, maxAge: 65, age: 70 } → Invalid ❌
+```
+
+---
+
+## Sign Validation
+
+### positive()
+
+Must be positive (> 0)
+
+```typescript
+v.number().positive()
+// Input: 5 → Valid ✅
+// Input: 0 → Invalid ❌
+// Input: -5 → Invalid ❌
+```
+
+### negative()
+
+Must be negative (< 0)
+
+```typescript
+v.number().negative()
+// Input: -5 → Valid ✅
+// Input: 0 → Invalid ❌
+// Input: 5 → Invalid ❌
+```
+
+---
+
+## Parity Validation
+
+### odd()
+
+Must be odd
+
+```typescript
+v.number().odd()
+// Input: 1 → Valid ✅
+// Input: 3 → Valid ✅
+// Input: 2 → Invalid ❌
+```
+
+### even()
+
+Must be even
+
+```typescript
+v.number().even()
+// Input: 2 → Valid ✅
+// Input: 4 → Valid ✅
+// Input: 3 → Invalid ❌
+```
+
+### modulo(value)
+
+Must be divisible by the given number
+
+```typescript
+v.number().modulo(5)
+// Input: 10 → Valid ✅ (10 % 5 === 0)
+// Input: 15 → Valid ✅ (15 % 5 === 0)
+// Input: 13 → Invalid ❌ (13 % 5 !== 0)
+```
+
+---
+
+## Value Selection
+
+### enum(enumObject)
+
+Must be one of enum values
+
+```typescript
+enum Status { ACTIVE = 1, INACTIVE = 0 }
+v.number().enum(Status)
+// Input: 1 → Valid ✅
+// Input: 2 → Invalid ❌
+```
+
+### oneOf(values) / in(values)
+
+Must be one of values
+
+```typescript
+v.number().oneOf([1, 2, 3, 4, 5])
+// Input: 3 → Valid ✅
+// Input: 10 → Invalid ❌
+```
+
+### allowsOnly(values)
+
+Allow only specified values
+
+```typescript
+v.number().allowsOnly([0, 1])
+// Input: 1 → Valid ✅
+// Input: 2 → Invalid ❌
+```
+
+### forbids(values) / notIn(values)
+
+Forbid specified values
+
+```typescript
+v.number().forbids([0, -1])
+// Input: 5 → Valid ✅
+// Input: 0 → Invalid ❌
+```
+
+---
+
+## String Length Validation
+
+These methods validate the string representation of numbers. They're inherited from `StringValidator` and are useful when validating stringified numbers.
+
+### length(length) {#length}
+
+Number must have exact string length
+
+```typescript
+v.number().length(3)
+// Input: 123 → Valid ✅ (string length: 3)
+// Input: 12 → Invalid ❌ (string length: 2)
+// Input: 1234 → Invalid ❌ (string length: 4)
+```
+
+**Note:** This validates the string representation of the number, not the numeric value itself.
+
+### minLength(length) {#minlength}
+
+Number must have minimum string length
+
+```typescript
+v.number().minLength(3)
+// Input: 123 → Valid ✅ (string length: 3)
+// Input: 1234 → Valid ✅ (string length: 4)
+// Input: 12 → Invalid ❌ (string length: 2)
+```
+
+### maxLength(length) {#maxlength}
+
+Number must have maximum string length
+
+```typescript
+v.number().maxLength(3)
+// Input: 123 → Valid ✅ (string length: 3)
+// Input: 12 → Valid ✅ (string length: 2)
+// Input: 1234 → Invalid ❌ (string length: 4)
+```
+
+---
+
+## Examples
+
+### Age Validation
+
+```typescript
+const ageSchema = v.number()
+  .required()
+  .between(18, 120);
+
+const result = await validate(ageSchema, 25);
+// Result: { isValid: true, data: 25 }
+```
+
+### Price Validation
+
+```typescript
+const priceSchema = v.number()
+  .required()
+  .min(0)
+  .max(10000);
+
+const result = await validate(priceSchema, 99.99);
+// Result: { isValid: true, data: 99.99 }
+```
+
+### Percentage Validation
+
+```typescript
+const percentageSchema = v.number()
+  .required()
+  .between(0, 100);
+
+const result = await validate(percentageSchema, 85.5);
+// Result: { isValid: true, data: 85.5 }
+```
+
+### Positive Integer Validation
+
+```typescript
+const quantitySchema = v.number()
+  .required()
+  .positive()
+  .min(1);
+
+const result = await validate(quantitySchema, 5);
+// Result: { isValid: true, data: 5 }
+```
+
+### Even Number Validation
+
+```typescript
+const evenSchema = v.number()
+  .required()
+  .even();
+
+const result = await validate(evenSchema, 6);
+// Result: { isValid: true, data: 6 }
+```
+
+### Modulo Validation
+
+```typescript
+const divisibleSchema = v.number()
+  .required()
+  .modulo(5);
+
+const result = await validate(divisibleSchema, 10);
+// Result: { isValid: true, data: 10 }
+```
+
+### String Length Validation
+
+```typescript
+const pinSchema = v.number()
+  .required()
+  .length(4);
+
+const result = await validate(pinSchema, 1234);
+// Result: { isValid: true, data: 1234 }
+```
+
+### Min/Max String Length
+
+```typescript
+const codeSchema = v.number()
+  .required()
+  .minLength(3)
+  .maxLength(6);
+
+const result = await validate(codeSchema, 12345);
+// Result: { isValid: true, data: 12345 }
+```
+
+### Sibling Comparison
+
+```typescript
+const schema = v.object({
+  minPrice: v.number().required(),
+  maxPrice: v.number().required(),
+  price: v.number()
+    .required()
+    .betweenSibling("minPrice", "maxPrice")
+});
+
+const result = await validate(schema, {
+  minPrice: 10,
+  maxPrice: 100,
+  price: 50
+});
+// Result: { isValid: true, data: { minPrice: 10, maxPrice: 100, price: 50 } }
+```
+
+### Strict Comparison
+
+```typescript
+const schema = v.number()
+  .required()
+  .greaterThan(0)
+  .lessThan(100);
+
+const result = await validate(schema, 50);
+// Result: { isValid: true, data: 50 }
+```
+
+---
+
+## See Also
+
+- [Number Validator Overview](./) - Return to overview
+- [Number Mutators](./mutators) - Data transformation methods
+- [Base Validator](../base-validator/) - Core validation methods
+- [Scalar Validator](../scalar-validator) - Value selection methods
+- [Three-Layer Architecture](../concepts/three-layer-architecture) - Understanding validators

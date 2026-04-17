@@ -1,0 +1,147 @@
+---
+title: Conditional Validation
+description: Advanced conditional validation patterns
+---
+
+# Conditional Validation
+
+Advanced conditional validation patterns for complex scenarios.
+
+---
+
+## Basic Conditional Validation
+
+```typescript
+// Field is required if another field exists
+v.string().requiredWith("email")
+
+// Field is required if another field equals a value
+v.string().requiredIf("type", "admin")
+
+// Field is required unless another field equals a value
+v.string().requiredUnless("type", "guest")
+
+// Field must be present if another field exists
+v.string().presentWith("email")
+```
+
+---
+
+## Complex Conditional Logic
+
+```typescript
+// Required if all fields exist
+v.string().requiredWithAll(["email", "phone"])
+
+// Required if any field exists
+v.string().requiredWithAny(["email", "phone"])
+
+// Required if field value is in array
+v.string().requiredIfIn("type", ["admin", "moderator"])
+
+// Required if field is empty
+v.string().requiredIfEmpty("email")
+```
+
+---
+
+## When Rules
+
+```typescript
+v.string().when("type", {
+  is: {
+    admin: v.string().required().minLength(5),
+    user: v.string().required().minLength(3)
+  },
+  otherwise: v.string().optional()
+})
+```
+
+---
+
+## Real-World Example
+
+```typescript
+const userSchema = v.object({
+  type: v.string().required().oneOf(["admin", "user", "guest"]),
+  email: v.string().optional().email(),
+  phone: v.string().optional(),
+  name: v.string().requiredUnless("type", "guest"),
+  role: v.string().requiredIf("type", "admin"),
+  address: v.string().requiredWithAll(["email", "phone"])
+});
+```
+
+---
+
+## Advanced Patterns
+
+```typescript
+const schema = v.object({
+  type: v.string().required().oneOf(["admin", "user"]),
+  profile: v.object({
+    name: v.string().required(),
+    email: v.string().required().email(),
+    role: v.string().when("type", {
+      is: {
+        admin: v.string().required().oneOf(["super", "moderator"]),
+        user: v.string().required().oneOf(["member", "guest"])
+      }
+    })
+  })
+});
+```
+
+---
+
+## Error Handling
+
+```typescript
+v.string()
+  .requiredIf("type", "admin", "Admin role is required")
+  .requiredWith("email", "Name is required when email is provided")
+  .requiredUnless("type", "guest", "Role is required for registered users")
+```
+
+---
+
+## Best Practices
+
+```typescript
+// ✅ Good: Check simple conditions first
+v.string()
+  .required()           // Simple check first
+  .minLength(3)         // Then length
+  .when("type", {       // Complex condition last
+    is: { admin: v.string().minLength(5) }
+  })
+
+// ✅ Good: Efficient conditional logic
+v.string()
+  .requiredIf("type", "admin")
+  .minLength(3)
+  .maxLength(20)
+```
+
+---
+
+## Testing
+
+```typescript
+// Test different user types
+const adminData = { type: "admin", role: "super", name: "John Doe" };
+const userData = { type: "user", role: "member", name: "Jane Doe" };
+const guestData = { type: "guest", name: "Guest User" };
+
+const adminResult = await validate(schema, adminData);
+const userResult = await validate(schema, userData);
+const guestResult = await validate(schema, guestData);
+```
+
+---
+
+## See Also
+
+- [Validation Flow](./validation-flow) - How validation works
+- [Error Messages](./error-messages) - Handling validation errors
+- [Type Inference](./type-inference) - TypeScript integration

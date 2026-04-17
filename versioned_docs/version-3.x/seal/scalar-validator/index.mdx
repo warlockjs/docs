@@ -1,0 +1,124 @@
+---
+title: Scalar Validator Overview
+description: Validate scalar values (string, number, boolean) with flexible rules
+sidebar_position: 10
+---
+
+# Scalar Validator
+
+The Scalar Validator validates scalar values (strings, numbers, booleans, etc.) with flexible validation rules. It's ideal for form fields, API parameters, and configuration values.
+
+---
+
+## Basic Usage
+
+```typescript
+import { v, validate } from "@warlock.js/seal";
+
+enum Status {
+  Active = "active",
+  Inactive = "inactive",
+  Pending = "pending"
+}
+
+const schema = v.scalar()
+  .required()
+  .enum(Status);
+
+const result = await validate(schema, "active");
+// Result: { isValid: true, data: "active" }
+```
+
+---
+
+## What's Included
+
+### Validators (24 methods)
+
+- **Value Selection**: `enum()`, `in()`, `oneOf()`, `allowsOnly()`, `forbids()`, `notIn()`
+- **Accepted/Declined**: `accepted()`, `declined()`, plus conditional variants
+- **Conditional Accepted**: `acceptedIf()`, `acceptedUnless()`, `acceptedIfRequired()`, `acceptedIfPresent()`, `acceptedWithout()`
+- **Conditional Declined**: `declinedIf()`, `declinedUnless()`, `declinedIfRequired()`, `declinedIfPresent()`, `declinedWithout()`
+
+[View all validators →](./validators)
+
+---
+
+## Common Patterns
+
+### Enum Validation
+
+```typescript
+enum Status {
+  Active = "active",
+  Inactive = "inactive",
+  Pending = "pending"
+}
+
+const statusSchema = v.scalar()
+  .required()
+  .enum(Status);
+
+const result = await validate(statusSchema, "active");
+// Result: { isValid: true, data: "active" }
+```
+
+### Value Selection
+
+```typescript
+const roleSchema = v.scalar()
+  .required()
+  .in(["admin", "user", "guest"]);
+
+const result = await validate(roleSchema, "admin");
+// Result: { isValid: true, data: "admin" }
+```
+
+### Accepted/Declined Values
+
+```typescript
+// Accepted: 1, "1", true, "true", "yes", "y", "on"
+const termsSchema = v.scalar()
+  .required()
+  .accepted();
+
+// Declined: 0, "0", false, "false", "no", "n", "off"
+const spamSchema = v.scalar()
+  .required()
+  .declined();
+```
+
+### Conditional Acceptance
+
+```typescript
+const newsletterSchema = v.scalar()
+  .acceptedIf("subscribe", true);
+
+// Valid if subscribe === true
+const result = await validate(newsletterSchema, "yes", {
+  subscribe: true
+});
+```
+
+---
+
+## Inherited Methods
+
+The Scalar Validator extends `BaseValidator` and inherits all base validation methods:
+
+- **Basic Rules**: `required()`, `optional()`, `present()`, `nullable()`
+- **Comparison**: `equal()`, `notEqual()`, `sameAs()`, `differentFrom()`
+- **Type Checking**: `typeOf()`, `instanceOf()`
+- **Advanced**: `when()`, `custom()`, `transform()`
+
+[View Base Validator →](../base-validator/)
+
+---
+
+## See Also
+
+- [Scalar Validators](./validators) - All validation methods
+- [Base Validator](../base-validator/) - Inherited methods
+- [String Validator](../string-validator/) - Text-specific validation
+- [Number Validator](../number-validator/) - Numeric validation
+- [Boolean Validator](../boolean-validator) - Boolean validation

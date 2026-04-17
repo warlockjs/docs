@@ -1,0 +1,161 @@
+---
+title: Union Validator
+description: Validate a value against multiple validator types — the first match wins.
+---
+
+import MethodCard from '@site/src/components/Common/MethodCard';
+
+# Union Validator
+
+The `UnionValidator` validates a value against a list of validators. The **first validator that passes** wins; if none pass, the field fails.
+
+```ts
+import { v } from "@warlock.js/seal";
+
+// Accept an email address OR a username
+const identifier = v.union([
+  v.string().email(),
+  v.string().alphanumeric().minLength(3).maxLength(20),
+]);
+```
+
+---
+
+## Creating a Union
+
+Use `v.union(validators, errorMessage?)`:
+
+```ts
+const field = v.union([
+  v.string(),
+  v.number(),
+]);
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `validators` | `BaseValidator[]` | Validators to try in order |
+| `errorMessage` | `string?` | Custom error when all validators fail |
+
+### How it works internally
+
+1. For each validator in the array, `matchesType(value)` is checked first. If it returns `false`, that branch is **skipped** (type optimisation).
+2. The first validator that both matches the type **and** passes all its rules is used.
+3. If no validator passes, the configured error message is returned.
+
+---
+
+## Usage Patterns
+
+### Same type, different rules
+
+```ts
+// "identifier" can be an email OR an alphanumeric username
+const identifierSchema = v.object({
+  identifier: v.union([
+    v.string().email(),
+    v.string().alphanumeric().minLength(3).maxLength(20),
+  ]).required(),
+});
+
+// Valid: { identifier: "alice@example.com" }  →  email branch matches
+// Valid: { identifier: "alice99" }             →  username branch matches
+// Invalid: { identifier: "alice 99" }          →  spaces → both fail
+```
+
+### Different types
+
+```ts
+// A settings value can be a string, number, or boolean
+const settingValue = v.union([
+  v.string(),
+  v.number(),
+  v.boolean(),
+]);
+
+// Valid: "dark"  |  42  |  true
+```
+
+### Optional union
+
+```ts
+const optionalValue = v.union([
+  v.string().email(),
+  v.number().positive(),
+]).optional();
+```
+
+### Custom error message
+
+```ts
+const field = v.union(
+  [v.string().email(), v.string().alphanumeric()],
+  "Must be a valid email or alphanumeric identifier"
+);
+```
+
+---
+
+## Real-World Examples
+
+### Login — email or phone
+
+```ts
+const loginSchema = v.object({
+  credential: v.union([
+    v.string().email(),
+    v.string().pattern(/^\+?[0-9]{7,15}$/),
+  ]).required().label("Email or phone"),
+  password: v.string().required().minLength(8),
+});
+```
+
+### Flexible pricing
+
+```ts
+const priceSchema = v.object({
+  price: v.union([
+    v.number().positive(),          // fixed price
+    v.string().pattern(/^free$/i),  // literal "free"
+  ]).required(),
+});
+// Valid: { price: 9.99 }  |  { price: "free" }
+```
+
+### Mixed-type config map
+
+```ts
+const configValue = v.union([
+  v.string(),
+  v.number(),
+  v.boolean(),
+  v.array(v.string()),
+]);
+
+const configSchema = v.object({
+  theme:       configValue,
+  maxRetries:  configValue,
+  debug:       configValue,
+  allowedTags: configValue,
+});
+```
+
+---
+
+## JSON Schema
+
+`toJsonSchema()` produces a `oneOf` keyword:
+
+```ts
+v.union([v.string(), v.number()]).toJsonSchema();
+// → { oneOf: [{ type: "string" }, { type: "number" }] }
+```
+
+---
+
+## See Also
+
+- [Base Validator](../base-validator/index) — common methods (required, optional, label…)
+- [Record Validator](../record-validator/index) — dynamic-key objects
+- [Tuple Validator](../tuple-validator/index) — fixed-length typed arrays
+- [Type Inference](../concepts/type-inference) — inferring TypeScript types from validators

@@ -1,0 +1,91 @@
+---
+sidebar_position: 2
+---
+
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+# Quick Start
+
+## Installation
+
+<Tabs>
+  <TabItem value="npm" label="npm" default>
+
+```bash
+npm install @warlock.js/cache
+```
+
+  </TabItem>
+  <TabItem value="yarn" label="yarn">
+
+```bash
+yarn add @warlock.js/cache
+```
+
+  </TabItem>
+  <TabItem value="pnpm" label="pnpm">
+
+```bash
+pnpm add @warlock.js/cache
+```
+
+  </TabItem>
+</Tabs>
+
+## Setup
+
+```ts
+import { cache, MemoryCacheDriver, CACHE_FOR } from "@warlock.js/cache";
+
+cache.setCacheConfigurations({
+  default: "memory",
+  drivers: { memory: MemoryCacheDriver },
+  options: { memory: { ttl: CACHE_FOR.ONE_HOUR } },
+});
+await cache.init();
+```
+
+## Core Patterns
+
+### set / get
+
+Store and retrieve data:
+
+```ts
+await cache.set(`products.${id}`, product, CACHE_FOR.ONE_HOUR);
+const product = await cache.get(`products.${id}`); // null if expired or missing
+```
+
+### remember
+
+Fetch from cache or compute on miss:
+
+```ts
+const categoryProducts = await cache.remember(
+  `products.category.${categoryId}`,
+  CACHE_FOR.HALF_HOUR,
+  () => db.products.findByCategory(categoryId), // only called on cache miss
+);
+```
+
+### removeNamespace
+
+Invalidate all keys in a namespace (e.g. after checkout):
+
+```ts
+await cache.removeNamespace(`orders.${userId}`);
+```
+
+## Key Concepts
+
+- **TTL**: Time-to-live in seconds (how long values stay cached before expiring)
+- **Dot-notation keys**: Use hierarchical keys like `"products.123"` or `"category.electronics.featured"` to organize related cache entries
+- **Namespaces**: Groups of related keys that can be invalidated together with `removeNamespace()`
+
+## Next Steps
+
+- [Configuration](./configurations) - Set up Redis or other drivers
+- [Cache Manager](./cache-manager) - Complete method reference
+- [Advanced Features](./tags) - Cache tags, events, and middleware
+

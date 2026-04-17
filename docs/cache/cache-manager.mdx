@@ -1,0 +1,273 @@
+---
+sidebar_position: 3
+---
+
+# Cache Manager
+
+The cache manager is the main interface for working with cache in your application. It manages drivers, handles configuration, and provides a unified API for all cache operations.
+
+```ts
+import { cache } from "@warlock.js/cache";
+```
+
+## Setup
+
+Before using the cache, configure and initialize it:
+
+```ts title="src/main.ts"
+import { cache } from "@warlock.js/cache";
+import cacheConfigurations from "./config/cache";
+
+// Set configurations
+cache.setCacheConfigurations(cacheConfigurations);
+
+// Initialize (connects to the default driver)
+await cache.init();
+```
+
+:::info Important
+**@warlock.js/cache** requires manual setup. Unlike the Warlock framework where initialization is automatic, you must call `setCacheConfigurations()` and `init()` before using any cache operations.
+:::
+
+:::danger
+Always initialize at application startup. Using cache methods before `init()` will throw errors.
+:::
+
+## Basic Operations
+
+The cache manager provides core cache operations that work with all drivers. All examples use the [`CACHE_FOR`](./utils#cache-for) enum for TTL values to make code more readable.
+
+### Set
+
+Store a value in cache:
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+// Cache a product by ID
+await cache.set(`products.${productId}`, product, CACHE_FOR.ONE_HOUR);
+```
+
+If TTL is omitted, the driver's default TTL is used, or the value is stored forever.
+
+### Get
+
+Retrieve a value:
+
+```ts
+const product = await cache.get(`products.${productId}`); // Returns null if not found
+```
+
+### Remove
+
+Delete a specific key:
+
+```ts
+await cache.remove(`products.${productId}`);
+```
+
+### Flush
+
+Clear the entire cache:
+
+```ts
+await cache.flush();
+```
+
+### Has
+
+Check if a key exists without fetching:
+
+```ts
+const exists = await cache.has(`products.${productId}`);
+```
+
+:::tip
+Use `has()` instead of `get() !== null` when you only need to check existence.
+:::
+
+### Pull
+
+Get and remove in one operation:
+
+```ts
+const verifyToken = await cache.pull(`users.${userId}.verify-token`);
+```
+
+### Forever
+
+Store without expiration:
+
+```ts
+await cache.forever("app.config", { version: "1.0.0" });
+// Manually remove when needed
+await cache.remove("app.config");
+```
+
+### Remember (Get or Compute)
+
+The `remember()` method gets a value from cache, or if it doesn't exist, executes a callback to generate it, caches the result, and returns it. **It also prevents cache stampedes** - if multiple requests try to generate the same value simultaneously, only the first one executes the callback.
+
+```ts
+import { cache, CACHE_FOR } from "@warlock.js/cache";
+
+// Get from cache, or compute and cache if missing
+const products = await cache.remember(`products.category.${categoryId}`, CACHE_FOR.HALF_HOUR, async () => {
+  return await db.products.findByCategory(categoryId);
+});
+```
+
+#### `set()` vs `remember()`
+
+| Method | When to Use | Behavior |
+|--------|-------------|----------|
+| **`set()`** | When you already have the value | Simply stores the value in cache |
+| **`remember()`** | When value needs to be computed on cache miss | Gets from cache OR executes callback to generate, then caches |
+
+**Use `set()` when:**
+```ts
+const profile = await db.users.getProfile(userId);
+await cache.set(`users.${userId}.profile`, profile, CACHE_FOR.ONE_DAY); // You have the value
+```
+
+**Use `remember()` when:**
+```ts
+// Let the cache handle getting/computing for you
+const profile = await cache.remember(`users.${userId}.profile`, CACHE_FOR.ONE_DAY, async () => {
+  return await db.users.getProfile(userId); // Only called if cache miss
+});
+```
+
+:::tip
+Always use `remember()` for expensive operations (database queries, API calls, computations) to prevent cache stampedes. See [Cache Stampede Prevention](./stampede-prevention) for details.
+:::
+
+## Driver Management
+
+### Get Current Driver
+
+```ts
+const currentDriver = cache.currentDriver;
+```
+
+If no driver is active, the cache manager uses [NullCacheDriver](./null) as fallback.
+
+### Switch Default Driver
+
+Change the active driver:
+
+```ts
+await cache.use("redis");
+```
+
+The `use()` method is async because it loads the driver if not already loaded.
+
+### Get Specific Driver
+
+Get a driver instance without changing the default:
+
+```ts
+const redisDriver = await cache.driver("redis");
+const memoryDriver = await cache.driver("memory");
+
+// Use specific driver directly
+await redisDriver.set("key", "value");
+await memoryDriver.set("temp", 123);
+```
+
+### Register Custom Driver
+
+Add drivers at runtime:
+
+```ts
+import { CustomCacheDriver } from "./CustomCacheDriver";
+
+cache.registerDriver("custom", CustomCacheDriver);
+await cache.use("custom");
+```
+
+## Driver Options
+
+### Get Current Options
+
+```ts
+const options = cache.options;
+```
+
+### Update Options
+
+```ts
+import { CACHE_FOR } from "@warlock.js/cache";
+
+cache.setOptions({
+  globalPrefix: "newprefix",
+  ttl: CACHE_FOR.ONE_HOUR * 2, // 2 hours
+});
+```
+
+### Global Prefix
+
+All built-in drivers support a `globalPrefix` option to avoid key conflicts, especially with shared storage like Redis. Think of it like a database name—it separates your keys from other applications.
+
+Set it in your [configuration](./configurations) or update at runtime with `setOptions()`.
+
+## Namespaces
+
+Namespaces help organize cache keys hierarchically using dot notation. See the dedicated [Namespaces documentation](./namespaces) for a complete guide on using namespaces effectively.
+
+```ts
+// Basic namespace usage
+await cache.set(`orders.${userId}.recent`, orders);
+await cache.set(`orders.${userId}.total`, total);
+
+// Remove all keys in a namespace
+await cache.removeNamespace(`orders.${userId}`);
+```
+
+## Advanced Features
+
+The cache manager provides powerful features for complex caching scenarios. Each has dedicated documentation:
+
+- **[Cache Stampede Prevention](./stampede-prevention)** - Use `remember()` to prevent concurrent cache regenerations
+- **[Cache Tags](./tags)** - Group and invalidate related cache entries
+- **[Atomic Operations](./atomic-operations)** - Race-condition free `increment()`, `decrement()`, and `setNX()`
+- **[Bulk Operations](./bulk-operations)** - Efficient `many()` and `setMany()` for batch processing
+- **[Event System](./events)** - Monitor all cache operations with comprehensive events
+
+## Cache Keys
+
+**Always use dot notation strings for keys:**
+
+- ✅ `"user.1"`
+- ✅ `"posts.123.comments"`
+- ✅ `"app.config.settings"`
+
+- ❌ `{ id: 1 }` (objects not recommended)
+- ❌ `"user:1"` (colons not recommended)
+
+:::tip Recommended
+Dot notation makes keys predictable, readable, and easier to debug. If you need to generate keys from complex data, see [parseCacheKey utility](./utils#parse-cache-key).
+:::
+
+## Disconnect
+
+Disconnect from the current driver:
+
+```ts
+await cache.disconnect();
+```
+
+## Troubleshooting
+
+:::info
+**Always call `init()` before using cache operations** — cache methods will throw errors if initialization hasn't completed.
+
+**Use `await cache.driver('name')` to access a specific driver without changing the default** — this is useful when you need to read from one driver and write to another in the same operation, such as checking rate limits in memory cache while storing results in Redis.
+:::
+
+## Related Documentation
+
+- [Cache Configurations](./configurations) - Configure drivers and options
+- [Cache Driver Interface](./cache-driver-interface) - Complete method reference
+- [Drivers](./memory) - Learn about available drivers
+- [Best Practices](./best-practices) - Production-ready caching strategies
