@@ -1,0 +1,91 @@
+---
+sidebar_position: 5
+---
+
+# Timezone
+
+By default every job schedules relative to **UTC**. Use `.inTimezone()` to pin a job to a specific IANA timezone so its wall-clock time stays correct regardless of server location or DST transitions.
+
+## Basic Usage
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+scheduler.addJob(
+  job("morning-digest", sendDailyDigest)
+    .daily()
+    .at("08:00")
+    .inTimezone("America/New_York")   // fires at 8 AM Eastern, not 8 AM UTC
+);
+
+scheduler.start();
+```
+
+## Per-Job Timezones
+
+Each job has its own timezone. You can run the same logical task in multiple regions by registering separate jobs:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+const regions = [
+  { name: "us",  tz: "America/New_York" },
+  { name: "eu",  tz: "Europe/Berlin" },
+  { name: "asia", tz: "Asia/Tokyo" },
+];
+
+for (const { name, tz } of regions) {
+  scheduler.addJob(
+    job(`morning-report-${name}`, () => sendReport(name))
+      .daily()
+      .at("09:00")
+      .inTimezone(tz)
+  );
+}
+
+scheduler.start();
+```
+
+## Common IANA Timezone Strings
+
+| Region | Timezone string |
+|---|---|
+| US Eastern | `America/New_York` |
+| US Central | `America/Chicago` |
+| US Mountain | `America/Denver` |
+| US Pacific | `America/Los_Angeles` |
+| UTC | `UTC` |
+| UK / Ireland | `Europe/London` |
+| Central Europe | `Europe/Berlin` |
+| Eastern Europe | `Europe/Kiev` |
+| India | `Asia/Kolkata` |
+| Japan | `Asia/Tokyo` |
+| Australia (Sydney) | `Australia/Sydney` |
+
+A full list is available at [IANA Time Zone Database](https://www.iana.org/time-zones).
+
+## Signature
+
+```ts
+job.inTimezone(tz: string): this
+```
+
+The `tz` parameter must be a valid IANA timezone identifier. Invalid values will cause dayjs (the underlying library) to throw when calculating the next run time.
+
+## Interaction with `at()` and `on()`
+
+The timezone applies to all time calculations for that job. When you write:
+
+```ts
+job("task", fn)
+  .weekly()
+  .on("monday")
+  .at("09:00")
+  .inTimezone("Europe/Berlin")
+```
+
+The job fires at **9:00 AM Berlin local time** on Mondays — automatically shifting for CET/CEST as DST changes.
+
+:::note
+The server's own clock and timezone do not affect scheduled jobs that use `.inTimezone()`. The job will fire at the correct wall-clock time in the specified zone even if your server runs in UTC.
+:::

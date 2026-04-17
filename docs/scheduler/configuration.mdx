@@ -1,0 +1,256 @@
+---
+sidebar_position: 7
+---
+
+# Configuration
+
+The `Scheduler` class is configurable through a set of chainable methods. All configuration must happen before calling `.start()`.
+
+## Tick Interval — `runEvery()`
+
+The scheduler checks for due jobs on a recurring tick. The default tick interval is **1000 ms (1 second)**. Increase it to reduce CPU overhead when your shortest job interval is longer than a second:
+
+```ts
+import { Scheduler, job } from "@warlock.js/scheduler";
+
+const myScheduler = new Scheduler();
+
+myScheduler
+  .runEvery(60_000)   // check for due jobs once per minute
+  .addJob(job("report", generateReport).daily().at("09:00"))
+  .addJob(job("cleanup", cleanupFn).weekly().on("sunday").at("02:00"))
+  .start();
+```
+
+The minimum allowed interval is **100 ms**. Smaller values throw an error:
+
+```ts
+myScheduler.runEvery(50); // throws: "Tick interval must be at least 100ms"
+```
+
+## Parallel Execution — `runInParallel()`
+
+By default, jobs that are due at the same tick run **sequentially** (one after the other). Enable parallel mode to run them concurrently:
+
+```ts
+import { Scheduler, job } from "@warlock.js/scheduler";
+
+const myScheduler = new Scheduler();
+
+myScheduler
+  .runInParallel(true)            // enable parallel execution
+  .addJob(job("job-a", taskA).everyHour())
+  .addJob(job("job-b", taskB).everyHour())
+  .addJob(job("job-c", taskC).everyHour())
+  .start();
+```
+
+All three jobs will start simultaneously on each hourly tick.
+
+### Concurrency Limit
+
+Pass a second argument to cap how many jobs run at once:
+
+```ts
+myScheduler.runInParallel(true, 5); // at most 5 concurrent jobs per tick
+```
+
+When more jobs are due than the concurrency limit allows, they are batched: the first 5 start together, the next batch starts after the first finishes, and so on.
+
+The default max concurrency is **10**.
+
+## Job Management
+
+### Adding Jobs
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+// Add a single job
+scheduler.addJob(job("cleanup", cleanupFn).daily().at("03:00"));
+
+// Add multiple jobs at once
+scheduler.addJobs([
+  job("job-a", taskA).everyHour(),
+  job("job-b", taskB).daily(),
+  job("job-c", taskC).weekly(),
+]);
+
+// Fluent chaining
+scheduler
+  .addJob(job("a", taskA).everyMinutes(5))
+  .addJob(job("b", taskB).everyMinutes(10));
+```
+
+### Creating Jobs Inline — `newJob()`
+
+`newJob()` creates, registers, and returns a job in one call:
+
+```ts
+scheduler
+  .newJob("cleanup", cleanupFn)
+  .daily()
+  .at("03:00");
+```
+
+### Removing Jobs
+
+```ts
+const removed = scheduler.removeJob("cleanup"); // true if found and removed
+```
+
+### Looking Up Jobs
+
+```ts
+const j = scheduler.getJob("cleanup");
+
+if (j) {
+  console.log("Next run:", j.nextRun?.toISOString());
+  console.log("Is running:", j.isRunning);
+}
+```
+
+### Listing All Jobs
+
+```ts
+const all = scheduler.list(); // readonly Job[]
+console.log(`${scheduler.jobCount} jobs registered`);
+```
+
+## Lifecycle Methods
+
+### `start()`
+
+Prepares all registered jobs and begins the tick loop. Throws if the scheduler is already running or has no jobs:
+
+```ts
+scheduler.start();
+// throws "Cannot start scheduler with no jobs." if addJob() was never called
+// throws "Scheduler is already running." if called twice
+```
+
+### `stop()`
+
+Immediately halts the tick loop. Any jobs currently executing are **not** waited on:
+
+```ts
+scheduler.stop();
+// scheduler.isRunning === false
+```
+
+### `shutdown(timeout?)`
+
+Gracefully stops the scheduler. It:
+1. Stops scheduling new ticks
+2. Waits for all currently-running jobs to finish
+3. Times out after the specified duration (default **30 000 ms**)
+
+```ts
+// Default 30-second timeout
+await scheduler.shutdown();
+
+// Custom timeout
+await scheduler.shutdown(60_000);  // wait up to 60 s
+```
+
+Wire this to your process signal handlers:
+
+```ts
+import { scheduler } from "@warlock.js/scheduler";
+
+scheduler.start();
+
+process.on("SIGTERM", async () => {
+  await scheduler.shutdown(30_000);
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  await scheduler.shutdown(5_000);
+  process.exit(0);
+});
+```
+
+## Checking Scheduler State
+
+```ts
+console.log(scheduler.isRunning);  // boolean
+console.log(scheduler.jobCount);   // number of registered jobs
+```
+
+## CronParser Utility
+
+The `CronParser` class and `parseCron()` helper are exported for use outside of scheduling contexts — for example, to preview the next run time of a cron expression:
+
+```ts
+import { parseCron, CronParser } from "@warlock.js/scheduler";
+import type { CronFields } from "@warlock.js/scheduler";
+
+// Quick utility
+const parser = parseCron("0 9 * * 1-5");
+const nextRun = parser.nextRun();
+console.log("Next:", nextRun.toISOString());
+
+// Check if right now matches
+console.log("Matches now:", parser.matches(dayjs()));
+
+// Inspect the parsed fields
+const fields: CronFields = parser.fields;
+// { minutes: [0], hours: [9], daysOfMonth: [1..31], months: [1..12], daysOfWeek: [1,2,3,4,5] }
+
+// Access the original expression
+console.log(parser.expression); // "0 9 * * 1-5"
+```
+
+## Complete Setup Example
+
+```ts
+import { Scheduler, job } from "@warlock.js/scheduler";
+import { logger } from "./logger";
+
+const appScheduler = new Scheduler();
+
+// Observability
+appScheduler.on("job:start",    (name)         => logger.debug(`Job started: ${name}`));
+appScheduler.on("job:complete", (name, result) => logger.info({ name, duration: result.duration }, "Job complete"));
+appScheduler.on("job:error",    (name, error)  => logger.error({ name, error }, "Job failed"));
+appScheduler.on("job:skip",     (name, reason) => logger.warn({ name, reason }, "Job skipped"));
+
+// Configuration
+appScheduler
+  .runEvery(1_000)        // check every second
+  .runInParallel(true, 5) // up to 5 concurrent jobs
+
+// Jobs
+  .addJob(
+    job("token-cleanup", deleteExpiredTokens)
+      .daily()
+      .at("03:00")
+      .preventOverlap()
+      .retry(3, 2000)
+  )
+  .addJob(
+    job("weekly-report", generateWeeklyReport)
+      .weekly()
+      .on("monday")
+      .at("08:00")
+      .inTimezone("America/New_York")
+      .preventOverlap()
+  )
+  .addJob(
+    job("heartbeat", pingExternalService)
+      .everyMinutes(5)
+      .retry(2, 1000, 2)
+  );
+
+appScheduler.start();
+logger.info("Scheduler started with", appScheduler.jobCount, "jobs");
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  logger.info("Shutting down scheduler…");
+  await appScheduler.shutdown(30_000);
+  logger.info("Scheduler shut down cleanly");
+  process.exit(0);
+});
+```

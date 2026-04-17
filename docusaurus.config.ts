@@ -91,15 +91,9 @@ const config: Config = {
       items: [
         {
           type: "doc",
-          docId: "warlock/getting-started/introduction",
+          docId: "framework/getting-started/introduction",
           position: "left",
-          label: "Warlock",
-        },
-        {
-          type: "doc",
-          docId: "cascade/getting-started/introduction",
-          position: "left",
-          label: "Cascade",
+          label: "Framework",
         },
         {
           type: "doc",
@@ -109,9 +103,34 @@ const config: Config = {
         },
         {
           type: "doc",
+          docId: "cascade/getting-started/introduction",
+          position: "left",
+          label: "Cascade",
+        },
+        {
+          type: "doc",
           docId: "cache/introduction",
           position: "left",
           label: "Cache",
+        },
+        {
+          type: "dropdown",
+          label: "More",
+          position: "left",
+          items: [
+            {
+              href: "/docs/herald/introduction",
+              label: "Herald — Message Bus",
+            },
+            {
+              href: "/docs/logger/introduction",
+              label: "Logger — Logging",
+            },
+            {
+              href: "/docs/scheduler/introduction",
+              label: "Scheduler — Job Scheduling",
+            },
+          ],
         },
         {
           type: "docsVersionDropdown",

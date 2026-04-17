@@ -1,0 +1,93 @@
+---
+sidebar_position: 4
+---
+
+# Overlap Prevention
+
+By default, if a job takes longer than its interval, the scheduler will start a new execution while the old one is still running. Enable `.preventOverlap()` to skip those runs instead.
+
+## Basic Usage
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+scheduler.addJob(
+  job("process-queue", async () => {
+    // This might take several minutes
+    await queue.processAllPendingItems();
+  })
+    .everyMinutes(5)
+    .preventOverlap()   // skip the 5-min tick if previous run is still going
+);
+
+scheduler.start();
+```
+
+When the scheduler fires and the job is still running, it emits a `job:skip` event with the reason `"Job is already running"`, then moves on.
+
+## Why It Matters
+
+Consider a job that runs every minute to process a queue. On a busy day, processing takes 90 seconds:
+
+| Time | Without `preventOverlap` | With `preventOverlap` |
+|------|--------------------------|----------------------|
+| 00:00 | Run #1 starts | Run #1 starts |
+| 01:00 | Run #2 starts (concurrent!) | Run #2 **skipped** |
+| 01:30 | Run #1 finishes | Run #1 finishes |
+| 02:00 | Run #3 starts | Run #2 starts |
+
+Without overlap prevention, you get multiple workers racing over the same data. With it, runs are always sequential.
+
+## Checking Skip Events
+
+```ts
+import { scheduler } from "@warlock.js/scheduler";
+
+scheduler.on("job:skip", (name, reason) => {
+  // name    = "process-queue"
+  // reason  = "Job is already running"
+  console.log(`[scheduler] ${name} skipped — ${reason}`);
+});
+```
+
+## Disabling Overlap Prevention
+
+Pass `false` to explicitly re-enable concurrent execution if you've previously set it:
+
+```ts
+job("task", fn).everyMinute().preventOverlap(false);
+```
+
+## Signature
+
+```ts
+job.preventOverlap(skip?: boolean): this
+// skip defaults to true
+```
+
+## Checking Run State Programmatically
+
+```ts
+import { scheduler } from "@warlock.js/scheduler";
+
+const j = scheduler.getJob("process-queue");
+
+if (j?.isRunning) {
+  console.log("Job is currently executing — will be skipped on next tick");
+}
+```
+
+## Graceful Shutdown and Overlap
+
+During `scheduler.shutdown()`, in-flight jobs are always allowed to finish (up to the configured timeout), regardless of whether overlap prevention is enabled. This is separate from the tick-time skip behavior.
+
+```ts
+// Give jobs up to 60 s to finish during shutdown
+await scheduler.shutdown(60_000);
+```
+
+See [Configuration](./configuration) for more on graceful shutdown.
+
+:::tip
+`preventOverlap()` is recommended for any job that touches shared state — database rows, files, external APIs — where running two copies simultaneously could cause corruption or duplicate work.
+:::

@@ -1,0 +1,117 @@
+---
+sidebar_position: 1
+---
+
+# Logger Introduction
+
+`@warlock.js/logger` is the built-in logging package for Warlock.js v4. It gives you structured, multi-channel logging with five severity levels, a clean interface for passing structured data, and zero configuration needed to get started.
+
+## Basic usage
+
+```ts
+import { log } from "@warlock.js/logger";
+
+// Three-argument shorthand: module, action, message
+await log.info("users", "register", "New user created");
+await log.debug("auth", "tokenRefresh", { userId: 42 });
+await log.warn("payments", "retry", "Payment gateway timeout");
+await log.error("orders", "checkout", new Error("Stripe API unreachable"));
+await log.success("email", "send", "Welcome email delivered");
+```
+
+Every call receives three pieces of context: **module**, **action**, and **message**. This trio lets you filter and search logs by feature area rather than wading through flat text lines.
+
+## The five log levels
+
+| Method | When to use |
+|---|---|
+| `log.debug()` | Development diagnostics, variable dumps, flow tracing |
+| `log.info()` | Normal operational events (user registered, job queued) |
+| `log.warn()` | Unexpected but recoverable conditions (retry, fallback) |
+| `log.error()` | Failures that need attention; accepts `Error` objects |
+| `log.success()` | Explicit happy-path confirmation (payment completed) |
+
+All five methods are `async` and return a `Promise<Logger>`.
+
+## Structured logging with `LoggingData`
+
+When you need to attach arbitrary context to a log entry, pass a `LoggingData` object instead of the three-argument form.
+
+```ts
+import { log, type LoggingData } from "@warlock.js/logger";
+
+const entry: LoggingData = {
+  type: "error",
+  module: "orders",
+  action: "checkout",
+  message: "Card declined",
+  context: {
+    orderId: "ord_9f2a",
+    userId: 101,
+    amount: 4999,
+  },
+};
+
+await log(entry);
+```
+
+The `context` field is a free-form `Record<string, any>` — add whatever metadata helps you diagnose the problem later. File-based channels persist `context` alongside the log entry; the console channel displays it inline.
+
+### `LoggingData` interface
+
+```ts
+type LoggingData = {
+  type: "info" | "debug" | "warn" | "error" | "success";
+  module: string;
+  action: string;
+  message: any;
+  context?: Record<string, any>;
+};
+```
+
+## Logging `Error` objects
+
+Pass an `Error` instance directly as the `message`. File channels capture the full stack trace; the console channel pretty-prints it.
+
+```ts
+try {
+  await processOrder(id);
+} catch (err) {
+  await log.error("orders", "process", err);
+}
+```
+
+## Channels overview
+
+The logger routes every call through one or more **channels**. Each channel decides how to store or display the message. Three channels ship out of the box:
+
+| Channel | What it does |
+|---|---|
+| `ConsoleLog` | Colorized terminal output, one line per entry |
+| `FileLog` | Plain-text `.log` files with optional rotation and grouping |
+| `JSONFileLog` | Structured `.json` files — ideal for log aggregators |
+
+You can also create custom channels by extending `LogChannel`. See the [Channels](./channels) page for full details and the [Configurations](./configurations) page to wire everything up.
+
+## Utilities
+
+Two utilities ship alongside the core logger:
+
+```ts
+import {
+  captureAnyUnhandledRejection,
+  flushSync,
+} from "@warlock.js/logger";
+
+// Automatically log unhandledRejection and uncaughtException events
+captureAnyUnhandledRejection();
+
+// Force all buffered log entries to disk before the process exits
+process.on("beforeExit", () => {
+  flushSync();
+});
+```
+
+`captureAnyUnhandledRejection()` hooks into Node.js's `unhandledRejection` and `uncaughtException` events and routes them through the error channel. Call it once during app startup.
+
+`flushSync()` is a synchronous flush that drains the in-memory buffer of file-based channels. Use it in `beforeExit` or shutdown hooks to make sure nothing is lost when the process stops.

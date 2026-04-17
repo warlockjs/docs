@@ -1,0 +1,227 @@
+---
+sidebar_position: 4
+---
+
+# Consumers
+
+A consumer subscribes to a channel and processes incoming messages. Herald offers two structured approaches on top of the raw channel API.
+
+## 1. Raw channel subscribe
+
+Quick, inline consumption — useful for scripts or simple cases:
+
+```typescript
+import { communicators } from "@warlock.js/herald";
+
+communicators()
+  .channel<{ userId: number; email: string }>("user.created")
+  .subscribe(async (message, ctx) => {
+    await sendWelcomeEmail(message.payload.email);
+    await ctx.ack();
+  });
+```
+
+### Message shape
+
+Every handler receives two arguments:
+
+| Argument | Type | Description |
+|---|---|---|
+| `message.payload` | `TPayload` | The typed message body |
+| `message.metadata` | `MessageMetadata` | `messageId`, `timestamp`, `correlationId`, headers, retryCount, etc. |
+| `message.raw` | `unknown` | The raw broker message (amqplib `Message`) |
+| `ctx` | `MessageContext` | Ack / nack / reply controls |
+
+## 2. EventConsumer class
+
+`EventConsumer` is the idiomatic Herald way to consume events. Each class handles exactly one event type.
+
+```typescript
+import { EventConsumer } from "@warlock.js/herald";
+import type { ConsumedEventMessage } from "@warlock.js/herald";
+
+interface OrderPlacedPayload {
+  orderId: string;
+  total: number;
+  customerId: string;
+}
+
+export class OrderPlacedConsumer extends EventConsumer<OrderPlacedPayload> {
+  public static eventName = "order.placed";
+
+  public async handle(payload: OrderPlacedPayload, event: ConsumedEventMessage) {
+    console.log(`Processing order ${payload.orderId} for customer ${payload.customerId}`);
+    await fulfillOrder(payload.orderId);
+  }
+}
+```
+
+:::note Auto-ack
+When using `EventConsumer`, Herald automatically acks on success and nacks (with requeue) on an unhandled exception. You do not need to call `ctx.ack()` inside `handle()`.
+:::
+
+### ConsumedEventMessage
+
+The second argument to `handle()` provides additional context about the event envelope:
+
+| Field | Type | Description |
+|---|---|---|
+| `eventName` | `string` | The event name from the envelope |
+| `messageId` | `string` | Unique message ID |
+| `occurredAt` | `Date \| undefined` | When the event was published |
+| `version` | `number \| undefined` | Event version |
+| `metadata` | `Record<string, any> \| undefined` | Custom metadata from the producer |
+| `payload` | `TPayload` | Typed payload (same as first argument) |
+| `message` | `Message` | Full raw message |
+
+## 3. @Consumable decorator
+
+Apply `@Consumable()` to auto-subscribe the consumer when the communicator connects. This is the recommended pattern for production code because it decouples consumer registration from bootstrap order.
+
+```typescript
+import { EventConsumer, Consumable } from "@warlock.js/herald";
+import type { ConsumedEventMessage } from "@warlock.js/herald";
+
+interface UserCreatedPayload {
+  userId: number;
+  email: string;
+}
+
+@Consumable()
+export class UserCreatedConsumer extends EventConsumer<UserCreatedPayload> {
+  public static eventName = "user.created";
+
+  public async handle(payload: UserCreatedPayload, event: ConsumedEventMessage) {
+    await provisionUserAccount(payload.userId);
+  }
+}
+```
+
+Herald keeps a registry of `@Consumable`-decorated classes. When a communicator connects (or if it is already connected), it subscribes each class automatically. You do not need to call `subscribeConsumer()` yourself.
+
+### Targeting a specific communicator
+
+```typescript
+@Consumable({ communicator: "analytics" })
+export class PageViewConsumer extends EventConsumer<{ page: string }> {
+  public static eventName = "page.viewed";
+
+  public async handle(payload: { page: string }) {
+    await recordAnalytics(payload.page);
+  }
+}
+```
+
+## 4. defineConsumer factory
+
+For consumers that don't need a full class:
+
+```typescript
+import { defineConsumer } from "@warlock.js/herald";
+
+defineConsumer<{ orderId: string; total: number }>("order.placed", {
+  handle: async (payload) => {
+    await fulfillOrder(payload.orderId);
+  },
+});
+```
+
+`defineConsumer` automatically applies `@Consumable()`, so the consumer is registered immediately.
+
+With inline validation:
+
+```typescript
+import { defineConsumer } from "@warlock.js/herald";
+
+defineConsumer<{ userId: number }>("user.created", {
+  handle: async (payload) => {
+    await sendWelcomeEmail(payload.userId);
+  },
+  validate: async (payload) => {
+    return typeof payload.userId === "number";
+  },
+});
+```
+
+## Payload validation with Seal
+
+Attach a schema to an `EventConsumer` and Herald validates the payload before calling `handle()`. Invalid payloads are nacked without reaching your handler:
+
+```typescript
+import { EventConsumer, Consumable } from "@warlock.js/herald";
+import { v } from "@warlock.js/seal";
+
+@Consumable()
+export class OrderPlacedConsumer extends EventConsumer<{ orderId: string; total: number }> {
+  public static eventName = "order.placed";
+
+  public schema = v.object({
+    orderId: v.string().required(),
+    total: v.number().min(0).required(),
+  });
+
+  public async handle(payload: { orderId: string; total: number }) {
+    await fulfillOrder(payload.orderId);
+  }
+}
+```
+
+## Version filtering
+
+Consumers can declare which event versions they accept. Versions outside the range are acknowledged (skipped) without reaching `handle()`:
+
+```typescript
+@Consumable()
+export class OrderPlacedV2Consumer extends EventConsumer<OrderPlacedV2Payload> {
+  public static eventName = "order.placed";
+  public static minVersion = 2;
+  public static maxVersion = 3;
+
+  public async handle(payload: OrderPlacedV2Payload) {
+    // Only called for version 2 and 3 events
+  }
+}
+```
+
+## Manually subscribing and unsubscribing
+
+If you need programmatic control:
+
+```typescript
+import { subscribeConsumer, communicators } from "@warlock.js/herald";
+
+// Subscribe
+const unsubscribe = await subscribeConsumer(OrderPlacedConsumer);
+
+// Later, unsubscribe
+unsubscribe();
+```
+
+Or via the communicator directly:
+
+```typescript
+communicators().subscribe(OrderPlacedConsumer);
+communicators().driver.unsubscribe(OrderPlacedConsumer);
+```
+
+## Subscribe options
+
+The raw `channel.subscribe()` accepts options for advanced scenarios:
+
+```typescript
+communicators()
+  .channel<OrderPayload>("orders")
+  .subscribe(handler, {
+    prefetch: 10,         // process up to 10 messages concurrently
+    autoAck: false,       // manual acknowledgement (default)
+    exclusive: true,      // only one consumer on this queue
+    group: "order-workers", // consumer tag / group name
+    retry: {
+      maxRetries: 3,
+      delay: 2000,        // ms between retries
+    },
+    deadLetter: {
+      channel: "orders.failed",
+    },
+  });
+```

@@ -21,7 +21,7 @@ const Hero = () => {
 
                 <div className="flex flex-col gap-5 items-center justify-center space-y-4 sm:flex-row z-100">
                   <a
-                    href="https://warlock.js.org/docs/warlock/getting-started/introduction"
+                    href="https://warlock.js.org/docs/framework/getting-started/introduction"
                     target="_blank"
                     className="rounded-sm bg-primary px-5 md:px-8 py-4 font-semibold text-white duration-300 ease-in-out hover:bg-opacity-80 hover:text-white"
                   >

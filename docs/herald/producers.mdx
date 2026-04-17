@@ -1,0 +1,195 @@
+---
+sidebar_position: 3
+---
+
+# Producers
+
+A producer publishes messages onto a channel. Herald gives you three progressively structured ways to do this.
+
+## 1. Direct channel publish
+
+The simplest approach — get a channel and call `publish()`:
+
+```typescript
+import { communicators } from "@warlock.js/herald";
+
+await communicators()
+  .channel<{ orderId: string; total: number }>("order.placed")
+  .publish({ orderId: "ord-123", total: 49.99 });
+```
+
+For the default communicator, the shortcut `communicatorChannel` saves a step:
+
+```typescript
+import { communicatorChannel } from "@warlock.js/herald";
+
+await communicatorChannel<{ orderId: string; total: number }>("order.placed").publish({
+  orderId: "ord-123",
+  total: 49.99,
+});
+```
+
+## 2. EventMessage class
+
+`EventMessage` is the idiomatic Herald way to publish events. Extending it gives you a reusable, self-documenting event object that carries its own channel name and payload type.
+
+```typescript
+import { EventMessage } from "@warlock.js/herald";
+
+interface OrderPlacedPayload {
+  orderId: string;
+  total: number;
+  customerId: string;
+}
+
+export class OrderPlacedEvent extends EventMessage<OrderPlacedPayload> {
+  public eventName = "order.placed";
+}
+```
+
+Publish it with `publishEvent()`:
+
+```typescript
+import { publishEvent } from "@warlock.js/herald";
+import { OrderPlacedEvent } from "./events/order-placed.event";
+
+await publishEvent(new OrderPlacedEvent({ orderId: "ord-123", total: 49.99, customerId: "cust-1" }));
+```
+
+Or via a communicator directly:
+
+```typescript
+import { communicators } from "@warlock.js/herald";
+
+communicators().publish(new OrderPlacedEvent({ orderId: "ord-123", total: 49.99, customerId: "cust-1" }));
+```
+
+### Transforming the payload with toJSON
+
+Override `toJSON()` to transform the data before it leaves the application:
+
+```typescript
+import { EventMessage } from "@warlock.js/herald";
+import type { User } from "../models/user";
+
+export class UserCreatedEvent extends EventMessage<{ id: number; name: string }> {
+  public eventName = "user.created";
+
+  public constructor(private user: User) {
+    super();
+  }
+
+  public toJSON() {
+    return {
+      id: this.user.id,
+      name: this.user.fullName,
+    };
+  }
+}
+```
+
+### Adding metadata and versioning
+
+```typescript
+import { EventMessage } from "@warlock.js/herald";
+
+export class OrderShippedEvent extends EventMessage<{ orderId: string; trackingCode: string }> {
+  public eventName = "order.shipped";
+  public version = 2;
+  public metadata = { source: "fulfillment-service" };
+}
+```
+
+The serialized envelope that reaches the broker looks like:
+
+```json
+{
+  "payload": { "orderId": "ord-123", "trackingCode": "TRK-987" },
+  "eventName": "order.shipped",
+  "messageId": "<uuid>",
+  "version": 2,
+  "metadata": { "source": "fulfillment-service" },
+  "occurredAt": "2026-04-17T10:00:00.000Z"
+}
+```
+
+## 3. defineEvent factory
+
+For simple events that don't need a full class, `defineEvent` is a one-liner:
+
+```typescript
+import { defineEvent, publishEvent } from "@warlock.js/herald";
+
+const UserCreatedEvent = defineEvent<{ id: number; email: string }>("user.created");
+
+await publishEvent(new UserCreatedEvent({ id: 1, email: "alice@example.com" }));
+```
+
+With a payload transformation:
+
+```typescript
+import { defineEvent, publishEvent } from "@warlock.js/herald";
+import type { User } from "../models/user";
+
+const UserCreatedEvent = defineEvent<User, { id: number; email: string }>(
+  "user.created",
+  {
+    toJSON: (user) => ({ id: user.id, email: user.email }),
+  },
+);
+
+await publishEvent(new UserCreatedEvent(userDocument));
+```
+
+## Publish options
+
+All `publish()` calls accept an optional second argument for fine-grained control:
+
+```typescript
+await communicators().channel("order.placed").publish(
+  { orderId: "ord-123", total: 49.99 },
+  {
+    persistent: true,        // survives broker restart (default: true)
+    priority: 5,             // 0–9; higher = processed first
+    ttl: 60_000,             // message expires after 60 s
+    delay: 5_000,            // deliver after 5 s (requires delayed-message plugin)
+    correlationId: "req-42", // link related messages
+    headers: { region: "eu-west-1" },
+  },
+);
+```
+
+## Batch publish
+
+Publish multiple messages efficiently with `publishBatch()`:
+
+```typescript
+import { communicatorChannel } from "@warlock.js/herald";
+
+const events = [
+  { event: "page_view", page: "/home" },
+  { event: "page_view", page: "/products" },
+  { event: "click", element: "add-to-cart" },
+];
+
+await communicatorChannel("analytics").publishBatch(events);
+```
+
+## Payload validation
+
+Attach a Seal schema to a channel and Herald validates every outgoing message before it hits the broker:
+
+```typescript
+import { communicatorChannel } from "@warlock.js/herald";
+import { v } from "@warlock.js/seal";
+
+const orderSchema = v.object({
+  orderId: v.string().required(),
+  total: v.number().min(0).required(),
+});
+
+const channel = communicatorChannel("order.placed", { schema: orderSchema });
+
+// This will throw if validation fails
+await channel.publish({ orderId: "ord-123", total: 49.99 });
+```

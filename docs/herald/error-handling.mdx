@@ -1,0 +1,260 @@
+---
+sidebar_position: 7
+---
+
+# Error Handling
+
+Herald is designed around explicit acknowledgement. Every message must eventually be acked, nacked, or rejected. This page covers strategies for dealing with failures at every layer.
+
+## Smart auto-ack / auto-nack
+
+You do not have to call `ctx.ack()` in every handler. Herald applies smart defaults:
+
+- Handler returns normally → auto-ack
+- Handler throws an unhandled exception → auto-nack (requeue by default)
+
+```typescript
+import { communicators } from "@warlock.js/herald";
+
+communicators()
+  .channel<{ orderId: string }>("orders")
+  .subscribe(async (message) => {
+    // If processOrder throws, Herald auto-nacks and requeues.
+    await processOrder(message.payload.orderId);
+    // If we reach here, Herald auto-acks.
+  });
+```
+
+Override this at any time with explicit calls:
+
+```typescript
+.subscribe(async (message, ctx) => {
+  try {
+    await processOrder(message.payload.orderId);
+    await ctx.ack();
+  } catch (error) {
+    if (isRecoverable(error)) {
+      await ctx.nack(true);  // requeue
+    } else {
+      await ctx.reject();    // discard (no requeue)
+    }
+  }
+});
+```
+
+## Retries
+
+Configure automatic retries per subscription. Herald republishes the message with an incremented `x-retry-count` header:
+
+```typescript
+communicators()
+  .channel<{ orderId: string }>("orders")
+  .subscribe(handler, {
+    retry: {
+      maxRetries: 3,
+      delay: 2_000, // ms between retries
+    },
+  });
+```
+
+Exponential backoff with a custom delay function:
+
+```typescript
+.subscribe(handler, {
+  retry: {
+    maxRetries: 5,
+    delay: (attempt) => Math.min(1_000 * 2 ** attempt, 30_000),
+  },
+});
+```
+
+After `maxRetries` is exceeded the message is either sent to the dead-letter queue (if configured) or discarded.
+
+## Dead-letter queues
+
+A dead-letter queue captures messages that failed all retry attempts. Configure it per channel or per subscription.
+
+### Per channel (queue-level DLQ)
+
+```typescript
+import { communicatorChannel } from "@warlock.js/herald";
+
+// Primary queue — failed messages go to "orders.failed"
+const ordersChannel = communicatorChannel("orders", {
+  durable: true,
+  deadLetter: { channel: "orders.failed" },
+});
+
+// Dead-letter consumer
+communicatorChannel("orders.failed").subscribe(async (message, ctx) => {
+  await alertOpsTeam(message.payload);
+  await saveFailedMessageToDB(message.payload, message.metadata);
+  await ctx.ack();
+});
+```
+
+### Per subscription
+
+```typescript
+communicators()
+  .channel<{ orderId: string }>("orders")
+  .subscribe(handler, {
+    retry: { maxRetries: 3, delay: 1_000 },
+    deadLetter: { channel: "orders.failed" },
+  });
+```
+
+## Manual retry via ctx.retry()
+
+Call `ctx.retry()` from within a handler to republish the message with an incremented counter:
+
+```typescript
+.subscribe(async (message, ctx) => {
+  const retries = message.metadata.retryCount ?? 0;
+
+  try {
+    await processOrder(message.payload.orderId);
+    await ctx.ack();
+  } catch (error) {
+    if (retries < 3) {
+      await ctx.retry(5_000); // retry after 5 s
+    } else {
+      await ctx.reject(); // give up
+    }
+  }
+});
+```
+
+## Validation errors
+
+When a channel has a Seal schema, validation failures on inbound messages result in an automatic nack (no requeue):
+
+```typescript
+import { communicatorChannel } from "@warlock.js/herald";
+import { v } from "@warlock.js/seal";
+
+communicatorChannel("orders", {
+  schema: v.object({
+    orderId: v.string().required(),
+    total: v.number().min(0).required(),
+  }),
+}).subscribe(async (message) => {
+  // Only called for valid payloads
+  await processOrder(message.payload.orderId);
+});
+```
+
+Invalid messages are silently rejected without reaching your handler.
+
+## EventConsumer error handling
+
+`EventConsumer` subclasses automatically ack on success and nack-with-requeue on an unhandled exception. If you want custom error handling, catch the error inside `handle()`:
+
+```typescript
+import { EventConsumer, Consumable } from "@warlock.js/herald";
+
+@Consumable()
+export class OrderPlacedConsumer extends EventConsumer<{ orderId: string }> {
+  public static eventName = "order.placed";
+
+  public async handle(payload: { orderId: string }) {
+    try {
+      await fulfillOrder(payload.orderId);
+    } catch (error) {
+      if (error instanceof OutOfStockError) {
+        // Swallow and ack — we will not retry stock errors
+        await notifyMerchant(payload.orderId);
+        return;
+      }
+      // Re-throw → Herald will nack and requeue
+      throw error;
+    }
+  }
+}
+```
+
+## Payload validation in EventConsumer
+
+Attach a schema to nack invalid messages before `handle()` is called:
+
+```typescript
+import { EventConsumer, Consumable } from "@warlock.js/herald";
+import { v } from "@warlock.js/seal";
+
+@Consumable()
+export class OrderPlacedConsumer extends EventConsumer<{ orderId: string; total: number }> {
+  public static eventName = "order.placed";
+
+  public schema = v.object({
+    orderId: v.string().required(),
+    total: v.number().min(0).required(),
+  });
+
+  public async handle(payload: { orderId: string; total: number }) {
+    await fulfillOrder(payload.orderId);
+  }
+}
+```
+
+## Broker-level errors
+
+Listen for driver errors on the communicator registry:
+
+```typescript
+import { communicatorRegistry, communicators } from "@warlock.js/herald";
+
+// Registry-level events
+communicatorRegistry.on("disconnected", (comm) => {
+  console.error(`${comm.name} disconnected — reconnecting...`);
+});
+
+// Driver-level errors
+communicators().driver.on("error", (error) => {
+  console.error("RabbitMQ error:", error);
+  // Send to your monitoring service (Sentry, Datadog, etc.)
+});
+```
+
+## Connection errors at startup
+
+`connectToCommunicator()` throws if the broker is unreachable. Wrap it in a try/catch for graceful startup failure handling:
+
+```typescript
+import { connectToCommunicator } from "@warlock.js/herald";
+
+try {
+  await connectToCommunicator({
+    driver: "rabbitmq",
+    host: process.env.RABBITMQ_HOST ?? "localhost",
+  });
+} catch (error) {
+  console.error("Cannot connect to message broker:", error);
+  process.exit(1);
+}
+```
+
+## MissingCommunicatorError
+
+Calling `communicators()` before a communicator is registered throws `MissingCommunicatorError`. This usually indicates a bootstrap ordering issue:
+
+```typescript
+import { communicators, MissingCommunicatorError } from "@warlock.js/herald";
+
+try {
+  const channel = communicators().channel("orders");
+} catch (error) {
+  if (error instanceof MissingCommunicatorError) {
+    console.error("No communicator registered. Did you call connectToCommunicator()?");
+  }
+}
+```
+
+## Summary
+
+| Scenario | Recommended approach |
+|---|---|
+| Transient network / processing error | Retry with `retry.maxRetries` + `retry.delay` |
+| Permanent failure after max retries | Dead-letter queue |
+| Invalid payload schema | Seal schema on channel or consumer |
+| Fatal error — do not retry | `ctx.reject()` or `ctx.nack(false)` |
+| Conditional business logic failure | Catch in `handle()`, decide ack vs. throw |

@@ -1,0 +1,113 @@
+---
+sidebar_position: 3
+---
+
+# Retry & Backoff
+
+Jobs can automatically retry on failure. Configure this with `.retry()` — optionally enabling exponential backoff so successive attempts wait progressively longer.
+
+## Basic Retry
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+scheduler.addJob(
+  job("send-report", async () => {
+    await emailService.send(report);
+  })
+    .daily()
+    .at("08:00")
+    .retry(3)           // retry up to 3 times, 1 s between attempts (default delay)
+);
+```
+
+By default the delay between retries is **1000 ms (1 second)**.
+
+## Custom Delay
+
+Pass the delay in milliseconds as the second argument:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+scheduler.addJob(
+  job("sync-inventory", async () => {
+    await externalApi.syncInventory();
+  })
+    .everyHour()
+    .retry(5, 2000)     // retry up to 5 times, wait 2 s between each attempt
+);
+```
+
+## Exponential Backoff
+
+Pass a `backoffMultiplier` as the third argument. Each retry multiplies the base delay by the multiplier raised to the attempt number:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+scheduler.addJob(
+  job("process-queue", async () => {
+    await queue.processNext();
+  })
+    .everyMinutes(10)
+    .retry(5, 1000, 2)  // 1s → 2s → 4s → 8s → 16s
+);
+```
+
+**Delay schedule with `retry(5, 1000, 2)`:**
+
+| Attempt | Wait before attempt |
+|---------|-------------------|
+| 1 (initial) | — |
+| 2 | 1 000 ms |
+| 3 | 2 000 ms |
+| 4 | 4 000 ms |
+| 5 | 8 000 ms |
+| 6 | 16 000 ms |
+
+The formula is: `delay × backoffMultiplier ^ (attempt - 1)`
+
+## Signature
+
+```ts
+job.retry(
+  maxRetries: number,
+  delay?: number,           // milliseconds, default 1000
+  backoffMultiplier?: number // optional, enables exponential backoff
+): this
+```
+
+## Checking Retry Count in Events
+
+After a job completes (successfully or not), the `JobResult` object includes how many retries were made:
+
+```ts
+import { scheduler } from "@warlock.js/scheduler";
+
+scheduler.on("job:complete", (name, result) => {
+  if (result.retries && result.retries > 0) {
+    console.log(`${name} succeeded after ${result.retries} retries`);
+  }
+});
+
+scheduler.on("job:error", (name, error) => {
+  // Fires after ALL retries are exhausted
+  console.error(`${name} failed permanently:`, error);
+});
+```
+
+See [Events](./events) for the full event reference.
+
+## When to Use Backoff
+
+| Scenario | Recommended config |
+|---|---|
+| Transient network errors | `retry(3, 1000)` |
+| Rate-limited external API | `retry(5, 2000, 2)` |
+| Database deadlocks | `retry(3, 500)` |
+| Long-running payment gateway | `retry(4, 5000, 1.5)` |
+
+:::tip
+Combine retry with `preventOverlap()` for long-running jobs. If a job fails and retries push it past its next scheduled run, overlap prevention will skip the duplicate execution automatically.
+:::

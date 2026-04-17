@@ -1,0 +1,224 @@
+---
+sidebar_position: 6
+---
+
+# RabbitMQ
+
+RabbitMQ is the primary and recommended Herald driver. It is backed by [amqplib](https://www.npmjs.com/package/amqplib).
+
+## Installation
+
+```bash
+npm install amqplib
+# or
+pnpm add amqplib
+# or via Warlock CLI
+npx warlock add herald --driver=rabbitmq
+```
+
+## Connecting
+
+```typescript
+import { connectToCommunicator } from "@warlock.js/herald";
+
+await connectToCommunicator({
+  driver: "rabbitmq",
+  host: "localhost",
+  port: 5672,
+  username: "guest",
+  password: "guest",
+  vhost: "/",
+});
+```
+
+You can also pass a full URI instead of individual fields:
+
+```typescript
+await connectToCommunicator({
+  driver: "rabbitmq",
+  uri: "amqp://guest:guest@localhost:5672/%2F",
+});
+```
+
+## All connection options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `driver` | `"rabbitmq"` | — | Required. Selects the RabbitMQ driver. |
+| `host` | `string` | `"localhost"` | Broker hostname or IP. |
+| `port` | `number` | `5672` | AMQP port. |
+| `username` | `string` | `"guest"` | Broker username. |
+| `password` | `string` | `"guest"` | Broker password. |
+| `vhost` | `string` | `"/"` | Virtual host. |
+| `uri` | `string` | — | Full AMQP URI (overrides host/port/credentials). |
+| `heartbeat` | `number` | `60` | Heartbeat interval in seconds. |
+| `connectionTimeout` | `number` | — | Connection timeout in ms. |
+| `reconnect` | `boolean` | `true` | Auto-reconnect on disconnect. |
+| `reconnectDelay` | `number` | `5000` | Delay between reconnect attempts in ms. |
+| `prefetch` | `number` | — | Default prefetch count for consumers. |
+| `name` | `string` | `"default"` | Communicator name in the registry. |
+| `isDefault` | `boolean` | `true` | Whether this is the default communicator. |
+| `clientOptions` | `RabbitMQClientOptions` | — | Native amqplib options (see below). |
+
+## Native amqplib options
+
+Pass any low-level amqplib option via `clientOptions`:
+
+```typescript
+await connectToCommunicator({
+  driver: "rabbitmq",
+  host: "rabbitmq.internal",
+  clientOptions: {
+    frameMax: 0,
+    channelMax: 0,
+    locale: "en_US",
+    socket: {
+      keepAlive: true,
+      noDelay: true,
+      timeout: 10_000,
+    },
+  },
+});
+```
+
+## TLS / SSL
+
+```typescript
+import fs from "fs";
+
+await connectToCommunicator({
+  driver: "rabbitmq",
+  host: "rabbitmq.internal",
+  port: 5671,
+  clientOptions: {
+    socket: {
+      ca: [fs.readFileSync("/certs/ca.crt")],
+      cert: fs.readFileSync("/certs/client.crt"),
+      key: fs.readFileSync("/certs/client.key"),
+      rejectUnauthorized: true,
+    },
+  },
+});
+```
+
+## Queue (channel) options
+
+When you get a channel you can configure the underlying RabbitMQ queue:
+
+```typescript
+import { communicatorChannel } from "@warlock.js/herald";
+
+const ordersChannel = communicatorChannel("orders", {
+  durable: true,          // queue survives broker restart (default: true)
+  autoDelete: false,      // delete queue when last consumer disconnects
+  exclusive: false,       // single connection only
+  messageTtl: 86_400_000, // messages expire after 24 hours
+  maxLength: 10_000,      // max messages before oldest are dropped
+  deadLetter: {
+    channel: "orders.failed", // dead-letter queue name
+  },
+});
+```
+
+## Auto-reconnect
+
+The RabbitMQ driver watches the connection for `close` events and attempts to reconnect automatically:
+
+```typescript
+await connectToCommunicator({
+  driver: "rabbitmq",
+  host: process.env.RABBITMQ_HOST,
+  reconnect: true,        // default: true
+  reconnectDelay: 3_000,  // retry every 3 s
+});
+```
+
+Consumers and channels created before a disconnect are re-established automatically when reconnection succeeds. Pending subscribers added via `@Consumable()` are replayed on reconnect.
+
+To disable auto-reconnect (useful in tests):
+
+```typescript
+await connectToCommunicator({
+  driver: "rabbitmq",
+  host: "localhost",
+  reconnect: false,
+});
+```
+
+## Listening to driver events
+
+```typescript
+import { communicatorRegistry } from "@warlock.js/herald";
+
+communicatorRegistry.on("connected", (communicator) => {
+  console.log(`${communicator.name} connected to RabbitMQ`);
+});
+
+communicatorRegistry.on("disconnected", (communicator) => {
+  console.warn(`${communicator.name} disconnected`);
+});
+```
+
+Or on the driver directly:
+
+```typescript
+import { communicators } from "@warlock.js/herald";
+
+communicators().driver.on("error", (error) => {
+  console.error("RabbitMQ driver error:", error);
+});
+
+communicators().driver.on("reconnecting", (attempt) => {
+  console.log(`Reconnection attempt #${attempt}`);
+});
+```
+
+Available events: `connected`, `disconnected`, `error`, `reconnecting`.
+
+## Channel management
+
+```typescript
+import { communicators } from "@warlock.js/herald";
+
+const comm = communicators();
+
+// List all channels created by this communicator
+const names = comm.driver.getChannelNames();
+
+// Get queue stats
+const stats = await comm.channel("orders").stats();
+console.log(`${stats.messageCount} messages, ${stats.consumerCount} consumers`);
+
+// Purge all pending messages
+const purged = await comm.channel("orders").purge();
+console.log(`Purged ${purged} messages`);
+
+// Delete the queue entirely
+await comm.channel("orders").delete();
+```
+
+## Delayed messages (plugin)
+
+Sending a message with a `delay` requires the [rabbitmq-delayed-message-exchange](https://github.com/rabbitmq/rabbitmq-delayed-message-exchange) plugin enabled on your broker.
+
+```typescript
+await communicatorChannel("scheduled.notifications").publish(
+  { userId: 1, template: "onboarding-day-3" },
+  { delay: 3 * 24 * 60 * 60 * 1000 }, // deliver in 3 days
+);
+```
+
+## Priority queues
+
+Messages support a priority from 0 (lowest) to 9 (highest):
+
+```typescript
+await communicatorChannel("tasks").publish(
+  { taskId: "urgent-42" },
+  { priority: 9 },
+);
+```
+
+:::note Kafka coming soon
+Apache Kafka driver support is planned. See the [introduction](./introduction#supported-drivers) for the current driver roadmap.
+:::

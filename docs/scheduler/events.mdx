@@ -1,0 +1,183 @@
+---
+sidebar_position: 6
+---
+
+# Events
+
+The `Scheduler` class extends Node.js `EventEmitter` with a fully typed interface. Subscribe to events to add logging, metrics, alerting, or custom error handling without modifying job code.
+
+## Subscribing to Events
+
+```ts
+import { scheduler } from "@warlock.js/scheduler";
+
+scheduler.on("job:error", (name, error) => {
+  console.error(`[scheduler] ${name} failed:`, error);
+});
+
+scheduler.start();
+```
+
+Use `.once()` to handle an event only the first time it fires:
+
+```ts
+scheduler.once("scheduler:started", () => {
+  console.log("Scheduler is up and running");
+});
+```
+
+Remove a listener with `.off()`:
+
+```ts
+function handleError(name: string, error: unknown) { /* ... */ }
+
+scheduler.on("job:error", handleError);
+// later…
+scheduler.off("job:error", handleError);
+```
+
+## Event Reference
+
+### `job:start`
+
+Fires immediately before a job's callback is invoked.
+
+```ts
+scheduler.on("job:start", (jobName: string) => {
+  console.log(`[${new Date().toISOString()}] Starting: ${jobName}`);
+});
+```
+
+### `job:complete`
+
+Fires when a job finishes successfully. Includes the `JobResult` with timing and retry information.
+
+```ts
+import type { JobResult } from "@warlock.js/scheduler";
+
+scheduler.on("job:complete", (jobName: string, result: JobResult) => {
+  console.log(`${jobName} finished in ${result.duration}ms`);
+
+  if (result.retries && result.retries > 0) {
+    console.log(`  → succeeded after ${result.retries} retries`);
+  }
+});
+```
+
+**`JobResult` shape:**
+
+```ts
+type JobResult = {
+  success: boolean;
+  duration: number;   // milliseconds
+  error?: unknown;    // present when success is false
+  retries?: number;   // number of retry attempts made
+};
+```
+
+### `job:error`
+
+Fires when a job's callback throws and all retries are exhausted.
+
+```ts
+scheduler.on("job:error", (jobName: string, error: unknown) => {
+  // Send to your error tracker
+  Sentry.captureException(error, { tags: { job: jobName } });
+});
+```
+
+### `job:skip`
+
+Fires when a scheduled run is skipped. This happens when overlap prevention is enabled and the job is already running.
+
+```ts
+scheduler.on("job:skip", (jobName: string, reason: string) => {
+  console.warn(`${jobName} skipped: ${reason}`);
+});
+```
+
+### `scheduler:started`
+
+Fires once when `scheduler.start()` is called and the tick loop begins.
+
+```ts
+scheduler.on("scheduler:started", () => {
+  console.log("Job scheduler started");
+});
+```
+
+### `scheduler:stopped`
+
+Fires when `scheduler.stop()` or `scheduler.shutdown()` stops the tick loop.
+
+```ts
+scheduler.on("scheduler:stopped", () => {
+  console.log("Job scheduler stopped");
+});
+```
+
+### `scheduler:tick`
+
+Fires on every scheduler tick (once per second by default). Useful for debugging or heartbeat monitoring. Avoid heavy work inside this handler.
+
+```ts
+scheduler.on("scheduler:tick", (timestamp: Date) => {
+  // Fires every second — keep this handler lightweight
+  metrics.gauge("scheduler.tick", 1);
+});
+```
+
+## Full Event Types
+
+```ts
+import type { SchedulerEvents } from "@warlock.js/scheduler";
+
+// SchedulerEvents maps each event name to its argument tuple:
+// {
+//   "job:start":         [jobName: string];
+//   "job:complete":      [jobName: string, result: JobResult];
+//   "job:error":         [jobName: string, error: unknown];
+//   "job:skip":          [jobName: string, reason: string];
+//   "scheduler:started": [];
+//   "scheduler:stopped": [];
+//   "scheduler:tick":    [timestamp: Date];
+// }
+```
+
+## Production Pattern — Centralised Observability
+
+Set up all observers in one place before calling `start()`:
+
+```ts
+import { scheduler } from "@warlock.js/scheduler";
+import { logger } from "./logger";
+import { metrics } from "./metrics";
+import { alerts } from "./alerts";
+
+// Timing metrics
+scheduler.on("job:start",    (name)         => metrics.increment(`job.start.${name}`));
+scheduler.on("job:complete", (name, result) => {
+  metrics.increment(`job.success.${name}`);
+  metrics.timing(`job.duration.${name}`, result.duration);
+});
+
+// Error alerting
+scheduler.on("job:error", (name, error) => {
+  logger.error({ job: name, error }, "Job failed");
+  alerts.critical(`Scheduler job "${name}" failed`, error);
+});
+
+// Skipped-run visibility
+scheduler.on("job:skip", (name, reason) => {
+  logger.warn({ job: name, reason }, "Job skipped");
+});
+
+// Lifecycle
+scheduler.on("scheduler:started", () => logger.info("Scheduler started"));
+scheduler.on("scheduler:stopped", () => logger.info("Scheduler stopped"));
+
+// Register jobs and start
+scheduler
+  .addJob(/* ... */)
+  .start();
+```

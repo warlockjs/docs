@@ -1,0 +1,79 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+Herald is the message bus package for Warlock.js. It gives your application a clean, type-safe way to publish and consume events across services — whether you are building a monolith that needs internal event routing or a microservice architecture that passes messages through RabbitMQ.
+
+## What Herald does
+
+```typescript
+import { connectToCommunicator, communicators } from "@warlock.js/herald";
+
+// Connect once at startup
+await connectToCommunicator({
+  driver: "rabbitmq",
+  host: "localhost",
+  port: 5672,
+});
+
+// Publish from anywhere in your app
+await communicators().channel("order.placed").publish({ orderId: "ord-123" });
+
+// Subscribe from anywhere in your app
+communicators()
+  .channel<{ orderId: string }>("order.placed")
+  .subscribe(async (message, ctx) => {
+    console.log("New order:", message.payload.orderId);
+    await ctx.ack();
+  });
+```
+
+Herald handles the low-level broker details so your code only deals with channels, payloads, and handlers.
+
+## Core concepts
+
+| Concept | Description |
+|---|---|
+| **Communicator** | A named, connected wrapper around a broker driver. You can have multiple (e.g. one for notifications, one for analytics). |
+| **Driver** | The actual broker implementation — RabbitMQ today, Kafka coming soon. |
+| **Channel** | A named queue or topic. Channels are lazy-created and cached. |
+| **EventMessage** | A typed class that defines a publishable event and its payload shape. |
+| **EventConsumer** | A typed class that defines how to handle one specific event. |
+| **@Consumable** | A decorator that auto-subscribes an `EventConsumer` when a communicator connects. |
+
+## Supported drivers
+
+| Driver | Status |
+|---|---|
+| RabbitMQ | Stable |
+| Kafka | Coming soon |
+
+## Package
+
+Herald is a standalone package. Install it separately from the Warlock.js core:
+
+```bash
+npm install @warlock.js/herald amqplib
+# or
+pnpm add @warlock.js/herald amqplib
+# or
+yarn add @warlock.js/herald amqplib
+```
+
+If you use the Warlock CLI, the `--driver` flag installs the required peer dependency for you:
+
+```bash
+npx warlock add herald --driver=rabbitmq
+```
+
+## Next steps
+
+- [Getting Started](./getting-started) — set up your first connection
+- [Producers](./producers) — define and publish events
+- [Consumers](./consumers) — define and consume events
+- [Request / Reply](./request-reply) — synchronous RPC over the message bus
+- [RabbitMQ](./rabbitmq) — driver-specific configuration
+- [Error Handling](./error-handling) — retries, dead-letter queues, nack strategies
+- [Configuration](./configuration) — full config reference

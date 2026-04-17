@@ -489,19 +489,19 @@ const notificationsConfig = config.get("notifications");
 
 ## Using Config in Your App
 
-Access configuration using the `config()` helper:
+Access configuration using the `config` object:
 
 ```typescript
 import { config } from "@warlock.js/core";
 
-// Get entire config file
-const dbConfig = config("database");
+// Get entire config section
+const dbConfig = config.get("database");
 
-// Get specific key
-const dbHost = config("database.host");
+// Get a specific nested key
+const dbHost = config.key("database.host");
 
 // With default value
-const port = config("http.port", 2030);
+const port = config.key("http.port", 2030);
 ```
 
 ### Example: Controller Using Config

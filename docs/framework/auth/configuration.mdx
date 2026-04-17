@@ -80,7 +80,7 @@ jwt: {
 Generate a secure secret using the CLI:
 
 ```bash
-warlock jwt:secret
+warlock jwt.generate
 ```
 
 This will generate a random secret and add it to your `.env` file.
@@ -334,7 +334,7 @@ export default authConfigurations;
 Add these to your `.env` file:
 
 ```bash
-# Generate using: warlock jwt:secret
+# Generate using: warlock jwt.generate
 JWT_SECRET=your-super-secret-key-here
 JWT_REFRESH_SECRET=your-refresh-secret-key-here
 ```
@@ -344,7 +344,7 @@ JWT_REFRESH_SECRET=your-refresh-secret-key-here
 ### Generate JWT Secret
 
 ```bash
-warlock jwt:secret
+warlock jwt.generate
 ```
 
 Generates a cryptographically secure random string and adds it to your `.env` file.
@@ -352,7 +352,7 @@ Generates a cryptographically secure random string and adds it to your `.env` fi
 ### Cleanup Expired Tokens
 
 ```bash
-warlock auth:cleanup
+warlock auth.cleanup
 ```
 
 Removes expired access and refresh tokens from the database. Run this periodically (e.g., via cron job) to keep your database clean.

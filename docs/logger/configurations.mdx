@@ -1,0 +1,185 @@
+---
+sidebar_position: 2
+---
+
+# Logger Configurations
+
+Logger configuration lives in `src/config/log.ts`. The file exports a `LogConfigurations` object that Warlock picks up automatically.
+
+## Minimal setup
+
+```ts title="src/config/log.ts"
+import { ConsoleLog } from "@warlock.js/logger";
+import { LogConfigurations } from "@warlock.js/core";
+
+const logConfigurations: LogConfigurations = {
+  enabled: true,
+  channels: [new ConsoleLog()],
+};
+
+export default logConfigurations;
+```
+
+`enabled: true` is the default — you can omit it, but keeping it explicit makes toggling logging easier during development.
+
+## Full config schema
+
+```ts title="src/config/log.ts"
+import { ConsoleLog, FileLog, JSONFileLog } from "@warlock.js/logger";
+import { LogConfigurations } from "@warlock.js/core";
+
+const logConfigurations: LogConfigurations = {
+  /**
+   * Master switch. Set to false to silence all channels.
+   * @default true
+   */
+  enabled: true,
+
+  /**
+   * Default channels used in every environment unless overridden below.
+   */
+  channels: [new ConsoleLog()],
+
+  /**
+   * Environment-specific overrides.
+   * The key is the value of the APP_ENV / NODE_ENV environment variable.
+   */
+  production: {
+    channels: [
+      new FileLog({
+        storagePath: process.cwd() + "/storage/logs",
+        chunk: "daily",
+        rotate: true,
+        maxFileSize: 10 * 1024 * 1024, // 10 MB
+      }),
+    ],
+  },
+
+  staging: {
+    channels: [
+      new ConsoleLog(),
+      new JSONFileLog({
+        storagePath: process.cwd() + "/storage/logs",
+        name: "staging",
+      }),
+    ],
+  },
+};
+
+export default logConfigurations;
+```
+
+## `enabled`
+
+```ts
+enabled: boolean  // default: true
+```
+
+Setting `enabled: false` disables all channels globally. Useful when running tests or when you want to keep the config file in place but suppress output temporarily.
+
+## `channels`
+
+```ts
+channels: LogChannel[]
+```
+
+An array of channel instances. Every log call is forwarded to **all** channels in this array. Channels are instantiated when the config file is evaluated, so you can pass options directly to each constructor.
+
+```ts
+import { ConsoleLog, FileLog } from "@warlock.js/logger";
+
+channels: [
+  new ConsoleLog(),
+  new FileLog({ storagePath: "/var/log/myapp" }),
+],
+```
+
+## Environment-specific channels
+
+Add a key that matches the `APP_ENV` (or `NODE_ENV`) value. When the app runs in that environment, the top-level `channels` array is replaced by the environment-specific one.
+
+```ts title="src/config/log.ts"
+import { ConsoleLog, FileLog } from "@warlock.js/logger";
+import { LogConfigurations } from "@warlock.js/core";
+
+const logConfigurations: LogConfigurations = {
+  enabled: true,
+  // Used in development (and any env without an explicit override)
+  channels: [new ConsoleLog()],
+
+  // Used only in production
+  production: {
+    channels: [
+      new FileLog({
+        chunk: "daily",
+        rotate: true,
+      }),
+    ],
+  },
+};
+
+export default logConfigurations;
+```
+
+You can stack as many environments as you need — `development`, `staging`, `production`, `test`, etc. The match is a simple string comparison against the current environment value.
+
+## Filtering logs by level per-channel
+
+Each channel accepts a `levels` option to restrict which severity levels it handles. This lets you, for example, write only errors to a dedicated file while everything else goes to the console.
+
+```ts title="src/config/log.ts"
+import { ConsoleLog, FileLog } from "@warlock.js/logger";
+import { LogConfigurations } from "@warlock.js/core";
+
+const logConfigurations: LogConfigurations = {
+  enabled: true,
+  channels: [
+    // Show all levels in the terminal
+    new ConsoleLog(),
+
+    // Write only errors and warnings to a file
+    new FileLog({
+      storagePath: process.cwd() + "/storage/logs",
+      name: "errors",
+      levels: ["error", "warn"],
+    }),
+  ],
+};
+
+export default logConfigurations;
+```
+
+The `levels` option is available on every channel type. See the [Channels](./channels) page for the full list of per-channel options.
+
+## Custom filter function
+
+For more granular control, pass a `filter` function. It receives the full `LoggingData` object and returns `true` to allow or `false` to suppress.
+
+```ts
+import { ConsoleLog, type LoggingData } from "@warlock.js/logger";
+
+new ConsoleLog({
+  filter: (data: LoggingData) => {
+    // Suppress auth debug noise in the console
+    if (data.module === "auth" && data.type === "debug") return false;
+    return true;
+  },
+});
+```
+
+## Date and time format
+
+All channels support a `dateFormat` option that controls how timestamps appear in log entries.
+
+```ts
+import { FileLog } from "@warlock.js/logger";
+
+new FileLog({
+  dateFormat: {
+    date: "YYYY-MM-DD",   // default: "DD-MM-YYYY"
+    time: "HH:mm:ss",     // default: "HH:mm:ss"
+  },
+});
+```
+
+Format tokens follow [Day.js format strings](https://day.js.org/docs/en/display/format).

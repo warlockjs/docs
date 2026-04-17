@@ -1,0 +1,135 @@
+---
+sidebar_position: 1
+---
+
+# Introduction
+
+`@warlock.js/scheduler` is a production-ready job scheduling package for Node.js. It lets you run recurring background tasks using either a clean fluent API or standard cron expressions — with built-in support for timezones, retry logic, overlap prevention, and graceful shutdown.
+
+## Installation
+
+```bash
+npm install @warlock.js/scheduler
+```
+
+## Quick Start
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+// Clean up expired tokens every night at 3 AM
+scheduler.addJob(
+  job("cleanup", async () => {
+    await db.deleteExpiredTokens();
+  })
+    .daily()
+    .at("03:00")
+);
+
+scheduler.start();
+```
+
+That's it. `scheduler` is a ready-to-use singleton — no configuration required for simple use cases.
+
+## Two Scheduling Styles
+
+### Fluent API
+
+The fluent API is the recommended approach. It reads like plain English:
+
+```ts
+import { job } from "@warlock.js/scheduler";
+
+// Every day at 9 AM
+job("morning-report", sendReport).daily().at("09:00");
+
+// Every Monday at midnight
+job("weekly-cleanup", cleanupOldData).weekly().on("monday");
+
+// Every 15 minutes
+job("heartbeat", pingHealthCheck).everyMinutes(15);
+
+// First of each month at midnight
+job("monthly-invoice", generateInvoices).monthly().on(1).at("00:00");
+```
+
+### Cron Expressions
+
+Use raw cron syntax when you need precise schedules or are migrating from an existing cron-based system:
+
+```ts
+import { job } from "@warlock.js/scheduler";
+
+// 9 AM on weekdays (Monday–Friday)
+job("standup-reminder", sendReminder).cron("0 9 * * 1-5");
+
+// Every 5 minutes
+job("cache-refresh", refreshCache).cron("*/5 * * * *");
+
+// First day of every month at midnight
+job("monthly-report", generateMonthlyReport).cron("0 0 1 * *");
+```
+
+**Cron field reference:**
+
+```
+┌───────────── minute (0-59)
+│ ┌───────────── hour (0-23)
+│ │ ┌───────────── day of month (1-31)
+│ │ │ ┌───────────── month (1-12)
+│ │ │ │ ┌───────────── day of week (0-6, Sunday=0)
+│ │ │ │ │
+* * * * *
+```
+
+Supported field syntax: `*`, `5`, `1,3,5`, `1-5`, `*/5`, `1-10/2`.
+
+## The Scheduler Singleton
+
+For most apps, import the built-in `scheduler` singleton directly:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+scheduler
+  .addJob(job("job-a", taskA).daily().at("02:00"))
+  .addJob(job("job-b", taskB).everyHour())
+  .start();
+```
+
+When you need multiple isolated schedulers (e.g. in tests or separate process pools), instantiate `Scheduler` directly:
+
+```ts
+import { Scheduler, job } from "@warlock.js/scheduler";
+
+const myScheduler = new Scheduler();
+myScheduler.addJob(job("isolated-task", runTask).everyMinutes(5));
+myScheduler.start();
+```
+
+## Graceful Shutdown
+
+Always wire up shutdown so running jobs can finish cleanly before the process exits:
+
+```ts
+import { scheduler } from "@warlock.js/scheduler";
+
+scheduler.start();
+
+process.on("SIGTERM", async () => {
+  // Waits up to 30 s for running jobs to finish (default timeout)
+  await scheduler.shutdown();
+  process.exit(0);
+});
+```
+
+## What's Next
+
+| Topic | Description |
+|---|---|
+| [Defining Jobs](./defining-jobs) | Full fluent API reference — every timing method |
+| [Retry & Backoff](./retry-backoff) | Automatic retries with optional exponential backoff |
+| [Overlap Prevention](./overlap-prevention) | Skip a run if the previous one is still going |
+| [Timezone](./timezone) | Per-job timezone support with IANA strings |
+| [Events](./events) | Observe the full job lifecycle |
+| [Configuration](./configuration) | Tick interval, parallel execution, concurrency |

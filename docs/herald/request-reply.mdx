@@ -1,0 +1,142 @@
+---
+sidebar_position: 5
+---
+
+# Request / Reply (RPC)
+
+Herald supports the request-reply pattern (also called RPC — Remote Procedure Call) over the message bus. This lets you send a message and await a typed response, all through your broker, without managing correlation IDs or reply queues manually.
+
+## Requester side
+
+Call `channel.request()` with a payload and an optional timeout:
+
+```typescript
+import { communicators } from "@warlock.js/herald";
+
+interface ResizeRequest {
+  imageUrl: string;
+  width: number;
+  height: number;
+}
+
+interface ResizeResult {
+  processedUrl: string;
+  durationMs: number;
+}
+
+const result = await communicators()
+  .channel<ResizeRequest>("image.resize")
+  .request<ResizeResult>(
+    { imageUrl: "https://cdn.example.com/photo.jpg", width: 800, height: 600 },
+    { timeout: 30_000 }, // default: 30 s
+  );
+
+console.log("Resized image URL:", result.processedUrl);
+```
+
+Herald:
+1. Creates a temporary exclusive reply queue
+2. Publishes your message with `replyTo` and `correlationId` properties set
+3. Waits for a matching reply
+4. Resolves the promise with the typed response or rejects after the timeout
+
+## Responder side
+
+Register a handler with `channel.respond()`. The return value of your handler becomes the response:
+
+```typescript
+import { communicators } from "@warlock.js/herald";
+
+communicators()
+  .channel<ResizeRequest>("image.resize")
+  .respond<ResizeResult>(async (message) => {
+    const { imageUrl, width, height } = message.payload;
+
+    const processed = await resizeImage(imageUrl, width, height);
+
+    return {
+      processedUrl: processed.url,
+      durationMs: processed.durationMs,
+    };
+  });
+```
+
+Herald automatically calls `ctx.reply(response)` and `ctx.ack()` after your handler returns.
+
+## Timeout handling
+
+If no reply arrives within the timeout window, `request()` rejects with an error:
+
+```typescript
+import { communicators } from "@warlock.js/herald";
+
+try {
+  const result = await communicators()
+    .channel<{ query: string }>("search.execute")
+    .request<{ results: string[] }>(
+      { query: "warlock.js" },
+      { timeout: 5_000 },
+    );
+} catch (error) {
+  if (error instanceof Error && error.message.includes("Request timeout")) {
+    // Handle timeout gracefully
+    return { results: [] };
+  }
+  throw error;
+}
+```
+
+## Manual reply via ctx
+
+When you need the responder to have full control over acknowledgement — for example when you want to nack on errors — use `ctx.reply()` directly inside a regular `subscribe()` handler:
+
+```typescript
+import { communicators } from "@warlock.js/herald";
+
+communicators()
+  .channel<{ query: string }>("search.execute")
+  .subscribe(async (message, ctx) => {
+    try {
+      const results = await runSearch(message.payload.query);
+      await ctx.reply({ results });
+      await ctx.ack();
+    } catch (error) {
+      await ctx.nack(false); // don't requeue; let the requester time out
+    }
+  });
+```
+
+## Full worked example
+
+```typescript
+// === responder.ts — runs in the worker process ===
+import { connectToCommunicator, communicators } from "@warlock.js/herald";
+
+await connectToCommunicator({ driver: "rabbitmq", host: "localhost" });
+
+communicators()
+  .channel<{ a: number; b: number }>("math.add")
+  .respond<{ sum: number }>(async (message) => {
+    const { a, b } = message.payload;
+    return { sum: a + b };
+  });
+```
+
+```typescript
+// === requester.ts — runs in the API process ===
+import { connectToCommunicator, communicators } from "@warlock.js/herald";
+
+await connectToCommunicator({ driver: "rabbitmq", host: "localhost" });
+
+const response = await communicators()
+  .channel<{ a: number; b: number }>("math.add")
+  .request<{ sum: number }>({ a: 3, b: 4 });
+
+console.log(response.sum); // 7
+```
+
+## Notes
+
+- Each `request()` call creates and tears down its own exclusive reply queue. This is the standard AMQP RPC pattern and is safe under concurrent load.
+- The `respond()` handler should be idempotent where possible — network issues can cause re-delivery.
+- For long-running background jobs prefer fire-and-forget events with a separate completion event rather than RPC.

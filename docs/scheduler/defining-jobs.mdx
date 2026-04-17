@@ -1,0 +1,214 @@
+---
+sidebar_position: 2
+---
+
+# Defining Jobs
+
+A **job** pairs a unique name with an async callback and a schedule. Use the `job()` factory function to create one, then chain timing methods to describe when it should run.
+
+```ts
+import { job } from "@warlock.js/scheduler";
+
+const myJob = job("my-job", async (j) => {
+  console.log("Running:", j.name);
+});
+```
+
+The callback receives the `Job` instance so you can inspect its `name`, `lastRun`, and `isRunning` properties at execution time.
+
+## Preset Intervals
+
+These convenience methods cover the most common schedules:
+
+```ts
+import { job } from "@warlock.js/scheduler";
+
+job("every-second",    task).everySecond();
+job("every-minute",    task).everyMinute();
+job("hourly",          task).everyHour();
+job("daily",           task).daily();         // alias for everyDay()
+job("weekly",          task).weekly();        // alias for everyWeek()
+job("monthly",         task).monthly();       // alias for everyMonth()
+job("yearly",          task).yearly();        // alias for everyYear()
+job("twice-a-day",     task).twiceDaily();    // every 12 hours
+job("always-running",  task).always();        // alias for everyMinute()
+```
+
+## Custom Intervals
+
+Use `every(value, unit)` when the presets don't fit:
+
+```ts
+import { job } from "@warlock.js/scheduler";
+
+job("every-5-min",   task).every(5, "minute");
+job("every-2-hours", task).every(2, "hour");
+job("every-3-days",  task).every(3, "day");
+```
+
+Plural shortcuts are also available:
+
+```ts
+job("poll", task).everySeconds(30);
+job("sync", task).everyMinutes(15);
+job("report", task).everyHours(6);
+```
+
+Available time units: `"second"`, `"minute"`, `"hour"`, `"day"`, `"week"`, `"month"`, `"year"`.
+
+## Targeting a Specific Time — `at()`
+
+Chain `.at()` to run a job at a precise time of day. Accepts `HH:mm` or `HH:mm:ss` format:
+
+```ts
+import { job } from "@warlock.js/scheduler";
+
+// Daily at 3 AM
+job("nightly-cleanup", cleanupFn).daily().at("03:00");
+
+// Every Monday at 9:30 AM
+job("weekly-report", reportFn).weekly().on("monday").at("09:30");
+
+// 1st of month at exactly midnight
+job("billing", billingFn).monthly().on(1).at("00:00");
+```
+
+## Targeting a Specific Day — `on()`
+
+Pass a day-of-week string or a day-of-month number:
+
+```ts
+import { job } from "@warlock.js/scheduler";
+
+// Day of week (string)
+job("monday-standup",   task).weekly().on("monday");
+job("friday-report",    task).weekly().on("friday");
+
+// Day of month (number 1–31)
+job("mid-month-sync",   task).monthly().on(15);
+job("end-of-month",     task).monthly().on(31);
+```
+
+Valid day-of-week strings: `"sunday"`, `"monday"`, `"tuesday"`, `"wednesday"`, `"thursday"`, `"friday"`, `"saturday"`.
+
+:::caution
+Passing a number outside the range 1–31 throws an error at definition time, not at runtime.
+:::
+
+## Boundary Shortcuts — `beginOf()` / `endOf()`
+
+Run a job at the very start or end of a time period:
+
+```ts
+import { job } from "@warlock.js/scheduler";
+
+// Start of every day (00:00)
+job("day-open",    task).daily().beginOf("day");
+
+// End of every day (23:59)
+job("day-close",   task).daily().endOf("day");
+
+// Start of every month (1st at 00:00)
+job("month-open",  task).monthly().beginOf("month");
+
+// End of every month (last day at 23:59)
+job("month-close", task).monthly().endOf("month");
+
+// Start of every year (Jan 1 at 00:00)
+job("year-open",   task).yearly().beginOf("year");
+
+// End of every year (Dec 31 at 23:59)
+job("year-close",  task).yearly().endOf("year");
+```
+
+`beginOf` and `endOf` support `"day"`, `"month"`, and `"year"`.
+
+## Cron Expressions
+
+When you need a schedule that the fluent API can't express directly, use `.cron()`:
+
+```ts
+import { job } from "@warlock.js/scheduler";
+
+// 9 AM Mon–Fri
+job("standup", sendReminder).cron("0 9 * * 1-5");
+
+// Every 5 minutes
+job("cache-warm", warmCache).cron("*/5 * * * *");
+
+// 2:30 PM on the 15th of every month
+job("billing-reminder", sendReminder).cron("30 14 15 * *");
+
+// Every 2 hours
+job("report", generateReport).cron("0 */2 * * *");
+```
+
+:::info
+`.cron()` and the fluent timing methods are mutually exclusive. Calling `.cron()` clears any previously set interval configuration, and vice versa.
+:::
+
+## Reading Job State
+
+After a job is added to the scheduler and running, you can inspect it:
+
+```ts
+import { scheduler } from "@warlock.js/scheduler";
+
+const j = scheduler.getJob("nightly-cleanup");
+
+if (j) {
+  console.log("Next run:", j.nextRun?.toISOString());
+  console.log("Last run:", j.lastRun?.toISOString());
+  console.log("Is running:", j.isRunning);
+  console.log("Cron expression:", j.cronExpression); // null if using fluent API
+  console.log("Intervals:", j.intervals);
+}
+```
+
+## Terminating a Job
+
+Call `.terminate()` to stop a job and clear its schedule. The job remains registered in the scheduler but will never fire again until you reconfigure it:
+
+```ts
+import { scheduler } from "@warlock.js/scheduler";
+
+const j = scheduler.getJob("temp-task");
+j?.terminate();
+```
+
+To fully remove a job from the scheduler:
+
+```ts
+scheduler.removeJob("temp-task");
+```
+
+## Adding Jobs to the Scheduler
+
+Once defined, register jobs with the scheduler:
+
+```ts
+import { scheduler, job } from "@warlock.js/scheduler";
+
+// Fluent chaining on the scheduler
+scheduler
+  .addJob(job("cleanup",  cleanupFn).daily().at("03:00"))
+  .addJob(job("report",   reportFn).weekly().on("monday").at("09:00"))
+  .addJob(job("heartbeat", pingFn).everyMinutes(5));
+
+scheduler.start();
+```
+
+Or create a job directly from the scheduler instance using `newJob()`:
+
+```ts
+import { scheduler } from "@warlock.js/scheduler";
+
+scheduler
+  .newJob("cleanup", cleanupFn)
+  .daily()
+  .at("03:00");
+
+scheduler.start();
+```
+
+`newJob()` creates the job, registers it, and returns the `Job` instance for further chaining.
