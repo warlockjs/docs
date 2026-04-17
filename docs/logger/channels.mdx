@@ -1,12 +1,16 @@
 ---
-sidebar_position: 3
+sidebar_position: 2
 ---
 
-# Logger Channels
+# Channels
 
-A **channel** is a destination for log messages. Each channel receives a `LoggingData` object and decides how to store or display it. You can register multiple channels simultaneously — every log call is forwarded to all of them.
+A **channel** is a destination for log messages. Every channel receives a `LoggingData` object and decides how to store or display it. You can register multiple channels simultaneously — every log call fans out to all of them in parallel. For example, you might send everything to `ConsoleLog` during development while also routing errors to `FileLog` and `JSONFileLog` in production.
+
+---
 
 ## ConsoleLog
+
+`ConsoleLog` writes colorized, icon-prefixed lines to the terminal. It has no external dependencies and requires no configuration to use.
 
 ```ts
 import { ConsoleLog } from "@warlock.js/logger";
@@ -14,7 +18,15 @@ import { ConsoleLog } from "@warlock.js/logger";
 const channel = new ConsoleLog();
 ```
 
-Output written to the terminal looks like this:
+### Terminal output
+
+Each line follows this format:
+
+```
+{icon} ({ISO timestamp}) [{module}] [{action}] {message}
+```
+
+Real output looks like this:
 
 ```
 ⚙ (2024-03-15T10:22:00.000Z) [auth] [hashPassword] Hashing started
@@ -24,7 +36,17 @@ Output written to the terminal looks like this:
 ✓ (2024-03-15T10:22:03.890Z) [email] [send] Welcome email delivered
 ```
 
-Each part of the line is independently colorized:
+**Icons by level**
+
+| Level | Icon |
+|---|---|
+| `debug` | ⚙ |
+| `info` | ℹ |
+| `warn` | ⚠ |
+| `error` | ✗ |
+| `success` | ✓ |
+
+**Colors by part**
 
 | Part | Color |
 |---|---|
@@ -37,59 +59,97 @@ Each part of the line is independently colorized:
 | Message — `error` | Red Bright |
 | Message — `success` | Green Bright |
 
-| Level | Icon |
-|---|---|
-| `debug` | ⚙ |
-| `info` | ℹ |
-| `warn` | ⚠ |
-| `error` | ✗ |
-| `success` | ✓ |
-
-If `message` is an object, it is passed to a second `console.log` call on its own line so the browser/Node inspector can expand it.
+:::tip Object messages
+If `message` is an object, `ConsoleLog` issues a second `console.log` call with the raw object on its own line so the Node.js inspector (or browser DevTools) can expand it interactively.
+:::
 
 ### Filtering by level
+
+Pass a `levels` array to restrict which log levels this channel handles. All other levels are silently ignored.
 
 ```ts
 import { ConsoleLog } from "@warlock.js/logger";
 
+// Only surface warnings and errors in the terminal
 new ConsoleLog({
-  // Only show warnings and errors in this channel
   levels: ["warn", "error"],
 });
 ```
 
 ### Custom filter function
 
+Use `filter` for fine-grained control. Return `false` to suppress a message, `true` to allow it.
+
 ```ts
 import { ConsoleLog } from "@warlock.js/logger";
 
+// Suppress noisy health-check pings from console output
 new ConsoleLog({
-  // Suppress noisy health-check pings from console output
   filter: (data) => data.module !== "health",
 });
 ```
 
-`ConsoleLog` accepts the full `BasicLogConfigurations` shape: `levels`, `filter`, `dateFormat`, and `context`.
+### Filtering by module
+
+A common pattern is keeping the terminal focused on the subsystem you are actively working on:
+
+```ts
+import { ConsoleLog } from "@warlock.js/logger";
+
+// During local development, only show auth-related messages
+new ConsoleLog({
+  filter: (data) => data.module === "auth",
+});
+
+// Show everything except background workers
+new ConsoleLog({
+  filter: (data) => !["queue", "scheduler"].includes(data.module),
+});
+
+// Errors always pass through, info only for payments
+new ConsoleLog({
+  filter: (data) =>
+    data.type === "error" || data.module === "payments",
+});
+```
+
+`ConsoleLog` accepts the `BasicLogConfigurations` shape: `levels`, `filter`, and `dateFormat`.
 
 ---
 
 ## FileLog
+
+`FileLog` writes plain-text log lines to disk. Log entries are buffered in memory (up to 100 messages) and flushed to disk every 5 seconds or whenever the buffer is full.
 
 ```ts
 import { FileLog } from "@warlock.js/logger";
 
 const channel = new FileLog({
   storagePath: process.cwd() + "/storage/logs",
-  name: "app",
   chunk: "daily",
-  rotate: true,
 });
 ```
 
-Each line written to the file follows this format:
+### File format
+
+Each line follows this format:
+
+```
+[date time] [level] [module][action]: message
+```
+
+Real output looks like this:
 
 ```
 [15-03-2024 10:22:01] [info] [users][register]: New user created
+[15-03-2024 10:22:03] [error] [payments][charge]: Card declined
+```
+
+### Error objects
+
+When the logged `message` is an `Error` instance, `FileLog` writes the `.message` first, then a `[trace]` marker, then the full `.stack`:
+
+```
 [15-03-2024 10:22:03] [error] [payments][charge]: Card declined
 [trace]
 Error: Card declined
@@ -97,103 +157,58 @@ Error: Card declined
     at processTicksAndRejections (node:internal/process/task_queues:95:5)
 ```
 
-`Error` objects are handled automatically — the `.message` and full `.stack` are both written.
+### File naming and chunking
 
-### All config options
+The `chunk` option controls how entries are split across files.
+
+| Value | Description | Example filename |
+|---|---|---|
+| `"single"` | One file for all entries (default) | `app.log` |
+| `"daily"` | One file per calendar day | `15-03-2024.log` |
+| `"hourly"` | One file per hour | `15-03-2024-10-00-00-am.log` |
 
 ```ts
 import { FileLog } from "@warlock.js/logger";
 
+// One file per day — good balance of granularity and file count
 new FileLog({
-  /**
-   * Directory where log files are stored.
-   * @default process.cwd() + "/storage/logs"
-   */
   storagePath: process.cwd() + "/storage/logs",
-
-  /**
-   * Base file name (without extension).
-   * Only used when chunk is "single".
-   * @default "app"
-   */
-  name: "app",
-
-  /**
-   * File extension.
-   * @default "log"
-   */
-  extension: "log",
-
-  /**
-   * How to split entries across files.
-   *   "single"  — one file for everything (e.g. app.log)
-   *   "daily"   — one file per day      (e.g. 15-03-2024.log)
-   *   "hourly"  — one file per hour     (e.g. 15-03-2024-10-00-00-am.log)
-   * @default "single"
-   */
   chunk: "daily",
+});
 
-  /**
-   * Rotate the active file when it exceeds maxFileSize.
-   * @default true
-   */
-  rotate: true,
-
-  /**
-   * Maximum file size in bytes before rotation is triggered.
-   * @default 10485760 (10 MB)
-   */
-  maxFileSize: 10 * 1024 * 1024,
-
-  /**
-   * Day.js format string appended to the rotated file's name.
-   * @default "DD-MM-YYYY"
-   */
-  rotateFileName: "DD-MM-YYYY",
-
-  /**
-   * Number of messages to buffer in memory before flushing to disk.
-   * The buffer is also flushed automatically every 5 seconds.
-   * @default 100
-   */
-  maxMessagesToWrite: 100,
-
-  /**
-   * Group log entries into sub-directories.
-   * Order matters — ["level", "module"] creates:
-   *   storage/logs/error/users/app.log
-   */
-  groupBy: ["level", "module"],
-
-  /** Restrict which log levels this channel handles (default: all). */
-  levels: ["info", "warn", "error"],
-
-  /** Custom filter predicate. Return false to suppress a message. */
-  filter: (data) => data.module !== "health",
-
-  /** Day.js format strings for the date and time shown in each line. */
-  dateFormat: {
-    date: "DD-MM-YYYY",
-    time: "HH:mm:ss",
-  },
+// One file per hour — useful for high-volume services
+new FileLog({
+  storagePath: process.cwd() + "/storage/logs",
+  chunk: "hourly",
 });
 ```
 
 ### File rotation
 
-When `rotate: true` and the active file reaches `maxFileSize`, it is renamed with a timestamp suffix and a fresh file is started:
+When `rotate: true`, `FileLog` checks the active file size before each write. Once the file exceeds `maxFileSize` bytes, it is renamed with a timestamp suffix and a fresh file is opened:
 
 ```
 storage/logs/
-├── app.log                              ← active file
+├── app.log                              ← active file (fresh after rotation)
 └── app-15-03-2024-1710494523000.log     ← rotated archive
 ```
 
-The rotated file name is built as `{name}-{rotateFileName}-{Date.now()}.{extension}`.
+The rotated file name is composed as `{name}-{rotateFileName}-{Date.now()}.{extension}`. Control the date portion with the `rotateFileName` Day.js format string.
+
+```ts
+import { FileLog } from "@warlock.js/logger";
+
+new FileLog({
+  storagePath: process.cwd() + "/storage/logs",
+  rotate: true,
+  maxFileSize: 10 * 1024 * 1024, // 10 MB
+  rotateFileName: "DD-MM-YYYY",  // → app-15-03-2024-1710494523000.log
+});
+```
 
 ### Grouping into sub-directories
 
-`groupBy` arranges entries into a directory hierarchy instead of writing everything to one flat file. Order determines the nesting depth.
+`groupBy` arranges log files into a directory hierarchy instead of writing everything to one flat file. Values map directly to `LoggingData` fields. **Order determines nesting depth.**
 
 ```ts
 import { FileLog } from "@warlock.js/logger";
@@ -204,7 +219,7 @@ new FileLog({
 });
 ```
 
-With this configuration the directory tree looks like:
+With `["level", "module"]` the directory tree looks like:
 
 ```
 storage/logs/
@@ -224,30 +239,152 @@ storage/logs/
         └── app.log
 ```
 
-Adding `"action"` as a third level pushes each action into its own sub-directory under the module:
+Adding `"action"` as a third level creates one file per action under each module:
 
 ```ts
-groupBy: ["level", "module", "action"],
-// → storage/logs/error/payments/charge/app.log
+new FileLog({
+  storagePath: process.cwd() + "/storage/logs",
+  groupBy: ["level", "module", "action"],
+});
+```
+
+```
+storage/logs/
+├── error/
+│   └── payments/
+│       └── charge/
+│           └── app.log
+├── info/
+│   └── users/
+│       └── register/
+│           └── app.log
+└── warn/
+    └── queue/
+        └── process/
+            └── app.log
+```
+
+### All config options
+
+```ts
+import { FileLog } from "@warlock.js/logger";
+
+new FileLog({
+  /**
+   * Directory where log files are stored.
+   * Created automatically if it does not exist.
+   * @default process.cwd() + "/storage/logs"
+   */
+  storagePath: process.cwd() + "/storage/logs",
+
+  /**
+   * Base file name (without extension).
+   * Used as the leaf file name for all chunk modes.
+   * @default "app"
+   */
+  name: "app",
+
+  /**
+   * File extension appended to the log file name.
+   * Ignored by JSONFileLog, which always uses "json".
+   * @default "log"
+   */
+  extension: "log",
+
+  /**
+   * How to split entries across files.
+   *   "single"  — one file for everything       → app.log
+   *   "daily"   — one file per calendar day     → 15-03-2024.log
+   *   "hourly"  — one file per clock hour       → 15-03-2024-10-00-00-am.log
+   * @default "single"
+   */
+  chunk: "daily",
+
+  /**
+   * Enable file rotation when the active file exceeds maxFileSize.
+   * The full file is renamed before a new one is opened.
+   * @default false
+   */
+  rotate: true,
+
+  /**
+   * Maximum file size in bytes before rotation is triggered.
+   * Only checked when rotate is true.
+   * @default 10485760 (10 MB)
+   */
+  maxFileSize: 10 * 1024 * 1024,
+
+  /**
+   * Day.js format string used in the rotated file's name.
+   * Results in: {name}-{rotateFileName}-{Date.now()}.{extension}
+   * @default "DD-MM-YYYY"
+   */
+  rotateFileName: "DD-MM-YYYY",
+
+  /**
+   * Maximum number of messages to hold in memory before flushing to disk.
+   * The buffer is also flushed automatically every 5 seconds.
+   * @default 100
+   */
+  maxMessagesToWrite: 100,
+
+  /**
+   * Arrange log files into a subdirectory hierarchy.
+   * Values map to LoggingData fields: "level", "module", "action".
+   * Order determines nesting depth — first entry is the top-level directory.
+   * @example ["level", "module"] → storage/logs/error/payments/app.log
+   */
+  groupBy: ["level", "module"],
+
+  /**
+   * Restrict which log levels this channel handles.
+   * Omit (or pass an empty array) to handle all levels.
+   */
+  levels: ["info", "warn", "error"],
+
+  /**
+   * Custom filter predicate. Return false to suppress a message.
+   * Evaluated after the levels check.
+   */
+  filter: (data) => data.module !== "health",
+
+  /**
+   * Day.js format strings for the date and time written in each log line.
+   * Defaults to the logger's global dateFormat setting.
+   */
+  dateFormat: {
+    date: "DD-MM-YYYY",
+    time: "HH:mm:ss",
+  },
+});
 ```
 
 ---
 
 ## JSONFileLog
 
+`JSONFileLog` is a drop-in replacement for `FileLog` that writes structured JSON files instead of plain text. Every log entry is a typed object — no regex parsing needed.
+
 ```ts
 import { JSONFileLog } from "@warlock.js/logger";
 
 const channel = new JSONFileLog({
   storagePath: process.cwd() + "/storage/logs",
-  name: "app",
   chunk: "daily",
 });
 ```
 
-`JSONFileLog` is a drop-in replacement for `FileLog` that writes structured `.json` files instead of plain text. The file extension is always `json` regardless of the `extension` option.
+:::note Channel name
+`JSONFileLog` registers under the internal channel name `"fileJson"` — **not** `"json"`. Use the correct name when looking up the channel at runtime:
 
-Each file is a JSON object with a `messages` array. Every entry is a complete structured object — no line-by-line parsing needed:
+```ts
+const jsonChannel = log.channel("fileJson");
+```
+:::
+
+### File format
+
+The extension is always `json` regardless of the `extension` option. Each file is a JSON object with a `messages` array:
 
 ```json
 {
@@ -257,8 +394,7 @@ Each file is a JSON object with a `messages` array. Every entry is a complete st
       "level": "info",
       "date": "15-03-2024 10:22:01",
       "module": "users",
-      "action": "register",
-      "timestamp": "2024-03-15T10:22:01.482Z"
+      "action": "register"
     },
     {
       "content": "Card declined",
@@ -270,44 +406,41 @@ Each file is a JSON object with a `messages` array. Every entry is a complete st
         "Error: Card declined",
         "    at chargeCard (/app/src/payments.ts:42:11)",
         "    at processTicksAndRejections (node:internal/process/task_queues:95:5)"
-      ],
-      "context": { "orderId": "ord_9f2a", "amount": 4999 },
-      "timestamp": "2024-03-15T10:22:03.111Z"
+      ]
     }
   ]
 }
 ```
 
-Key differences from `FileLog`:
+### Differences from FileLog
 
-- `Error` objects have their `.stack` split on newlines and stored as a `string[]` — easier to query in a log aggregator.
-- The `context` field from `LoggingData` is preserved as a plain object.
-- The `content` field holds the string message, not a pre-formatted log line.
+| Aspect | FileLog | JSONFileLog |
+|---|---|---|
+| Output format | Plain text lines | JSON object with `messages` array |
+| Error stack | Written as a raw multi-line string after `[trace]` | Split on newlines, stored as `string[]` in `stack` |
+| Message field | Pre-formatted log line | `content` field holds the original string |
+| File extension | Configurable (default `"log"`) | Always `"json"` |
 
-`JSONFileLog` inherits all `FileLog` options and supports the same rotation, chunking, and `groupBy` features.
-
-:::note Channel name
-`JSONFileLog` registers under the internal channel name `"fileJson"` (not `"json"`). Use this when retrieving the channel by name:
-
-```ts
-const jsonChannel = log.channel("fileJson");
-```
+:::tip Error stacks as arrays
+Storing the stack as `string[]` rather than a raw string makes it trivial to query in log aggregators like Elasticsearch, Loki, or Datadog — no string-splitting at query time.
 :::
+
+`JSONFileLog` inherits all `FileLog` options and supports the same [chunking](#file-naming-and-chunking), [rotation](#file-rotation), and [`groupBy`](#grouping-into-sub-directories) features.
 
 ---
 
 ## Custom channels
 
-Extend `LogChannel` and implement the `log` method. The abstract base class handles configuration merging, level filtering, the `filter` predicate, and date formatting automatically.
+Extend `LogChannel` and implement the `log` method. The abstract base class handles configuration merging, level filtering, the `filter` predicate, and date formatting for you.
 
-### Working example — SlackLog
+### Complete example — SlackLog
 
 ```ts title="src/channels/slack-log.ts"
 import { LogChannel, type LoggingData } from "@warlock.js/logger";
 
 type SlackConfig = {
   webhookUrl: string;
-  /** Only forward these levels to Slack. Defaults to all levels. */
+  /** Forward only these levels to Slack. Omit to forward all levels. */
   levels?: ("error" | "warn")[];
 };
 
@@ -315,7 +448,7 @@ export class SlackLog extends LogChannel<SlackConfig> {
   public name = "slack";
 
   public async log(data: LoggingData) {
-    // Respect the configured levels and filter predicate
+    // shouldBeLogged checks both the levels list and the filter predicate
     if (!this.shouldBeLogged(data)) return;
 
     const { type, module, action, message } = data;
@@ -334,39 +467,35 @@ export class SlackLog extends LogChannel<SlackConfig> {
 Register it alongside the built-in channels:
 
 ```ts title="src/config/log.ts"
-import { ConsoleLog } from "@warlock.js/logger";
+import { ConsoleLog, FileLog } from "@warlock.js/logger";
 import { SlackLog } from "../channels/slack-log";
-import type { LogConfigurations } from "@warlock.js/core";
 
-const logConfigurations: LogConfigurations = {
-  enabled: true,
-  channels: [new ConsoleLog()],
-  production: {
-    channels: [
-      new ConsoleLog(),
-      new SlackLog({
-        webhookUrl: process.env.SLACK_WEBHOOK_URL!,
-        levels: ["error", "warn"],
-      }),
-    ],
-  },
-};
-
-export default logConfigurations;
+const channels = [
+  new ConsoleLog(),
+  new FileLog({ chunk: "daily" }),
+  new SlackLog({
+    webhookUrl: process.env.SLACK_WEBHOOK_URL!,
+    levels: ["error", "warn"],
+  }),
+];
 ```
 
-### One-time async initialization
+### The `init()` hook
 
-Override the protected `init()` hook for any setup that should run once after construction — opening a socket, connecting to a remote service, preparing a write stream, etc. The logger waits for `init()` to resolve before the channel is marked ready.
+Override the protected `init()` method for any one-time setup that should happen after construction — opening a socket, establishing a database connection, preparing a write stream, etc.
 
 ```ts
 import { LogChannel, type LoggingData } from "@warlock.js/logger";
 
-export class DatabaseLog extends LogChannel {
+type DbConfig = { connectionString: string };
+
+export class DatabaseLog extends LogChannel<DbConfig> {
   public name = "database";
   private client!: SomeDbClient;
 
   protected async init() {
+    // Runs once, automatically, after the channel is constructed.
+    // The logger waits for this promise before marking the channel ready.
     this.client = await SomeDbClient.connect(this.config("connectionString"));
   }
 
@@ -383,21 +512,33 @@ export class DatabaseLog extends LogChannel {
 |---|---|---|
 | `name` | `string` | Unique identifier for this channel |
 | `description` | `string?` | Optional human-readable description |
-| `terminal` | `boolean` | `true` if output goes to a terminal; ANSI codes are preserved. `false` (default) strips them via `clearMessage()` |
+| `terminal` | `boolean` | `true` if output goes to a terminal. ANSI codes are preserved when `true`; stripped via `clearMessage()` when `false` (default) |
 | `log(data)` | abstract method | Implement your write/send logic here |
 | `shouldBeLogged(data)` | protected method | Returns `false` if `data.type` is not in `levels` or if `filter` returns `false` |
 | `config(key)` | protected method | Type-safe accessor that merges provided options with channel defaults |
-| `getDateAndTimeFormat()` | protected method | Returns `{ date, time }` Day.js format strings from config |
+| `getDateAndTimeFormat()` | protected method | Returns `{ date, time }` Day.js format strings resolved from config |
 | `init()` | protected hook | Optional async setup called once after construction |
 | `defaultConfigurations` | protected field | Override in subclasses to provide option defaults (merged with user-supplied config) |
-| `withBasicConfigurations(config)` | protected method | Factory helper that merges a partial config with `filter: () => true` as baseline |
+| `withBasicConfigurations(config)` | protected method | Factory helper that merges a partial config with a pass-through `filter` as the baseline |
 
-### The `clearMessage` utility
+:::note No built-in flushSync
+None of the built-in channels (`ConsoleLog`, `FileLog`, `JSONFileLog`) implement a `flushSync` method. `FileLog` flushes its buffer automatically every 5 seconds or when the buffer reaches `maxMessagesToWrite`.
+:::
 
-When `terminal` is `false`, the logger strips ANSI escape codes from string messages automatically before passing them to your channel. The helper is also exported if you need it directly:
+---
+
+## clearMessage utility
+
+When `terminal` is `false` (the default for every built-in file channel), the logger automatically strips ANSI escape codes from string messages before passing them to the channel. This ensures log files contain clean text with no color codes.
+
+The helper is also exported directly for use in your own code:
 
 ```ts
 import { clearMessage } from "@warlock.js/logger";
 
-const plain = clearMessage("\u001b[32mHello\u001b[0m"); // → "Hello"
+const raw = "\u001b[32mDeployment succeeded\u001b[0m";
+const plain = clearMessage(raw);
+// → "Deployment succeeded"
 ```
+
+`clearMessage` accepts any value. Non-string values are returned as-is; only string values containing ANSI escape sequences are modified.

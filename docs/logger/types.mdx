@@ -2,9 +2,11 @@
 sidebar_position: 5
 ---
 
-# Logger Types
+# Types
 
-This page documents every public type and interface exported from `src/types.ts` in `@warlock.js/logger`. Use this as the definitive reference when writing custom channels, configuring the logger, or typing log data in your application code.
+All public TypeScript types exported from `@warlock.js/logger`.
+
+---
 
 ## `LogLevel`
 
@@ -12,15 +14,13 @@ This page documents every public type and interface exported from `src/types.ts`
 type LogLevel = "debug" | "info" | "warn" | "error" | "success";
 ```
 
-**Import**
-
 ```ts
 import { type LogLevel } from "@warlock.js/logger";
 ```
 
-`LogLevel` is used wherever the logger needs to identify the severity of a log entry. The five values map directly to the five shorthand methods on the `Log` interface:
+The severity label attached to every log entry. All five shorthand methods on `Log` correspond to a value of this type.
 
-| Value | When it applies |
+| Value | When to use |
 |---|---|
 | `"debug"` | Development diagnostics, variable dumps, flow tracing |
 | `"info"` | Normal operational events (user registered, job queued) |
@@ -36,40 +36,50 @@ import { type LogLevel } from "@warlock.js/logger";
 type DebugMode = "daily" | "monthly" | "yearly" | "hourly";
 ```
 
-`DebugMode` is the subset of `FileLogConfig.chunk` values that control **time-based log file rotation**. Each value tells the file channel to start a new log file at the corresponding time boundary:
+```ts
+import { type DebugMode } from "@warlock.js/logger";
+```
+
+The time-based subset of values accepted by `FileLog.chunk`. Use it when you need to type a variable that holds a rotation interval.
 
 | Value | Rotation boundary |
 |---|---|
-| `"hourly"` | A new file every hour |
-| `"daily"` | A new file every day |
-| `"monthly"` | A new file every calendar month |
-| `"yearly"` | A new file every year |
+| `"hourly"` | New file every hour |
+| `"daily"` | New file every day |
+| `"monthly"` | New file every calendar month |
+| `"yearly"` | New file every year |
 
-Note that `FileLogConfig.chunk` also accepts `"single"` (write everything to one file forever), but `"single"` is not part of `DebugMode` — `DebugMode` covers only the time-based rotation variants.
+:::note
+`FileLog.chunk` also accepts `"single"` (one file, no rotation). `"single"` is **not** part of `DebugMode` — `DebugMode` covers only the time-based variants.
+:::
 
 ---
 
 ## `LoggingData`
 
-`LoggingData` is the shape callers pass into the logger. It is the primary input type for both the callable form (`log(data)`) and the object-argument overloads of the level methods.
-
 ```ts
 type LoggingData = {
-  type: "info" | "debug" | "warn" | "error" | "success";
-  module: string;
   action: string;
-  message: any;
   context?: Record<string, any>;
+  message: any;
+  module: string;
+  type: LogLevel;
 };
 ```
 
+```ts
+import { type LoggingData } from "@warlock.js/logger";
+```
+
+The primary input shape — what callers pass to `log(data)` or to the object-argument overloads of the level methods.
+
 | Field | Required | Description |
 |---|---|---|
-| `type` | yes | Log severity level |
-| `module` | yes | Feature area or source module identifier |
 | `action` | yes | Specific operation being performed |
-| `message` | yes | The log content — string, object, or `Error` |
 | `context` | no | Free-form metadata attached to this entry |
+| `message` | yes | Log content — string, object, or `Error` |
+| `module` | yes | Feature area or source module identifier |
+| `type` | yes | Severity level |
 
 **Example**
 
@@ -77,15 +87,11 @@ type LoggingData = {
 import { log, type LoggingData } from "@warlock.js/logger";
 
 const entry: LoggingData = {
-  type: "error",
-  module: "orders",
   action: "checkout",
+  context: { amount: 4999, orderId: "ord_9f2a", userId: 101 },
   message: "Card declined",
-  context: {
-    orderId: "ord_9f2a",
-    userId: 101,
-    amount: 4999,
-  },
+  module: "orders",
+  type: "error",
 };
 
 await log(entry);
@@ -99,124 +105,209 @@ await log(entry);
 type OmittedLoggingData = Omit<LoggingData, "type">;
 ```
 
-`OmittedLoggingData` is `LoggingData` with the `type` field removed. It is used by the object-argument overloads of the shorthand level methods (`log.info(data)`, `log.error(data)`, etc.) so callers do not need to repeat the log level — the method name already carries it.
+```ts
+import { type OmittedLoggingData } from "@warlock.js/logger";
+```
+
+`LoggingData` with `type` removed. Used by the object-argument overloads of the shorthand level methods (`log.info(data)`, `log.error(data)`, etc.) so callers do not repeat the level — the method name already carries it.
+
+**Example**
+
+```ts
+import { log, type OmittedLoggingData } from "@warlock.js/logger";
+
+const data: OmittedLoggingData = {
+  action: "checkout",
+  message: "Card declined",
+  module: "orders",
+};
+
+await log.error(data);
+```
 
 ---
 
 ## `BasicLogConfigurations`
 
-`BasicLogConfigurations` is the optional configuration object accepted by logger initialization. All fields are optional.
-
 ```ts
 interface BasicLogConfigurations {
-  levels?: LogLevel[];
   dateFormat?: {
-    date?: string;
-    time?: string;
+    date?: string; // Day.js format, default: "DD-MM-YYYY"
+    time?: string; // Day.js format, default: "HH:mm:ss"
   };
   filter?: (data: LoggingData) => boolean;
+  levels?: LogLevel[];
 }
 ```
 
+```ts
+import { type BasicLogConfigurations } from "@warlock.js/logger";
+```
+
+The optional configuration object accepted by logger and channel initialization. All three fields are optional — omit any you do not need.
+
+:::note
+`BasicLogConfigurations` has exactly **3 fields**: `dateFormat`, `filter`, and `levels`. There is no `context` field.
+:::
+
 | Field | Description |
 |---|---|
-| `levels` | Whitelist of log levels to process; entries at unlisted levels are dropped |
-| `dateFormat.date` | Custom date format string applied to every log entry |
-| `dateFormat.time` | Custom time format string applied to every log entry |
+| `dateFormat.date` | Day.js format string for the date portion of each entry (default: `"DD-MM-YYYY"`) |
+| `dateFormat.time` | Day.js format string for the time portion of each entry (default: `"HH:mm:ss"`) |
 | `filter` | Predicate called before writing; return `false` to suppress the entry |
+| `levels` | Whitelist of levels to process; entries at unlisted levels are silently dropped |
+
+**Example**
+
+```ts
+import { createLogger, type BasicLogConfigurations } from "@warlock.js/logger";
+
+const config: BasicLogConfigurations = {
+  dateFormat: { date: "YYYY/MM/DD", time: "HH:mm" },
+  filter: (data) => data.module !== "healthcheck",
+  levels: ["warn", "error"],
+};
+
+createLogger(config);
+```
 
 ---
 
 ## `LogMessage`
 
-`LogMessage` is the **internal formatted shape** produced by the logger after it processes a `LoggingData` entry. Channels receive a `LogMessage`, not a raw `LoggingData`.
-
 ```ts
 interface LogMessage {
-  content: string;
-  level: LogLevel;
-  date: string;
-  module: string;
   action: string;
-  stack?: string;
   context?: Record<string, any>;
+  content: string;
+  date: string;
+  level: LogLevel;
+  module: string;
+  stack?: string;
 }
 ```
 
+```ts
+import { type LogMessage } from "@warlock.js/logger";
+```
+
+The internal formatted shape produced by the logger after processing a `LoggingData` entry. Channels receive a `LogMessage` — not a raw `LoggingData`. This is the type you work with when implementing a custom channel.
+
 | Field | Required | Description |
 |---|---|---|
-| `content` | yes | Formatted log message text |
-| `level` | yes | Severity level of the entry |
-| `date` | yes | Date portion, formatted according to `dateFormat.date` |
-| `module` | yes | Source module identifier from the original `LoggingData` |
 | `action` | yes | Action name from the original `LoggingData` |
-| `stack` | no | Stack trace string, populated when `message` is an `Error` |
-| `context` | no | Merged context — combines caller-supplied data with channel-level enrichment |
+| `context` | no | Caller-supplied context metadata |
+| `content` | yes | Formatted log message text |
+| `date` | yes | Date/time string, formatted per `dateFormat` config |
+| `level` | yes | Severity level of the entry |
+| `module` | yes | Source module identifier from the original `LoggingData` |
+| `stack` | no | Stack trace — present when `message` was an `Error` |
 
-This is the type you work with when implementing a custom channel via `LogContract` or extending `LogChannel`.
+:::note
+`stack` is a `string` in `FileLog` but a `string[]` in `JSONFileLog`.
+:::
 
 ---
 
 ## `LogContract`
 
-`LogContract` is the interface every log channel must satisfy. Implement it directly when you need full control over the channel lifecycle, or extend `LogChannel` (which provides sensible defaults) for the common case.
-
 ```ts
 interface LogContract {
-  name: string;
   description?: string;
-  terminal?: boolean;
-  log(data: LoggingData): void | Promise<void>;
   flushSync?(): void;
+  log(data: LoggingData): void | Promise<void>;
+  name: string;
+  terminal?: boolean;
 }
 ```
 
-| Field | Required | Description |
+```ts
+import { type LogContract } from "@warlock.js/logger";
+```
+
+The interface every log channel must satisfy. Implement it directly for full control (e.g. remote aggregators, database sinks); extend `LogChannel` when you want built-in date formatting, level filtering, and `BasicLogConfigurations` support for free.
+
+| Member | Required | Description |
 |---|---|---|
-| `name` | yes | Unique channel identifier used to look up the channel at runtime |
 | `description` | no | Human-readable description of what the channel does |
-| `terminal` | no | Set to `true` if this channel writes to a terminal (enables color formatting in the core) |
-| `log(data)` | yes | Entry point called by the logger for every log entry; may be async |
 | `flushSync()` | no | Synchronous flush; implement when the channel buffers entries in memory |
+| `log(data)` | yes | Entry point called by the logger for every entry; may be async |
+| `name` | yes | Unique channel identifier used to look up the channel at runtime |
+| `terminal` | no | Set `true` if this channel writes to a terminal (enables color formatting in core) |
 
-**When to implement `LogContract` directly vs. extending `LogChannel`**
+**Minimal custom channel**
 
-Implement `LogContract` directly when you are integrating with an external system (e.g. a remote log aggregator or a database) and you do not need any of the built-in formatting helpers. Extend `LogChannel` when you want the pre-built date formatting, level filtering, and `BasicLogConfigurations` support for free.
+```ts
+import { type LogContract, type LoggingData } from "@warlock.js/logger";
+
+class SlackChannel implements LogContract {
+  name = "slack";
+  description = "Posts error logs to Slack";
+
+  async log(data: LoggingData): Promise<void> {
+    if (data.type !== "error") return;
+    await postToSlack(`[${data.module}] ${data.action}: ${data.message}`);
+  }
+}
+```
 
 ---
 
 ## `Log`
 
-`Log` is the callable interface type of the `log` default export. It combines a direct call signature with the five level methods and two utility methods.
-
 ```ts
 interface Log {
-  // Direct call — pass a full LoggingData object
   (data: LoggingData): Promise<Logger>;
 
-  // Object-argument overloads
-  info(data: OmittedLoggingData): Promise<Logger>;
-  debug(data: OmittedLoggingData): Promise<Logger>;
-  warn(data: OmittedLoggingData): Promise<Logger>;
-  error(data: OmittedLoggingData): Promise<Logger>;
-  success(data: OmittedLoggingData): Promise<Logger>;
+  channel(name: string): LogChannel | undefined;
 
-  // Three-argument shorthand overloads
-  info(module: string, action: string, message: any): Promise<Logger>;
+  debug(data: OmittedLoggingData): Promise<Logger>;
   debug(module: string, action: string, message: any): Promise<Logger>;
-  warn(module: string, action: string, message: any): Promise<Logger>;
+
+  error(data: OmittedLoggingData): Promise<Logger>;
   error(module: string, action: string, message: any): Promise<Logger>;
+
+  info(data: OmittedLoggingData): Promise<Logger>;
+  info(module: string, action: string, message: any): Promise<Logger>;
+
+  success(data: OmittedLoggingData): Promise<Logger>;
   success(module: string, action: string, message: any): Promise<Logger>;
 
-  // Utilities
-  channel(name: string): LogChannel | undefined;
+  warn(data: OmittedLoggingData): Promise<Logger>;
+  warn(module: string, action: string, message: any): Promise<Logger>;
 }
 ```
 
-`log` — the package's default export — is of this type. It is a callable function that also carries the five level methods and two utility methods as properties.
+```ts
+import { log, type Log } from "@warlock.js/logger";
+```
+
+The callable interface type of the `log` default export. `log` is a function that also carries the five level methods and one utility method as properties.
+
+:::note
+`Log` does **not** expose a `flushSync` method. Flushing is handled per-channel via `LogContract.flushSync`.
+:::
 
 | Member | Description |
 |---|---|
-| `(data)` | Call `log` directly with a `LoggingData` object |
-| `log.info / debug / warn / error / success` | Shorthand methods; each accepts either an `OmittedLoggingData` object or `(module, action, message)` |
-| `log.channel(name)` | Retrieve a registered channel instance by its `name`; returns `undefined` if not found |
+| `(data)` | Call `log` directly with a full `LoggingData` object |
+| `log.debug / error / info / success / warn` | Shorthand methods; each accepts either an `OmittedLoggingData` object or `(module, action, message)` |
+| `log.channel(name)` | Retrieve a registered channel by `name`; returns `undefined` if not found |
+
+**Examples**
+
+```ts
+import { log } from "@warlock.js/logger";
+
+// Direct call
+await log({ action: "start", message: "Server online", module: "app", type: "info" });
+
+// Shorthand — object form
+await log.error({ action: "checkout", message: new Error("Card declined"), module: "orders" });
+
+// Shorthand — positional form
+await log.warn("cache", "miss", "Key not found");
+
+// Channel lookup
+const fileChannel = log.channel("file");
+```

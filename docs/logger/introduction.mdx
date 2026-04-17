@@ -2,40 +2,94 @@
 sidebar_position: 1
 ---
 
-# Logger Introduction
+# Logger
 
-`@warlock.js/logger` is the built-in logging package for Warlock.js v4. It gives you structured, multi-channel logging with five severity levels, a clean interface for passing structured data, and zero configuration needed to get started.
+> Structured, multi-channel logging for Node.js — with five severity levels, a clean three-argument API, and full TypeScript support.
 
-## Basic usage
+## Installation
 
-```ts
-import { log } from "@warlock.js/logger";
-
-// Three-argument shorthand: module, action, message
-await log.info("users", "register", "New user created");
-await log.debug("auth", "tokenRefresh", { userId: 42 });
-await log.warn("payments", "retry", "Payment gateway timeout");
-await log.error("orders", "checkout", new Error("Stripe API unreachable"));
-await log.success("email", "send", "Welcome email delivered");
+```bash
+npm install @warlock.js/logger
 ```
 
-Every call receives three pieces of context: **module**, **action**, and **message**. This trio lets you filter and search logs by feature area rather than wading through flat text lines.
+## Zero to first log
+
+:::info No channels = no output
+The logger starts with **no channels** — nothing is printed or written until you add at least one.
+:::
+
+```ts title="src/index.ts"
+import { logger, log } from "@warlock.js/logger";
+import { ConsoleLog } from "@warlock.js/logger";
+
+logger.addChannel(new ConsoleLog());
+
+await log.info("users", "register", "New user created successfully");
+```
+
+That's it. Three lines of setup, then you're logging.
+
+---
+
+## The module · action · message pattern
+
+Every log call carries three pieces of context: **module**, **action**, and **message**.
+
+```ts
+await log.info("users", "register", "New user created");
+//            ^^^^^^^ ^^^^^^^^^^ ^^^^^^^^^^^^^^^^^^^^^^
+//            module   action      message
+```
+
+This trio lets you filter and search logs by feature area — no more wading through flat text. Here are real-world examples across domains:
+
+```ts
+// Auth
+await log.info("auth", "login", "User signed in");
+await log.warn("auth", "tokenExpired", "JWT expired for session");
+
+// Payments
+await log.info("payments", "chargeInitiated", { amount: 4999, currency: "USD" });
+await log.error("payments", "chargeFailed", new Error("Stripe declined card"));
+
+// Email
+await log.success("email", "welcomeSent", "Welcome email delivered");
+await log.warn("email", "bounced", "Delivery failed — invalid address");
+
+// Orders
+await log.debug("orders", "priceCalculation", { subtotal: 120, discount: 10 });
+await log.success("orders", "fulfillment", "Order shipped via FedEx");
+```
+
+:::tip
+Use lowercase `camelCase` for both `module` and `action` — they become searchable keys in file and JSON channels.
+:::
+
+---
 
 ## The five log levels
 
-| Method | When to use |
-|---|---|
-| `log.debug()` | Development diagnostics, variable dumps, flow tracing |
-| `log.info()` | Normal operational events (user registered, job queued) |
-| `log.warn()` | Unexpected but recoverable conditions (retry, fallback) |
-| `log.error()` | Failures that need attention; accepts `Error` objects |
-| `log.success()` | Explicit happy-path confirmation (payment completed) |
+| Level | Method | When to use | Console style |
+|---|---|---|---|
+| `debug` | `log.debug()` | Dev diagnostics, variable dumps, flow tracing | dim grey |
+| `info` | `log.info()` | Normal operational events (user registered, job queued) | blue |
+| `warn` | `log.warn()` | Unexpected but recoverable conditions (retry, fallback) | yellow |
+| `error` | `log.error()` | Failures that need attention; accepts `Error` objects | red |
+| `success` | `log.success()` | Explicit happy-path confirmation (payment completed) | green |
 
-All five methods are `async` and return a `Promise<Logger>`.
+```ts
+await log.debug("cache", "miss", "Key not found, fetching from DB");
+await log.info("jobs", "queued", "SendInvoice job added to queue");
+await log.warn("api", "rateLimitApproaching", "80% of quota used");
+await log.error("db", "connectionFailed", new Error("ECONNREFUSED 5432"));
+await log.success("payments", "captured", "Payment of $49.99 captured");
+```
 
-## Structured logging with `LoggingData`
+---
 
-When you need to attach arbitrary context to a log entry, pass a `LoggingData` object instead of the three-argument form.
+## Structured logging
+
+When you need to attach arbitrary metadata, pass a `LoggingData` object instead of the three-argument shorthand.
 
 ```ts
 import { log, type LoggingData } from "@warlock.js/logger";
@@ -49,15 +103,14 @@ const entry: LoggingData = {
     orderId: "ord_9f2a",
     userId: 101,
     amount: 4999,
+    retryCount: 2,
   },
 };
 
 await log(entry);
 ```
 
-The `context` field is a free-form `Record<string, any>` — add whatever metadata helps you diagnose the problem later. File-based channels persist `context` alongside the log entry; the console channel displays it inline.
-
-### `LoggingData` interface
+The `LoggingData` type in full:
 
 ```ts
 type LoggingData = {
@@ -69,50 +122,96 @@ type LoggingData = {
 };
 ```
 
-## Logging `Error` objects
+**Use the shorthand** for simple messages. **Use `LoggingData`** when you need the `context` field — file and JSON channels persist it alongside the entry; the console channel displays it inline.
 
-Pass an `Error` instance directly as the `message`. File channels capture the full stack trace; the console channel pretty-prints it.
+---
+
+## Logging errors
+
+Pass an `Error` instance directly as the `message` argument. File channels capture the full stack trace automatically.
 
 ```ts
 try {
-  await processOrder(id);
+  await processPayment(orderId);
 } catch (err) {
-  await log.error("orders", "process", err);
+  await log.error("payments", "processPayment", err);
 }
 ```
 
-## Channels overview
+:::warning
+Always pass the raw `Error` object — do **not** stringify it first (`err.message`). Passing the object lets file channels record the full stack trace.
+:::
 
-The logger routes every call through one or more **channels**. Each channel decides how to store or display the message. Three channels ship out of the box:
+---
 
-| Channel | What it does |
-|---|---|
-| `ConsoleLog` | Colorized terminal output, one line per entry |
-| `FileLog` | Plain-text `.log` files with optional rotation and grouping |
-| `JSONFileLog` | Structured `.json` files — ideal for log aggregators |
+## `log` vs `logger`
 
-You can also create custom channels by extending `LogChannel`. See the [Channels](./channels) page for full details and the [Configurations](./configurations) page to wire everything up.
-
-## The `logger` singleton and `log` interface
-
-The package exports two ways to interact with the default logger:
-
-| Export | Type | When to use |
+| Export | Type | Typical use |
 |---|---|---|
-| `log` | Functional `Log` interface | Recommended — call `log.info(...)`, `log.error(...)` etc. directly |
-| `logger` | `Logger` class instance | When you need to call `logger.addChannel()`, `logger.setChannels()`, or `logger.configure()` imperatively |
+| `log` | Bound shorthand object | Everyday logging — `log.info(...)`, `log.error(...)` |
+| `logger` | `Logger` class instance | One-time setup — `logger.addChannel(...)`, `logger.configure(...)` |
 
-Both `log` and `logger` target the same underlying instance. The `log` object is a callable function that also has the five level methods bound to it.
+Both target the same underlying instance. Calling `log.info(...)` is identical to calling `logger.info(...)`.
+
+```ts
+import { log, logger } from "@warlock.js/logger";
+
+// These are equivalent:
+await log.info("users", "login", "User signed in");
+await logger.info("users", "login", "User signed in");
+
+// Only logger exposes the setup API:
+logger.addChannel(new ConsoleLog());
+logger.configure({ levels: ["warn", "error"] });
+logger.setChannels([new ConsoleLog(), new FileLog()]);
+```
+
+The `log` object binds exactly: `info`, `debug`, `warn`, `error`, `success`, and `channel`.
+
+---
+
+## Built-in channels
+
+| Channel | Name | What it does |
+|---|---|---|
+| `ConsoleLog` | `"console"` | Colorized terminal output, one line per entry |
+| `FileLog` | `"file"` | Plain-text `.log` files with `"single"`, `"daily"`, or `"hourly"` rotation |
+| `JSONFileLog` | `"fileJson"` | Structured `.json` files — ideal for log aggregators |
+
+See the [Channels](./channels) page for full configuration options and examples.
+
+---
 
 ## Utilities
 
-Two utilities ship alongside the core logger:
+### `captureAnyUnhandledRejection()`
 
-```ts
-import { captureAnyUnhandledRejection } from "@warlock.js/logger";
+Registers process-level handlers for `unhandledRejection` and `uncaughtException`. Both are forwarded to `log.error()` with `module: "app"`. Call it once at startup.
 
-// Automatically log unhandledRejection and uncaughtException events
+```ts title="src/index.ts"
+import { logger, log, captureAnyUnhandledRejection } from "@warlock.js/logger";
+import { ConsoleLog } from "@warlock.js/logger";
+
+logger.addChannel(new ConsoleLog());
 captureAnyUnhandledRejection();
+
+// From here, unhandled promise rejections and uncaught exceptions
+// are automatically logged before the process exits.
 ```
 
-`captureAnyUnhandledRejection()` hooks into Node.js's `unhandledRejection` and `uncaughtException` process events and routes them through `log.error()`. Both events are logged with module `"app"` — rejections under action `"unhandledRejection"`, exceptions under action `"uncaughtException"`. Call it once during app startup.
+### `clearMessage()`
+
+Strips ANSI escape codes from a string. Useful when you need clean output for non-terminal destinations.
+
+```ts
+import { clearMessage } from "@warlock.js/logger";
+
+clearMessage("\u001b[32mHello\u001b[0m"); // → "Hello"
+```
+
+---
+
+## What's next
+
+- [Channels](./channels) — configure `ConsoleLog`, `FileLog`, and `JSONFileLog` output destinations
+- [Setup](./setup) — wire multiple channels together and configure env-based log levels
