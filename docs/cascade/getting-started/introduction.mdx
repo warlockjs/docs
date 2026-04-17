@@ -6,30 +6,46 @@ sidebar_position: 1
 
 > **Part of the [Warlock.js](https://github.com/hassanzohdy/warlock.js) Full-Stack Framework**
 
-Hey there! 👋 Ready to supercharge your Node.js apps with a delightful MongoDB experience? **Cascade** is your new best friend for all things database: easy, powerful, and fun to use!
+Hey there! 👋 Ready to supercharge your Node.js apps with a powerful, flexible database layer? **Cascade** is a multi-driver ORM supporting **MongoDB and PostgreSQL** — easy, powerful, and fun to use no matter which database you're on.
 
 ## 🤔 Why Cascade?
 
-There are a few MongoDB tools out there (like [Mongoose](https://mongoosejs.com/) and [Prisma](https://www.prisma.io/)), but Cascade is:
+There are plenty of database tools out there (like [Mongoose](https://mongoosejs.com/) and [Prisma](https://www.prisma.io/)), but Cascade is different:
 
-- 🧩 **Simple & Intuitive:** Just a thin, friendly wrapper around the MongoDB driver.
+- 🗄️ **Multi-Driver:** Works with MongoDB and PostgreSQL through a unified API — switch drivers without rewriting your models.
+- 🧩 **Simple & Intuitive:** A friendly, consistent interface on top of your chosen database driver.
 - 🔌 **Multi-connection & Multi-database:** Connect to as many databases as you want, easily.
 - 🧙‍♂️ **Full-featured Models:** Models are first-class citizens, with tons of utilities.
-- 🏗️ **Powerful Aggregation:** Build complex queries with a breeze.
+- 🏗️ **Powerful Query Builder:** Build complex queries with scopes, filters, and aggregations.
+- 🔗 **Relations System:** Define and traverse relationships between models with ease.
+- 🛡️ **Seal Validation Integration:** Built-in schema validation powered by the Seal package.
 - ⚡ **Events-Driven:** Listen and react to database events (before/after create, update, delete, etc.).
 - 🗃️ **Embedded Documents:** Nest documents inside each other, no sweat.
 - 🔄 **Syncing Models:** *Auto-update related data when things change—see below!*
 - 🗑️ **Recycle Bin:** Soft-delete with a trash collection.
-- 🛠️ **Migration System:** Evolve your schema with confidence.
+- 🛠️ **Migration System:** Evolve your schema with confidence across both drivers.
 - 🧙‍♂️ **Auto-increment & Random IDs:** Choose your own adventure for primary keys.
 - 🧪 **Data Casting:** Type-safe, custom, and automatic casting.
 - 📦 **Pagination, Output Formatting, and More!**
 
 :::tip Did you know?
-**Syncing Models** is a rare and powerful feature—almost no other MongoDB ORM or framework offers it! With Cascade, you can automatically keep related documents in sync. For example, when you update a user's profile, all related posts or comments can be updated too, *automagically* ✨. [Learn more about syncing models &rarr;](../relationships/syncing-models)
+**Syncing Models** is a rare and powerful feature—almost no other ORM offers it! With Cascade, you can automatically keep related records in sync. For example, when you update a user's profile, all related posts or comments can be updated too, *automagically* ✨. [Learn more about syncing models &rarr;](../relationships/syncing-models)
 :::
 
-And that's just the start! Cascade is designed to be **delightful** for both beginners and pros.
+And that's just the start! Cascade is designed to be **delightful** for both beginners and pros, regardless of whether you're on MongoDB or PostgreSQL.
+
+## 🗄️ Supported Drivers
+
+Cascade ships with first-class support for two drivers:
+
+| Driver | Value |
+|---|---|
+| MongoDB | `"mongodb"` |
+| PostgreSQL | `"postgres"` |
+
+:::info MySQL
+A `"mysql"` driver name is reserved but not yet supported — connecting with it will throw an error.
+:::
 
 ## 👀 Quick Peek: Defining a Model
 
@@ -38,7 +54,7 @@ import { Model } from "@warlock.js/cascade";
 
 export class User extends Model {
   /**
-   * The collection name (required)
+   * The collection/table name (required)
    */
   public static collection = "users";
 }

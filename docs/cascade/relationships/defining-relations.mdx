@@ -1,0 +1,331 @@
+---
+sidebar_position: 2
+---
+
+# 🔗 Defining Relations
+
+Relations in Cascade are declared **statically** on your model class using the `relations` property. Each key in that object becomes the relation name you'll use when eager-loading or lazy-loading, and each value is a `RelationDefinition` produced by one of the four fluent helper functions.
+
+:::info
+All helpers — `hasMany`, `hasOne`, `belongsTo`, `belongsToMany` — are imported from `@warlock.js/cascade`. Each returns a `RelationDefinition` object that Cascade reads at query time.
+:::
+
+---
+
+## 🏗️ The `static relations` Property
+
+Every model that participates in a relationship must declare a `static relations` property typed as `RelationDefinitions`. The property is a plain object whose keys are the logical relation names and whose values are `RelationDefinition` objects.
+
+```ts title="src/models/user.model.ts"
+import { Model, hasMany } from "@warlock.js/cascade";
+import { Post } from "./post.model";
+
+export class User extends Model {
+  static table = "users";
+
+  static relations = {
+    posts: hasMany(Post),
+  };
+}
+```
+
+The type behind `static relations` is:
+
+```ts
+// from relations/types.ts
+type RelationDefinitions = Record<string, RelationDefinition>;
+```
+
+And a `RelationDefinition` carries these readonly fields:
+
+```ts
+// from relations/types.ts
+type RelationDefinition = {
+  readonly type: RelationType;           // "hasMany" | "hasOne" | "belongsTo" | "belongsToMany"
+  readonly model: typeof Model;
+  readonly foreignKey?: string;
+  readonly localKey?: string;
+  readonly pivot?: string;              // pivot table name (belongsToMany only)
+  readonly pivotLocalKey?: string;
+  readonly pivotForeignKey?: string;
+  readonly select?: string[];
+};
+```
+
+---
+
+## 🧩 `hasMany` — One-to-Many
+
+Use `hasMany` when one record on the current model owns **many** records on another model. The foreign key lives on the **related** model's table.
+
+### Signature
+
+```ts
+hasMany(model: typeof Model, options?: HasManyOptions): RelationDefinition
+```
+
+### `HasManyOptions`
+
+```ts
+// from relations/types.ts
+type HasManyOptions = {
+  foreignKey?: string;   // column on the related table (default: "<currentModel>Id")
+  localKey?: string;     // column on the current table  (default: primary key)
+  select?: string[];     // columns to select from the related table
+};
+```
+
+### Example
+
+```ts title="src/models/user.model.ts"
+import { Model, hasMany } from "@warlock.js/cascade";
+import { Post } from "./post.model";
+
+export class User extends Model {
+  static table = "users";
+
+  static relations = {
+    // A user has many posts; Post.userId → User.id
+    posts: hasMany(Post, { foreignKey: "userId" }),
+  };
+}
+```
+
+:::tip
+If your foreign key follows the default convention (`<modelName>Id`, e.g. `userId`), you can omit the `options` argument entirely.
+:::
+
+---
+
+## 🔎 `hasOne` — One-to-One (Model Owns Foreign Key)
+
+Use `hasOne` when one record on the current model is linked to **exactly one** record on another model, and the foreign key lives on the **related** model's table.
+
+### Signature
+
+```ts
+hasOne(model: typeof Model, options?: HasOneOptions): RelationDefinition
+```
+
+### `HasOneOptions`
+
+```ts
+// from relations/types.ts
+type HasOneOptions = {
+  foreignKey?: string;
+  localKey?: string;
+  select?: string[];
+};
+```
+
+### Example
+
+```ts title="src/models/user.model.ts"
+import { Model, hasOne, hasMany } from "@warlock.js/cascade";
+import { Profile } from "./profile.model";
+import { Post } from "./post.model";
+
+export class User extends Model {
+  static table = "users";
+
+  static relations = {
+    profile: hasOne(Profile, { foreignKey: "userId" }),
+    posts:   hasMany(Post,    { foreignKey: "userId" }),
+  };
+}
+```
+
+---
+
+## ↩️ `belongsTo` — Belongs To (Current Model Holds Foreign Key)
+
+Use `belongsTo` when the **current** model holds the foreign key column that points to a parent model. This is the inverse of `hasOne` and `hasMany`.
+
+### Signature
+
+```ts
+belongsTo(model: typeof Model, options?: BelongsToOptions): RelationDefinition
+```
+
+### `BelongsToOptions`
+
+```ts
+// from relations/types.ts
+type BelongsToOptions = {
+  foreignKey?: string;   // column on THIS table (default: "<relatedModel>Id")
+  localKey?: string;     // column on the related table (default: primary key)
+  select?: string[];
+};
+```
+
+### Example
+
+```ts title="src/models/post.model.ts"
+import { Model, belongsTo } from "@warlock.js/cascade";
+import { User } from "./user.model";
+
+export class Post extends Model {
+  static table = "posts";
+
+  static relations = {
+    // Post.userId → User.id
+    author: belongsTo(User, { foreignKey: "userId" }),
+  };
+}
+```
+
+:::tip
+`belongsTo` accepts a string shorthand in place of a full options object when you only need to specify the foreign key:
+
+```ts
+author: belongsTo(User, "userId"),
+```
+:::
+
+---
+
+## 🔀 `belongsToMany` — Many-to-Many (Pivot Table)
+
+Use `belongsToMany` when records on both sides are linked through an intermediate **pivot table**. The `options.pivot` field is **required**.
+
+### Signature
+
+```ts
+belongsToMany(model: typeof Model, options: BelongsToManyOptions): RelationDefinition
+```
+
+### `BelongsToManyOptions`
+
+```ts
+// from relations/types.ts
+type BelongsToManyOptions = {
+  pivot: string;             // pivot table name — REQUIRED
+  pivotLocalKey?: string;    // pivot column pointing to THIS model (default: "<currentModel>Id")
+  pivotForeignKey?: string;  // pivot column pointing to the related model (default: "<relatedModel>Id")
+  foreignKey?: string;
+  localKey?: string;
+  select?: string[];
+};
+```
+
+### Example
+
+```ts title="src/models/post.model.ts"
+import { Model, belongsTo, belongsToMany } from "@warlock.js/cascade";
+import { User } from "./user.model";
+import { Tag } from "./tag.model";
+
+export class Post extends Model {
+  static table = "posts";
+
+  static relations = {
+    author: belongsTo(User, { foreignKey: "userId" }),
+
+    tags: belongsToMany(Tag, {
+      pivot:            "post_tags",
+      pivotLocalKey:    "postId",
+      pivotForeignKey:  "tagId",
+    }),
+  };
+}
+```
+
+---
+
+## 🌐 Complete Example — User ↔ Post
+
+Here is a full, self-contained example of a bidirectional User → Post relationship.
+
+```ts title="src/models/user.model.ts"
+import { Model, hasMany } from "@warlock.js/cascade";
+import { Post } from "./post.model";
+
+export class User extends Model {
+  static table = "users";
+
+  static relations = {
+    posts: hasMany(Post, { foreignKey: "userId" }),
+  };
+}
+```
+
+```ts title="src/models/post.model.ts"
+import { Model, belongsTo } from "@warlock.js/cascade";
+import { User } from "./user.model";
+
+export class Post extends Model {
+  static table = "posts";
+
+  static relations = {
+    author: belongsTo(User, { foreignKey: "userId" }),
+  };
+}
+```
+
+**Eager-load at query time:**
+
+```ts title="Fetching users with their posts"
+// Returns User instances, each with a populated `posts` array
+const users = await User.with("posts").all();
+
+for (const user of users) {
+  console.log(user.getRelation<Post[]>("posts"));
+}
+```
+
+**Eager-load at query time with the inverse:**
+
+```ts title="Fetching posts with their author"
+const posts = await Post.with("author").all();
+
+for (const post of posts) {
+  console.log(post.getRelation<User>("author"));
+}
+```
+
+---
+
+## ⚡ Lazy-Loading with `model.load()`
+
+If you already have a model instance and need to load relations after the fact, use `instance.load(...relationNames)`. It returns the same instance (typed as `this`) so calls can be chained.
+
+### Signature
+
+```ts
+load(...relations: string[]): Promise<this>
+```
+
+### Example
+
+```ts title="Lazy-loading relations on an existing instance"
+const user = await User.find(1);
+
+// Load a single relation
+await user.load("posts");
+
+// Load multiple relations at once
+await user.load("posts", "profile");
+
+// Access the loaded data
+const posts = user.getRelation<Post[]>("posts");
+```
+
+:::info
+`model.load()` only fetches relations that have not been loaded yet. Use `model.isLoaded(relationName)` to check whether a relation is already present before triggering an extra query.
+:::
+
+---
+
+## 📦 Type Reference
+
+| Type | Description |
+|---|---|
+| `RelationType` | `"hasOne" \| "hasMany" \| "belongsTo" \| "belongsToMany"` |
+| `RelationDefinition` | Full structural description of one relation (type, model, keys, pivot, select) |
+| `RelationDefinitions` | `Record<string, RelationDefinition>` — the shape of `static relations` |
+| `HasManyOptions` | Config options accepted by `hasMany()` |
+| `HasOneOptions` | Config options accepted by `hasOne()` |
+| `BelongsToOptions` | Config options accepted by `belongsTo()` |
+| `BelongsToManyOptions` | Config options accepted by `belongsToMany()` (pivot required) |
+| `LoadedRelationResult` | `Model \| Model[] \| null` — what `getRelation()` returns |
+| `LoadedRelationsMap` | `Map<string, LoadedRelationResult>` — internal store on each instance |

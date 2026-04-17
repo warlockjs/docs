@@ -1,0 +1,517 @@
+---
+sidebar_position: 5
+---
+
+# 🧱 Column Helpers
+
+Cascade ships a set of **standalone column helper functions** that you use inside `createTable(name, cb)` callbacks. Each helper returns a `DetachedColumnBuilder` — the same fluent builder you get from the class-based API, but self-contained so it works outside a full migration class.
+
+```ts title="Quick look"
+import { createTable, string, integer, boolCol } from "@warlock.js/cascade";
+
+await createTable("products", t => {
+  t.id();
+  string("name").notNullable();
+  integer("stock").default(0);
+  boolCol("is_active").default(true);
+});
+```
+
+:::info DetachedColumnBuilder
+Every helper returns a `DetachedColumnBuilder` — a `ColumnBuilder` that carries its own internal migration sink. It collects pending indexes, foreign keys, and vector indexes automatically so you never have to wire anything up manually.
+:::
+
+---
+
+## 📝 Text Columns
+
+### `string(name, length?)`
+
+Creates a `VARCHAR` column. `length` defaults to `255` when omitted.
+
+```ts title="string"
+string("username");            // VARCHAR(255)
+string("code", 10);           // VARCHAR(10)
+```
+
+---
+
+### `char(name, length?)`
+
+Creates a fixed-length `CHAR` column.
+
+```ts title="char"
+char("country_code", 2);      // CHAR(2)
+```
+
+---
+
+### `text(name)`
+
+Creates an unbounded `TEXT` column — suitable for longer prose.
+
+```ts title="text"
+text("bio");
+```
+
+---
+
+### `mediumText(name)`
+
+Creates a `MEDIUMTEXT` column — up to ~16 MB of text.
+
+```ts title="mediumText"
+mediumText("article_body");
+```
+
+---
+
+### `longText(name)`
+
+Creates a `LONGTEXT` column — up to ~4 GB of text.
+
+```ts title="longText"
+longText("raw_html");
+```
+
+---
+
+## 🔢 Numeric Columns
+
+### `integer(name)` / `int(name)`
+
+Creates an `INTEGER` column. `int` is a convenient alias.
+
+```ts title="integer / int"
+integer("views");
+int("quantity");
+```
+
+---
+
+### `smallInteger(name)` / `smallInt(name)`
+
+Creates a `SMALLINT` column (−32 768 to 32 767).
+
+```ts title="smallInteger / smallInt"
+smallInteger("rating");
+smallInt("priority");
+```
+
+---
+
+### `tinyInteger(name)` / `tinyInt(name)`
+
+Creates a `TINYINT` column (0 to 255 unsigned, or −128 to 127 signed).
+
+```ts title="tinyInteger / tinyInt"
+tinyInteger("age_group");
+tinyInt("level");
+```
+
+---
+
+### `bigInteger(name)` / `bigInt(name)`
+
+Creates a `BIGINT` column — ideal for large counters or external IDs.
+
+```ts title="bigInteger / bigInt"
+bigInteger("external_id");
+bigInt("total_events");
+```
+
+---
+
+### `float(name)`
+
+Creates a `FLOAT` column for approximate single-precision values.
+
+```ts title="float"
+float("latitude");
+```
+
+---
+
+### `double(name)`
+
+Creates a `DOUBLE` column for approximate double-precision values.
+
+```ts title="double"
+double("price_raw");
+```
+
+---
+
+### `decimal(name, precision?, scale?)`
+
+Creates a `DECIMAL` column with exact precision. Supply `precision` (total digits) and `scale` (decimal places).
+
+```ts title="decimal"
+decimal("price", 10, 2);     // DECIMAL(10, 2)
+decimal("tax_rate", 5, 4);   // DECIMAL(5, 4)
+```
+
+:::tip Monetary values
+Always use `decimal` rather than `float` or `double` for money. Floating-point rounding errors will silently corrupt financial data.
+:::
+
+---
+
+## ✅ Boolean
+
+### `boolCol(name)` / `bool(name)`
+
+Creates a `BOOLEAN` column. `bool` is a convenient alias.
+
+```ts title="boolCol / bool"
+boolCol("is_active").default(true);
+bool("is_verified").default(false);
+```
+
+---
+
+## 📅 Date / Time Columns
+
+### `date(name)`
+
+Stores a calendar date (`YYYY-MM-DD`) with no time component.
+
+```ts title="date"
+date("birthday");
+```
+
+---
+
+### `dateTime(name)`
+
+Stores a date + time without timezone info (`DATETIME`).
+
+```ts title="dateTime"
+dateTime("published_at");
+```
+
+---
+
+### `timestamp(name)`
+
+Stores a `TIMESTAMP` — typically auto-managed by the database engine.
+
+```ts title="timestamp"
+timestamp("created_at");
+```
+
+---
+
+### `time(name)`
+
+Stores a `TIME` value (hours, minutes, seconds).
+
+```ts title="time"
+time("open_at");
+```
+
+---
+
+### `year(name)`
+
+Stores a 4-digit `YEAR` value.
+
+```ts title="year"
+year("founded");
+```
+
+---
+
+## 🗄️ JSON / Binary
+
+### `json(name)` / `objectCol(name)`
+
+Stores a native `JSON` column. `objectCol` is a semantic alias for when you think of the value as a plain object.
+
+```ts title="json / objectCol"
+json("metadata");
+objectCol("settings");
+```
+
+---
+
+### `binary(name)` / `blobCol(name)`
+
+Stores raw binary data (`BINARY` / `BLOB`). `blobCol` is an alias.
+
+```ts title="binary / blobCol"
+binary("thumbnail");
+blobCol("file_content");
+```
+
+---
+
+## 🪪 Identifiers
+
+### `uuid(name)`
+
+Stores a `UUID` string (36 characters, e.g. `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`).
+
+```ts title="uuid"
+uuid("public_id");
+```
+
+---
+
+### `ulid(name)`
+
+Stores a `ULID` — a 26-character, lexicographically sortable identifier.
+
+```ts title="ulid"
+ulid("trace_id");
+```
+
+:::info UUID vs ULID
+Prefer `ulid` when you need sortable IDs (e.g. for pagination cursors or event streams). Prefer `uuid` for maximum compatibility with external systems.
+:::
+
+---
+
+## 🌐 Network
+
+### `ipAddress(name)`
+
+Stores an IP address string (IPv4 or IPv6).
+
+```ts title="ipAddress"
+ipAddress("last_login_ip");
+```
+
+---
+
+### `macAddress(name)`
+
+Stores a MAC address string.
+
+```ts title="macAddress"
+macAddress("device_mac");
+```
+
+---
+
+## 🗺️ Geo / Spatial
+
+### `point(name)`
+
+Stores a geographic `POINT` (longitude, latitude).
+
+```ts title="point"
+point("location");
+```
+
+---
+
+### `polygon(name)`
+
+Stores a geographic `POLYGON` (closed ring of points).
+
+```ts title="polygon"
+polygon("service_area");
+```
+
+---
+
+### `lineString(name)`
+
+Stores a geographic `LINESTRING` (ordered sequence of points).
+
+```ts title="lineString"
+lineString("route");
+```
+
+---
+
+### `geometry(name)`
+
+Stores any generic `GEOMETRY` value — use when the subtype is not fixed.
+
+```ts title="geometry"
+geometry("shape");
+```
+
+---
+
+## 🤖 AI / Vector
+
+### `vector(name, dimensions)`
+
+Stores a fixed-length float vector — the native type used by pgvector and similar extensions. The `dimensions` parameter is required and must match your embedding model output size.
+
+```ts title="vector"
+vector("embedding", 1536);   // OpenAI text-embedding-3-small
+vector("embedding", 3072);   // OpenAI text-embedding-3-large
+vector("embedding", 768);    // Sentence-Transformers BERT-base
+```
+
+:::tip Indexing vectors
+After defining the column, chain `.hnsw()` or `.ivfflat()` on the builder to add an approximate-nearest-neighbor index for fast similarity search.
+:::
+
+---
+
+## 🏷️ Set Types
+
+### `enumCol(name, values)`
+
+Creates an `ENUM` column restricted to a fixed list of string values.
+
+```ts title="enumCol"
+enumCol("status", ["draft", "published", "archived"]);
+enumCol("role",   ["admin", "editor", "viewer"]);
+```
+
+---
+
+### `setCol(name, values)`
+
+Creates a `SET` column that can hold zero or more values from the allowed list simultaneously.
+
+```ts title="setCol"
+setCol("permissions", ["read", "write", "delete", "admin"]);
+```
+
+:::info ENUM vs SET
+Use `enumCol` when a column holds exactly one value from the list. Use `setCol` when a column may hold multiple values at once (stored as a bitmask).
+:::
+
+---
+
+## 📦 Array Types
+
+Array helpers create PostgreSQL-native array columns. Each element in the array must match the base type.
+
+### `arrayInt(name)`
+
+`INTEGER[]` — array of integers.
+
+```ts title="arrayInt"
+arrayInt("scores");
+```
+
+---
+
+### `arrayBigInt(name)`
+
+`BIGINT[]` — array of big integers.
+
+```ts title="arrayBigInt"
+arrayBigInt("external_ids");
+```
+
+---
+
+### `arrayFloat(name)`
+
+`REAL[]` — array of single-precision floats.
+
+```ts title="arrayFloat"
+arrayFloat("measurements");
+```
+
+---
+
+### `arrayDecimal(name)`
+
+`DECIMAL[]` — array of exact decimals.
+
+```ts title="arrayDecimal"
+arrayDecimal("prices");
+```
+
+---
+
+### `arrayBoolean(name)`
+
+`BOOLEAN[]` — array of booleans.
+
+```ts title="arrayBoolean"
+arrayBoolean("flags");
+```
+
+---
+
+### `arrayText(name)`
+
+`TEXT[]` — array of text values.
+
+```ts title="arrayText"
+arrayText("tags");
+```
+
+---
+
+### `arrayDate(name)`
+
+`DATE[]` — array of calendar dates.
+
+```ts title="arrayDate"
+arrayDate("holidays");
+```
+
+---
+
+### `arrayTimestamp(name)`
+
+`TIMESTAMPTZ[]` — array of timezone-aware timestamps.
+
+```ts title="arrayTimestamp"
+arrayTimestamp("event_times");
+```
+
+---
+
+### `arrayUuid(name)`
+
+`UUID[]` — array of UUIDs; useful for storing ordered references without a join table.
+
+```ts title="arrayUuid"
+arrayUuid("invited_user_ids");
+```
+
+:::tip Arrays vs join tables
+Array columns are a good fit for small, ordered, read-heavy lists. For large, frequently-mutated, or queryable sets of related records, a normalized join table will serve you better.
+:::
+
+---
+
+## Full example
+
+```ts title="schema/create-posts-table.ts"
+import {
+  createTable,
+  string,
+  text,
+  integer,
+  decimal,
+  boolCol,
+  dateTime,
+  timestamp,
+  json,
+  uuid,
+  enumCol,
+  vector,
+  arrayText,
+} from "@warlock.js/cascade";
+
+await createTable("posts", t => {
+  t.id();
+  uuid("public_id").unique();
+  string("title", 300).notNullable();
+  text("body");
+  decimal("score", 5, 2).default(0);
+  integer("view_count").default(0);
+  boolCol("is_published").default(false);
+  enumCol("status", ["draft", "published", "archived"]).default("draft");
+  arrayText("tags").default([]);
+  json("meta").nullable();
+  vector("embedding", 1536).nullable();
+  dateTime("published_at").nullable();
+  timestamp("created_at");
+  timestamp("updated_at");
+});
+```

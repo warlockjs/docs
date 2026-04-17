@@ -5,18 +5,18 @@ sidebar_position: 2
 import Tabs from "@theme/Tabs";
 import TabItem from "@theme/TabItem";
 
-# Embedded Documents
+# 📄 Embedded Documents
 
-Embedded documents concept is a core feature of MongoDB, and it is very useful when you want to store related data in the same document. This is a very common practice in MongoDB, and it is called **Embedded Relationships**.
+Embedded documents are a core feature of MongoDB, and they are very useful when you want to store related data inside the same document. This is a very common practice in MongoDB and is called **Embedded Relationships**.
 
-It makes the query faster because when we fetch the post we don't have to lookup the `users` collection to get the author's data, it is already there.
+It makes queries faster because when you fetch the post you don't have to look up the `users` collection to get the author's data — it is already stored inside the document.
 
-Before we continue, Let's create three models that we'll use in all of our examples
+Before we continue, let's create three models that we'll use throughout all of our examples.
 
 <Tabs>
   <TabItem value="user" label="User Model" default>
 
-```ts src/app/models/user.ts
+```ts title="src/app/models/user.ts"
 import { Model, Casts } from "@warlock.js/cascade";
 
 export class User extends Model {
@@ -40,7 +40,7 @@ export class User extends Model {
   </TabItem>
   <TabItem value="comment" label="Comment Model">
 
-```ts src/app/models/comment.ts
+```ts title="src/app/models/comment.ts"
 import { Model, Casts } from "@warlock.js/cascade";
 
 export class Comment extends Model {
@@ -53,7 +53,7 @@ export class Comment extends Model {
    * {@inheritDoc}
    */
   protected casts: Casts = {
-    comment: "string",
+    content: "string",
     createdBy: "object",
   };
 }
@@ -62,7 +62,7 @@ export class Comment extends Model {
   </TabItem>
   <TabItem value="post" label="Post Model">
 
-```ts src/app/models/post.ts{15,16}
+```ts title="src/app/models/post.ts"
 import { Model, Casts } from "@warlock.js/cascade";
 
 export class Post extends Model {
@@ -77,8 +77,8 @@ export class Post extends Model {
   protected casts: Casts = {
     title: "string",
     content: "string",
-    author: "object", // user object
-    comments: "array", // array of comments
+    author: "object", // embedded user object
+    comments: "array", // array of embedded comments
   };
 }
 ```
@@ -86,18 +86,18 @@ export class Post extends Model {
   </TabItem>
 </Tabs>
 
-## Embedding Documents
+## 🧩 Embedding Documents
 
-There are two types of embedded documents:
+There are two kinds of embedded documents:
 
-1. Embedding Single document
-2. Embedding Multiple documents
+1. Embedding a single document
+2. Embedding multiple documents
 
-### Embedding Single Document
+### Embedding a Single Document
 
-Consider embedding single document as a `hasOne` relationship in SQL databases, where the document contains only one embedded document.
+Think of embedding a single document as a `hasOne` relationship in SQL: the parent document contains exactly one embedded child document.
 
-For example, the post has an `author` so the author will be embedded inside the post document as a single document, for example:
+For example, a post has an `author`, so the author's data is embedded directly inside the post document:
 
 ```json
 {
@@ -112,9 +112,9 @@ For example, the post has an `author` so the author will be embedded inside the 
 }
 ```
 
-Let's see how we can achieve this using models
+Here is how to achieve this with Cascade models:
 
-```ts src/app.ts {13}
+```ts title="src/app.ts"
 import { Post } from "./models/post";
 import { User } from "./models/user";
 
@@ -127,38 +127,24 @@ async function main() {
   const post = await Post.create({
     title: "Hello World",
     content: "This is the post body",
-    author: author.embeddedData, // embed the author data
+    author: author.embedData, // embed the author's data
   });
 }
 
 main();
 ```
 
-What we've done here is we created a new user, which is basically a very simple operation, then we created a new post and we embedded the author's data inside the post document using the `embeddedData` property.
-
-The data of the author that will be stored will be the following:
-
-```json
-{
-  "id": 5122,
-  "name": "John Doe",
-  "image": "https://example.com/image.jpg",
-  "createdAt": "2023-01-01T00:00:00.000Z",
-  "updatedAt": "2023-01-01T00:00:00.000Z"
-}
-```
+We create a new user, then create a new post and embed the author's data inside it using the `embedData` getter.
 
 :::tip Did you know?
-The `embeddedData` property is a getter that returns the embedded data of the model, it is used internally by the model to embed the data, if you do not override it, it will return the whole model data. Thus, you **should override** it to return only the data you want to embed.
+The `embedData` getter returns the data that will be stored when this model instance is embedded inside another document. By default it returns the full model data. **Override it** on any model to control exactly which fields get embedded.
 :::
 
 ### Specifying the Embedded Data
 
-As mentioned earlier, using `embeddedData` property will embed the whole model data, but what if you want to embed only the `id`, `name` and `image` of the author?
+By default, `embedData` returns the whole model document. If you only want to embed `id`, `name`, and `image` from the author, override `get embedData` on the `User` model:
 
-Well, let's then update our `User` model to return only the data we want to embed
-
-```ts src/app/models/user.ts{22,23,24}
+```ts title="src/app/models/user.ts"
 import { Model, Casts } from "@warlock.js/cascade";
 
 export class User extends Model {
@@ -178,15 +164,15 @@ export class User extends Model {
   };
 
   /**
-   * {@inheritDoc}
+   * Only embed these fields when this model is nested inside another document.
    */
-  public get embeddedData() {
+  public get embedData() {
     return this.only(["id", "name", "image"]);
   }
 }
 ```
 
-This will reduce the embedded documents when we embed the user data inside the post document to the following:
+Now every time `author.embedData` is used, only the following data will be stored:
 
 ```json
 {
@@ -196,9 +182,11 @@ This will reduce the embedded documents when we embed the user data inside the p
 }
 ```
 
-Another way to define the embedded columns is by defining the `embedded` property, it is an array of columns that will be embedded, for example:
+### Declaring Embedded Columns with `static embed`
 
-```ts src/app/models/user.ts{22}
+Instead of overriding the full `get embedData` getter, you can declare a static `embed` array on the model. Cascade will read this list and pick only those columns when building the embedded payload:
+
+```ts title="src/app/models/user.ts"
 import { Model, Casts } from "@warlock.js/cascade";
 
 export class User extends Model {
@@ -206,6 +194,11 @@ export class User extends Model {
    * Collection name
    */
   public static collection = "users";
+
+  /**
+   * Columns included when this model is embedded in another document.
+   */
+  public static embed = ["id", "name", "image"];
 
   /**
    * {@inheritDoc}
@@ -216,39 +209,59 @@ export class User extends Model {
     email: "string",
     password: "string",
   };
+}
+```
+
+This is the recommended shorthand when you just need to whitelist a set of fields — no need to write a full getter.
+
+:::tip
+When using [castModel](./../models/casting-data#castmodel), the `embedData` getter is used automatically to produce the nested payload, so you do not need to call it manually.
+:::
+
+## 🗂️ Embedding Multiple Documents
+
+Embedding multiple documents means storing a list of child documents inside a single column of the parent document. For example, you can store a list of comments directly inside a post.
+
+:::warning
+It is **not recommended** to store large or unbounded lists (like comments) inside a single document. If a post accumulates many comments the document will grow very large and queries will slow down. For those cases, prefer **referencing documents** and storing comments in their own collection.
+:::
+
+### Setting Up `static embed` on the Parent
+
+To declare which array columns hold embedded sub-documents, add a `static embed` property to the **parent** model listing those column names:
+
+```ts title="src/app/models/post.ts"
+import { Model, Casts } from "@warlock.js/cascade";
+
+export class Post extends Model {
+  /**
+   * Collection name
+   */
+  public static collection = "posts";
+
+  /**
+   * Columns that contain embedded sub-documents.
+   * Cascade uses this list when serialising the model.
+   */
+  public static embed = ["comments"];
 
   /**
    * {@inheritDoc}
    */
-  public embedded = ["id", "name", "image"];
+  protected casts: Casts = {
+    title: "string",
+    content: "string",
+    author: "object",
+    comments: "array",
+  };
 }
 ```
 
-That's how we can embed single documents, let's now see how we can embed multiple documents.
+### Pushing Embedded Documents
 
-:::tip
-When using [castModel](./../models/casting-data#castmodel), the `embeddedData` property will be used to embed the data, so you don't have to worry about it.
-:::
+To add a comment into a post's `comments` array, push the comment's `embedData` directly onto the field and then save:
 
-### Embedding Multiple Documents
-
-Embedding multiple documents is basically adding list of documents inside one column of a parent document, for example we can insert list of comments inside a single post
-
-:::warning
-It's not **recommended** to store large documents like comments inside a single post, if the post has a lot of comments, it will be very slow to retrieve the post data, instead you should use **referencing documents** to store the comments in a separate collection.
-:::
-
-### Associating Documents
-
-To associate documents, we use the `associate` method, it takes three arguments:
-
-1. The column name
-2. The model class
-3. the embedded property name, default to `embeddedData`
-
-Let's see an example
-
-```ts src/app.ts {25}
+```ts title="src/app.ts"
 import { Post } from "./models/post";
 import { User } from "./models/user";
 import { Comment } from "./models/comment";
@@ -259,66 +272,27 @@ async function main() {
     image: "https://example.com/image.jpg",
   });
 
-  // now let's create a new post model
-  const post = new Post({
-    title: "Hello World",
-    content: "This is the post body",
-    author: author.embeddedData,
-  });
-
-  // create new comment
   const comment = await Comment.create({
     content: "This is a comment",
-    createdBy: author.embeddedData,
+    createdBy: author.embedData,
   });
 
-  // let's add that comment to the post
-  post.associate("comments", comment);
-
-  post.save();
+  const post = await Post.create({
+    title: "Hello World",
+    content: "This is the post body",
+    author: author.embedData,
+    comments: [comment.embedData], // start with one embedded comment
+  });
 }
 
 main();
 ```
 
-This will inject the comment into our post in `comments` column, we can specify the embedded property name by passing the third argument to the `associate` method
+### Controlling What Gets Embedded
 
-```ts src/app.ts {25}
-import { Post } from "./models/post";
-import { User } from "./models/user";
-import { Comment } from "./models/comment";
+Override `get embedData` on the child model to limit which fields are stored when it is embedded:
 
-async function main() {
-  const author = await User.create({
-    name: "John Doe",
-    image: "https://example.com/image.jpg",
-  });
-
-  // now let's create a new post model
-  const post = new Post({
-    title: "Hello World",
-    content: "This is the post body",
-    author: author.embeddedData,
-  });
-
-  // create new comment
-  const comment = await Comment.create({
-    content: "This is a comment",
-    createdBy: author.embeddedData,
-  });
-
-  // let's add that comment to the post
-  post.associate("comments", comment, "embedToPost");
-
-  post.save();
-}
-
-main();
-```
-
-Let's define that `embedToPost` property in our `Comment` model
-
-```ts src/app/models/comment.ts {28}
+```ts title="src/app/models/comment.ts"
 import { Model, Casts } from "@warlock.js/cascade";
 
 export class Comment extends Model {
@@ -336,104 +310,52 @@ export class Comment extends Model {
   };
 
   /**
-   * {@inheritDoc}
+   * Fields included when this comment is embedded inside a parent document.
    */
-  public get embeddedData() {
-    return this.only(["id", "content", "createdBy"]);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  public get embedToPost() {
+  public get embedData() {
     return this.only(["id", "content", "createdBy", "createdAt"]);
   }
 }
 ```
 
-> If the `comments` field does not exist, it will be created automatically
+Or use the static shorthand:
 
-### Re-Associating Documents
+```ts title="src/app/models/comment.ts"
+import { Model, Casts } from "@warlock.js/cascade";
 
-Consider the `reassociate` method as an update for the document inside the parent document, for example, if the comment's data is updated, we can re-associate it to the post to update the comment data inside the post
+export class Comment extends Model {
+  public static collection = "comments";
 
-```ts src/app.ts {14}
+  /**
+   * Fields included when this comment is embedded inside a parent document.
+   */
+  public static embed = ["id", "content", "createdBy", "createdAt"];
+
+  protected casts: Casts = {
+    content: "string",
+    createdBy: "object",
+  };
+}
+```
+
+### Reading Embedded Data in Responses
+
+Because `Post` declares `static embed = ["comments"]`, Cascade knows to include the embedded array when the model is serialised. You can also call `embedData` on a post instance yourself to produce the embedded payload for nesting inside yet another document:
+
+```ts title="src/app.ts"
 import { Post } from "./models/post";
-import { User } from "./models/user";
-import { Comment } from "./models/comment";
 
 async function main() {
-  const comment = await Comment.find(1);
-
-  comment.set("comment", "a new comment");
-
-  comment.save();
-
   const post = await Post.find(1);
 
-  post.reassociate("comments", comment);
-
-  post.save();
+  // embedData returns the fields defined by static embed (or the full document
+  // if embed is not declared) — ready to be stored inside another document.
+  console.log(post.embedData);
 }
 
 main();
 ```
 
-The `reassociate` method does multiple things, first off, it checks is the `comments` field exists, if not then it creates a new one, then it checks if the comment exists inside the `comments` field, if not then it pushes it to the `comments` field, if it exists then it updates the comment data inside the `comments` field in the same index.
-
-You may also pass the third argument to the `reassociate` method to specify the embedded property name
-
-```ts src/app.ts {14}
-import { Post } from "./models/post";
-import { User } from "./models/user";
-import { Comment } from "./models/comment";
-
-async function main() {
-  const comment = await Comment.find(1);
-
-  comment.set("comment", "a new comment");
-
-  comment.save();
-
-  const post = await Post.find(1);
-
-  post.reassociate("comments", comment, "embedToPost");
-
-  post.save();
-}
-
-main();
-```
-
-:::tip Did you know?
-The `reassociate` method can work exactly like the `associate` method, so you can use it to associate new documents to the parent document, but its always **recommended** to use the `associate` method to associate new documents.
-:::
-
-### Disassociating Documents
-
-I guess you already know what the `disassociate` method does, it removes the document from the parent document, let's see an example
-
-```ts src/app.ts {13}
-import { Post } from "./models/post";
-import { User } from "./models/user";
-import { Comment } from "./models/comment";
-
-async function main() {
-  const comment = await Comment.find(1);
-
-  const post = await Post.find(1);
-
-  post.reassociate("comments", comment);
-
-  // now let's disassociate (remove) the comment from the post
-  post.disassociate("comments", comment);
-
-  post.save();
-}
-
-main();
-```
-
-:::info Embedded Objects
-Any one of the three methods, should receive the embedded model as second argument, but you may also pass any type of data, for example the field could be an array of strings, or an array of numbers, if the second argument is an object, the methods will look for `id` inside it as a unique identifier, if it's not found, then it will search by the entire value regardless of the type, if not found in `reassociate` method, then it will push it to the array, if not found in `disassociate` method, then it will do nothing.
+:::info
+`embedData` is a plain getter on every model instance. It reads `static embed` if it is defined, otherwise returns the full document data. There is no method call required — just access the getter and use the result directly.
 :::

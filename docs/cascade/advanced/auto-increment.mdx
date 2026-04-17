@@ -2,41 +2,125 @@
 sidebar_position: 2
 ---
 
-# 🔢 Auto-Increment IDs
+# 🔢 Auto-Increment & ID Strategies
 
-Need sequential IDs like in SQL? Cascade's auto-increment feature gives you easy, reliable, and unique numbers for your documents! 🔥
+Need sequential numeric IDs like in SQL, or globally unique UUIDs? Cascade gives you full control over how primary keys are generated—no collisions, no worries! 🔥
 
-## 🚦 How It Works
-Cascade manages a special counter collection behind the scenes. Every time you create a new document, it grabs the next number for you—no collisions, no worries!
+## 🏗️ The Primary Key
 
-## 🏗️ Enabling Auto-Increment
-Just set `autoIncrement = true` in your model:
+Every model has a `static primaryKey` property that defaults to `"id"`. You can override it per model:
 
 ```ts title="src/models/order.ts"
 import { Model } from "@warlock.js/cascade";
 
 export class Order extends Model {
   public static collection = "orders";
-  public autoIncrement = true;
+  public static primaryKey = "orderId";
 }
 ```
 
-## 🧙‍♂️ Pro Tip: Custom Start Value
-You can set a custom starting value:
-
-```ts title="src/models/order.ts"
-public autoIncrement = { start: 1000 };
-```
-
-## ⚠️ Gotchas
-- Auto-increment is great for user-facing IDs, but not for sharding or distributed writes.
-- Use MongoDB's ObjectId for globally unique IDs.
-
 :::info
-Auto-increment works perfectly with all Cascade features—casting, events, and more!
+The instance getter `get id()` always returns the value stored at `primaryKey`, regardless of what that column is named.
 :::
 
 ---
 
+## 🔢 Sequential Numeric IDs
+
+Set `static autoGenerateId = true` to enable Cascade's built-in auto-increment counter. Cascade manages a special counter collection behind the scenes and gives each new document the next number in the sequence.
+
+```ts title="src/models/order.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Order extends Model {
+  public static collection = "orders";
+  public static autoGenerateId = true;
+}
+```
+
+### 🚀 Custom Starting Value
+
+Use `static initialId` to start counting from a specific number instead of `1`:
+
+```ts title="src/models/order.ts"
+export class Order extends Model {
+  public static collection = "orders";
+  public static autoGenerateId = true;
+  public static initialId = 1000; // first document gets id: 1000
+}
+```
+
+### ⏭️ Custom Step Size
+
+Use `static incrementIdBy` to control how much the counter increases with each new document:
+
+```ts title="src/models/order.ts"
+export class Order extends Model {
+  public static collection = "orders";
+  public static autoGenerateId = true;
+  public static initialId = 100;
+  public static incrementIdBy = 10; // 100, 110, 120, ...
+}
+```
+
+### 🎲 Random Starting Value & Random Step
+
+If you want unpredictability in your sequence, Cascade supports randomised variants of both the initial ID and the increment:
+
+```ts title="src/models/session.ts"
+export class Session extends Model {
+  public static collection = "sessions";
+  public static autoGenerateId = true;
+  public static randomInitialId = true;  // picks a random starting number
+  public static randomIncrement = true;  // increments by a random amount each time
+}
+```
+
+:::tip
+`randomInitialId` and `randomIncrement` each accept `true` (Cascade picks a random value) or a `() => number` callback so you can supply your own random logic.
+:::
+
+---
+
+## 🪪 UUID-Based IDs
+
+When you need globally unique, distributed-safe IDs, use the `get uuid` getter on any model instance. Cascade supports two UUID strategies via the `UuidStrategy` type:
+
+| Strategy | Description |
+|----------|-------------|
+| `"v4"`   | Random UUID (default) |
+| `"v7"`   | Time-ordered UUID — better for indexed columns |
+
+```ts title="src/models/user.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class User extends Model {
+  public static collection = "users";
+}
+
+// Reading the UUID of a saved document:
+const user = await User.create({ name: "Ada" });
+console.log(user.uuid); // e.g. "018f4c2a-..."
+```
+
+:::info
+`get uuid` reads the `uuid` field from the document's stored data. The `UuidStrategy` (`"v4" | "v7"`) is configured at the data-source or migration level, not on the model class itself.
+:::
+
+---
+
+## 🔄 Sequential vs UUID — Quick Comparison
+
+| | Sequential Numeric IDs | UUID |
+|---|---|---|
+| **Property** | `autoGenerateId`, `initialId`, `incrementIdBy` | `get uuid` / `UuidStrategy` |
+| **Human-readable** | ✅ Yes | ❌ No |
+| **Distributed-safe** | ❌ Needs central counter | ✅ Yes |
+| **Time-ordered** | ✅ Yes | ✅ With `"v7"` |
+| **Configurable step** | ✅ `incrementIdBy` | — |
+
+---
+
 ## 🌟 What's Next?
+
 - [🧠 Master-Mind Pattern](./master-mind)

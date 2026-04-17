@@ -1,0 +1,353 @@
+---
+sidebar_position: 2
+---
+
+# ✍️ Writing Migrations
+
+Migrations are version-controlled schema changes that can be applied and rolled back in a deterministic order. Each migration is a class that extends `Migration` and implements two abstract methods: `up()` for the forward change and `down()` for the rollback.
+
+## 🏗️ Extending `Migration`
+
+Every migration file exports a class that extends the abstract `Migration` base.
+
+```ts title="migrations/2026_01_15_create_users_table.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export default class CreateUsersTable extends Migration {
+  async up(): Promise<void> {
+    await this.createTable("users", (table) => {
+      table.id();
+      table.string("name");
+      table.string("email").unique();
+      table.timestamps();
+    });
+  }
+
+  async down(): Promise<void> {
+    await this.dropTable("users");
+  }
+}
+```
+
+:::tip
+Always implement `down()` as the exact inverse of `up()`. A missing or incorrect `down()` makes rollbacks unreliable.
+:::
+
+## 🔗 Linking a Migration to a Model — `Migration.for()`
+
+`Migration.for(ModelClass)` returns an anonymous abstract subclass that is pre-bound to the model's table name and data source. This is the idiomatic way to write migrations for existing models.
+
+```ts title="migrations/2026_01_15_create_posts_table.ts"
+import { Migration } from "@warlock.js/cascade";
+import { Post } from "../models/post";
+
+export default class CreatePostsTable extends Migration.for(Post) {
+  async up(): Promise<void> {
+    await this.createTable(this.tableName, (table) => {
+      table.id();
+      table.string("title");
+      table.text("body");
+      table.timestamps();
+    });
+  }
+
+  async down(): Promise<void> {
+    await this.dropTable(this.tableName);
+  }
+}
+```
+
+:::info
+`Migration.for(Model)` binds the migration to the model's `tableName` and `dataSource` automatically. You do not need to hard-code the table name.
+:::
+
+## 📅 Naming Conventions, `order`, and `createdAt`
+
+The runner discovers migration files by name. Follow these conventions:
+
+| Property | Description |
+|---|---|
+| `static migrationName` | Human-readable identifier used in logs and the tracking table. Defaults to the class name. |
+| `static createdAt` | ISO timestamp string (`YYYY_MM_DD` prefix). Drives chronological ordering. |
+| `static order` | Optional numeric tie-breaker when two migrations share the same `createdAt`. |
+
+```ts title="migrations/2026_01_15_add_avatar_to_users.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export default class AddAvatarToUsers extends Migration {
+  static migrationName = "AddAvatarToUsers";
+  static createdAt = "2026-01-15T10:00:00.000Z";
+  static order = 1;
+
+  async up(): Promise<void> {
+    await this.addColumn("users", (col) => {
+      col.string("avatar").nullable();
+    });
+  }
+
+  async down(): Promise<void> {
+    await this.dropColumn("users", "avatar");
+  }
+}
+```
+
+:::tip
+Use file-name prefixes like `2026_01_15_` to keep migrations visually sorted on disk. The prefix is parsed as `createdAt` when the static property is omitted.
+:::
+
+## 🗂️ Table Operations
+
+### `this.createTable(name, cb)`
+
+Creates a new table. The callback receives a column builder.
+
+```ts title="up() — createTable"
+await this.createTable("products", (table) => {
+  table.id();
+  table.string("sku", 64).unique();
+  table.decimal("price", 10, 2).defaultValue(0);
+  table.boolean("active").defaultValue(true);
+  table.timestamps();
+});
+```
+
+### `this.dropTable(name)`
+
+Drops an existing table unconditionally.
+
+```ts title="down() — dropTable"
+await this.dropTable("products");
+```
+
+### `this.renameTable(oldName, newName)`
+
+Renames a table without touching its data.
+
+```ts title="up() — renameTable"
+await this.renameTable("items", "products");
+```
+
+```ts title="down() — renameTable (reverse)"
+await this.renameTable("products", "items");
+```
+
+### `this.hasTable(name)`
+
+Checks whether a table exists. Returns `Promise<boolean>`. Useful for conditional migrations.
+
+```ts title="Conditional table check"
+if (!(await this.hasTable("audit_logs"))) {
+  await this.createTable("audit_logs", (table) => {
+    table.id();
+    table.string("action");
+    table.timestamps();
+  });
+}
+```
+
+## 🧱 Column Operations
+
+### `this.addColumn(table, cb)`
+
+Adds one or more columns to an existing table via a column builder callback.
+
+```ts title="up() — addColumn"
+await this.addColumn("users", (col) => {
+  col.string("phone", 20).nullable();
+  col.string("country", 2).defaultValue("US");
+});
+```
+
+### `this.dropColumn(table, name)`
+
+Drops a single named column from a table.
+
+```ts title="down() — dropColumn"
+await this.dropColumn("users", "phone");
+await this.dropColumn("users", "country");
+```
+
+### `this.modifyColumn(table, cb)`
+
+Modifies existing column definitions. The callback receives a column builder; each column built inside represents a modification.
+
+```ts title="up() — modifyColumn"
+await this.modifyColumn("users", (col) => {
+  col.string("email", 320).notNullable().unique();
+});
+```
+
+:::info
+`modifyColumn` alters existing columns in-place. Not all databases support every modification — check your driver's capabilities.
+:::
+
+## 🗃️ Index Operations
+
+### `this.addIndex(table, definition)`
+
+Creates an index using an `IndexDefinition` object.
+
+```ts title="up() — addIndex"
+await this.addIndex("orders", {
+  name: "idx_orders_status_created",
+  columns: ["status", "created_at"],
+});
+```
+
+### `this.dropIndex(table, name)`
+
+Drops a named index from a table.
+
+```ts title="down() — dropIndex"
+await this.dropIndex("orders", "idx_orders_status_created");
+```
+
+## 🔑 Foreign Key Operations
+
+### `this.addForeignKey(table, cb)`
+
+Adds a foreign key constraint via a `ForeignKeyBuilder` callback.
+
+```ts title="up() — addForeignKey"
+await this.addForeignKey("posts", (fk) => {
+  fk.column("user_id")
+    .references("id")
+    .on("users")
+    .onDelete("CASCADE")
+    .onUpdate("CASCADE");
+});
+```
+
+### `this.dropForeignKey(table, name)`
+
+Drops a named foreign key constraint.
+
+```ts title="down() — dropForeignKey"
+await this.dropForeignKey("posts", "posts_user_id_foreign");
+```
+
+## 🧪 Inspecting SQL Without Executing — `this.toSQL()`
+
+`toSQL()` serializes all queued DDL operations into SQL strings and **clears the internal operation queue** without executing anything against the database. Use it for dry-run inspection or logging.
+
+```ts title="Previewing generated SQL"
+const migration = new CreateUsersTable();
+await migration.up();           // queues operations
+const statements = migration.toSQL();  // returns SQL[], clears queue
+
+console.log(statements);
+// [
+//   "CREATE TABLE `users` (...)",
+//   ...
+// ]
+```
+
+:::info
+Calling `toSQL()` clears `pendingOperations`. Any subsequent call to `execute()` without re-running `up()` will be a no-op.
+:::
+
+## ▶️ Executing a Migration — `this.execute()`
+
+`execute()` runs all queued pending operations directly through the injected driver. In normal CLI usage the migration runner calls this for you; use it directly only when integrating migrations programmatically.
+
+```ts title="Manual execution"
+const migration = new CreateUsersTable();
+migration.setDriver(driver);
+
+await migration.up();       // queues operations
+await migration.execute();  // flushes queue to the database
+```
+
+:::tip
+The migration runner (`cascade migrate`) handles `setDriver`, `up/down` dispatch, and `execute` orchestration automatically. Calling `execute()` manually is an advanced use case.
+:::
+
+## 📋 `MigrationContract` Interface
+
+`MigrationContract` is the full public interface that every migration class must satisfy. It is exported from `@warlock.js/cascade` for typing purposes.
+
+```ts title="MigrationContract surface"
+import type { MigrationContract } from "@warlock.js/cascade";
+
+interface MigrationContract {
+  // Lifecycle
+  up(): Promise<void>;
+  down(): Promise<void>;
+
+  // Driver injection
+  setDriver(driver: MigrationDriverContract): void;
+  getDriver(): MigrationDriverContract;
+  setMigrationDefaults(defaults?: MigrationDefaults): void;
+
+  // Table DDL
+  createTable(name: string, cb: (table: ColumnBuilder) => void): Promise<void>;
+  dropTable(name: string): Promise<void>;
+  renameTable(oldName: string, newName: string): Promise<void>;
+  hasTable(name: string): Promise<boolean>;
+
+  // Column DDL
+  addColumn(table: string, cb: (col: ColumnBuilder) => void): Promise<void>;
+  dropColumn(table: string, name: string): Promise<void>;
+  modifyColumn(table: string, cb: (col: ColumnBuilder) => void): Promise<void>;
+
+  // Index DDL
+  addIndex(table: string, definition: IndexDefinition): Promise<void>;
+  dropIndex(table: string, name: string): Promise<void>;
+
+  // Foreign key DDL
+  addForeignKey(table: string, cb: (fk: ForeignKeyBuilder) => void): Promise<void>;
+  dropForeignKey(table: string, name: string): Promise<void>;
+
+  // Inspection
+  toSQL(): string[];
+  execute(): Promise<void>;
+}
+```
+
+:::info
+`MigrationContract` is the source of truth for what is guaranteed to be available in every migration. The abstract `Migration` class implements all of these methods — your subclass only needs to provide `up()` and `down()`.
+:::
+
+## 🗺️ Complete Example
+
+```ts title="migrations/2026_01_15_create_orders_table.ts"
+import { Migration } from "@warlock.js/cascade";
+import { Order } from "../models/order";
+
+export default class CreateOrdersTable extends Migration.for(Order) {
+  static migrationName = "CreateOrdersTable";
+  static createdAt = "2026-01-15T12:00:00.000Z";
+  static order = 0;
+
+  async up(): Promise<void> {
+    // Create the table
+    await this.createTable(this.tableName, (table) => {
+      table.id();
+      table.string("reference", 32).unique();
+      table.decimal("total", 10, 2).defaultValue(0);
+      table.string("status", 32).defaultValue("pending");
+      table.timestamps();
+    });
+
+    // Add an index on status + created_at for dashboard queries
+    await this.addIndex(this.tableName, {
+      name: "idx_orders_status_created",
+      columns: ["status", "created_at"],
+    });
+
+    // Add a foreign key to users
+    await this.addForeignKey(this.tableName, (fk) => {
+      fk.column("user_id")
+        .references("id")
+        .on("users")
+        .onDelete("CASCADE");
+    });
+  }
+
+  async down(): Promise<void> {
+    await this.dropForeignKey(this.tableName, "orders_user_id_foreign");
+    await this.dropIndex(this.tableName, "idx_orders_status_created");
+    await this.dropTable(this.tableName);
+  }
+}
+```

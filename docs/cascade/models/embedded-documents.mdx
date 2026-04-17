@@ -39,22 +39,22 @@ Now, when you create a post and pass a category id, Cascade will fetch and embed
 
 By default, all fields are embedded. But you can control what gets embedded:
 
-### 1. `embeddedData` Getter
+### 1. `embedData` Getter
 
 Override this getter in your model to specify exactly what to embed:
 
 ```ts title="src/models/category.ts"
-public get embeddedData() {
+public get embedData() {
   return this.only(["id", "name"]);
 }
 ```
 
-### 2. `embedded` Property
+### 2. `embed` Property
 
 Or, just list the fields you want:
 
 ```ts title="src/models/category.ts"
-public embedded = ["id", "name"];
+static embed: string[] = ["id", "name"];
 ```
 
 ### 3. `embedAllExceptTimestampsAndUserColumns`

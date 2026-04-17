@@ -1,0 +1,195 @@
+---
+sidebar_position: 1
+---
+
+# 🗄️ Migrations Introduction
+
+Migrations are version-controlled, reproducible descriptions of your database schema. Instead of running raw SQL by hand, you write a migration class — Cascade executes it, tracks it in a dedicated table (`_migrations`), and lets you roll it back at any time.
+
+Every change to your schema — creating tables, adding columns, defining indexes, adding constraints — lives in a migration. This means your database structure is part of your codebase, diffable in git, and reproducible across every environment.
+
+:::tip Why migrations?
+Migrations solve the "works on my machine" problem for databases. A new team member can clone the repo and run all migrations to get an identical schema, no manual SQL required.
+:::
+
+---
+
+## 🧱 Creating a Migration
+
+Every migration extends the `Migration` abstract class and implements two methods:
+
+- **`up()`** — applies the forward change (create table, add column, etc.)
+- **`down()`** — reverts the change (drop table, drop column, etc.)
+
+```ts title="database/migrations/create-users-table.ts"
+import { Migration } from "@warlock.js/cascade";
+
+export class CreateUsersTable extends Migration {
+  // A unique, stable identifier for this migration
+  static migrationName = "create_users_table";
+  // Optional: controls ordering when multiple migrations share the same batch
+  static order = 1;
+
+  public tableName = "users";
+
+  async up() {
+    await this.createTable(() => {
+      this.bigIncrements("id");
+      this.string("name", 100);
+      this.string("email", 255).unique();
+      this.string("password");
+      this.timestamps();
+    });
+  }
+
+  async down() {
+    await this.dropTableIfExists();
+  }
+}
+```
+
+:::info Static properties
+`migrationName` is **required** — the runner will throw if it is missing.  
+`order` and `createdAt` are optional and influence execution ordering within a batch.
+:::
+
+---
+
+## 🔗 Model-Scoped Migrations with `Migration.for()`
+
+When a migration targets a specific model's table, use the static factory `Migration.for(ModelClass)`. It returns an anonymous abstract subclass pre-wired with the model's `tableName` and `dataSource`, so you never have to repeat those details.
+
+```ts title="database/migrations/add-verified-at-to-users.ts"
+import { Migration } from "@warlock.js/cascade";
+import { User } from "../../src/models/user";
+
+export class AddVerifiedAtToUsers extends Migration.for(User) {
+  static migrationName = "add_verified_at_to_users";
+
+  async up() {
+    await this.addColumn(() => {
+      this.timestamp("verified_at").nullable();
+    });
+  }
+
+  async down() {
+    await this.dropColumn("verified_at");
+  }
+}
+```
+
+:::tip
+`Migration.for(User)` automatically reads `User.tableName` and `User.dataSource`, keeping your migration and model in sync even if the table name changes in the model.
+:::
+
+---
+
+## 🚀 Registering and Running Migrations
+
+The `migrationRunner` singleton is the single entry-point for executing migrations. Register your classes with it, then call `runAll()`.
+
+```ts title="database/index.ts"
+import { migrationRunner } from "@warlock.js/cascade";
+import { CreateUsersTable } from "./migrations/create-users-table";
+import { AddVerifiedAtToUsers } from "./migrations/add-verified-at-to-users";
+
+// Register individual migrations
+migrationRunner.register(CreateUsersTable);
+
+// Or register many at once
+migrationRunner.registerMany([
+  CreateUsersTable,
+  AddVerifiedAtToUsers,
+]);
+
+// Run all pending migrations
+await migrationRunner.runAll();
+```
+
+### Key `MigrationRunner` methods
+
+| Method | Description |
+|---|---|
+| `register(MigrationClass)` | Adds a single migration to the registry. Throws if `migrationName` is missing. |
+| `registerMany(migrations)` | Registers an array of migration classes. Returns `this` for chaining. |
+| `runAll(options?)` | Runs all pending (not yet executed) migrations in phase-sorted order. |
+| `rollbackLast(options?)` | Rolls back the most recent migration batch. |
+| `rollbackBatches(n, options?)` | Rolls back the N most-recent batches. |
+| `rollbackAll(options?)` | Rolls back every executed migration. |
+| `fresh(options?)` | Rolls back all migrations then re-runs all of them. |
+| `run(MigrationClass, options?)` | Executes a single migration's `up()`. |
+| `rollback(MigrationClass, options?)` | Executes a single migration's `down()`. |
+| `status()` | Returns execution status for all registered migrations. |
+| `exportSQL(options?)` | Exports phase-ordered `.up.sql` / `.down.sql` files to `database/sql/`. |
+| `clear()` | Empties the registered migrations list. |
+
+---
+
+## ⚙️ Phase System — `SQLGrammar`
+
+Cascade does not execute all SQL statements in the order they were defined. Instead, `SQLGrammar` classifies every generated statement into one of **six execution phases** and sorts them to guarantee dependency safety:
+
+| Phase | Category | Examples |
+|---|---|---|
+| **1** | Extensions | `CREATE EXTENSION` |
+| **2** | Types | `CREATE TYPE` (enums, composites) |
+| **3** | Tables | `CREATE TABLE`, `DROP TABLE` |
+| **4** | Columns | `ALTER TABLE … ADD COLUMN`, `DROP COLUMN` |
+| **5** | Indexes | `CREATE INDEX`, `CREATE UNIQUE INDEX` |
+| **6** | Constraints & Data | Foreign keys, `INSERT`, `UPDATE` |
+
+Within the same phase, statements are further sorted by `createdAt` timestamp and then by `migrationName`, giving you a deterministic ordering across the whole batch.
+
+```ts
+// SQLGrammar static API (used internally by the runner)
+SQLGrammar.phase(sql);           // → 1 | 2 | 3 | 4 | 5 | 6
+SQLGrammar.classify(sql);        // → SQLStatementType (e.g. "createTable", "createIndex")
+SQLGrammar.sort(taggedSQLArray); // → TaggedSQL[] sorted by phase → date → name
+```
+
+:::info Why phases matter
+If a migration in one class creates a table and another adds a foreign key referencing that table, the phase system ensures the `CREATE TABLE` (phase 3) always runs before the foreign key constraint (phase 6), even if the two migrations are registered in the opposite order.
+:::
+
+---
+
+## 🏷️ `TaggedSQL` and `SQLStatementType`
+
+Internally, every SQL string the migration system produces is wrapped in a `TaggedSQL` object that carries metadata used by `SQLGrammar.sort()`:
+
+```ts
+type TaggedSQL = {
+  sql: string;              // The raw SQL string
+  phase: 1 | 2 | 3 | 4 | 5 | 6; // Execution phase
+  statementType: SQLStatementType; // Semantic category
+  createdAt?: Date;         // Optional timestamp for ordering
+  migrationName?: string;   // Optional migration identifier for ordering
+};
+```
+
+`SQLStatementType` is a union of 19 semantic DDL/DML category strings (e.g. `"createTable"`, `"createIndex"`, `"createExtension"`, `"insertData"`, etc.) that `SQLGrammar.classify()` resolves from the raw SQL text.
+
+You rarely interact with `TaggedSQL` directly — `migrationRunner` and the internal `SQLSerializer` handle it automatically. Understanding the type helps when reading runner logs or exported SQL files.
+
+---
+
+## 🔧 `SQLSerializer` — Dialect Adapters
+
+Each database dialect (PostgreSQL, MySQL, etc.) ships an implementation of the abstract `SQLSerializer` class. It converts the queue of `PendingOperation` objects accumulated by your `up()` and `down()` methods into dialect-specific SQL strings.
+
+```ts
+// Abstract contract (implement per dialect)
+abstract class SQLSerializer {
+  abstract serialize(
+    operation: PendingOperation,
+    table: string
+  ): string | string[] | null;
+
+  serializeAll(
+    operations: PendingOperation[],
+    table: string
+  ): string[];
+}
+```
+
+The serializer is wired up by the migration driver — you never instantiate it yourself.

@@ -1,0 +1,203 @@
+---
+sidebar_position: 1
+---
+
+# 🌐 Global Scopes
+
+Global scopes let you define query constraints that are **automatically applied to every query** made through a model. Once registered, a global scope runs transparently — you never have to remember to add `.where("deletedAt", null)` or `.where("tenantId", currentTenant)` yourself.
+
+:::info What are global scopes?
+A global scope is a named callback that modifies a `QueryBuilderContract` before (or after) the driver executes the query. Every call to `Model.query()`, `Model.find()`, `Model.all()`, and any other query entry-point will automatically have the scope applied.
+:::
+
+---
+
+## 🔧 Registering a Global Scope
+
+Use the static `Model.addGlobalScope(name, callback, options?)` method to register a scope on a model class.
+
+```ts title="models/post.model.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Post extends Model {
+  public static table = "posts";
+
+  static {
+    Post.addGlobalScope("published", query => {
+      query.where("status", "published");
+    });
+  }
+}
+```
+
+Every query on `Post` will now automatically include `WHERE status = 'published'`.
+
+### Method Signature
+
+```ts title="type signature"
+static addGlobalScope(
+  name: string,
+  callback: (query: QueryBuilderContract) => void,
+  options?: GlobalScopeOptions,
+): void
+```
+
+### `GlobalScopeOptions`
+
+```ts title="model.types.ts"
+type GlobalScopeOptions = {
+  timing?: ScopeTiming; // defaults to "before"
+};
+```
+
+### `GlobalScopeDefinition`
+
+Internally, each registered scope is stored as a `GlobalScopeDefinition`:
+
+```ts title="model.types.ts"
+type GlobalScopeDefinition = {
+  callback: (query: QueryBuilderContract) => void;
+  timing: ScopeTiming;
+};
+```
+
+---
+
+## ⏱️ Scope Timing with `ScopeTiming`
+
+The `timing` option controls **when** the scope callback is applied relative to driver execution.
+
+```ts title="model.types.ts"
+type ScopeTiming = "before" | "after";
+```
+
+| Value | Behaviour |
+|-------|-----------|
+| `"before"` | Applied **before** the driver executes the query. This is the default. Use it to filter, restrict, or shape the query. |
+| `"after"` | Applied **after** driver execution. Useful for post-processing result sets at the query-builder level. |
+
+```ts title="models/audit-log.model.ts"
+AuditLog.addGlobalScope(
+  "recentFirst",
+  query => {
+    query.orderByDesc("createdAt");
+  },
+  { timing: "before" },
+);
+```
+
+:::tip Default timing
+If you omit `options` or `options.timing`, the scope is applied `"before"` execution — which is correct for the vast majority of use cases such as filtering by tenant, status, or soft-delete columns.
+:::
+
+---
+
+## 🗑️ Removing a Global Scope
+
+To permanently remove a registered global scope from a model class, call `Model.removeGlobalScope(name)`.
+
+```ts title="models/post.model.ts"
+// Remove the "published" scope so all posts are visible (e.g. in an admin context)
+Post.removeGlobalScope("published");
+```
+
+### Method Signature
+
+```ts title="type signature"
+static removeGlobalScope(name: string): void
+```
+
+This mutates the model class's internal `globalScopes` map. The scope is removed for **all future queries** on that model.
+
+:::info Persistent removal
+`removeGlobalScope` is a class-level operation. If you only want to skip a scope for a single query, use `withoutGlobalScope` on the query builder instead (see below).
+:::
+
+---
+
+## 🚫 Opting Out Per Query
+
+Sometimes you need to bypass one or all global scopes for a specific query without permanently removing them.
+
+### Skip a Specific Scope
+
+```ts title="Bypass a single named scope"
+const allPosts = await Post.query()
+  .withoutGlobalScope("published")
+  .all();
+```
+
+### Skip All Global Scopes
+
+```ts title="Bypass every global scope"
+const rawPosts = await Post.query()
+  .withoutGlobalScopes()
+  .all();
+```
+
+### Method Signatures
+
+```ts title="query-builder.ts"
+withoutGlobalScope(...scopeNames: string[]): this
+withoutGlobalScopes(): this
+```
+
+`withoutGlobalScope` accepts one or more scope names. `withoutGlobalScopes` (no arguments) disables **every** pending global scope on that query instance.
+
+:::tip Safe to chain
+Both methods return `this`, so they integrate seamlessly into any fluent query chain.
+:::
+
+---
+
+## 📦 Multiple Global Scopes
+
+A model can have as many named global scopes as needed. Each must have a unique name — re-registering the same name replaces the previous definition.
+
+```ts title="models/article.model.ts"
+export class Article extends Model {
+  public static table = "articles";
+
+  static {
+    Article.addGlobalScope("notDeleted", query => {
+      query.whereNull("deletedAt");
+    });
+
+    Article.addGlobalScope("currentTenant", query => {
+      query.where("tenantId", getCurrentTenantId());
+    });
+
+    Article.addGlobalScope("activeOnly", query => {
+      query.where("isActive", true);
+    });
+  }
+}
+```
+
+All three scopes are applied automatically to every `Article` query.
+
+---
+
+## 🏗️ Practical Example: Soft Deletes
+
+A common use of global scopes is excluding soft-deleted rows by default.
+
+```ts title="models/user.model.ts"
+export class User extends Model {
+  public static table = "users";
+
+  static {
+    User.addGlobalScope("notDeleted", query => {
+      query.whereNull("deletedAt");
+    });
+  }
+}
+
+// Normal query — soft-deleted users excluded automatically
+const activeUsers = await User.all();
+
+// Admin view — include soft-deleted users
+const allUsers = await User.query()
+  .withoutGlobalScope("notDeleted")
+  .all();
+```

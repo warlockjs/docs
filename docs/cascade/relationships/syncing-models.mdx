@@ -2,44 +2,60 @@
 sidebar_position: 3
 ---
 
-# Syncing Models
+# 🔄 Syncing Models
 
-Syncing models is a major powerful feature in `Cascade`, it allows you to embed documents inside other documents, and it will auto update the embedded documents whenever the original document is updated.
+Syncing models is a major powerful feature in `Cascade`. It lets you embed documents inside other documents and automatically propagate updates whenever the source document changes — including cascading deletes.
 
-## The Problem
+## 🧩 The Problem
 
-Let's say we have a category model, and post model, the post has an embedded document for category, the problem here is whenever the category is updated, the post keeps the same information about the category when the post is saved.
+Say you have a `Category` model and a `Post` model. Each post embeds a category snapshot. The problem: when the category name changes, every embedded copy inside posts stays stale.
 
-## The Solution
+## ✅ The Solution
 
-The solution here is with `Syncing Models`, the concept is simple, when the category is updated, search for all categories that are embedded inside posts, and update them.
+Model sync solves this. When a category is updated, Cascade searches every post that embeds that category and updates the embedded copy automatically.
 
-We have here two scenarios:
+There are two embedding scenarios:
 
-1. Single embedded document
-2. Array of embedded documents
+1. **Single embedded document** — one model embedded as an object
+2. **Array of embedded documents** — a list of models embedded as an array
 
-Let's see each one of them.
+## 🏗️ Setup: `modelSync`
 
-## Single Embedded Document
+The sync system is powered by the `modelSync` singleton. Import it from `@warlock.js/cascade`:
 
-Let's go with the single embedded document scenario, as we mentioned we need to update the post's category when the category itself is updated.
+```ts
+import { modelSync } from "@warlock.js/cascade";
+```
 
-Let's take a look at the post model:
+You register syncs inside a `modelSync.register()` callback. This is the recommended pattern because it is HMR-safe — the callback is re-executed on hot reload and previous subscriptions are automatically cleaned up.
+
+```ts title="src/sync/index.ts"
+import { modelSync } from "@warlock.js/cascade";
+import { Category } from "../models/category";
+import { Post } from "../models/post";
+
+modelSync.register(() => {
+  modelSync.sync(Category, Post, "category");
+});
+```
+
+:::tip
+Call `modelSync.register()` once at app startup (e.g. in your bootstrap file). You do not need to put sync logic inside the model class itself.
+:::
+
+## 📄 Single Embedded Document
+
+The most common case: a post embeds one category object. When the category is updated, all matching posts are updated.
+
+**Post model** (unchanged — just uses `castModel`):
 
 ```ts title="src/models/post.ts"
 import { Model, Casts, castModel } from "@warlock.js/cascade";
 import { Category } from "./category";
 
 export class Post extends Model {
-  /**
-   * Collection name
-   */
   public static collection = "posts";
 
-  /**
-   * {@inheritDoc}
-   */
   protected casts: Casts = {
     title: "string",
     content: "string",
@@ -48,391 +64,250 @@ export class Post extends Model {
 }
 ```
 
-Let's take a look at the category model:
+**Sync registration:**
+
+```ts title="src/sync/index.ts"
+import { modelSync } from "@warlock.js/cascade";
+import { Category } from "../models/category";
+import { Post } from "../models/post";
+
+modelSync.register(() => {
+  // When a Category is updated, update the "category" field in Post documents
+  modelSync.sync(Category, Post, "category");
+});
+```
+
+`modelSync.sync(SourceModel, TargetModel, targetField)` creates a single-document sync. Internally it matches by `category.id` inside the `posts` collection.
+
+### Static shortcut
+
+Models expose `Model.sync()` and `Model.syncMany()` as static shortcuts that delegate to `modelSync`:
+
+```ts title="src/sync/index.ts"
+import { modelSync } from "@warlock.js/cascade";
+import { Category } from "../models/category";
+import { Post } from "../models/post";
+
+modelSync.register(() => {
+  Category.sync(Post, "category");
+});
+```
+
+Both `modelSync.sync(Category, Post, "category")` and `Category.sync(Post, "category")` are equivalent.
+
+## 📚 Array of Embedded Documents
+
+When the target field holds an **array** of embedded documents, use `syncMany` instead of `sync`:
+
+```ts title="src/sync/index.ts"
+import { modelSync } from "@warlock.js/cascade";
+import { Comment } from "../models/comment";
+import { Post } from "../models/post";
+
+modelSync.register(() => {
+  // When a Comment is updated, update its entry inside the "comments" array in Post
+  modelSync.syncMany(Comment, Post, "comments");
+  // or equivalently:
+  // Comment.syncMany(Post, "comments");
+});
+```
+
+:::warning
+The array-sync example above is illustrative. Storing comments directly inside post documents is generally not recommended — prefer a separate collection.
+:::
+
+:::info
+All fluent methods shown below work identically for both `sync` and `syncMany` operations.
+:::
+
+## 🎨 Embedded Data Shape
+
+By default the sync uses the model's `embedData` property to extract the data to store. You can change this with `embed()`:
+
+```ts title="src/sync/index.ts"
+import { modelSync } from "@warlock.js/cascade";
+import { Category } from "../models/category";
+import { Post } from "../models/post";
+
+modelSync.register(() => {
+  modelSync
+    .sync(Category, Post, "category")
+    .embed("embedMinimal"); // "embedData" | "embedParent" | "embedMinimal"
+});
+```
+
+| Value | Description |
+|---|---|
+| `"embedData"` | Default — full embedded representation |
+| `"embedParent"` | Parent-facing representation |
+| `"embedMinimal"` | Minimal set of fields (id + essential display fields) |
+
+You can also define a custom getter on the model and point `embed()` at a custom key if your model defines one. For a fully custom embed shape, add the getter to the model:
 
 ```ts title="src/models/category.ts"
 import { Model, Casts } from "@warlock.js/cascade";
 
 export class Category extends Model {
-  /**
-   * Collection name
-   */
   public static collection = "categories";
 
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-}
-```
-
-This is just a normal category model, let's update the code to make it synced with the post model:
-
-```ts title="src/models/category.ts" {1,14}
-import { Model, Casts, ModelSync } from "@warlock.js/cascade";
-
-export class Category extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "categories";
-
-  /**
-   * Sync with posts
-   */
-  public syncWith: ModelSync[] = [
-    // sync post
-    Post.sync("category"),
-  ];
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-}
-```
-
-Let's understand what's happening here:
-
-First off, We added a new property called `syncWith` that is an array of `ModelSync` instances.
-
-We can create an instance of `ModelSync` that is linked to the model using the static method `sync`, this method returns a new instance of `ModelSync` that is linked to the model.
-
-The `sync` method takes first argument with the name of the field that we need to update in our case it will be the `category` field in the post model.
-
-So the scenario here as follows, category data is updated, the `ModelSync` class will be instantly called after the model is saved, it will search in the `posts` collection for all posts that has the same category id, which internally searches in `category.id` field, but we only pass the top field name which is `category`
-
-## Array of Embedded Documents
-
-The second scenario is when we have an array of embedded documents, let's say we have a post model that has an array of comments, we want to update the comments list inside the post when a comment is updated.
-
-:::warning
-This is just an example, it is **not recommended** to store comments inside each post document, it is better to store them in a separate collection.
-:::
-
-Let's take a look at the post model:
-
-```ts title="src/models/post.ts"
-import { Model, Casts, castModel } from "@warlock.js/cascade";
-import { Comment } from "./comment";
-
-export class Post extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "posts";
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    title: "string",
-    content: "string",
-    comments: castModel(Comment),
-  };
-}
-```
-
-Let's take a look at the comment model:
-
-```ts title="src/models/comment.ts"
-import { Model, Casts, ModelSync } from "@warlock.js/cascade";
-import { Post } from "./post";
-
-export class Comment extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "comments";
-
-  /**
-   * Sync with posts
-   */
-  public syncWith: ModelSync[] = [
-    // sync comments inside post whenever a comment is updated
-    Post.syncMany("comments"),
-  ];
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    content: "string",
-    isActive: "boolean",
-  };
-}
-```
-
-The `syncMany` method works exactly like `sync` except that it will search inside an array of embedded documents.
-
-:::info
-The rest of the coming documentation works in both scenarios `sync` and `syncMany` but we will use `sync` for simplicity
-:::
-
-## Embedded custom data
-
-By default the `ModelSync` will call the `embeddedData` property to get the data from, but if we want to use another property we can pass it as a second argument to the `sync` method.
-
-Let's say we want to sync the category id and name only, we can do it like this:
-
-```ts title="src/models/category.ts" {1,14}
-import { Model, Casts, ModelSync } from "@warlock.js/cascade";
-
-export class Category extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "categories";
-
-  /**
-   * Sync with posts
-   */
-  public syncWith: ModelSync[] = [
-    // sync post
-    Post.sync("category", "embedIdAndNameOnly"),
-  ];
-
-  /**
-   * {@inheritDoc}
-   */
   protected casts: Casts = {
     name: "string",
     isActive: "boolean",
   };
 
-  /**
-   * Embed id and name only
-   */
-  public get embedIdAndNameOnly() {
+  public get embedIdAndName() {
     return this.only(["id", "name"]);
   }
 }
 ```
 
-## Update multiple fields
+Then reference it via `embed()`:
 
-Another scenario where we want to update multiple columns when the model is updated, let's say we want to update `createdBy` and `updatedBy` fields in the post when the user is updated, in that case, pass an array of fields to the `sync` method:
-
-```ts title="src/models/user.ts" {1,14}
-import { Model, Casts, ModelSync } from "@warlock.js/cascade";
-
-export class User extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "users";
-
-  /**
-   * Sync with posts
-   */
-  public syncWith: ModelSync[] = [
-    // sync post
-    Post.sync(["createdBy", "updatedBy"]),
-  ];
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-}
+```ts title="src/sync/index.ts"
+modelSync.register(() => {
+  modelSync.sync(Category, Post, "category").embed("embedIdAndName" as any);
+});
 ```
 
-What happens here the `ModelSync` will search in all columns that has the same value as the user id, which internally searches in `createdBy.id` and `updatedBy.id` fields, but we only pass the top field name which is `createdBy` and `updatedBy`
+## 🔑 Custom Identifier Field
 
-## Unset On Delete
+By default the sync matches documents by the `id` field inside the embedded object. Use `identifyBy()` to use a different field:
 
-Another scenario is being taking care of is when the actual document of the embedded document is deleted, in that case we can perform multiple actions based on our needs.
-
-1. Unset the embedded document.
-2. Delete the document that has the embedded document.
-3. Do nothing.
-
-Let's see each one of them:
-
-### Unset the embedded document
-
-Call `unsetOnDelete` method on the `ModelSync` instance, this will unset the embedded document when the actual document is deleted.
-
-```ts title="src/models/category.ts" {1,14}
-import { Model, Casts, ModelSync } from "@warlock.js/cascade";
-import { Post } from "./post";
-
-export class Category extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "categories";
-
-  /**
-   * Sync with posts
-   */
-  public syncWith: ModelSync[] = [
-    // sync post
-    Post.sync("category").unsetOnDelete(),
-  ];
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-}
+```ts title="src/sync/index.ts"
+modelSync.register(() => {
+  modelSync
+    .sync(Category, Post, "category")
+    .identifyBy("slug");
+});
 ```
 
-> This is the default behavior, so you don't have to call `unsetOnDelete` method.
+## 📏 Max Sync Depth
 
-### Delete the document that has the embedded document
+Cascade supports chained syncs — syncing a model that itself triggers another sync. The default maximum depth is `3` (the `DEFAULT_MAX_SYNC_DEPTH` constant). Override it per operation:
 
-The second scenario we can think of, when the original document is deleted, delete all related documents, for example we can delete all posts when their category is deleted.
-
-```ts title="src/models/category.ts" {1,14}
-import { Model, Casts, ModelSync } from "@warlock.js/cascade";
-import { Post } from "./post";
-
-export class Category extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "categories";
-
-  /**
-   * Sync with posts
-   */
-  public syncWith: ModelSync[] = [
-    // sync post
-    Post.sync("category").removeOnDelete(),
-  ];
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-}
+```ts title="src/sync/index.ts"
+modelSync.register(() => {
+  modelSync
+    .sync(Category, Post, "category")
+    .maxDepth(5);
+});
 ```
 
-By calling `removeOnDelete`, the `ModelSync` will search for all posts that have the deleted category and remove them.
+:::info
+Cascade automatically detects circular sync chains and stops them — depth limiting is an additional safeguard for long linear chains.
+:::
 
-### Ignoring the delete action
+## 👀 Watch Specific Fields
 
-The third scenario is when we want to ignore the delete action, in that case we can call `ignoreOnDelete` method.
+Syncing every time any field changes can be expensive. Restrict the sync to fire only when specific fields are modified:
 
-```ts title="src/models/category.ts" {1,14}
-import { Model, Casts, ModelSync } from "@warlock.js/cascade";
-import { Post } from "./post";
+```ts title="src/sync/index.ts"
+import { modelSync } from "@warlock.js/cascade";
+import { Category } from "../models/category";
+import { Post } from "../models/post";
 
-export class Category extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "categories";
-
-  /**
-   * Sync with posts
-   */
-  public syncWith: ModelSync[] = [
-    // sync post
-    Post.sync("category").ignoreOnDelete(),
-  ];
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-}
+modelSync.register(() => {
+  modelSync
+    .sync(Category, Post, "category")
+    .watchFields(["name", "slug"]);
+});
 ```
 
-This will keep the `category` document inside the post when the category is deleted.
+If the category update touches only `isActive`, the sync will **not** run. This is the correct replacement for the old `updateWhenChange()` method.
 
-## Sync only when certain fields are updated
+## 🗑️ Behavior on Delete
 
-Because this is a costy operation, we can limit the sync to only when certain fields are updated, for example we can sync the category when the `name` is updated, any other updated fields will not trigger the sync, in that case use `updateWhenChange` by passing the fields that we want to sync when they are updated.
+When the source document is deleted you have three options.
 
-```ts title="src/models/category.ts" {1,14}
-import { Model, Casts, ModelSync } from "@warlock.js/cascade";
-import { Post } from "./post";
+### 1. Unset the embedded field (default)
 
-export class Category extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "categories";
-
-  /**
-   * Sync with posts
-   */
-  public syncWith: ModelSync[] = [
-    // sync post
-    Post.sync("category").updateWhenChange(["name"]),
-  ];
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-}
+```ts title="src/sync/index.ts"
+modelSync.register(() => {
+  modelSync
+    .sync(Category, Post, "category")
+    .unsetOnDelete();
+});
 ```
 
-## Update with certain criteria
+The `category` field on matching posts is unset (removed). This is the default, so you only need to call it explicitly when you want to be clear.
 
-Sometimes it is not good to update all documents that has the same id, for example we can update the category in the post only when the post is active, in that case we can use the `where` method that returns a query builder instance.
+### 2. Remove the target documents
 
-```ts title="src/models/category.ts" {1,14}
-import { Model, Casts, ModelSync } from "@warlock.js/cascade";
-import { Post } from "./post";
-
-export class Category extends Model {
-  /**
-   * Collection name
-   */
-  public static collection = "categories";
-
-  /**
-   * Sync with posts
-   */
-  public syncWith: ModelSync[] = [
-    // sync post
-    Post.sync("category").where(query => {
-      query.where("isActive", true);
-    }),
-    }),
-  ];
-
-  /**
-   * {@inheritDoc}
-   */
-  protected casts: Casts = {
-    name: "string",
-    isActive: "boolean",
-  };
-}
+```ts title="src/sync/index.ts"
+modelSync.register(() => {
+  modelSync
+    .sync(Category, Post, "category")
+    .removeOnDelete();
+});
 ```
 
-The `query` here is an instance of the [Model Aggregate Query](./../aggregate/model-aggregate.mdx) so you can easily apply whatever filter you would like when fetching posts.
+All posts that reference the deleted category are themselves deleted.
 
-## A final Note about Sync
+### 3. Leave the embedded data as-is
 
-All sync operations first fetch the documents then perform a `save` or `destroy` actions, this will allow multiple sync operations to be performed in one query.
+Simply do not call `unsetOnDelete()` or `removeOnDelete()`. Without a delete handler the embedded snapshot is preserved as it was at the time of deletion.
 
-For example, if category is updated, find all posts for that category, and update each one of them, this will call all `syncs` inside the post, in that sense, all comments will be updated as well if they are synced with the posts.
+:::tip
+Default behavior (no explicit call) leaves the embedded data in place. Call `.unsetOnDelete()` only when you want the field actively removed.
+:::
 
-Also, all related events like `onSaving`, `onSaved`, `onDeleting`, `onDeleted`...etc will be triggered as well.
+## 🔧 Fluent API Reference
+
+Every call to `modelSync.sync()` or `modelSync.syncMany()` returns a `ModelSyncOperation` instance with a full fluent API:
+
+| Method | Description |
+|---|---|
+| `.embed(key)` | Set embed method: `"embedData"`, `"embedParent"`, or `"embedMinimal"` |
+| `.identifyBy(field)` | Match embedded documents by this field instead of `id` |
+| `.maxDepth(n)` | Maximum chained sync depth (default `3`) |
+| `.watchFields([...fields])` | Only sync when one of these source fields changed |
+| `.unsetOnDelete()` | Unset the target field when the source is deleted |
+| `.removeOnDelete()` | Delete target documents when the source is deleted |
+| `.unsubscribe()` | Manually remove this sync's event subscriptions |
+| `.$cleanup()` | Alias for `unsubscribe()` (used by the HMR cleanup cycle) |
+| `.getConfig()` | Return a read-only snapshot of the current sync configuration |
+
+## 🔁 HMR-Safe Registration
+
+In development with hot module replacement (HMR) it is critical that old event subscriptions are removed before new ones are registered. `modelSync.register()` handles this automatically:
+
+```ts title="src/sync/index.ts"
+import { modelSync } from "@warlock.js/cascade";
+import { Category } from "../models/category";
+import { Post } from "../models/post";
+import { Comment } from "../models/comment";
+
+const unregister = modelSync.register(() => {
+  Category.sync(Post, "category").watchFields(["name"]);
+  Comment.syncMany(Post, "comments");
+});
+
+// Call unregister() to tear down all syncs registered in this callback
+// modelSync.register() does this automatically on re-execution during HMR
+```
+
+## 📦 TypeScript Types
+
+The sync system exposes the following types for advanced use:
+
+```ts
+import type {
+  SyncResult,
+  SyncConfig,
+  SyncContext,
+} from "@warlock.js/cascade";
+```
+
+| Type | Description |
+|---|---|
+| `SyncResult` | Outcome of a sync operation — counts of affected documents and any errors |
+| `SyncConfig` | Configuration object describing one sync relationship |
+| `SyncContext` | Runtime context passed through a sync chain — tracks source, target, and depth |
+
+## ⛓️ Chained Syncs and Events
+
+All sync operations first fetch matching documents and then run `save()` or `destroy()` on each one. This means:
+
+- A category update triggers post updates, which in turn trigger any syncs **registered on the post** (e.g. comment syncs inside posts)
+- All model lifecycle events — `onSaving`, `onSaved`, `onDeleting`, `onDeleted` — fire normally on every touched document
+- Cascade tracks the sync chain and enforces the `maxDepth` limit to prevent runaway chains

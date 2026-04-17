@@ -1,0 +1,430 @@
+---
+sidebar_position: 8
+---
+
+# 🚀 Running Migrations
+
+The `migrationRunner` singleton is the central executor in Cascade's migration system. It registers migration classes, tracks execution state in a dedicated database table, and provides a full suite of commands to run, rollback, inspect, and export your migrations.
+
+:::info What is `migrationRunner`?
+`migrationRunner` is a pre-constructed `MigrationRunner` instance exported from `@warlock.js/cascade`. You import and use it directly — there is no need to instantiate anything yourself.
+:::
+
+## 📦 Importing
+
+```ts title="src/database/migrate.ts"
+import { migrationRunner } from "@warlock.js/cascade";
+```
+
+---
+
+## 🗂️ Registering Migrations
+
+Before the runner can do anything, it needs to know which migrations exist. Registration links your migration classes to the runner's internal registry.
+
+### `migrationRunner.register(migration)`
+
+Register a single migration class.
+
+```ts title="src/database/migrate.ts"
+import { migrationRunner } from "@warlock.js/cascade";
+import { CreateUsersTable } from "./migrations/2024_01_01_create_users_table";
+
+migrationRunner.register(CreateUsersTable);
+```
+
+:::warning Migration name required
+The runner will throw an `Error` if the migration class does not have a `migrationName` property set. Always define it on your migration class.
+:::
+
+---
+
+### `migrationRunner.registerMany(migrations[])`
+
+Register multiple migration classes at once. This is the recommended approach when you have many migrations.
+
+```ts title="src/database/migrate.ts"
+import { migrationRunner } from "@warlock.js/cascade";
+import { CreateUsersTable } from "./migrations/2024_01_01_create_users_table";
+import { CreatePostsTable } from "./migrations/2024_01_02_create_posts_table";
+import { CreateCommentsTable } from "./migrations/2024_01_03_create_comments_table";
+import { AddIndexesToPosts } from "./migrations/2024_01_04_add_indexes_to_posts";
+
+migrationRunner.registerMany([
+  CreateUsersTable,
+  CreatePostsTable,
+  CreateCommentsTable,
+  AddIndexesToPosts,
+]);
+```
+
+Returns `this` so you can chain additional calls.
+
+---
+
+## ▶️ Running Migrations
+
+### `migrationRunner.runAll(options?)`
+
+Runs all pending registered migrations that have not yet been executed. Migrations are grouped into a **batch** and executed in phase-sorted order.
+
+```ts title="src/database/migrate.ts"
+await migrationRunner.runAll();
+```
+
+With options:
+
+```ts title="src/database/migrate.ts"
+import { RunMigrationsOptions } from "@warlock.js/cascade";
+
+const options: RunMigrationsOptions = {
+  only: ["CreateUsersTable", "CreatePostsTable"], // run only these migrations
+  dryRun: true,                                   // simulate without executing
+};
+
+await migrationRunner.runAll(options);
+```
+
+:::tip Dry run
+Set `dryRun: true` to preview which migrations would run without actually touching the database. Great for CI checks.
+:::
+
+The runner writes a record for each executed migration to the tracking table and logs progress when `verbose` is enabled.
+
+---
+
+### `migrationRunner.run(migration, options?)`
+
+Run a **single** migration class directly, executing its `up()` method.
+
+```ts title="src/database/migrate.ts"
+import { CreateUsersTable } from "./migrations/2024_01_01_create_users_table";
+
+await migrationRunner.run(CreateUsersTable);
+```
+
+Any driver or query errors are propagated to the caller.
+
+---
+
+## ↩️ Rolling Back Migrations
+
+### `migrationRunner.rollback(migration, options?)`
+
+Roll back a **single** migration class, executing its `down()` method.
+
+```ts title="src/database/migrate.ts"
+import { CreateUsersTable } from "./migrations/2024_01_01_create_users_table";
+
+await migrationRunner.rollback(CreateUsersTable);
+```
+
+---
+
+### `migrationRunner.rollbackLast(options?)`
+
+Rolls back the most recently executed batch of migrations.
+
+```ts title="src/database/migrate.ts"
+await migrationRunner.rollbackLast();
+```
+
+---
+
+### `migrationRunner.rollbackBatches(n, options?)`
+
+Rolls back the **N** most recent migration batches in reverse order.
+
+```ts title="src/database/migrate.ts"
+// Undo the last 3 batches
+await migrationRunner.rollbackBatches(3);
+```
+
+With rollback options:
+
+```ts title="src/database/migrate.ts"
+import { RollbackOptions } from "@warlock.js/cascade";
+
+const options: RollbackOptions = {
+  batches: 2,
+  only: ["CreateCommentsTable"],  // only roll back this migration
+  dryRun: false,
+};
+
+await migrationRunner.rollbackBatches(2, options);
+```
+
+---
+
+### `migrationRunner.rollbackAll(options?)`
+
+Rolls back **every** executed migration, returning the database to a clean slate.
+
+```ts title="src/database/migrate.ts"
+await migrationRunner.rollbackAll();
+```
+
+:::warning Destructive operation
+`rollbackAll` will execute the `down()` method of every migration that has ever been recorded in the tracking table. Use with caution in production.
+:::
+
+---
+
+### `migrationRunner.fresh(options?)`
+
+Equivalent to running `rollbackAll` followed immediately by `runAll`. Drops all tracked migrations and re-runs everything from scratch.
+
+```ts title="src/database/migrate.ts"
+await migrationRunner.fresh();
+```
+
+:::tip Development reset
+`fresh()` is ideal during development when you want a clean database state without manually dropping tables.
+:::
+
+---
+
+## 🔍 Inspecting Migration State
+
+### `migrationRunner.status()`
+
+Returns execution status for every registered migration, including whether it has been executed, which batch it belongs to, and when it ran.
+
+```ts title="src/database/migrate.ts"
+import { MigrationStatus } from "@warlock.js/cascade";
+
+const statuses: MigrationStatus[] = await migrationRunner.status();
+
+for (const s of statuses) {
+  console.log(`${s.name} — executed: ${s.executed}, batch: ${s.batch ?? "—"}`);
+}
+```
+
+Each `MigrationStatus` record contains:
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Migration class name |
+| `table` | `string` | Target table |
+| `executed` | `boolean` | Whether this migration has run |
+| `batch` | `number \| undefined` | Batch number it was run in |
+| `executedAt` | `Date \| undefined` | When it was executed |
+| `filePath` | `string \| undefined` | Source file path |
+
+---
+
+### `migrationRunner.getExecutedMigrations()`
+
+Queries the migrations tracking table and returns raw records for all migrations that have been executed.
+
+```ts title="src/database/migrate.ts"
+import { MigrationRecord } from "@warlock.js/cascade";
+
+const executed: MigrationRecord[] = await migrationRunner.getExecutedMigrations();
+
+executed.forEach((record) => {
+  console.log(`${record.name} ran in batch ${record.batch} at ${record.executedAt}`);
+});
+```
+
+Each `MigrationRecord` reflects a row in the `_migrations` tracking table:
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Migration name |
+| `batch` | `number` | Batch it was included in |
+| `executedAt` | `Date` | Execution timestamp |
+| `createdAt` | `Date` | Record creation timestamp |
+
+---
+
+## 📄 Exporting SQL
+
+### `migrationRunner.exportSQL(options?)`
+
+Generates the SQL for all registered migrations and writes `.up.sql` and `.down.sql` files to the `database/sql/` directory — without executing anything against the database.
+
+```ts title="src/database/migrate.ts"
+await migrationRunner.exportSQL();
+```
+
+This is useful for auditing, code review, or handing off SQL to a DBA.
+
+:::info Output location
+SQL files are written to `database/sql/` relative to your project root. Each migration produces two files: `<name>.up.sql` and `<name>.down.sql`.
+:::
+
+---
+
+## 🏗️ Types Reference
+
+### `MigrationRunnerOptions`
+
+Configuration passed when constructing a custom `MigrationRunner` instance (the default singleton is pre-configured).
+
+```ts
+import { MigrationRunnerOptions } from "@warlock.js/cascade";
+
+const options: MigrationRunnerOptions = {
+  migrationsTable: "_migrations", // table used to track executed migrations
+  verbose: true,                  // log migration progress
+  dryRun: false,                  // global dry-run override
+};
+```
+
+---
+
+### `RunMigrationsOptions`
+
+Options accepted by `runAll()` and `run()`.
+
+```ts
+import { RunMigrationsOptions } from "@warlock.js/cascade";
+
+const options: RunMigrationsOptions = {
+  only: ["CreateUsersTable"],  // restrict to specific migration names
+  dryRun: true,               // simulate without executing
+};
+```
+
+---
+
+### `RollbackOptions`
+
+Options accepted by rollback methods.
+
+```ts
+import { RollbackOptions } from "@warlock.js/cascade";
+
+const options: RollbackOptions = {
+  batches: 1,                       // number of batches to roll back
+  only: ["CreateCommentsTable"],    // restrict to specific migration names
+  dryRun: false,
+};
+```
+
+---
+
+### `MigrationResult`
+
+The result returned for each individual migration execution.
+
+```ts
+import { MigrationResult } from "@warlock.js/cascade";
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Migration name |
+| `table` | `string` | Target table |
+| `direction` | `"up" \| "down"` | Whether it ran or rolled back |
+| `success` | `boolean` | Whether execution succeeded |
+| `error` | `Error \| undefined` | Error if execution failed |
+| `durationMs` | `number` | How long it took in milliseconds |
+| `executedAt` | `Date` | When it was executed |
+
+---
+
+### `MigrationStatus`
+
+Returned by `status()`. See the [status section](#migrationsrunnerstatus) above for the full field table.
+
+---
+
+### `PendingMigration`
+
+Represents a migration that is registered but not yet executed.
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Migration name |
+| `table` | `string` | Target table |
+| `filePath` | `string \| undefined` | Source file on disk |
+| `createdAt` | `Date \| undefined` | Creation timestamp |
+
+---
+
+### `MigrationRecord`
+
+A row in the `_migrations` tracking table. See the [getExecutedMigrations section](#migrationrunnergetexecutedmigrations) above for the full field table.
+
+---
+
+## 🌍 Real-World Example
+
+Below is a complete example of how you would wire up migrations in a Warlock application — registering all migrations in one place and exposing a script entry point.
+
+```ts title="src/database/migrations/index.ts"
+export { CreateUsersTable } from "./2024_01_01_create_users_table";
+export { CreatePostsTable } from "./2024_01_02_create_posts_table";
+export { CreateCommentsTable } from "./2024_01_03_create_comments_table";
+export { AddIndexesToPosts } from "./2024_01_04_add_indexes_to_posts";
+```
+
+```ts title="src/database/migrate.ts"
+import { migrationRunner } from "@warlock.js/cascade";
+import * as migrations from "./migrations";
+
+// Register all migrations at once
+migrationRunner.registerMany(Object.values(migrations));
+
+// Export helpers so your CLI scripts can call them directly
+export { migrationRunner };
+```
+
+```ts title="scripts/migrate.ts"
+import { migrationRunner } from "../src/database/migrate";
+
+const command = process.argv[2];
+
+switch (command) {
+  case "run":
+    await migrationRunner.runAll();
+    break;
+
+  case "rollback":
+    await migrationRunner.rollbackLast();
+    break;
+
+  case "rollback:all":
+    await migrationRunner.rollbackAll();
+    break;
+
+  case "fresh":
+    await migrationRunner.fresh();
+    break;
+
+  case "status": {
+    const statuses = await migrationRunner.status();
+    statuses.forEach((s) => {
+      const state = s.executed ? `✔ batch ${s.batch}` : "pending";
+      console.log(`  ${s.name.padEnd(50)} ${state}`);
+    });
+    break;
+  }
+
+  case "export:sql":
+    await migrationRunner.exportSQL();
+    break;
+
+  default:
+    console.error(`Unknown command: ${command}`);
+    process.exit(1);
+}
+```
+
+:::tip Integrate with npm scripts
+Add these to your `package.json` for quick access:
+
+```json title="package.json"
+{
+  "scripts": {
+    "migrate": "tsx scripts/migrate.ts run",
+    "migrate:rollback": "tsx scripts/migrate.ts rollback",
+    "migrate:fresh": "tsx scripts/migrate.ts fresh",
+    "migrate:status": "tsx scripts/migrate.ts status",
+    "migrate:export": "tsx scripts/migrate.ts export:sql"
+  }
+}
+```
+:::

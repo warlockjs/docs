@@ -4,7 +4,7 @@ sidebar_position: 13
 
 # 🎉 Model Events
 
-Cascade's event system lets you hook into every important moment in your model's lifecycle! Run custom code before or after creating, updating, saving, or deleting—perfect for logging, syncing, notifications, and more. 🪄
+Cascade's event system lets you hook into every important moment in your model's lifecycle! Run custom code before or after creating, updating, saving, fetching, validating, restoring, or deleting—perfect for logging, syncing, notifications, and more. 🪄
 
 ## ✨ Why Use Model Events?
 - Add business logic without cluttering your models
@@ -12,77 +12,214 @@ Cascade's event system lets you hook into every important moment in your model's
 - Sync related models
 - Send notifications after actions
 
-> **Note:** While you *can* technically stop an action in a before-event, we recommend handling validation explicitly in your application logic or with dedicated validation tools—not in model events. Events are best for side effects and automation, not for core validation.
+> **Note:** Events are best for side effects and automation. Use dedicated validation tools for core validation logic rather than relying on model events for that purpose.
 
 ## 🚦 Full List of Events
 
-### Before (Sync, can cancel action)
-- `onCreating(model)`
-- `onSaving(model)`
-- `onUpdating(model, oldModel)`
-- `onDeleting(model)`
+Cascade exposes **16 lifecycle events** across all model operations.
 
-### After (Async, cannot cancel)
-- `onCreated(model)`
-- `onSaved(model, oldModel)`
-- `onUpdated(model, oldModel)`
-- `onDeleted(model)`
+### Persistence Events
+| Event | When it fires |
+|---|---|
+| `creating` | Before a new model is inserted |
+| `created` | After a new model is inserted |
+| `updating` | Before an existing model is updated |
+| `updated` | After an existing model is updated |
+| `saving` | Before any save (create or update) |
+| `saved` | After any save (create or update) |
+| `deleting` | Before a model is deleted |
+| `deleted` | After a model is deleted |
 
-## 🏗️ How to Listen to Events
-Just use the `events()` method on your model class:
+### Validation Events
+| Event | When it fires |
+|---|---|
+| `validating` | Before model validation runs |
+| `validated` | After model validation completes |
+
+### Fetch / Hydration Events
+| Event | When it fires |
+|---|---|
+| `fetching` | Before a query is executed (receives the query builder) |
+| `fetched` | After a model is loaded from the database |
+| `hydrating` | Before model data is hydrated from a raw document |
+
+### Restore Events
+| Event | When it fires |
+|---|---|
+| `restoring` | Before a soft-deleted model is restored |
+| `restored` | After a soft-deleted model is restored |
+
+:::tip
+All listeners are **async**. Each listener in a set is called sequentially, so you can safely `await` inside them.
+:::
+
+## 🏗️ Class-Level Events with `Model.events()`
+
+The primary way to subscribe to events for all instances of a model class is via the static `events()` method. It returns a `ModelEvents` instance that exposes a fluent shorthand API.
 
 ```ts title="src/app.ts"
 User.events()
-  .onCreating((user) => console.log("Creating!"))
-  .onSaving((user) => console.log("Saving!"))
-  .onDeleting((user) => console.log("Deleting!"));
+  .onCreating((user) => console.log("About to create:", user.get("email")))
+  .onCreated((user) => console.log("Created user:", user.id))
+  .onSaving((user) => console.log("Saving user..."))
+  .onSaved((user) => console.log("Saved user!"))
+  .onUpdating((user, oldUser) => console.log("Updating user..."))
+  .onUpdated((user, oldUser) => console.log("Updated user!"))
+  .onDeleting((user) => console.log("Deleting user..."))
+  .onDeleted((user) => console.log("Deleted user!"));
+```
+
+### All Shorthand Methods on `ModelEvents`
+
+Every event has a dedicated shorthand method on the `ModelEvents` instance returned by `Model.events()`:
+
+| Shorthand method | Event name |
+|---|---|
+| `.onSaving(listener)` | `saving` |
+| `.onSaved(listener)` | `saved` |
+| `.onCreating(listener)` | `creating` |
+| `.onCreated(listener)` | `created` |
+| `.onUpdating(listener)` | `updating` |
+| `.onUpdated(listener)` | `updated` |
+| `.onDeleting(listener)` | `deleting` |
+| `.onDeleted(listener)` | `deleted` |
+| `.onValidating(listener)` | `validating` |
+| `.onValidated(listener)` | `validated` |
+| `.onFetching(listener)` | `fetching` |
+| `.onHydrating(listener)` | `hydrating` |
+| `.onFetched(listener)` | `fetched` |
+| `.onRestoring(listener)` | `restoring` |
+| `.onRestored(listener)` | `restored` |
+
+```ts title="src/app.ts"
+User.events()
+  .onValidating((user) => console.log("Validating user data..."))
+  .onValidated((user) => console.log("Validation complete!"))
+  .onFetching((query) => console.log("Running query:", query))
+  .onFetched((user) => console.log("Fetched user:", user.id))
+  .onHydrating((user) => console.log("Hydrating from raw doc..."))
+  .onRestoring((user) => console.log("Restoring soft-deleted user..."))
+  .onRestored((user) => console.log("User restored!"));
 ```
 
 ## ➕ Registering Multiple Listeners
-You can register as many listeners as you want for each event:
+
+You can register as many listeners as you want for each event — they run sequentially:
 
 ```ts title="src/app.ts"
 User.events()
-  .onSaving((user) => console.log("First listener!"))
-  .onSaving((user) => console.log("Second listener!"));
+  .onSaving((user) => console.log("First listener: sanitizing data"))
+  .onSaving((user) => console.log("Second listener: updating timestamps"));
 ```
 
 ## 🧑‍💻 Event Parameters
-- `model`: The current model instance
-- `oldModel`: The previous state (for update/save events)
 
-## 🛑 Cancelling Actions in Before Events
-Return `false` from a before-event listener to stop the action. This is best used for rare, advanced scenarios (like enforcing business rules), not for general validation:
+- `model` — the current model instance
+- `oldModel` — the previous state (available on `updating` / `updated` / `saved`)
+- For `fetching`, the listener receives the **query builder** instead of a model instance
+
+## 🎛️ Static Event API: `Model.on` / `Model.once` / `Model.off`
+
+Beyond the shorthand chain, you can subscribe, unsubscribe, and register one-shot listeners directly on the class using the low-level static API. All three return an **unsubscribe function**.
 
 ```ts title="src/app.ts"
-User.events().onSaving((user) => {
-  if (user.get("status") === "archived") {
-    return false; // Prevent saving if status is archived
-  }
+// Subscribe
+const unsubscribe = User.on("created", async (user) => {
+  await sendWelcomeEmail(user.get("email"));
+});
+
+// One-shot: fires once then removes itself automatically
+User.once("deleting", async (user) => {
+  console.log("This fires only for the very next delete");
+});
+
+// Unsubscribe by reference
+const listener = async (user) => console.log("saved", user.id);
+User.on("saved", listener);
+User.off("saved", listener);
+
+// Or use the returned unsubscribe function
+unsubscribe();
+```
+
+## 🔩 Instance-Level Events: `model.on` / `model.once` / `model.off` / `model.emitEvent`
+
+Every model **instance** also carries its own event bus. Instance events fire in addition to class-level and global events—they are scoped to that specific object.
+
+```ts title="src/app.ts"
+const user = await User.findById(userId);
+
+// Listen on this specific instance only
+const unsub = user.on("saved", async (u) => {
+  console.log("This particular user was saved:", u.id);
+});
+
+// One-shot on instance
+user.once("deleted", async (u) => {
+  console.log("This user was deleted:", u.id);
+});
+
+// Remove listener from instance
+user.off("saved", myListener);
+
+// Emit an event manually (fires instance → class → global buses)
+await user.emitEvent("saved");
+```
+
+:::info
+When `model.emitEvent(event, context?)` is called it propagates through three buses in order:
+1. The **instance** event bus (`model.events`)
+2. The **class** event bus (`Model.events()`)
+3. The **global** event bus (`globalModelEvents`)
+:::
+
+## 🌍 Global Events with `Model.globalEvents()` and `globalModelEvents`
+
+Use global events to react to lifecycle moments across **every** model in your application without wiring up listeners to individual classes.
+
+```ts title="src/app.ts"
+import { globalModelEvents } from "@warlock.js/cascade";
+
+// Via the singleton import
+globalModelEvents.on("created", async (model) => {
+  console.log(`[AUDIT] ${model.constructor.name} created:`, model.id);
+});
+
+// Via any model's static helper (same singleton)
+User.globalEvents().on("deleted", async (model) => {
+  console.log(`[AUDIT] Something was deleted:`, model.id);
 });
 ```
 
+`Model.globalEvents()` and the `globalModelEvents` export both reference the **same singleton** `ModelEvents<Model>` instance. The full `on` / `once` / `off` / `emit` API is available on it.
+
 ## 🌍 Real-World Use Cases
-- **Logging**: Track changes for auditing
-- **Syncing**: Update related models (e.g., recalculate counts)
-- **Notifications**: Send emails or push notifications after creation
-- **Enforcing business rules**: (rare) Prevent certain actions based on custom logic
+
+- **Logging**: Track every create/update/delete for auditing via `globalModelEvents`
+- **Syncing**: Update counters or related models in `onUpdated`
+- **Notifications**: Send welcome emails in `onCreated`
+- **Cache invalidation**: Bust caches in `onSaved` or `onDeleted`
+- **Query instrumentation**: Log slow queries in `onFetching`
+- **Soft-delete cleanup**: Trigger side effects in `onRestored`
 
 ## 🧙‍♂️ Pro Tips
-- Use events for side effects and automation, not for core validation
-- Use after events for logging, syncing, and notifications
-- Chain listeners to keep code modular
+
+- Use **class events** (`Model.events()`) for model-specific logic
+- Use **global events** (`globalModelEvents`) for cross-cutting concerns like auditing and tracing
+- Use **instance events** (`model.on(...)`) when you need to scope a listener to a single object's lifetime
+- Always store the returned unsubscribe function when you need to clean up dynamically registered listeners
 
 ## 🛠️ Troubleshooting
-- If your event isn't firing, check that you're registering it on the correct model class
-- Remember: only before events can cancel actions
-- Use `console.log` or breakpoints to debug event flows
+
+- If your event isn't firing, confirm you registered it on the correct model class or the correct instance
+- Listeners run sequentially — an unhandled `Promise` rejection in one listener will stop subsequent listeners from running
+- Use `console.log` or breakpoints inside listeners to trace the event flow
 
 :::info
-Events make your models super flexible and powerful. Use them to automate, sync, and react to changes in your data!
+Events make your models super flexible and powerful. Use them to automate, sync, and react to changes in your data across all 16 lifecycle moments!
 :::
 
 ---
 
 ## 🌟 What's Next?
-- [🧰 Advanced Usage](../advanced/introduction) 
+- [🧰 Advanced Usage](../advanced/introduction)

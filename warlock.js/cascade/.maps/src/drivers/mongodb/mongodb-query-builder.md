@@ -1,0 +1,226 @@
+# mongodb-query-builder
+source: drivers/mongodb/mongodb-query-builder.ts
+description: MongoDB query builder assembling aggregation pipelines via operations.
+complexity: complex
+first-mapped: 2026-04-17 03:34:41 PM
+last-mapped: 2026-04-17 03:34:41 PM
+
+## Imports
+- `GenericObject`, `get` from `@mongez/reinforcements`
+- `AggregateOptions`, `ClientSession`, `Collection` from `mongodb`
+- `databaseTransactionContext` from `../../context/database-transaction-context`
+- `CursorPaginationOptions`, `CursorPaginationResult`, `DriverQuery`, `GroupByInput`, `HavingInput`, `JoinOptions`, `OrderDirection`, `PaginationOptions`, `PaginationResult`, `QueryBuilderContract`, `RawExpression`, `WhereCallback`, `WhereObject`, `WhereOperator` from `../../contracts`
+- `DataSource` from `../../data-source/data-source`
+- `dataSourceRegistry` from `../../data-source/data-source-registry`
+- `QueryBuilder` from `../../query-builder/query-builder`
+- `MongoDbDriver` from `./mongodb-driver`
+- `MongoQueryOperations` from `./mongodb-query-operations`
+- `MongoQueryParser` from `./mongodb-query-parser`
+- `Operation` from `./types`
+
+## Exports
+- `MongoQueryBuilder` — MongoDB aggregation pipeline query builder  [lines 32-2606]
+
+## Classes
+### MongoQueryBuilder<T>  [lines 32-2606] — MongoDB query builder using aggregation pipeline
+extends: QueryBuilder<T>
+implements: QueryBuilderContract<T>
+
+fields:
+- `override operations: Operation[]`  [line 43]
+- `readonly dataSource: DataSource`  [line 48]
+- `protected _operationsHelper?: MongoQueryOperations`  [line 53]
+- `hydrateCallback?: (data: any, index: number) => any`  [line 55]
+- `readonly table: string`  [line 69]
+- `eagerLoadRelations: Map<string, boolean | ((query: QueryBuilderContract) => void)>`  [lines 2410-2411]
+- `countRelations: string[]`  [line 2416]
+- `joinRelations: Map<string, { alias: string; type: "belongsTo" | "hasOne" | "hasMany" }>`  [lines 2421-2422]
+- `relationDefinitions?: Record<string, any>`  [line 2427]
+- `modelClass?: any`  [line 2432]
+
+methods:
+- `constructor(table: string, dataSource?: DataSource)`  [lines 68-75] — Initialize builder with table and data source
+- `protected get operationsHelper(): MongoQueryOperations`  [lines 81-86] — Lazy-create operations helper
+- `get collection(): Collection`  [lines 91-95] — Return MongoDB collection instance
+- `hydrate(callback): this`  [lines 100-103] — Register result hydrate callback
+- `onFetching(callback): () => void`  [lines 109-114] — Register pre-execution callback
+- `onHydrating(callback): () => void`  [lines 120-125] — Register pre-hydration callback
+- `onFetched(callback): () => void`  [lines 131-136] — Register post-hydration callback
+- `withoutGlobalScope(...scopeNames: string[]): this`  [lines 141-144] — Disable named global scopes
+- `withoutGlobalScopes(): this`  [lines 149-156] — Disable all global scopes
+- `scope(scopeName: string, ...args): this`  [lines 161-174] — Apply a local scope
+  - throws: `Error` — when scopes missing or not found
+- `where(...): this`  [lines 220-227] — Add AND where clause
+- `orWhere(...): this`  [lines 235-242] — Add OR where clause
+- `whereRaw(expression, bindings?): this`  [lines 249-251] — Add raw where clause
+- `orWhereRaw(expression, bindings?): this`  [lines 258-260] — Add raw OR where clause
+- `whereColumn(first, operator, second): this`  [lines 272-279] — Compare two columns
+- `orWhereColumn(first, operator, second): this`  [lines 287-294] — OR compare two columns
+- `whereColumns(comparisons): this`  [lines 300-307] — Multiple column comparisons
+- `whereBetweenColumns(field, lowerColumn, upperColumn): this`  [lines 315-322] — Value between two columns
+- `whereDate / whereDateEquals / whereDateBefore / whereDateAfter / whereTime / whereDay / whereMonth / whereYear`  [lines 333-412] — Date/time field filters
+- `whereJsonContains / whereJsonDoesntContain / whereJsonContainsKey / whereJsonLength / whereJsonIsArray / whereJsonIsObject / whereArrayLength`  [lines 423-499] — JSON/array filters
+- `whereId / whereIds / whereUuid / whereUlid`  [lines 509-535] — Identifier convenience filters
+- `whereFullText(fields, query): this`  [lines 542-549] — Full-text search filter
+- `orWhereFullText(fields, query): this`  [lines 556-563] — OR full-text search
+- `whereSearch(field, query): this`  [lines 570-572] — Single-field text search alias
+- `whereNot(callback): this`  [lines 578-581] — Negate callback conditions
+- `orWhereNot(callback): this`  [lines 587-590] — OR negate callback conditions
+- `whereIn / whereNotIn / whereNull / whereNotNull / whereBetween / whereNotBetween`  [lines 601-655] — Set and range filters
+- `whereLike / whereNotLike / whereStartsWith / whereNotStartsWith / whereEndsWith / whereNotEndsWith / whereDateBetween / whereDateNotBetween`  [lines 666-754] — Pattern and range filters
+- `whereExists(param): this`  [lines 765-777] — Field or subquery exists
+- `whereNotExists(param): this`  [lines 784-798] — Field or subquery absent
+- `whereSize(field, ...args): this`  [lines 806-823] — Array size filter
+- `textSearch(query, filters?): this`  [lines 834-837] — Full-text search with filters
+- `whereArrayContains / whereArrayNotContains / whereArrayHasOrEmpty / whereArrayNotHaveOrEmpty`  [lines 849-901] — Array membership filters
+- `protected addWhereClause(prefix, args): void`  [lines 908-932] — Normalize where arguments
+- `protected addRawWhere(type, expression, bindings?): this`  [lines 940-947] — Internal raw where helper
+- `protected normalizeSelectFields(args): { fields?; projection? }`  [lines 954-980] — Normalize select arguments
+- `select(...args): this`  [lines 991-998] — Project included fields
+- `selectAs(field, alias): this`  [lines 1006-1008] — Alias field in projection
+- `selectRaw(expression, bindings?): this`  [lines 1015-1021] — Raw computed projection
+- `selectRawMany(definitions): this`  [lines 1027-1038] — Multiple raw computed fields
+- `selectSub(expression, alias): this`  [lines 1045-1051] — Subquery projection field
+- `addSelectSub(expression, alias): this`  [lines 1058-1064] — Additional subquery projection
+- `selectAggregate(field, aggregate, alias): this`  [lines 1072-1083] — Aggregate computed field
+- `selectExists(field, alias): this`  [lines 1090-1096] — Existence boolean field
+- `selectCount(field, alias): this`  [lines 1103-1106] — Count projection field
+- `selectCase(cases, otherwise, alias): this`  [lines 1114-1125] — Multi-branch conditional field
+- `selectWhen(condition, thenValue, elseValue, alias): this`  [lines 1134-1147] — If-else conditional field
+- `selectDriverProjection(callback): this`  [lines 1153-1158] — Custom projection mutation
+- `selectJson(path, alias?): this`  [lines 1165-1168] — Extract JSON field
+- `selectJsonRaw(path, expression, alias): this`  [lines 1176-1183] — Raw JSON extraction
+- `deselectJson(path): this`  [lines 1189-1192] — Exclude JSON path
+- `selectConcat(fields, alias): this`  [lines 1199-1205] — Concatenate fields into one
+- `selectCoalesce(fields, alias): this`  [lines 1212-1218] — First non-null projection
+- `selectWindow(spec): this`  [lines 1224-1227] — Add window function stage
+  - side-effects: appends pipeline stage
+- `deselect(...args): this`  [lines 1233-1239] — Exclude specified fields
+- `distinctValues(fields?): this`  [lines 1245-1248] — Distinct group-based projection
+- `addSelect(...args): this`  [lines 1254-1260] — Append fields to selection
+- `clearSelect(): this`  [lines 1265-1268] — Remove all $project stages
+  - side-effects: filters operations list
+- `selectAll(): this`  [lines 1273-1275] — Alias for clearSelect
+- `selectDefault(): this`  [lines 1280-1282] — Alias for clearSelect
+- `orderBy(fieldOrFields, direction?): this`  [lines 1303-1325] — Sort by field(s)
+- `orderByDesc(field): this`  [lines 1331-1333] — Sort descending helper
+- `orderByRaw(expression, bindings?): this`  [lines 1340-1346] — Raw sort expression
+- `orderByRandom(limit?): this`  [lines 1351-1354] — Random sample ordering
+- `latest(column?)`  [lines 1360-1362] — Sort by date desc and fetch
+  - side-effects: executes query
+- `oldest(column?): this`  [lines 1368-1370] — Sort by date ascending
+- `limit(value): this`  [lines 1380-1383] — Limit result count
+- `skip(value): this`  [lines 1389-1392] — Skip documents
+- `offset(value): this`  [lines 1398-1400] — Alias for skip
+- `take(value): this`  [lines 1406-1408] — Alias for limit
+- `cursor(after?, before?): this`  [lines 1415-1418] — Cursor-based filter
+- `groupBy(fields, aggregates?): this`  [lines 1444-1458] — Group by fields optionally aggregating
+- `groupByRaw(expression, bindings?): this`  [lines 1465-1468] — Raw grouping expression
+- `having(...args): this`  [lines 1477-1497] — Filter grouped results
+- `havingRaw(expression, bindings?): this`  [lines 1504-1507] — Raw having expression
+- `join(tableOrOptions, localField?, foreignField?): this`  [lines 1520-1544] — Add $lookup join
+- `leftJoin(tableOrOptions, localField?, foreignField?): this`  [lines 1554-1578] — Left outer join
+- `rightJoin(tableOrOptions, localField?, foreignField?): this`  [lines 1591-1617] — Right outer join
+- `innerJoin(tableOrOptions, localField?, foreignField?): this`  [lines 1629-1653] — Inner join with match
+- `fullJoin(tableOrOptions, localField?, foreignField?): this`  [lines 1666-1690] — Full outer join
+- `crossJoin(table): this`  [lines 1699-1709] — Cross product join
+- `joinRaw(expression, _bindings?): this`  [lines 1719-1724] — Raw lookup stage
+- `raw(builder): this`  [lines 1730-1733] — Raw native query mutation
+- `extend<R>(extension, ..._args): R`  [lines 1741-1744] — Driver-specific extension hook
+  - throws: `Error` — always, extension unsupported
+- `clone(): this`  [lines 1750-1766] — Deep copy builder state
+- `tap(callback): this`  [lines 1772-1775] — Run callback in chain
+- `when<V>(condition, callback, otherwise?): this`  [lines 1786-1797] — Conditional builder modification
+- `async get<Output>(): Promise<Output[]>`  [lines 1807-1841] — Execute and return all documents
+  - throws: `Error` — from execute
+  - side-effects: invokes lifecycle callbacks, runs aggregation
+- `async getFirst<Output>(): Promise<Output | null>`  [lines 1847-1849] — First without added limit
+  - throws: `Error` — from execute
+- `async first<Output>(): Promise<Output | null>`  [lines 1855-1858] — First matching document
+  - throws: `Error` — from execute
+- `async firstOrFail<Output>(): Promise<Output>`  [lines 1864-1870] — First document or throw
+  - throws: `Error` — when none found
+- `async find<Output>(id): Promise<Output | null>`  [lines 1875-1877] — Find by id field
+  - throws: `Error` — from execute
+- `last<Output>(field?): Promise<Output | null>`  [lines 1882-1885] — Last by date field
+- `async count(): Promise<number>`  [lines 1891-1898] — Count matching documents
+  - throws: `Error` — from execute
+- `async sum(field): Promise<number>`  [lines 1905-1917] — Sum numeric field
+  - throws: `Error` — from execute
+  - side-effects: clears hydrate callback
+- `async avg(field): Promise<number>`  [lines 1924-1934] — Average numeric field
+  - throws: `Error` — from execute
+  - side-effects: clears hydrate callback
+- `async min(field): Promise<number>`  [lines 1941-1951] — Minimum field value
+  - throws: `Error` — from execute
+  - side-effects: clears hydrate callback
+- `async max(field): Promise<number>`  [lines 1958-1968] — Maximum field value
+  - throws: `Error` — from execute
+  - side-effects: clears hydrate callback
+- `async distinct<T>(field, ignoreNull?): Promise<T[]>`  [lines 1975-1987] — Distinct field values
+  - throws: `Error` — from execute
+  - side-effects: clears hydrate callback
+- `async countDistinct(field, ignoreNull?): Promise<number>`  [lines 1994-2000] — Count distinct values
+  - throws: `Error` — from execute
+- `async pluck<T>(field): Promise<T[]>`  [lines 2007-2017] — Extract values from documents
+  - throws: `Error` — from execute
+  - side-effects: clears hydrate callback
+- `async value<T>(field): Promise<T | null>`  [lines 2024-2030] — First document field value
+  - throws: `Error` — from execute
+  - side-effects: clears hydrate callback
+- `async exists(filter?): Promise<boolean>`  [lines 2037-2044] — Check if records exist
+  - throws: `Error` — from execute
+- `async notExists(filter?): Promise<boolean>`  [lines 2051-2053] — Check absence of records
+  - throws: `Error` — from execute
+- `async increment(field, amount?): Promise<number>`  [lines 2061-2075] — Increment field on first match
+  - throws: `Error` — from Mongo driver
+  - side-effects: mutates MongoDB document
+- `async decrement(field, amount?): Promise<number>`  [lines 2083-2085] — Decrement via negative increment
+  - throws: `Error` — from Mongo driver
+  - side-effects: mutates MongoDB document
+- `async incrementMany(field, amount?): Promise<number>`  [lines 2093-2101] — Increment many documents
+  - throws: `Error` — from Mongo driver
+  - side-effects: mutates MongoDB documents
+- `async decrementMany(field, amount?): Promise<number>`  [lines 2109-2111] — Decrement many documents
+  - throws: `Error` — from Mongo driver
+  - side-effects: mutates MongoDB documents
+- `async delete(): Promise<number>`  [lines 2116-2119] — Delete matching documents
+  - throws: `Error` — from Mongo driver
+  - side-effects: deletes documents
+- `async deleteOne(): Promise<number>`  [lines 2124-2127] — Delete single matching document
+  - throws: `Error` — from Mongo driver
+  - side-effects: deletes document
+- `async update(fields): Promise<number>`  [lines 2132-2138] — Update matching documents
+  - throws: `Error` — from Mongo driver
+  - side-effects: mutates documents
+- `async unset(...fields: string[]): Promise<number>`  [lines 2143-2155] — Unset fields on matches
+  - throws: `Error` — from Mongo driver
+  - side-effects: mutates documents
+- `async chunk(size, callback): Promise<void>`  [lines 2167-2193] — Iterate results in chunks
+  - throws: `Error` — from execute or callback
+  - side-effects: invokes callback per chunk
+- `async paginate(options?): Promise<PaginationResult<T>>`  [lines 2200-2219] — Page-based pagination
+  - throws: `Error` — from execute
+- `async cursorPaginate(options?): Promise<CursorPaginationResult<T>>`  [lines 2226-2296] — Cursor-based pagination
+  - throws: `Error` — from execute
+- `parse(): DriverQuery`  [lines 2305-2307] — Build pipeline for inspection
+- `pretty()`  [lines 2313-2315] — Pretty-printed pipeline string
+- `async explain(): Promise<unknown>`  [lines 2321-2328] — Return execution plan
+  - throws: `Error` — from Mongo driver
+  - side-effects: runs aggregate explain
+- `protected getParser(): MongoQueryParser`  [lines 2337-2345] — Build query parser instance
+  - side-effects: applies pending scopes
+- `protected buildPipeline()`  [lines 2351-2355] — Build aggregation pipeline
+- `protected buildFilter(): Record<string, unknown>`  [lines 2362-2379] — Build filter from match stage
+- `protected async execute<T>(pipeline?): Promise<T[]>`  [lines 2384-2401] — Run aggregate command
+  - throws: `Error` — from Mongo driver
+  - side-effects: resets operations list, runs aggregation
+- `joinWith(...relations: string[]): this`  [lines 2443-2454] — Eager load via $lookup
+- `with(...args): this`  [lines 2467-2494] — Eager load relations
+- `withCount(...relations: string[]): this`  [lines 2500-2503] — Count related records
+- `has(relation, operator?, count?): this`  [lines 2511-2515] — Filter having relation
+- `whereHas(relation, callback): this`  [lines 2522-2526] — Filter relation with conditions
+- `doesntHave(relation): this`  [lines 2532-2536] — Filter missing relation
+- `whereDoesntHave(relation, callback): this`  [lines 2543-2547] — Filter missing relation with conditions
+- `similarTo(column, embedding, alias?): this`  [lines 2577-2605] — Atlas vector similarity search
+  - side-effects: appends $vectorSearch and $addFields stages

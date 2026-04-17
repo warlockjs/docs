@@ -1,0 +1,342 @@
+---
+sidebar_position: 1
+---
+
+# 🛡️ Schema Validation
+
+Cascade integrates natively with [`@warlock.js/seal`](https://github.com/warlockjs/seal) to give every model a declarative validation layer. Attach a seal `ObjectValidator` to `static schema`, and Cascade automatically validates data before every database write.
+
+---
+
+## 📋 Attaching a Schema to a Model
+
+Declare `static schema` on your model class using any `ObjectValidator` from `@warlock.js/seal`. Cascade reads this property during the write lifecycle and validates the document against it before persisting anything.
+
+```ts title="src/models/product.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+
+export class Product extends Model {
+  static table = "products";
+
+  static schema = v.object({
+    name: v.string().required(),
+    price: v.number().min(0).required(),
+    stock: v.number().int().min(0).default(0),
+  });
+}
+```
+
+:::tip
+`static schema` is typed as `ObjectValidator` (imported from `@warlock.js/seal`). Any seal object schema is accepted — including schemas with nested objects, arrays, and custom rules.
+:::
+
+---
+
+## 💾 How Schema Runs During `save()`
+
+Calling `model.save()` delegates the database write to the internal `DatabaseWriter`. The writer checks whether the model exposes a `schema` property and, if it does, runs the seal validation pipeline against the current document data.
+
+The sequence around validation is:
+
+1. `save()` is called on the model instance.
+2. The `DatabaseWriter` emits the **`validating`** lifecycle event.
+3. The seal schema is executed against the model's data.
+4. If validation passes, the **`validated`** event is emitted and the write continues.
+5. If validation fails, a `DatabaseWriterValidationError` is thrown — the write is **aborted**.
+
+```ts title="src/controllers/product.controller.ts"
+import { Product } from "../models/product.model";
+
+const product = new Product({ name: "Widget", price: -1 });
+
+try {
+  await product.save();
+} catch (err) {
+  if (err instanceof DatabaseWriterValidationError) {
+    console.log(err.errors); // structured per-field error list
+  }
+}
+```
+
+---
+
+## 🎯 Validation Lifecycle Events
+
+Two dedicated events bracket the validation step. You can hook into them on any model instance, on the model class, or globally.
+
+| Event | Shorthand | Fired when |
+|---|---|---|
+| `"validating"` | `onValidating` | Just before the seal schema runs |
+| `"validated"` | `onValidated` | After the schema passes successfully |
+
+### Instance listeners
+
+```ts title="src/bootstrap.ts"
+const product = new Product({ name: "Widget", price: 10 });
+
+product.on("validating", async (model) => {
+  console.log("About to validate:", model.data);
+});
+
+product.on("validated", async (model) => {
+  console.log("Validation passed for:", model.get("name"));
+});
+
+await product.save();
+```
+
+### Static (class-level) listeners
+
+```ts title="src/bootstrap.ts"
+Product.on("validating", async (model) => {
+  // runs for every Product instance before validation
+});
+
+Product.on("validated", async (model) => {
+  // runs for every Product instance after validation succeeds
+});
+```
+
+### Shorthand helpers on `ModelEvents`
+
+```ts title="src/bootstrap.ts"
+Product.events().onValidating(async (model) => {
+  // same as .on("validating", ...)
+});
+
+Product.events().onValidated(async (model) => {
+  // same as .on("validated", ...)
+});
+```
+
+:::info
+The `"validating"` event fires even if the model has no `schema` defined, so you can always hook custom logic around the validation slot in the lifecycle.
+:::
+
+---
+
+## ❌ `DatabaseWriterValidationError`
+
+When seal validation fails, Cascade throws a `DatabaseWriterValidationError` — a subclass of `Error` that carries the full structured output from seal.
+
+### Shape
+
+```ts
+class DatabaseWriterValidationError extends Error {
+  /** Array of per-field seal validation errors */
+  readonly errors: ValidationResult["errors"];
+
+  constructor(message: string, errors: ValidationResult["errors"]);
+
+  /** Filter errors to those belonging to a specific field path */
+  getFieldErrors(fieldPath: string): ValidationResult["errors"];
+
+  /** Check whether a specific field path has any errors */
+  hasFieldError(fieldPath: string): boolean;
+
+  /** Colored terminal-formatted summary (used by Node.js inspect) */
+  toString(): string;
+}
+```
+
+### Catching and inspecting errors
+
+```ts title="src/controllers/product.controller.ts"
+import { DatabaseWriterValidationError } from "@warlock.js/cascade";
+import { Product } from "../models/product.model";
+
+async function createProduct(data: unknown) {
+  const product = new Product(data as any);
+
+  try {
+    await product.save();
+  } catch (err) {
+    if (err instanceof DatabaseWriterValidationError) {
+      // full error list
+      console.log(err.errors);
+
+      // check a specific field
+      if (err.hasFieldError("price")) {
+        const priceErrors = err.getFieldErrors("price");
+        console.log("Price errors:", priceErrors);
+      }
+    }
+
+    throw err;
+  }
+}
+```
+
+:::tip
+`DatabaseWriterValidationError` implements the Node.js `nodejs.util.inspect.custom` symbol, so `console.log(err)` in a terminal prints a formatted, color-coded summary of every failing field automatically.
+:::
+
+---
+
+## 🔒 Strict Mode — Handling Unknown Fields
+
+`static strictMode` controls what Cascade does when the incoming document contains fields that are **not declared in the schema**.
+
+```ts
+type StrictMode = "strip" | "fail" | "allow";
+```
+
+| Value | Behaviour |
+|---|---|
+| `"strip"` | Unknown fields are silently removed before the write *(default)* |
+| `"fail"` | Unknown fields cause a `DatabaseWriterValidationError` to be thrown |
+| `"allow"` | Unknown fields pass through untouched |
+
+### Setting strict mode on a model
+
+```ts title="src/models/product.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+
+export class Product extends Model {
+  static table = "products";
+
+  // Reject any payload that contains undeclared fields
+  static strictMode: "fail" = "fail";
+
+  static schema = v.object({
+    name: v.string().required(),
+    price: v.number().min(0).required(),
+  });
+}
+```
+
+```ts title="src/models/log.model.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Log extends Model {
+  static table = "logs";
+
+  // Allow arbitrary extra fields (schema-less document storage)
+  static strictMode: "allow" = "allow";
+}
+```
+
+:::info
+When `strictMode` is `"strip"` (the default), you never need to handle unknown-field errors — Cascade quietly prunes them so the document written to the database always matches the schema exactly.
+:::
+
+---
+
+## 🔌 Embed Validator Seal Plugin
+
+Cascade ships a seal plugin called `embedValidator` that adds `v.embed()` and `v.embedMany()` to the seal `v` factory. Import the `database-seal-plugins` module as a **side effect** to register it globally — once registered it is available everywhere in your application.
+
+```ts title="src/bootstrap.ts"
+// Registers the embedValidator plugin as a side effect
+import "@warlock.js/cascade/validation/database-seal-plugins";
+```
+
+After this import, the seal `v` object gains two new methods:
+
+| Method | Returns | Purpose |
+|---|---|---|
+| `v.embed(model, options?)` | `EmbedModelValidator` | Validate a **single** embedded model |
+| `v.embedMany(model, options?)` | `EmbedModelValidator` | Validate an **array** of embedded models |
+
+`EmbedOptions` accepted by both methods:
+
+```ts
+type EmbedOptions = {
+  errorMessage?: string;
+  embed?: string | string[];
+};
+```
+
+---
+
+## 🧩 `v.embed()` and `v.embedMany()` — Embedded Model Validation
+
+Use `v.embed()` and `v.embedMany()` inside a parent model's schema to validate embedded (denormalized) sub-documents against another Cascade model's own schema.
+
+### `v.embed(model, options?)` — single embedded model
+
+```ts title="src/models/order.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+import "@warlock.js/cascade/validation/database-seal-plugins";
+import { Address } from "./address.model";
+
+export class Order extends Model {
+  static table = "orders";
+
+  static schema = v.object({
+    total: v.number().min(0).required(),
+    // Validates the embedded address against Address model's schema
+    shippingAddress: v.embed(Address),
+  });
+}
+```
+
+### `v.embedMany(model, options?)` — array of embedded models
+
+```ts title="src/models/order.model.ts"
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
+import "@warlock.js/cascade/validation/database-seal-plugins";
+import { OrderItem } from "./order-item.model";
+
+export class Order extends Model {
+  static table = "orders";
+
+  static schema = v.object({
+    total: v.number().min(0).required(),
+    // Validates each item in the array against OrderItem's schema
+    items: v.embedMany(OrderItem),
+  });
+}
+```
+
+### Controlling which fields are embedded
+
+Pass the `embed` option to restrict which fields are extracted from the embedded model during transformation:
+
+```ts title="src/models/order.model.ts"
+static schema = v.object({
+  shippingAddress: v.embed(Address, {
+    embed: ["street", "city", "postalCode"],
+    errorMessage: "Invalid shipping address",
+  }),
+});
+```
+
+---
+
+## 🏗️ `EmbedModelValidator` — Class Reference
+
+`EmbedModelValidator` is the seal `BaseValidator` subclass that powers both `v.embed()` and `v.embedMany()`. You can use it directly if you need programmatic control.
+
+```ts
+import { EmbedModelValidator } from "@warlock.js/cascade";
+```
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `matchesType(value)` | Returns `true` if value is a `Model` instance, a number, or an array of `Model` instances |
+| `model(model, errorMessage?)` | Configure validator for a **single** embedded model — registers the model mutator and validation rule |
+| `models(model, errorMessage?)` | Configure validator for **many** embedded models — registers array mutator and rules |
+| `embed(embed?)` | Add a transformer that extracts embed data from the model; accepts a field name or array of field names |
+
+### Manual usage example
+
+```ts title="src/validation/custom-embed.ts"
+import { EmbedModelValidator } from "@warlock.js/cascade";
+import { Address } from "../models/address.model";
+
+// Equivalent to v.embed(Address, { embed: ["city", "postalCode"] })
+const addressValidator = new EmbedModelValidator()
+  .model(Address, "Invalid address")
+  .embed(["city", "postalCode"]);
+```
+
+:::info
+In practice you will almost always reach for `v.embed()` and `v.embedMany()` rather than instantiating `EmbedModelValidator` directly. The factory methods are the canonical API.
+:::

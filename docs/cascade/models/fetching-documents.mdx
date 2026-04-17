@@ -8,77 +8,132 @@ Getting your data out of the database is just as important as saving it! Cascade
 
 ## 🔎 Find by ID
 
-Fetch a single document by its ID:
+Fetch a single document by its primary key:
+
+```ts title="src/app.ts"
+const user = await User.find(1); // returns User | null
+```
+
+If the record doesn't exist, `find` returns `null`. Handle it explicitly:
 
 ```ts title="src/app.ts"
 const user = await User.find(1);
+
+if (!user) {
+  throw new Error("User not found");
+}
 ```
 
-## 🚨 Find or Fail
+## 🚨 First or Fail
 
-Throw an error if not found (great for APIs!):
+Need to throw automatically when nothing matches? Use `firstOrFail` on the query builder:
 
 ```ts title="src/app.ts"
-const user = await User.findOrFail(1); // Throws if not found
+const user = await User.where("id", 1).firstOrFail(); // throws if not found
 ```
 
-## 📋 List All (with Filters!)
-
-Get all documents, or filter with powerful queries:
+`firstOrFail` is available on any `QueryBuilderContract` chain, so you can combine it with any filter:
 
 ```ts title="src/app.ts"
-const users = await User.list(); // All users
-const activeUsers = await User.list({ isActive: true }); // Filtered
+const admin = await User.where("role", "admin").where("isActive", true).firstOrFail();
+```
+
+## 📋 Fetch All Documents
+
+Use `Model.all()` to retrieve every document in the table:
+
+```ts title="src/app.ts"
+const users = await User.all();
+```
+
+To fetch all documents that match a filter, use `Model.findAll(filter?)` or build a query with `where` + `get`:
+
+```ts title="src/app.ts"
+// findAll with a filter object
+const activeUsers = await User.findAll({ isActive: true });
+
+// equivalent query-builder form
+const activeUsers = await User.where("isActive", true).get();
 ```
 
 ## 🧙‍♂️ Pro Tip: Advanced Filters
 
-You can use advanced MongoDB-style queries:
+Chain as many `where` calls as you need — every operator supported by the query builder is available:
 
 ```ts title="src/app.ts"
-const users = await User.list({ age: { $gte: 18 } });
+const adults = await User.where("age", ">=", 18).get();
+
+const recent = await User.where("createdAt", ">", someDate).orderBy("createdAt", "desc").get();
 ```
 
-## 🪄 Including Soft-Deleted (Trashed) Documents
+## 🔁 Fetch First / Last
 
-Want to include soft-deleted docs? Use `withTrashed`:
+`Model.first` returns the first matching document (or `null`):
 
 ```ts title="src/app.ts"
-const users = await User.list({ withTrashed: true });
+const user = await User.first(); // very first record
+const activeUser = await User.first({ isActive: true }); // first active user
+```
+
+To grab the most recent records use `Model.latest()` or `orderByDesc` on the query builder:
+
+```ts title="src/app.ts"
+const newest = await User.query().orderByDesc("createdAt").first();
 ```
 
 ## 🤝 Eager Loading Relationships
 
-Fetch related data in one go with `with`:
+Load related data in one query with `Model.with(...relations)`:
 
 ```ts title="src/app.ts"
-const posts = await Post.list({ with: ["category"] });
+// load a single relation
+const posts = await Post.with("category").get();
+
+// load multiple relations
+const posts = await Post.with("category", "author").get();
 ```
 
-## 🧩 Embedding Models (New Pattern!)
-
-When you use the `with` option, just pass the model class directly for embedded relationships:
+`Model.with` returns a `QueryBuilderContract` so you can keep chaining:
 
 ```ts title="src/app.ts"
-const posts = await Post.list({ with: [Category] }); // New & recommended!
+const posts = await Post.with("category")
+  .where("isPublished", true)
+  .orderBy("createdAt", "desc")
+  .get();
 ```
 
 :::tip Did you know?
-You no longer need to use `castModel(Category)`—just pass the model class directly! This is the new, recommended way. `castModel` is still supported for backward compatibility.
+`Model.with` is also available on the static model and returns a fully-chainable query builder. You can narrow the eager-loaded relation's query by passing a callback as the second argument to `with`.
 :::
 
-## 🏎️ Pagination & Sorting
+## 🏎️ Pagination
 
-Cascade supports pagination and sorting out of the box:
+Use `Model.paginate` (or `.paginate` on the query builder) to get a ready-made pagination result:
 
 ```ts title="src/app.ts"
-const users = await User.list({ page: 2, limit: 10, sort: { createdAt: -1 } });
+const result = await User.paginate({ page: 2, limit: 10 });
+
+// result.data    — array of User instances for this page
+// result.pages   — total number of pages
+// result.total   — total number of records
+// result.page    — current page
+// result.limit   — records per page
 ```
 
-## 🧙‍♂️ Pro Tip
-Combine filters, sorting, pagination, and relationships for supercharged queries!
+Combine pagination with ordering and filters:
 
----
+```ts title="src/app.ts"
+const result = await User.where("isActive", true)
+  .orderBy("createdAt", "desc")
+  .paginate({ page: 1, limit: 20 });
+```
+
+## 📊 Counting Records
+
+```ts title="src/app.ts"
+const total = await User.count();
+const activeCount = await User.where("isActive", true).count();
+```
 
 ## 🌟 What's Next?
 - [🔗 Relationships](../relationships/introduction)

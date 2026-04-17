@@ -4,241 +4,212 @@ sidebar_position: 2
 
 # Blueprint
 
-`MonPulse` introduces a `Blueprint` class, this class easily allows you to create indexes on your collections. You can create indexes on a single field, multiple fields, and compound indexes.
+Cascade exposes **blueprint** classes for inspecting the live schema of a connected database — listing tables, columns, and indexes. Blueprint is a **read-only introspection tool**; if you need to create or drop indexes, do that inside a [migration](../migrations/overview).
 
-## Creating a new blueprint
-
-To start using `Blueprint`, create an instance of it and pass the collection name to the constructor.
-
-```ts
-import { Blueprint } from "@warlock.js/cascade";
-
-const usersBlueprint = new Blueprint("users");
-```
-
-## Creating a new index
-
-To create a single field index, use the `index` method. The first argument is the field name, and the second argument is the index options.
-
-```ts
-await usersBlueprint.index("name"); // creates an index on the name field
-```
-
-This will create an index on the `name` field. The index name will be `users_name_index` to be easier to follow the naming convention.
-
-If you want to specify a custom index name, pass it as the second argument.
-
-```ts
-await usersBlueprint.index("name", { name: "users_name" });
-```
-
-### Creating a compound index
-
-To create a compound index, use the same method, but pass an array of fields instead of a single field.
-
-```ts
-await usersBlueprint.index(["name", "email"]);
-```
-
-This will create a new index in the `users` collection on the `name` and `email` fields. The index name will be `users_name_email_index`.
-
-Again, you can specify a custom index name.
-
-```ts
-await usersBlueprint.index(["name", "email"], { name: "users_name_email" });
-```
-
-### Creating a unique index
-
-Similar to the `index` method, you can use the `unique` method to create a unique index.
-
-```ts
-await usersBlueprint.unique("email");
-```
-
-This will enforce only unique values in the `email` field, if email is duplicated the index will throw an error.
-
-### Creating a text index
-
-A `text` index is used to search for text in a collection. To create a text index, use the `text` method.
-
-```ts
-await usersBlueprint.textIndex("name");
-```
-
-Text indexes are useful when you want to search for text in a collection. For example, if you want to search for users by their name, you can use the text index.
-
-### Creating a Geo Index
-
-A geo index **A.K.A** `2dsphere` index is used to store geo data in a collection. To create a geo index, use the `geoIndex` method.
-
-```ts
-await usersBlueprint.geoIndex("location");
-```
-
-:::info DID YOU KNOW?
-Any `index method` can create a single or compound index. For example, you can create a compound text index by passing an array of fields to any `index method`.
+:::info Blueprint is not a factory
+`new Blueprint("users")` and the `blueprint()` factory function are **no longer part of the API**. Use the driver-specific blueprint classes described below instead.
 :::
 
-:::tip Index Options
-Any `index method` receives two parameters, the first one is for the column(s) that will be indexed, the second one is [Index Options](https://docs.mongodb.com/manual/reference/method/db.collection.createIndex/#index-options), so you can freely use it as well.
+## `DriverBlueprintContract`
+
+Both the MongoDB and PostgreSQL blueprint classes implement the same interface so you can write driver-agnostic introspection code.
+
+```ts
+import { DriverBlueprintContract } from "@warlock.js/cascade";
+```
+
+### Interface methods
+
+| Method | Returns | Description |
+|---|---|---|
+| `listTables()` | `Promise<string[]>` | All table / collection names in the database |
+| `listIndexes(table)` | `Promise<TableIndexInformation[]>` | All indexes on the given table / collection |
+| `listColumns(table)` | `Promise<string[]>` | Column names for the given table |
+| `tableExists(table)` | `Promise<boolean>` | Whether the table / collection exists |
+
+### `TableIndexInformation` type
+
+Each entry returned by `listIndexes` conforms to this shape:
+
+```ts
+type TableIndexInformation = {
+  name: string;
+  columns?: string[];
+  type?: string;
+  unique: boolean;
+  partial: boolean;
+  options: Record<string, any>;
+};
+```
+
+- **`name`** — the index name as stored in the database
+- **`columns`** — column(s) covered by the index (may be empty for MongoDB schemaless collections)
+- **`type`** — index type string (e.g. `"btree"`, `"text"`, `"2dsphere"`)
+- **`unique`** — whether the index enforces uniqueness
+- **`partial`** — whether the index is a partial / sparse index
+- **`options`** — raw driver-specific options object
+
+## `MongoDBBlueprint`
+
+`MongoDBBlueprint` provides collection and index introspection for a MongoDB connection. It implements `DriverBlueprintContract`.
+
+### Getting a `MongoDBBlueprint` via the driver
+
+```ts
+import { connection } from "@warlock.js/cascade";
+
+// Obtain the underlying Db instance from the active connection
+const db = connection().database; // Db (from the `mongodb` package)
+
+import { MongoDBBlueprint } from "@warlock.js/cascade";
+
+const blueprint = new MongoDBBlueprint(db);
+```
+
+### Available methods
+
+#### `listTables()`
+
+Returns all collection names in the connected database.
+
+```ts
+const collections = await blueprint.listTables();
+// ["users", "orders", "products"]
+```
+
+#### `listIndexes(table)`
+
+Returns index metadata for a collection.
+
+```ts
+const indexes = await blueprint.listIndexes("users");
+/*
+[
+  { name: "_id_", columns: ["_id"], unique: false, partial: false, options: {} },
+  { name: "email_1", columns: ["email"], unique: true, partial: false, options: {} },
+]
+*/
+```
+
+#### `tableExists(table)`
+
+Checks whether a collection exists.
+
+```ts
+const exists = await blueprint.tableExists("users");
+// true
+```
+
+#### `listColumns(table)`
+
+:::info MongoDB is schemaless
+MongoDB has no fixed schema, so `listColumns()` always returns an empty array and logs a warning. Use your model definitions as the source of truth for field names.
 :::
 
-## Dropping indexes
-
-Dropping indexes are similar to creating them. To drop an index, use the `dropIndex` method.
-
 ```ts
-await usersBlueprint.dropIndex("name");
+const columns = await blueprint.listColumns("users");
+// [] — always empty for MongoDB
 ```
 
-### Drop unique index
+## `PostgresBlueprint`
 
-To drop a unique index, use the `dropUnique` method.
+`PostgresBlueprint` provides table and index introspection for a PostgreSQL connection using `information_schema` and `pg_catalog`. It implements `DriverBlueprintContract`.
 
-```ts
-await usersBlueprint.dropUnique("email");
-```
-
-### Drop text index
-
-To drop a text index, use the `dropTextIndex` method.
+### Getting a `PostgresBlueprint` via the driver
 
 ```ts
-await usersBlueprint.dropTextIndex("name");
+import { PostgresDriver, PostgresBlueprint } from "@warlock.js/cascade";
+
+// driver is an already-configured PostgresDriver instance
+const blueprint = new PostgresBlueprint(driver);
 ```
 
-### Drop geo index
+### Available methods
 
-To drop a geo index, use the `dropGeoIndex` method.
+#### `listTables()`
+
+Lists all public base table names in the connected database.
 
 ```ts
-await usersBlueprint.dropGeoIndex("location");
+const tables = await blueprint.listTables();
+// ["users", "orders", "products"]
 ```
 
-### Drop all indexes
+#### `listIndexes(table)`
 
-To drop all indexes, use the `dropAllIndexes` method.
+Lists and parses all indexes on the given table.
 
 ```ts
-await usersBlueprint.dropAllIndexes();
+const indexes = await blueprint.listIndexes("users");
+/*
+[
+  {
+    name: "users_pkey",
+    columns: ["id"],
+    type: "btree",
+    unique: true,
+    partial: false,
+    options: {},
+  },
+  {
+    name: "users_email_unique",
+    columns: ["email"],
+    type: "btree",
+    unique: true,
+    partial: false,
+    options: {},
+  },
+]
+*/
 ```
 
-## Listing indexes
+#### `listColumns(table)`
 
-To list a collection indexes, use the `listIndexes` method.
+Lists column names ordered by their ordinal position.
 
 ```ts
-await usersBlueprint.listIndexes();
+const columns = await blueprint.listColumns("users");
+// ["id", "name", "email", "created_at"]
 ```
 
-### Check if index exists
+#### `tableExists(table)`
 
-To check if an index exists, use the `indexExists` method.
+Checks whether the table exists in the public schema.
 
 ```ts
-await usersBlueprint.indexExists("name");
+const exists = await blueprint.tableExists("users");
+// true
 ```
 
-## Get indexes information
+## Writing driver-agnostic introspection code
 
-To get indexes information, use the `indexInformation` method.
+Because both blueprints implement `DriverBlueprintContract`, you can pass either one to shared utilities:
 
 ```ts
-await usersBlueprint.indexInformation();
+import { DriverBlueprintContract } from "@warlock.js/cascade";
+
+async function printIndexes(
+  blueprint: DriverBlueprintContract,
+  table: string,
+) {
+  const indexes = await blueprint.listIndexes(table);
+
+  for (const index of indexes) {
+    const kind = index.unique ? "UNIQUE" : "INDEX";
+    const cols = index.columns?.join(", ") ?? "—";
+    console.log(`[${kind}] ${index.name} (${cols})`);
+  }
+}
+
+// Works with MongoDB:
+await printIndexes(mongoBlueprint, "users");
+
+// Works with PostgreSQL:
+await printIndexes(postgresBlueprint, "users");
 ```
 
-This will return an array of indexes information.
+:::tip Create indexes in migrations
+Blueprint is intentionally read-only. To create or drop indexes, use the migration system — this keeps your schema changes versioned, repeatable, and safe to run in CI/CD pipelines.
 
-:::tip
-Read more about what is being returned from the [MongoDB documentation](https://www.mongodb.com/docs/manual/reference/method/db.collection.getIndexes/#output).
-
-## Truncate collection
-
-To truncate `(Delete all documents)` a collection, use the `truncate` method.
-
-```ts
-await usersBlueprint.truncate();
-```
-
-## Drop collection
-
-To drop a collection, use the `drop` method.
-
-```ts
-await usersBlueprint.drop();
-```
-
-## Get collection stats
-
-To get collection stats, use the `stats` method.
-
-```ts
-await usersBlueprint.stats();
-```
-
-This will return an object with the collection stats.
-
-:::tip
-Read more about what is being returned from the [MongoDB documentation](https://www.mongodb.com/docs/manual/reference/operator/aggregation/collStats/).
+See [Migrations Overview](../migrations/overview) for details.
 :::
-
-## Get collection size
-
-To get the collection size, use the `size` method.
-
-```ts
-await usersBlueprint.size();
-```
-
-This will return the collection size in bytes.
-
-## Get Indexes Size
-
-To get the indexes size, use the `indexesSize` method.
-
-```ts
-await usersBlueprint.indexesSize();
-```
-
-This will return the indexes size in bytes.
-
-## Get total size
-
-Total size equals the collection size plus the indexes size. To get the total size, use the `totalSize` method.
-
-```ts
-await usersBlueprint.totalSize();
-```
-
-## Get document average size
-
-To get the document average size, use the `averageDocumentSize` method.
-
-```ts
-await usersBlueprint.averageDocumentSize();
-```
-
-:::tip
-`avgDocSize` method is an **alias** for `averageDocumentSize` method.
-:::
-
-## Count documents
-
-To count documents in a collection, use the `count` method.
-
-```ts
-await usersBlueprint.count();
-```
-
-## The `blueprint` function
-
-If you want to instantiate a blueprint for a collection, you can use the `blueprint` function.
-
-```ts
-import { blueprint } from "@warlock.js/cascade";
-
-const usersBlueprint = blueprint("users");
-```
-
-Which internally creates a new instance of the `Blueprint` class.

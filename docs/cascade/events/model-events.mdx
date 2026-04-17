@@ -7,9 +7,11 @@ title: Model Events
 
 Model events are crucial in any application or complex package as they help manage the flow of your application and make your code more readable and maintainable.
 
+Cascade provides a full lifecycle event system covering **16 named events** across creation, updating, saving, deletion, validation, fetching, hydration, and restoration. Every event fires across three scopes in a defined order.
+
 ## Accessing Model Events
 
-To access the Model events manager, call the `events()` method on the Model class `(not the instance)`.
+To access the Model events manager, call the `events()` method on the Model class *(not the instance)*.
 
 ```ts title="src/app.ts"
 import { User } from "./models/user";
@@ -19,133 +21,325 @@ User.events().onSaving((user) => {
 });
 ```
 
-## Types of Events
+## All Lifecycle Events
 
-There are **8** types of events that could be triggered for a model:
+| Event name | When it fires |
+|---|---|
+| `creating` | Before a new document is inserted |
+| `created` | After a new document is inserted |
+| `updating` | Before an existing document is updated |
+| `updated` | After an existing document is updated |
+| `saving` | Before creating **or** updating (fires before `creating`/`updating`) |
+| `saved` | After creating **or** updating (fires after `created`/`updated`) |
+| `deleting` | Before a document is deleted |
+| `deleted` | After a document is deleted |
+| `validating` | Before model validation runs |
+| `validated` | After model validation completes |
+| `fetching` | Before a query is executed to fetch documents |
+| `hydrating` | While raw database data is being converted into a model instance |
+| `fetched` | After a model instance has been fully fetched and hydrated |
+| `restoring` | Before a soft-deleted document is restored |
+| `restored` | After a soft-deleted document has been restored |
 
-1. `onCreating(model: Model)`: Called before creating a new document.
-2. `onCreated(model: Model)`: Called after creating a new document.
-3. `onUpdating(model: Model, oldModel: Model)`: Called before updating a document.
-4. `onUpdated(model: Model, oldModel: Model)`: Called after updating a document.
-5. `onSaving(model: Model, oldModel?: Model)`: Called before saving a document, this event is triggered before creating or updating a document.
-6. `onSaved(model: Model, oldModel?: Model)`: Called after saving a document, this event is triggered after creating or updating a document.
-7. `onDeleting(model: Model)`: Called before deleting a document.
-8. `onDeleted(model: Model)`: Called after deleting a document.
-
-These **8** events are triggered in three scopes.
-
-All scopes has the same method name.
+:::info
+`ModelEventName` is the TypeScript union type covering all 16 string literals above.
+:::
 
 ## Scopes of Events
 
-There are three scopes of events in Cascade **(Ordered by the order of triggering)**
+There are three scopes of events in Cascade **(ordered by the order of triggering)**:
 
-1. **Self Events**: These events are callbacks that being called inside the model itself.
-2. **Model Events**: These events are triggered for a specific model.
-3. **Global Events**: These events are triggered for all models.
+1. **Self Events**: Lifecycle callbacks defined as methods inside the model class itself.
+2. **Model Events**: Listeners registered on a specific model class via `Model.events()`.
+3. **Global Events**: Listeners registered on the shared `globalModelEvents` singleton that fire for every model.
+
+All scopes expose the same method names. When an event fires, Cascade calls all three scopes sequentially in the order listed above.
 
 ## Self Events
 
-The self events are `methods` inside the model itself that can be called, in real world apps, they are not that much of usage, but they could be handy in some situations.
+Self events are `protected` methods inside the model class. They are called first, before any external listeners, making them useful for per-class default behaviour.
 
-Here are the available self events:
+Available self-event methods:
 
-1. `onCreating`: Called before creating a new document.
-2. `onCreated`: Called after creating a new document.
-3. `onUpdating`: Called before updating a document.
-4. `onUpdated`: Called after updating a document.
-5. `onSaving`: Called before saving a document, this event is triggered before creating or updating a document.
-6. `onSaved`: Called after saving a document, this event is triggered after creating or updating a document.
-7. `onDeleting`: Called before deleting a document.
-8. `onDeleted`: Called after deleting a document.
-
-These events are the first events triggered before the other scopes.
-
-An example of usage
+1. `onCreating` — before creating a new document.
+2. `onCreated` — after creating a new document.
+3. `onUpdating` — before updating a document.
+4. `onUpdated` — after updating a document.
+5. `onSaving` — before creating or updating.
+6. `onSaved` — after creating or updating.
+7. `onDeleting` — before deleting a document.
+8. `onDeleted` — after deleting a document.
+9. `onValidating` — before validation runs.
+10. `onValidated` — after validation completes.
+11. `onFetching` — before a query executes.
+12. `onHydrating` — while hydrating raw data into a model.
+13. `onFetched` — after fetch and hydration complete.
+14. `onRestoring` — before restoring a soft-deleted document.
+15. `onRestored` — after restoring a soft-deleted document.
 
 ```ts title="src/models/user.ts"
 import { Model } from "@warlock.js/cascade";
 
 export class User extends Model {
-  // ...
-
   /**
    * {@inheritdoc}
    */
   protected onCreating() {
-    // do something
+    // runs before this user is inserted
   }
 
   /**
    * {@inheritdoc}
    */
   protected onCreated() {
-    // do something
+    // runs after this user is inserted
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected onValidating() {
+    // runs before validation
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected onRestored() {
+    // runs after a soft-delete restore
   }
 }
 ```
 
 :::info
-Please note that all of these methods should be `protected` methods.
+All self-event methods must be `protected`.
 :::
 
 ## Model Events
 
-Model events are triggered whenever a model is triggering the event, their order of the trigger are the second ones to be triggered.
-
-This second type is mainly the most used one, as it is the most common one to be used in real world apps.
-
-An example of usage
+Model events are registered on a specific model class and are the second scope to fire. This is the most commonly used scope in real-world applications.
 
 ```ts title="src/app.ts"
 import { User } from "./models/user";
 
 User.events()
   .onCreating((user) => {
-    // do something
+    // runs before any User document is created
   })
   .onCreated((user) => {
-    // do something
+    // runs after any User document is created
+  })
+  .onSaving((user, oldUser) => {
+    // runs before creating or updating — oldUser present when updating
+  })
+  .onSaved((user, oldUser) => {
+    // runs after creating or updating
+  })
+  .onUpdating((user, oldUser) => {
+    // oldUser holds the previous data
+  })
+  .onUpdated((user, oldUser) => {
+    // oldUser holds the previous data
+  })
+  .onDeleting((user) => {
+    // runs before deletion
+  })
+  .onDeleted((user) => {
+    // runs after deletion
+  })
+  .onValidating((user) => {
+    // runs before validation
+  })
+  .onValidated((user) => {
+    // runs after validation
+  })
+  .onFetching((query) => {
+    // query is the QueryBuilder about to execute
+  })
+  .onFetched((user) => {
+    // runs after fetch + hydration
+  })
+  .onRestoring((user) => {
+    // runs before soft-delete restore
+  })
+  .onRestored((user) => {
+    // runs after soft-delete restore
   });
 ```
 
-All events methods are chainable, so you can chain as many events as you want.
+All event methods are chainable, so you can register as many listeners as you need in a single call chain.
+
+### `Model.on`, `Model.once`, and `Model.off`
+
+In addition to the shorthand helpers you can use the lower-level `on` / `once` / `off` API directly on `Model.events()` to work with event names as strings (typed as `ModelEventName`).
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+// Persistent listener — returns an unsubscribe function
+const unsubscribe = User.events().on("saving", (user) => {
+  console.log("saving user", user.id);
+});
+
+// One-shot listener — automatically removed after the first fire
+User.events().once("created", (user) => {
+  console.log("first user created", user.id);
+});
+
+// Remove a specific listener
+const listener = (user) => { /* ... */ };
+User.events().on("deleting", listener);
+User.events().off("deleting", listener);
+
+// Unsubscribe via the returned function
+unsubscribe();
+```
+
+:::tip
+`on()` returns an unsubscribe function so you can clean up listeners without keeping a reference to the original listener.
+:::
 
 ## Global Events
 
-Global events are triggered whenever a model is triggering the event, their order of the trigger are the last ones to be triggered.
+Global events are fired last, after self events and model events. They fire for **every** model in the application, making them ideal for cross-cutting concerns such as audit logging, metrics, and tracing.
 
-This also could be a good one as well for real world apps.
+### `Model.globalEvents()` / `globalModelEvents`
 
-An example of usage
+There are two ways to reach the global event bus:
 
 ```ts title="src/app.ts"
 import { Model } from "@warlock.js/cascade";
+import { globalModelEvents } from "@warlock.js/cascade";
 
-Model.events()
+// Via the static helper (recommended)
+Model.globalEvents()
   .onCreating((model) => {
-    // do something
+    console.log(`[audit] creating ${model.constructor.name}`);
   })
-  .onCreated((model) => {
-    // do something
+  .onDeleted((model) => {
+    console.log(`[audit] deleted ${model.constructor.name}`);
   });
+
+// Via the exported singleton directly
+globalModelEvents.onSaved((model) => {
+  // runs after any model of any class is saved
+});
 ```
 
-All events methods are chainable, so you can chain as many events as you want.
+Both `Model.globalEvents()` and the `globalModelEvents` export reference the **same singleton instance**, so you can use whichever import style fits your codebase.
+
+Global events support the full set of shorthand helpers and the `on` / `once` / `off` API, identical to model events.
+
+## Instance-Level Events
+
+You can also subscribe to events on a **single model instance**. Instance listeners fire as part of the self-events scope (first), scoped to that one object.
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+const user = await User.findById(id);
+
+// Persistent listener on this instance only
+const unsubscribe = user.on("saving", (u) => {
+  console.log("this specific user is saving");
+});
+
+// One-shot listener on this instance
+user.once("updated", (u) => {
+  console.log("this user updated for the first time");
+});
+
+// Remove a listener from this instance
+const listener = (u) => { /* ... */ };
+user.on("deleting", listener);
+user.off("deleting", listener);
+
+// Manually emit an event on this instance (fires all three scopes)
+await user.emitEvent("saving");
+
+// Unsubscribe via the returned function
+unsubscribe();
+```
+
+| Method | Description |
+|---|---|
+| `model.on(event, listener)` | Register a persistent listener; returns an unsubscribe function |
+| `model.once(event, listener)` | Register a one-shot listener; returns an unsubscribe function |
+| `model.off(event, listener)` | Remove a previously registered listener |
+| `model.emitEvent(event, context?)` | Manually emit a lifecycle event across all three scopes |
+
+## Event Payload Reference
+
+| Event | Arguments passed to listener |
+|---|---|
+| `creating` | `(model)` |
+| `created` | `(model)` |
+| `updating` | `(model, oldModel)` — `oldModel` is a clone with previous data |
+| `updated` | `(model, oldModel)` |
+| `saving` | `(model, oldModel?)` — `oldModel` present when updating |
+| `saved` | `(model, oldModel?)` |
+| `deleting` | `(model)` |
+| `deleted` | `(model, context)` — see `OnDeletedEventContext` below |
+| `validating` | `(model)` |
+| `validated` | `(model)` |
+| `fetching` | `(query)` — receives the `QueryBuilder` instance |
+| `hydrating` | `(model)` |
+| `fetched` | `(model)` |
+| `restoring` | `(model)` |
+| `restored` | `(model)` |
+
+### `OnDeletedEventContext`
+
+The `deleted` event passes a second argument — `OnDeletedEventContext` — that carries metadata about how the deletion was performed:
+
+```ts
+import type { OnDeletedEventContext } from "@warlock.js/cascade";
+
+User.events().onDeleted((user, context: OnDeletedEventContext) => {
+  // context carries deletion strategy info (e.g. soft vs hard delete)
+});
+```
 
 ## The Events Manager
 
-The second and third scopes have a `EventManager`, each `Model` or even the `Model` class itself has its own `EventManager` and they are all singletons, so you can call them multiple times with no worries.
+Each model class gets its own `ModelEvents` instance stored in a `WeakMap` registry (`modelEventsRegistry`). The manager is created lazily on first access and is a singleton per class, so calling `User.events()` multiple times always returns the same object.
 
-## Event Payload
+The global `globalModelEvents` is a module-level singleton instantiated once at import time.
 
-Let's take a quick look about what data are passed into the event callback.
+## Full Example
 
-1. `onCreating`: this event receives the model instance.
-2. `onCreated`: this event receives the model instance.
-3. `onUpdating`: this event receives the model instance and a clone of model instance with `old data`.
-4. `onUpdated`: this event receives the model instance and a clone of model instance with `old data`.
-5. `onSaving`: this event receives the model instance and, optionally, a clone of model instance with `old data`, if the second parameter is passed, it means that the model is being updated, otherwise it is being created.
-6. `onSaved`: this event receives the model instance and, optionally, a clone of model instance with `old data`, if the second parameter is passed, it means that the model is being updated, otherwise it is being created.
-7. `onDeleting`: this event receives the model instance.
-8. `onDeleted`: this event receives the model instance.
+```ts title="src/bootstrap/events.ts"
+import { Model } from "@warlock.js/cascade";
+import { globalModelEvents } from "@warlock.js/cascade";
+import { User } from "../models/user";
+import { Post } from "../models/post";
+
+// Per-model listeners
+User.events()
+  .onCreating((user) => {
+    user.set("createdAt", new Date());
+  })
+  .onValidating((user) => {
+    // custom pre-validation logic
+  })
+  .onDeleted((user, ctx) => {
+    console.log("User deleted", user.id, ctx);
+  });
+
+Post.events()
+  .onSaving((post) => {
+    post.set("updatedAt", new Date());
+  })
+  .onFetching((query) => {
+    query.where("isPublished", true);
+  });
+
+// Global listeners (all models)
+globalModelEvents
+  .onCreated((model) => {
+    console.log(`[audit] ${model.constructor.name} created`, model.id);
+  })
+  .onDeleted((model) => {
+    console.log(`[audit] ${model.constructor.name} deleted`, model.id);
+  });
+```

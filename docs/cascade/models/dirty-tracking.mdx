@@ -1,0 +1,169 @@
+---
+sidebar_position: 12
+---
+
+# 🔍 Dirty Tracking
+
+## Introduction
+
+Dirty tracking is the mechanism Cascade uses to know **which fields changed** on a model instance since it was loaded from the database or last saved. Instead of writing the entire document on every `save()` call, Cascade compares two snapshots of the model's data — the baseline (what was in the database) and the current state — and only persists what actually changed.
+
+Every model instance carries a `dirtyTracker` property, which is a `DatabaseDirtyTracker` instance that performs this diffing automatically as you mutate the model.
+
+:::info How it works
+When a model is loaded from the database, the tracker takes a snapshot of the raw data (the *baseline*). As you call `set()`, `merge()`, `unset()`, or any other mutation method, the tracker keeps a second snapshot of the *current* state. On every mutation it recomputes the diff between the two snapshots using dot-notation flattened keys, so deeply nested paths like `address.city` are tracked individually.
+:::
+
+---
+
+## 🧩 `model.dirtyTracker`
+
+The `dirtyTracker` property exposes the underlying `DatabaseDirtyTracker` instance attached to the model. All dirty-checking methods on the model delegate to this object.
+
+```ts title="src/app.ts"
+import { User } from "./models/user";
+
+const user = await User.find(1);
+
+console.log(user.dirtyTracker); // DatabaseDirtyTracker instance
+```
+
+---
+
+## ✅ `model.hasChanges`
+
+A boolean that is `true` when at least one field has been modified or removed since the baseline was taken.
+
+```ts title="src/app.ts"
+const user = await User.find(1);
+
+console.log(user.hasChanges); // false — nothing changed yet
+
+user.set("name", "Jane Doe");
+
+console.log(user.hasChanges); // true
+```
+
+:::tip
+`hasChanges` returns `true` when either modified columns **or** removed columns exist. Unsetting a field counts as a change.
+:::
+
+---
+
+## 🔎 `isDirty(column)`
+
+Checks whether a **specific column** has changed since the baseline. Accepts dot-notation paths for nested fields.
+
+```ts title="src/app.ts"
+const user = await User.find(1);
+
+user.set("name", "Jane Doe");
+
+console.log(user.isDirty("name"));    // true
+console.log(user.isDirty("email"));   // false
+console.log(user.isDirty("address.city")); // false
+```
+
+---
+
+## 📋 `getDirtyColumns()`
+
+Returns a **string array** of all column names (in dot-notation) that have changed since the baseline.
+
+```ts title="src/app.ts"
+const user = await User.find(1);
+
+user.set("name", "Jane Doe");
+user.set("address.city", "Cairo");
+
+console.log(user.getDirtyColumns());
+// ["name", "address.city"]
+```
+
+---
+
+## 🔄 `getDirtyColumnsWithValues()`
+
+Returns a `Record<string, { oldValue, newValue }>` mapping each dirty column name to its previous and current values. Useful for auditing or building change logs.
+
+```ts title="src/app.ts"
+const user = await User.find(1);
+// user.data.name === "Hasan Zohdy"
+
+user.set("name", "Jane Doe");
+user.set("age", 30);
+
+console.log(user.getDirtyColumnsWithValues());
+// {
+//   name: { oldValue: "Hasan Zohdy", newValue: "Jane Doe" },
+//   age:  { oldValue: 25,            newValue: 30          }
+// }
+```
+
+:::info
+Only columns that have actually changed are included. If you set a field to its current value, it will not appear in the result.
+:::
+
+---
+
+## 🗑️ `getRemovedColumns()`
+
+Returns a **string array** of column names that have been unset (removed) from the model since the baseline.
+
+```ts title="src/app.ts"
+const user = await User.find(1);
+// user has: name, email, age, address
+
+user.unset("age", "address");
+
+console.log(user.getRemovedColumns());
+// ["age", "address"]
+
+console.log(user.hasChanges); // true
+```
+
+---
+
+## 🏗️ `DatabaseDirtyTracker` — Public API
+
+The `DatabaseDirtyTracker` class is the engine behind dirty tracking. You rarely need to construct one directly (each model creates its own), but all its public methods are available through `model.dirtyTracker`.
+
+| Method | Description |
+|---|---|
+| `constructor(data)` | Initialises both baseline and current snapshots and computes initial dirty state. |
+| `hasChanges()` | Returns `true` if any column was modified or removed. |
+| `isDirty(column)` | Returns `true` if the given column path has changed. |
+| `getDirtyColumns()` | Returns an array of modified dot-notation column paths. |
+| `getDirtyColumnsWithValues()` | Returns a map of `{ oldValue, newValue }` for each dirty column. |
+| `getRemovedColumns()` | Returns an array of columns removed since the baseline. |
+| `replaceCurrentData(data)` | Replaces the current snapshot entirely and recomputes the diff. |
+| `mergeChanges(partial)` | Deep-merges partial data into the current snapshot and recomputes the diff. |
+| `unset(columns)` | Removes one or more columns from the current snapshot and recomputes the diff. |
+| `reset(data?)` | Resets both snapshots to the given data (or current data if omitted) and clears all dirty state. |
+
+### `replaceCurrentData` and `mergeChanges`
+
+These are lower-level methods used internally when the model's data is replaced wholesale (e.g. after a save round-trip) or merged incrementally.
+
+```ts title="src/app.ts"
+const user = await User.find(1);
+
+// Internally called after save() completes to reset the baseline
+user.dirtyTracker.reset();
+
+console.log(user.hasChanges); // false — baseline and current are in sync
+```
+
+---
+
+## 🐘 `SqlDatabaseDirtyTracker` — PostgreSQL JSON Awareness
+
+For SQL databases (PostgreSQL), Cascade uses `SqlDatabaseDirtyTracker`, a subclass of `DatabaseDirtyTracker`. The only difference is how it flattens data before diffing.
+
+`DatabaseDirtyTracker` uses **recursive dot-notation flattening**, so a nested object like `{ address: { city: "Cairo" } }` becomes `{ "address.city": "Cairo" }` for comparison. This is ideal for MongoDB-style documents.
+
+`SqlDatabaseDirtyTracker` uses a **shallow copy** instead, so JSON columns are compared as whole objects rather than decomposed into individual paths. This prevents false positives when a PostgreSQL `jsonb` column contains deeply nested data that should be treated as a single atomic value.
+
+:::info
+You do not need to select or configure `SqlDatabaseDirtyTracker` manually. When using a SQL connection, Cascade's model layer automatically uses the SQL-aware tracker.
+:::

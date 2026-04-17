@@ -1,0 +1,220 @@
+---
+sidebar_position: 15
+---
+
+# 🗑️ Soft Delete & Restore
+
+Cascade gives you three ways to delete model records — from reversible soft deletes to permanent removal — plus a full restoration pipeline for when you need to bring data back. 🔄
+
+## 🧠 The `DeleteStrategy` Union
+
+Every deletion in Cascade is governed by a `DeleteStrategy`:
+
+```ts
+type DeleteStrategy = "trash" | "soft" | "permanent";
+```
+
+| Strategy | What happens |
+|---|---|
+| `"soft"` | Sets a `deletedAt` timestamp on the row; the record stays in the same table and is excluded from normal queries |
+| `"trash"` | Moves the entire row to a separate trash table; the original row is removed |
+| `"permanent"` | Removes the row from the database immediately with no recovery path |
+
+## ⚙️ Configuring a Model
+
+Set the strategy and related columns directly on your model class:
+
+```ts title="src/models/post.ts"
+export class Post extends Model {
+  public static table = "posts";
+
+  // "soft" | "trash" | "permanent"
+  public static deleteStrategy: DeleteStrategy = "soft";
+
+  // Column that stores the deletion timestamp (soft strategy)
+  // Defaults to "deletedAt" — override only when your schema differs
+  public static deletedAtColumn = "deletedAt";
+
+  // Required when deleteStrategy is "trash"
+  // Records moved here instead of being updated in-place
+  public static trashTable = "posts_trash";
+}
+```
+
+:::tip
+`deletedAtColumn` defaults to `"deletedAt"` and only applies to the `"soft"` strategy. `trashTable` is only consulted when `deleteStrategy` is `"trash"` — you can omit it entirely for `"soft"` or `"permanent"` models.
+:::
+
+## 💥 Destroying a Model Instance
+
+Call `destroy()` on any model instance to delete it using the model's configured strategy:
+
+```ts title="src/app.ts"
+const post = await Post.find(1);
+if (post) {
+  await post.destroy();
+}
+```
+
+Pass a `strategy` override to change the behaviour for a single call without touching the model class:
+
+```ts title="src/app.ts"
+// Force permanent deletion for this call only
+await post.destroy({ strategy: "permanent" });
+
+// Force soft deletion even if the model is configured for trash
+await post.destroy({ strategy: "soft" });
+```
+
+You can also suppress lifecycle events or post-delete sync:
+
+```ts title="src/app.ts"
+await post.destroy({ skipEvents: true, skipSync: true });
+```
+
+:::info
+`destroy()` throws if the model instance is new (no primary key), if the primary key is missing, or if the record cannot be found in the database.
+:::
+
+## 🗂️ Bulk Deletes
+
+Use the static helpers to delete many records at once without loading them first:
+
+```ts title="src/app.ts"
+// Delete all records matching a filter
+await Post.delete({ isPublished: false });
+
+// Delete a single record matching a filter
+await Post.deleteOne({ slug: "draft-post" });
+
+// Delete every record in the table
+await Post.delete();
+```
+
+:::info
+`Model.delete(filter?)` and `Model.deleteOne(filter?)` operate directly on the database driver and return the number of rows affected. They do not load model instances and do not emit model events.
+:::
+
+## ♻️ Restoring a Single Record
+
+Restore a soft-deleted or trashed record by its primary key:
+
+```ts title="src/app.ts"
+const post = await Post.restore(1);
+```
+
+Pass `RestorerOptions` as the second argument to control conflict handling and other behaviour:
+
+```ts title="src/app.ts"
+const post = await Post.restore(1, {
+  onIdConflict: "assignNew", // or "fail"
+  skipEvents: false,
+});
+```
+
+`restore()` throws when:
+- The model's `deleteStrategy` is `"permanent"` (nothing to restore)
+- The record cannot be found among deleted records
+- `onIdConflict` is `"fail"` and a primary-key collision is detected
+
+## ♻️ Restoring All Deleted Records
+
+Restore every soft-deleted or trashed record for the model in one call:
+
+```ts title="src/app.ts"
+const posts = await Post.restoreAll();
+```
+
+Pass options to control conflict handling across the bulk operation:
+
+```ts title="src/app.ts"
+const posts = await Post.restoreAll({
+  onIdConflict: "assignNew",
+  skipEvents: false,
+});
+```
+
+`restoreAll()` returns an empty array when there are no deleted records to restore. It emits `restoring` and `restored` events for each record individually.
+
+## 🔀 `RestorerOptions` — ID Conflict Modes
+
+When restoring a record from the trash table, the original primary key may already be taken (e.g. a new record was inserted after deletion). `RestorerOptions` lets you decide what happens:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `onIdConflict` | `"fail" \| "assignNew"` | `"assignNew"` | `"fail"` throws an error; `"assignNew"` assigns a fresh primary key to the restored record |
+| `strategy` | `"trash" \| "soft"` | model default | Overrides the model's strategy for this restore operation |
+| `skipEvents` | `boolean` | `false` | Suppress `restoring`/`restored` events |
+
+:::tip
+`"assignNew"` is the safest default for `restoreAll()` — it keeps restoration going even when some IDs have been reused.
+:::
+
+## ⚡ Model Events
+
+Cascade fires lifecycle events before and after every delete or restore operation. Hook into them at the class level:
+
+```ts title="src/app/main.ts"
+Post.events()
+  .onDeleting((post) => console.log("About to delete", post.id))
+  .onDeleted((post) => console.log("Deleted", post.id))
+  .onRestoring((post) => console.log("About to restore", post.id))
+  .onRestored((post) => console.log("Restored", post.id));
+```
+
+Or listen on a specific instance:
+
+```ts title="src/app.ts"
+const post = await Post.find(1);
+post.on("deleting", (p) => console.log("Deleting", p.id));
+post.on("deleted", (p) => console.log("Deleted", p.id));
+await post.destroy();
+```
+
+| Event | Fired |
+|---|---|
+| `deleting` | Immediately before the deletion driver call |
+| `deleted` | After the deletion driver call succeeds |
+| `restoring` | Immediately before the restoration driver call |
+| `restored` | After the restoration driver call succeeds |
+
+:::info
+Pass `skipEvents: true` to `destroy()` or the restore methods to suppress all four events for that call.
+:::
+
+## 💣 Permanent Deletion — No Going Back
+
+Override any model to always delete permanently:
+
+```ts title="src/models/log.ts"
+export class Log extends Model {
+  public static table = "logs";
+  public static deleteStrategy = "permanent" as const;
+}
+```
+
+Or force permanent deletion for a single `destroy()` call regardless of the class config:
+
+```ts title="src/app.ts"
+await post.destroy({ strategy: "permanent" });
+```
+
+:::danger
+Permanent deletion removes the row from the database immediately. There is no restore path. Do not call `restore()` or `restoreAll()` on a model whose strategy is `"permanent"` — it will throw.
+:::
+
+## 🧙‍♂️ Choosing the Right Strategy
+
+| Use case | Recommended strategy |
+|---|---|
+| Audit trail, accidental-deletion recovery | `"soft"` |
+| Recycle bin / user-facing undo | `"trash"` |
+| Regulatory data removal, log pruning | `"permanent"` |
+
+---
+
+## 🌟 What's Next?
+
+- [🗑️ Destroying Models](./destroying-models)
+- [🔍 Fetching Documents](./fetching-documents)
+- [🔗 Relationships](../relationships/introduction)

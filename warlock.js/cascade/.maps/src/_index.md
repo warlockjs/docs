@@ -1,0 +1,377 @@
+# Cascade Source Map Index
+generated: 2026-04-17 03:34:41 PM
+
+## Types
+
+- `StrictMode` — `src/types.ts` — "strip" | "fail" | "allow" unknown-field handling mode union type
+- `DeleteStrategy` — `src/types.ts` — "trash" | "permanent" | "soft" model deletion strategy union type
+- `NamingConvention` — `src/types.ts` — "camelCase" | "snake_case" database column naming convention union type
+- `ModelDefaults` — `src/types.ts` — runtime model behaviour configuration object type (IDs, timestamps, deletion, validation)
+- `UuidStrategy` — `src/types.ts` — "v4" | "v7" for primary-key UUID generation
+- `MigrationDefaults` — `src/types.ts` — DDL-level migration defaults configuration object type
+- `DatabaseDriver` — `src/utils/connect-to-database.ts` — "mongodb" | "postgres" | "mysql" supported driver name union
+- `ModelDefaultConfig` — `src/utils/connect-to-database.ts` — alias for Partial<ModelDefaults>
+- `ConnectionOptions` — `src/utils/connect-to-database.ts` — shared + driver-specific connection configuration type
+- `DataSourceOptions` — `src/data-source/data-source.ts` — configuration bag passed to DataSource constructor
+- `DataSourceRegistryEvent` — `src/data-source/data-source-registry.ts` — "registered" | "default-registered" | "connected" | "disconnected" event name union
+- `DataSourceRegistryListener` — `src/data-source/data-source-registry.ts` — callback signature receiving a DataSource argument
+- `DataSourceContextValue` — `src/context/database-data-source-context.ts` — string | DataSource context value type
+- `DriverEvent` — `src/contracts/database-driver.contract.ts` — driver lifecycle event name union type
+- `DriverEventListener` — `src/contracts/database-driver.contract.ts` — variadic driver event listener callback type
+- `CreateDatabaseOptions` — `src/contracts/database-driver.contract.ts` — options for database creation
+- `DropDatabaseOptions` — `src/contracts/database-driver.contract.ts` — options for database drop
+- `InsertResult` — `src/contracts/database-driver.contract.ts` — document returned after insert
+- `UpdateResult` — `src/contracts/database-driver.contract.ts` — modified count returned after update
+- `UpdateOperations` — `src/contracts/database-driver.contract.ts` — cross-driver atomic update operations ($set, $unset, $inc, etc.)
+- `GenerateIdOptions` — `src/contracts/database-id-generator.contract.ts` — options for next sequential ID generation
+- `RemoverOptions` — `src/contracts/database-remover.contract.ts` — options controlling model destroy behaviour
+- `RemoverResult` — `src/contracts/database-remover.contract.ts` — result returned after destroy completes
+- `RestorerOptions` — `src/contracts/database-restorer.contract.ts` — options controlling model restore behaviour
+- `RestorerResult` — `src/contracts/database-restorer.contract.ts` — result returned after restore completes
+- `WriterOptions` — `src/contracts/database-writer.contract.ts` — options controlling model save behaviour
+- `WriterResult` — `src/contracts/database-writer.contract.ts` — result returned after save completes
+- `BuildUpdateOperationsResult` — `src/contracts/database-writer.contract.ts` — internal alias for UpdateOperations
+- `TableIndexInformation` — `src/contracts/driver-blueprint.contract.ts` — index metadata shape from information schema
+- `ColumnType` — `src/contracts/migration-driver.contract.ts` — union of all supported column type strings
+- `ColumnDefinition` — `src/contracts/migration-driver.contract.ts` — full column specification for DDL operations
+- `IndexDefinition` — `src/contracts/migration-driver.contract.ts` — index creation options
+- `FullTextIndexOptions` — `src/contracts/migration-driver.contract.ts` — full-text index configuration
+- `GeoIndexOptions` — `src/contracts/migration-driver.contract.ts` — geo-spatial index configuration
+- `VectorIndexOptions` — `src/contracts/migration-driver.contract.ts` — vector/AI index configuration
+- `ForeignKeyDefinition` — `src/contracts/migration-driver.contract.ts` — FK constraint definition
+- `MigrationDriverFactory` — `src/contracts/migration-driver.contract.ts` — factory function type for migration drivers
+- `OrderDirection` — `src/contracts/query-builder.contract.ts` — "asc" | "desc" order direction
+- `JoinOptions` — `src/contracts/query-builder.contract.ts` — join clause descriptor
+- `PaginationResult` — `src/contracts/query-builder.contract.ts` — page/limit pagination output type
+- `CursorPaginationResult` — `src/contracts/query-builder.contract.ts` — cursor pagination output type
+- `ChunkCallback` — `src/contracts/query-builder.contract.ts` — chunk iteration callback type
+- `CursorPaginationOptions` — `src/contracts/query-builder.contract.ts` — cursor pagination input type
+- `PaginationOptions` — `src/contracts/query-builder.contract.ts` — standard pagination input type
+- `WhereOperator` — `src/contracts/query-builder.contract.ts` — supported comparison operator union
+- `WhereObject` — `src/contracts/query-builder.contract.ts` — object-based predicate type
+- `WhereCallback` — `src/contracts/query-builder.contract.ts` — callback-based predicate type
+- `GroupByInput` — `src/contracts/query-builder.contract.ts` — groupBy field payload type
+- `HavingInput` — `src/contracts/query-builder.contract.ts` — having clause payload type
+- `RawExpression` — `src/contracts/query-builder.contract.ts` — native expression placeholder type
+- `DriverQuery` — `src/contracts/query-builder.contract.ts` — parsed query representation type
+- `PipelineStage` — `src/drivers/mongodb/types.ts` — union of supported MongoDB aggregation stage name strings
+- `Operation` — `src/drivers/mongodb/types.ts` — single query builder chain operation with stage and data
+- `MongoDriverOptions` — `src/drivers/mongodb/types.ts` — cascade-next MongoDB driver configuration options
+- `MongoQueryParserOptions` — `src/drivers/mongodb/mongodb-query-parser.ts` — parser configuration options shape
+- `PostgresConnectionConfig` — `src/drivers/postgres/types.ts` — PostgreSQL connection configuration type
+- `PostgresPoolConfig` — `src/drivers/postgres/types.ts` — pool config extending connection config
+- `PostgresQueryResult` — `src/drivers/postgres/types.ts` — generic query result wrapper type
+- `PostgresIsolationLevel` — `src/drivers/postgres/types.ts` — union of four isolation level strings
+- `PostgresTransactionOptions` — `src/drivers/postgres/types.ts` — transaction options type
+- `PostgresOperation` — `src/drivers/postgres/types.ts` — internal query-builder operation type
+- `PostgresWhereClause` — `src/drivers/postgres/types.ts` — internal pending WHERE clause representation
+- `PostgresNotification` — `src/drivers/postgres/types.ts` — NOTIFY payload structure
+- `PostgresCopyOptions` — `src/drivers/postgres/types.ts` — COPY command options for bulk operations
+- `PostgresOperationType` — `src/drivers/postgres/postgres-query-parser.ts` — union of supported SQL operation types
+- `PostgresParserOperation` — `src/drivers/postgres/postgres-query-parser.ts` — internal { type; data } op shape
+- `PostgresParserOptions` — `src/drivers/postgres/postgres-query-parser.ts` — parser configuration options
+- `SqlQueryResult` — `src/drivers/sql/sql-types.ts` — parameterized SQL query with values
+- `SqlJoinType` — `src/drivers/sql/sql-types.ts` — supported JOIN operation types
+- `SqlJoinClause` — `src/drivers/sql/sql-types.ts` — JOIN clause definition
+- `SqlOrderClause` — `src/drivers/sql/sql-types.ts` — ORDER BY clause definition
+- `SqlGroupClause` — `src/drivers/sql/sql-types.ts` — GROUP BY clause definition
+- `SqlHavingClause` — `src/drivers/sql/sql-types.ts` — HAVING clause condition
+- `SqlWhereType` — `src/drivers/sql/sql-types.ts` — WHERE clause operation type variants
+- `SqlWhereOperation` — `src/drivers/sql/sql-types.ts` — WHERE clause operation
+- `SqlSelectClause` — `src/drivers/sql/sql-types.ts` — SELECT clause definition
+- `SqlQueryConfig` — `src/drivers/sql/sql-types.ts` — SQL query building configuration
+- `SqlInsertOperation` — `src/drivers/sql/sql-types.ts` — INSERT operation definition
+- `SqlUpdateOperation` — `src/drivers/sql/sql-types.ts` — UPDATE operation definition
+- `SqlDeleteOperation` — `src/drivers/sql/sql-types.ts` — DELETE operation definition
+- `SqlAggregateFunction` — `src/drivers/sql/sql-types.ts` — supported aggregate function types
+- `OperationType` — `src/migration/migration.ts` — union of all supported migration operation strings
+- `PendingOperation` — `src/migration/migration.ts` — queued operation with type and payload for migrations
+- `MigrationResult` — `src/migration/types.ts` — result of a single migration execution
+- `MigrationStatus` — `src/migration/types.ts` — file-level status with executed flag
+- `PendingMigration` — `src/migration/types.ts` — pending migration ready to execute
+- `MigrationRecord` — `src/migration/types.ts` — row stored in the migrations tracking table
+- `MigrationRunnerOptions` — `src/migration/types.ts` — configuration for the migration runner
+- `RunMigrationsOptions` — `src/migration/types.ts` — options for running migrations
+- `RollbackOptions` — `src/migration/types.ts` — options for rolling back migrations
+- `SQLStatementType` — `src/migration/types.ts` — union of 19 semantic DDL/DML statement categories
+- `TaggedSQL` — `src/migration/types.ts` — SQL string annotated with phase and ordering metadata
+- `ScopeTiming` — `src/model/model.types.ts` — "before" | "after" timing control for global scopes
+- `GlobalScopeDefinition` — `src/model/model.types.ts` — global scope with callback and timing
+- `LocalScopeCallback` — `src/model/model.types.ts` — local scope callback function signature
+- `GlobalScopeOptions` — `src/model/model.types.ts` — options for adding global scopes
+- `ModelSchema` — `src/model/model.types.ts` — Record<string, any> generic schema type alias
+- `ChildModel` — `src/model/model.types.ts` — static side of model subclass for type-safe this-typed methods
+- `RegisterModelOptions` — `src/model/register-model.ts` — options for the RegisterModel decorator
+- `Op` — `src/query-builder/query-builder.ts` — { type, data } recorded operation type
+- `JoinWithConstraint` — `src/query-builder/query-builder.ts` — string or callback joinWith constraint type
+- `RelationType` — `src/relations/types.ts` — "hasOne" | "hasMany" | "belongsTo" | "belongsToMany" union
+- `RelationDefinition` — `src/relations/types.ts` — complete structural description of one relation
+- `HasManyOptions` — `src/relations/types.ts` — config options for hasMany helper
+- `HasOneOptions` — `src/relations/types.ts` — config options for hasOne helper
+- `BelongsToOptions` — `src/relations/types.ts` — config options for belongsTo helper
+- `BelongsToManyOptions` — `src/relations/types.ts` — config options for belongsToMany helper
+- `RelationConstraintCallback` — `src/relations/types.ts` — query modifier callback type
+- `RelationConstraints` — `src/relations/types.ts` — map of relation names to callbacks or booleans
+- `LoadedRelationResult` — `src/relations/types.ts` — Model | Model[] | null loaded relation result
+- `LoadedRelationsMap` — `src/relations/types.ts` — Map storing loaded relation data on a model
+- `RelationDefinitions` — `src/relations/types.ts` — Record type for model static relations property
+- `PivotData` — `src/relations/types.ts` — extra key-value data stored in pivot rows
+- `PivotIds` — `src/relations/types.ts` — array of number or string IDs for pivot operations
+- `SerializedRelation` — `src/relations/relation-hydrator.ts` — null | ModelSnapshot | ModelSnapshot[] serialized relation entry
+- `ModelSnapshot` — `src/relations/relation-hydrator.ts` — plain-object shape with data and relations for snapshots
+- `ModelEventName` — `src/events/model-events.ts` — union of 16 lifecycle event name string literals
+- `ModelEventListener` — `src/events/model-events.ts` — async listener callback signature
+- `OnDeletedEventContext` — `src/events/model-events.ts` — deleted event payload type
+- `AggregateExpression` — `src/expressions/aggregate-expressions.ts` — abstract aggregate expression object type
+- `AggregateFunction` — `src/expressions/aggregate-expressions.ts` — union of 8 supported aggregate function name strings
+- `SyncContext` — `src/sync/types.ts` — operation context tracking source, target, and chain
+- `SyncResult` — `src/sync/types.ts` — outcome of a sync operation with counts and errors
+- `SyncInstruction` — `src/sync/types.ts` — single executable sync update descriptor
+- `SyncConfig` — `src/sync/types.ts` — one sync relationship configuration
+- `SyncInstructionOptions` — `src/sync/types.ts` — depth, chain, and limit options for sync
+- `CollectInstructionsPayload` — `src/sync/types.ts` — input payload for instruction collection
+- `EmbedKey` — `src/sync/types.ts` — "embedData" | "embedParent" | "embedMinimal" embed property names union
+- `SyncEventPayload` — `src/sync/types.ts` — event data emitted during sync operations
+- `ModelSyncConfig` — `src/sync/types.ts` — all settings for one model sync operation
+- `ModelSyncEventTypeName` — `src/sync/model-events.ts` — union type of sync event type values
+- `ModelTransformCallback` — `src/utils/database-writer.utils.ts` — callback type receiving model transform options
+- `DefineModelOptions` — `src/utils/define-model.ts` — configuration shape for defineModel factory
+- `ModelType` — `src/utils/define-model.ts` — type helper to extract schema type from a defined model
+- `DatabaseSealPlugins` — `src/validation/database-seal-plugins.ts` — union type of registered seal plugin types
+- `EmbedOptions` — `src/validation/plugins/embed-validator-plugin.ts` — { errorMessage?, embed? } options for embed validator plugin
+
+## Interfaces / Contracts
+
+- `TransactionContextStore` — `src/context/database-transaction-context.ts` — interface with optional session field for transaction context
+- `DriverTransactionContract` — `src/contracts/database-driver.contract.ts` — manual transaction object with commit and rollback methods
+- `TransactionContext` — `src/contracts/database-driver.contract.ts` — callback-scoped explicit rollback handle
+- `DriverContract` — `src/contracts/database-driver.contract.ts` — primary driver interface used by the model layer
+- `IdGeneratorContract` — `src/contracts/database-id-generator.contract.ts` — contract for atomic sequential ID generation in NoSQL stores
+- `RemoverContract` — `src/contracts/database-remover.contract.ts` — deletion orchestration interface
+- `RestorerContract` — `src/contracts/database-restorer.contract.ts` — restoration orchestration interface
+- `WriterContract` — `src/contracts/database-writer.contract.ts` — save orchestration interface
+- `DriverBlueprintContract` — `src/contracts/driver-blueprint.contract.ts` — interface for inspecting live database schema
+- `MigrationDriverContract` — `src/contracts/migration-driver.contract.ts` — DDL driver interface for all schema operations
+- `QueryBuilderContract` — `src/contracts/query-builder.contract.ts` — full fluent query builder interface (database-agnostic)
+- `SyncAdapterContract` — `src/contracts/sync-adapter.contract.ts` — interface for executing sync instruction batches
+- `SyncInstruction` — `src/contracts/sync-adapter.contract.ts` — descriptor for a single sync update operation
+- `SqlDialectContract` — `src/drivers/sql/sql-dialect.contract.ts` — interface contract for database-specific SQL syntax variations
+- `MigrationContract` — `src/migration/migration.ts` — full interface defining the complete public migration API surface
+- `MigrationConstructor` — `src/migration/migration.ts` — constructor interface with optional static migrationName/createdAt/order
+- `ModelSyncOperationContract` — `src/sync/types.ts` — fluent API interface for model sync operations
+- `ModelSyncContract` — `src/sync/types.ts` — facade contract interface for sync registration
+
+## Classes
+
+- `DatabaseDirtyTracker` — `src/database-dirty-tracker.ts` — tracks model data mutations by diffing flattened initial and current snapshots
+- `SqlDatabaseDirtyTracker` — `src/sql-database-dirty-tracker.ts` — SQL-aware subclass of DatabaseDirtyTracker preserving nested JSON structure
+- `DatabaseDataSourceContext` — `src/context/database-data-source-context.ts` — singleton context tracking the active database data source per async scope
+- `DatabaseTransactionContext` — `src/context/database-transaction-context.ts` — singleton context managing database transaction sessions per async scope
+- `DataSourceRegistry` — `src/data-source/data-source-registry.ts` — singleton registry storing named DataSource instances with lifecycle events
+- `DataSource` — `src/data-source/data-source.ts` — immutable wrapper coupling a driver to its named configuration
+- `MongoDBBlueprint` — `src/drivers/mongodb/mongodb-blueprint.ts` — MongoDB schema introspection blueprint driver
+- `MongoDbDriver` — `src/drivers/mongodb/mongodb-driver.ts` — MongoDB driver implementing the Cascade DriverContract
+- `MongoIdGenerator` — `src/drivers/mongodb/mongodb-id-generator.ts` — atomic auto-increment integer ID generator for MongoDB
+- `MongoMigrationDriver` — `src/drivers/mongodb/mongodb-migration-driver.ts` — MongoDB implementation of MigrationDriverContract
+- `MongoQueryBuilder` — `src/drivers/mongodb/mongodb-query-builder.ts` — MongoDB aggregation pipeline query builder
+- `MongoQueryOperations` — `src/drivers/mongodb/mongodb-query-operations.ts` — helper class for appending MongoDB aggregation pipeline operations
+- `MongoQueryParser` — `src/drivers/mongodb/mongodb-query-parser.ts` — parses abstract query builder operations into a MongoDB aggregation pipeline
+- `MongoSyncAdapter` — `src/drivers/mongodb/mongodb-sync-adapter.ts` — MongoDB sync adapter executing batch sync instructions
+- `PostgresBlueprint` — `src/drivers/postgres/postgres-blueprint.ts` — PostgreSQL schema introspection blueprint using information_schema
+- `PostgresDialect` — `src/drivers/postgres/postgres-dialect.ts` — PostgreSQL dialect implementing SqlDialectContract
+- `PostgresDriver` — `src/drivers/postgres/postgres-driver.ts` — PostgreSQL DriverContract implementation for CRUD, transactions, and schema
+- `PostgresMigrationDriver` — `src/drivers/postgres/postgres-migration-driver.ts` — full DDL migration driver for PostgreSQL
+- `PostgresQueryBuilder` — `src/drivers/postgres/postgres-query-builder.ts` — PostgreSQL query builder with execution, hydration, and relation loading
+- `PostgresQueryParser` — `src/drivers/postgres/postgres-query-parser.ts` — translates query operations into PostgreSQL SQL and bindings
+- `PostgresSQLSerializer` — `src/drivers/postgres/postgres-sql-serializer.ts` — PostgreSQL DDL serializer converting pending operations to SQL strings
+- `PostgresSyncAdapter` — `src/drivers/postgres/postgres-sync-adapter.ts` — batch JSONB sync adapter implementing SyncAdapterContract for PostgreSQL
+- `ColumnBuilder` — `src/migration/column-builder.ts` — fluent builder class for accumulating column definitions in migrations
+- `DetachedColumnBuilder` — `src/migration/column-helpers.ts` — ColumnBuilder with its own detached migration sink for standalone use
+- `ForeignKeyBuilder` — `src/migration/foreign-key-builder.ts` — fluent builder for constructing and registering FK constraint definitions
+- `MigrationRunner` — `src/migration/migration-runner.ts` — batch/single migration executor tracking state in a database table
+- `Migration` — `src/migration/migration.ts` — abstract base class implementing MigrationContract with fluent DDL API
+- `SQLGrammar` — `src/migration/sql-grammar.ts` — static SQL classifier and phase sorter for dependency-safe migration ordering
+- `SQLSerializer` — `src/migration/sql-serializer.ts` — abstract base for dialect-specific serializers converting operations to SQL strings
+- `Model` — `src/model/model.ts` — abstract base class for all Cascade ORM models with data, events, queries, and lifecycle
+- `RelationHydrator` — `src/relations/relation-hydrator.ts` — static class restoring eager-loaded relations onto model instances from snapshots
+- `RelationLoader` — `src/relations/relation-loader.ts` — generic class batch-loading all relation types for model arrays
+- `PivotOperations` — `src/relations/pivot-operations.ts` — class managing attach, detach, sync, and toggle on a belongsToMany pivot table
+- `DatabaseRemover` — `src/remover/database-remover.ts` — orchestrates model deletion pipeline supporting trash, soft, and permanent strategies
+- `DatabaseRestorer` — `src/restorer/database-restorer.ts` — orchestrates model restoration pipeline for trash and soft-delete strategies
+- `ModelEvents` — `src/events/model-events.ts` — generic async lifecycle event emitter class for model hooks
+- `ModelSyncOperation` — `src/sync/model-sync-operation.ts` — manages a single source-to-target model sync relationship via event subscriptions
+- `ModelSyncFacade` — `src/sync/model-sync.ts` — tracks and manages all model sync operations with scoped HMR cleanup
+- `SyncContextManager` — `src/sync/sync-context.ts` — all-static helpers for sync context creation, depth validation, and cycle detection
+- `SyncManager` — `src/sync/sync-manager.ts` — orchestrates multi-level sync operations across models with depth limiting
+- `QueryBuilder` — `src/query-builder/query-builder.ts` — driver-agnostic fluent query builder recording operations for later parser consumption
+- `DatabaseWriter` — `src/writer/database-writer.ts` — orchestrates model persistence pipeline with validation, events, and sync
+- `DatabaseWriterValidationError` — `src/validation/database-writer-validation-error.ts` — custom Error subclass carrying structured seal validation results
+- `EmbedModelValidator` — `src/validation/validators/embed-validator.ts` — BaseValidator subclass wiring embed mutators, rules, and transformer together
+
+## Functions
+
+- `connectToDatabase(options)` — `src/utils/connect-to-database.ts` — creates, registers, and connects a DataSource for the given driver
+- `getDatabaseDriver()` — `src/utils/connect-to-database.ts` — returns the current driver from the default DataSource
+- `transaction(fn, options?)` — `src/utils/connect-to-database.ts` — shorthand wrapper delegating to the default driver transaction method
+- `isValidDateValue(value)` — `src/utils/is-valid-date-value.ts` — returns true for valid numeric timestamps or strict ISO 8601 date strings
+- `onceConnected(callback?)` — `src/utils/once-connected.ts` — fires callback immediately if connected, or on the next DataSource connection event
+- `onceDisconnected(callback?)` — `src/utils/once-connected.ts` — fires callback immediately if disconnected, or on the next DataSource disconnection event
+- `useModelTransformer(callback)` — `src/utils/database-writer.utils.ts` — wraps a model-aware callback into a seal TransformerCallback
+- `defineModel(options)` — `src/utils/define-model.ts` — declarative factory creating a typed Model subclass from configuration
+- `RegisterModel(options?)` — `src/model/register-model.ts` — class decorator that registers models in the global model registry
+- `registerModelInRegistry(name, model)` — `src/model/register-model.ts` — manually registers a model by name in the global registry
+- `getModelFromRegistry(name)` — `src/model/register-model.ts` — retrieves a model class by name from the global registry
+- `getAllModelsFromRegistry()` — `src/model/register-model.ts` — returns a Map copy of all registered models
+- `cleanupModelsRegistery()` — `src/model/register-model.ts` — clears all models from the global registry
+- `removeModelFromRegistery(name)` — `src/model/register-model.ts` — deletes a single model from the global registry by name
+- `resolveModelClass(model)` — `src/model/register-model.ts` — converts a string model name or class reference to a ChildModel
+- `hasMany(model, options?)` — `src/relations/helpers.ts` — builds a hasMany RelationDefinition
+- `hasOne(model, options?)` — `src/relations/helpers.ts` — builds a hasOne RelationDefinition
+- `belongsTo(model, options?)` — `src/relations/helpers.ts` — builds a belongsTo RelationDefinition
+- `belongsToMany(model, options)` — `src/relations/helpers.ts` — builds a belongsToMany RelationDefinition with pivot configuration
+- `createPivotOperations(model, relationName)` — `src/relations/pivot-operations.ts` — factory resolving relation definition and returning a PivotOperations instance
+- `isAggregateExpression(value)` — `src/expressions/aggregate-expressions.ts` — type-guard returning true if value is an AggregateExpression
+- `getModelUpdatedEvent(modelClass)` — `src/sync/model-events.ts` — returns the model updated event name string
+- `getModelDeletedEvent(modelClass)` — `src/sync/model-events.ts` — returns the model deleted event name string
+- `getModelEvent(modelName, eventType)` — `src/sync/model-events.ts` — returns event name from model name and event type
+- `getFieldValue(model, field, defaultValue?)` — `src/model/methods/accessor-methods.ts` — gets a field value from model data with optional default
+- `setFieldValue(model, field, value)` — `src/model/methods/accessor-methods.ts` — sets a field on model data and marks dirty tracker
+- `hasField(model, field)` — `src/model/methods/accessor-methods.ts` — checks field existence using sentinel symbol
+- `incrementField(model, field, amount?)` — `src/model/methods/accessor-methods.ts` — increments a numeric model field by amount
+- `decrementField(model, field, amount?)` — `src/model/methods/accessor-methods.ts` — decrements a numeric model field by amount
+- `unsetFields(model, ...fields)` — `src/model/methods/accessor-methods.ts` — removes fields from model data and updates dirty tracker
+- `mergeFields(model, values)` — `src/model/methods/accessor-methods.ts` — deep-merges values into model data
+- `getOnlyFields(model, fields)` — `src/model/methods/accessor-methods.ts` — picks a subset of fields from model data
+- `getStringField(model, key, defaultValue?)` — `src/model/methods/accessor-methods.ts` — typed string field accessor
+- `getNumberField(model, key, defaultValue?)` — `src/model/methods/accessor-methods.ts` — typed number field accessor
+- `getBooleanField(model, key, defaultValue?)` — `src/model/methods/accessor-methods.ts` — typed boolean field accessor
+- `destroyModel(model, options?)` — `src/model/methods/delete-methods.ts` — destroys a single model instance via DatabaseRemover
+- `deleteRecords(ModelClass, filter?)` — `src/model/methods/delete-methods.ts` — bulk-deletes records matching the given filter
+- `deleteOneRecord(ModelClass, filter?)` — `src/model/methods/delete-methods.ts` — deletes one record matching the given filter
+- `checkHasChanges(model)` — `src/model/methods/dirty-methods.ts` — returns whether the model has any unsaved changes
+- `checkIsDirty(model, column)` — `src/model/methods/dirty-methods.ts` — returns whether a specific column is dirty
+- `getDirtyColumnsWithValues(model)` — `src/model/methods/dirty-methods.ts` — returns dirty columns mapped to old/new value pairs
+- `getRemovedColumns(model)` — `src/model/methods/dirty-methods.ts` — returns the list of columns removed from the model
+- `getDirtyColumns(model)` — `src/model/methods/dirty-methods.ts` — returns the list of all dirty column names
+- `hydrateModel(ModelClass, data)` — `src/model/methods/hydration-methods.ts` — constructs a model instance from raw data
+- `modelFromSnapshot(ModelClass, snapshot)` — `src/model/methods/hydration-methods.ts` — rebuilds a model with relations from a snapshot object
+- `modelToSnapshot(model)` — `src/model/methods/hydration-methods.ts` — serializes a model and its relations to a snapshot object
+- `serializeModel(model)` — `src/model/methods/hydration-methods.ts` — serializes model data via driver
+- `cloneModel(model)` — `src/model/methods/hydration-methods.ts` — deep-clones a model with frozen data
+- `deepFreezeObject(obj)` — `src/model/methods/hydration-methods.ts` — recursively freezes an object
+- `replaceModelData(model, data)` — `src/model/methods/hydration-methods.ts` — replaces model data and resets the dirty tracker
+- `emitModelEvent(model, event, context?)` — `src/model/methods/instance-event-methods.ts` — emits event on instance, class, and global event buses
+- `onModelEvent(model, event, listener)` — `src/model/methods/instance-event-methods.ts` — subscribes a listener to an instance-level model event
+- `onceModelEvent(model, event, listener)` — `src/model/methods/instance-event-methods.ts` — subscribes a one-time listener to an instance-level model event
+- `offModelEvent(model, event, listener)` — `src/model/methods/instance-event-methods.ts` — unsubscribes a listener from an instance-level model event
+- `applyDefaultsToModel(ModelClass, defaults)` — `src/model/methods/meta-methods.ts` — applies config defaults to ModelClass static properties
+- `generateModelNextId(model)` — `src/model/methods/meta-methods.ts` — generates and assigns the next model ID
+- `performAtomicUpdate(model, operations)` — `src/model/methods/meta-methods.ts` — runs raw atomic operations on a model record
+- `performAtomicIncrement(model, field, amount?)` — `src/model/methods/meta-methods.ts` — atomically increments a model field
+- `performAtomicDecrement(model, field, amount?)` — `src/model/methods/meta-methods.ts` — atomically decrements a model field
+- `buildQuery(ModelClass)` — `src/model/methods/query-methods.ts` — builds a configured query builder with scopes, events, and eager loading
+- `buildNewQueryBuilder(ModelClass)` — `src/model/methods/query-methods.ts` — creates a raw query builder from the model data source
+- `findFirst(ModelClass, filter?)` — `src/model/methods/query-methods.ts` — returns the first matching model or null
+- `findLast(ModelClass, filter?)` — `src/model/methods/query-methods.ts` — returns the last matching model or null
+- `findAll(ModelClass, filter?)` — `src/model/methods/query-methods.ts` — returns all matching models
+- `countRecords(ModelClass, filter?)` — `src/model/methods/query-methods.ts` — returns the count of matching records
+- `findById(ModelClass, id)` — `src/model/methods/query-methods.ts` — finds a single model by primary key
+- `paginateRecords(ModelClass, options)` — `src/model/methods/query-methods.ts` — returns a paginated result set
+- `findLatest(ModelClass)` — `src/model/methods/query-methods.ts` — returns records in latest order
+- `increaseField(ModelClass, field, amount?)` — `src/model/methods/query-methods.ts` — increments a numeric field on matched records
+- `decreaseField(ModelClass, field, amount?)` — `src/model/methods/query-methods.ts` — decrements a numeric field on matched records
+- `performAtomic(ModelClass, filter, operations)` — `src/model/methods/query-methods.ts` — runs atomic update operations on matched records
+- `updateById(ModelClass, id, data)` — `src/model/methods/query-methods.ts` — updates record fields by primary key
+- `findAndUpdateRecords(ModelClass, filter, update)` — `src/model/methods/query-methods.ts` — atomically updates then returns records
+- `findOneAndUpdateRecord(ModelClass, filter, update)` — `src/model/methods/query-methods.ts` — updates one record and returns it
+- `findAndReplaceRecord(ModelClass, filter, document)` — `src/model/methods/query-methods.ts` — replaces one document and returns it
+- `findOneAndDeleteRecord(ModelClass, filter, options?)` — `src/model/methods/query-methods.ts` — deletes one record and returns it
+- `resolveDataSource(ModelClass)` — `src/model/methods/query-methods.ts` — resolves and caches the data source for a model class
+- `restoreRecord(ModelClass, id, options?)` — `src/model/methods/restore-methods.ts` — restores a single soft-deleted record by ID
+- `restoreAllRecords(ModelClass, options?)` — `src/model/methods/restore-methods.ts` — restores all soft-deleted records for a model
+- `addGlobalModelScope(ModelClass, name, callback, options?)` — `src/model/methods/scope-methods.ts` — registers a named global scope on a model class
+- `removeGlobalModelScope(ModelClass, name)` — `src/model/methods/scope-methods.ts` — deletes a named global scope from a model class
+- `addLocalModelScope(ModelClass, name, callback)` — `src/model/methods/scope-methods.ts` — registers a named local scope on a model class
+- `removeLocalModelScope(ModelClass, name)` — `src/model/methods/scope-methods.ts` — deletes a named local scope from a model class
+- `modelToJSON(model)` — `src/model/methods/serialization-methods.ts` — serializes a model to a plain record using resource or column config
+- `getModelEvents(ModelClass)` — `src/model/methods/static-event-methods.ts` — returns or lazily creates the ModelEvents instance for a model class
+- `cleanupModelEvents(ModelClass)` — `src/model/methods/static-event-methods.ts` — removes events registry entry and unregisters the model
+- `onStaticEvent(ModelClass, event, listener)` — `src/model/methods/static-event-methods.ts` — subscribes a listener to a named model class event
+- `onceStaticEvent(ModelClass, event, listener)` — `src/model/methods/static-event-methods.ts` — subscribes a one-time listener to a named model class event
+- `offStaticEvent(ModelClass, event, listener)` — `src/model/methods/static-event-methods.ts` — unsubscribes a listener from a named model class event
+- `getGlobalEvents()` — `src/model/methods/static-event-methods.ts` — returns the shared global model events emitter
+- `saveModel(model, data?, options?)` — `src/model/methods/write-methods.ts` — persists a model instance via DatabaseWriter
+- `createRecord(ModelClass, data)` — `src/model/methods/write-methods.ts` — instantiates and saves a new model record
+- `createManyRecords(ModelClass, data[])` — `src/model/methods/write-methods.ts` — creates multiple records in parallel
+- `findOrCreateRecord(ModelClass, filter, data?)` — `src/model/methods/write-methods.ts` — returns existing record or creates a new one
+- `upsertRecord(ModelClass, filter, data)` — `src/model/methods/write-methods.ts` — upserts a record with timestamps and saving events
+- `isMongoDBDriverLoaded()` — `src/drivers/mongodb/mongodb-driver.ts` — checks whether the mongodb module is loaded
+- `isAggregateExpression(value)` — `src/expressions/aggregate-expressions.ts` — type-guard returning true if value is an AggregateExpression
+- `databaseModelMutator` — `src/validation/mutators/embed-mutator.ts` — seal mutator resolving a single value to a Model instance
+- `databaseModelsMutator` — `src/validation/mutators/embed-mutator.ts` — seal mutator resolving an array of values to Model instances
+- `databaseModelRule` — `src/validation/rules/database-model-rule.ts` — seal schema rule validating a single Model instance
+- `databaseModelsRule` — `src/validation/rules/database-model-rule.ts` — seal schema rule validating an array of Model instances
+- `databaseModelTransformer` — `src/validation/transformers/embed-model-transformer.ts` — seal transformer extracting embed data from Model instances for storage
+- `string(length?)` — `src/migration/column-helpers.ts` — standalone varchar column helper
+- `char(length?)` — `src/migration/column-helpers.ts` — standalone fixed-length CHAR column helper
+- `text()` — `src/migration/column-helpers.ts` — standalone TEXT column helper
+- `mediumText()` — `src/migration/column-helpers.ts` — standalone MEDIUMTEXT column helper
+- `longText()` — `src/migration/column-helpers.ts` — standalone LONGTEXT column helper
+- `integer(options?)` — `src/migration/column-helpers.ts` — standalone INTEGER column helper
+- `int(options?)` — `src/migration/column-helpers.ts` — alias for integer column helper
+- `smallInteger(options?)` — `src/migration/column-helpers.ts` — standalone SMALLINT column helper
+- `smallInt(options?)` — `src/migration/column-helpers.ts` — alias for smallInteger column helper
+- `tinyInteger(options?)` — `src/migration/column-helpers.ts` — standalone TINYINT column helper
+- `tinyInt(options?)` — `src/migration/column-helpers.ts` — alias for tinyInteger column helper
+- `bigInteger(options?)` — `src/migration/column-helpers.ts` — standalone BIGINT column helper
+- `bigInt(options?)` — `src/migration/column-helpers.ts` — alias for bigInteger column helper
+- `float(options?)` — `src/migration/column-helpers.ts` — standalone FLOAT column helper
+- `double(options?)` — `src/migration/column-helpers.ts` — standalone DOUBLE column helper
+- `decimal(precision?, scale?)` — `src/migration/column-helpers.ts` — standalone DECIMAL column helper with precision/scale
+- `boolCol()` — `src/migration/column-helpers.ts` — standalone BOOLEAN column helper
+- `bool()` — `src/migration/column-helpers.ts` — alias for boolCol column helper
+- `date()` — `src/migration/column-helpers.ts` — standalone DATE column helper
+- `dateTime()` — `src/migration/column-helpers.ts` — standalone DATETIME column helper
+- `timestamp()` — `src/migration/column-helpers.ts` — standalone TIMESTAMP column helper
+- `time()` — `src/migration/column-helpers.ts` — standalone TIME column helper
+- `year()` — `src/migration/column-helpers.ts` — standalone YEAR column helper
+- `json()` — `src/migration/column-helpers.ts` — standalone JSON column helper
+- `objectCol()` — `src/migration/column-helpers.ts` — alias for json column helper
+- `binary()` — `src/migration/column-helpers.ts` — standalone BINARY/BLOB column helper
+- `blobCol()` — `src/migration/column-helpers.ts` — alias for binary column helper
+- `uuid()` — `src/migration/column-helpers.ts` — standalone UUID column helper
+- `ulid()` — `src/migration/column-helpers.ts` — standalone ULID column helper
+- `ipAddress()` — `src/migration/column-helpers.ts` — standalone IP address column helper
+- `macAddress()` — `src/migration/column-helpers.ts` — standalone MAC address column helper
+- `point()` — `src/migration/column-helpers.ts` — standalone geo point column helper
+- `polygon()` — `src/migration/column-helpers.ts` — standalone polygon column helper
+- `lineString()` — `src/migration/column-helpers.ts` — standalone line string column helper
+- `geometry()` — `src/migration/column-helpers.ts` — standalone geometry column helper
+- `vector(dimensions)` — `src/migration/column-helpers.ts` — standalone vector column helper for AI embeddings
+- `enumCol(values[])` — `src/migration/column-helpers.ts` — standalone ENUM column helper
+- `setCol(values[])` — `src/migration/column-helpers.ts` — standalone SET column helper
+- `arrayInt()` — `src/migration/column-helpers.ts` — standalone INTEGER[] column helper
+- `arrayBigInt()` — `src/migration/column-helpers.ts` — standalone BIGINT[] column helper
+- `arrayFloat()` — `src/migration/column-helpers.ts` — standalone REAL[] column helper
+- `arrayDecimal()` — `src/migration/column-helpers.ts` — standalone DECIMAL[] column helper
+- `arrayBoolean()` — `src/migration/column-helpers.ts` — standalone BOOLEAN[] column helper
+- `arrayText()` — `src/migration/column-helpers.ts` — standalone TEXT[] column helper
+- `arrayDate()` — `src/migration/column-helpers.ts` — standalone DATE[] column helper
+- `arrayTimestamp()` — `src/migration/column-helpers.ts` — standalone TIMESTAMPTZ[] column helper
+- `arrayUuid()` — `src/migration/column-helpers.ts` — standalone UUID[] column helper
+
+## Constants
+
+- `databaseDataSourceContext` — `src/context/database-data-source-context.ts` — singleton DatabaseDataSourceContext instance registered as "db.datasource"
+- `databaseTransactionContext` — `src/context/database-transaction-context.ts` — singleton DatabaseTransactionContext instance registered as "db.transaction"
+- `dataSourceRegistry` — `src/data-source/data-source-registry.ts` — singleton DataSourceRegistry instance
+- `globalModelEvents` — `src/events/model-events.ts` — module-level ModelEvents singleton for cross-model event concerns
+- `modelSync` — `src/sync/model-sync.ts` — global ModelSyncFacade singleton instance
+- `migrationRunner` — `src/migration/migration-runner.ts` — default singleton MigrationRunner instance
+- `DEFAULT_MAX_SYNC_DEPTH` — `src/sync/sync-context.ts` — default maximum sync chain depth value (3)
+- `MODEL_EVENT_PREFIX` — `src/sync/model-events.ts` — string prefix for all model sync events
+- `ModelSyncEventType` — `src/sync/model-events.ts` — const object with UPDATED and DELETED sync event type values
+- `MISSING_VALUE` — `src/model/methods/accessor-methods.ts` — unique symbol sentinel distinguishing missing vs undefined field
+- `$agg` — `src/expressions/aggregate-expressions.ts` — namespace object with aggregate expression factory methods (count, sum, avg, min, max, distinct, floor, first, last)
+- `isoRegex` — `src/utils/is-valid-date-value.ts` — regex matching ISO 8601 date and optional time strings
+- `embedValidator` — `src/validation/plugins/embed-validator-plugin.ts` — SealPlugin object registering v.embed and v.embedMany factory methods

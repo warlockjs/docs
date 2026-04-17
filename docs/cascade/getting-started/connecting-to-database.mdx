@@ -4,16 +4,17 @@ sidebar_position: 4
 
 # 🔌 Connecting to Your Database
 
-Let's get you connected! Cascade makes it super easy to connect to MongoDB, whether you're running locally or in the cloud. 🌐
+Let's get you connected! Cascade makes it straightforward to connect to your database of choice. 🌐
 
-## 🏗️ Build Your Connection
+## 🏗️ Basic Connection (MongoDB)
 
-Just call `connectToDatabase` with your connection details:
+Call `connectToDatabase` with your connection details and a `driver` field specifying which database engine to use:
 
-```ts
+```ts title="src/bootstrap/database.ts"
 import { connectToDatabase } from "@warlock.js/cascade";
 
-connectToDatabase({
+await connectToDatabase({
+  driver: "mongodb",
   host: "localhost",
   port: 27017,
   database: "my-database",
@@ -23,75 +24,103 @@ connectToDatabase({
 });
 ```
 
-You can pass any [MongoClient options](https://mongodb.github.io/node-mongodb-native/5.5/interfaces/MongoClientOptions.html) too!
+:::tip
+`connectToDatabase` is async — `await` it before running any queries so the connection is ready.
+:::
 
-```ts {10,11}
+## 🌐 Using a Connection URL (MongoDB)
+
+Prefer a connection string? Pass `url` alongside `database`:
+
+```ts title="src/bootstrap/database.ts"
 import { connectToDatabase } from "@warlock.js/cascade";
 
-connectToDatabase({
-  host: "localhost",
-  port: 27017,
-  database: "my-database",
-  username: "my-username",
-  password: "my-password",
-  dbAuth: "admin",
-  retryWrites: true,
-  replicaSet: "rs0",
-});
-```
-
-## 🌐 Using a Connection URL
-
-Prefer a connection string? No problem!
-
-```ts
-import { connectToDatabase } from "@warlock.js/cascade";
-
-connectToDatabase({
+await connectToDatabase({
+  driver: "mongodb",
   url: "mongodb://localhost:27017/my-database",
   database: "my-database",
 });
 ```
 
-## 🦸‍♂️ Singleton Connection
+## 🐘 PostgreSQL Example
 
-Cascade uses the Singleton pattern—call `connectToDatabase` as many times as you want, it'll only connect once!
+Cascade also supports PostgreSQL. Switch the `driver` field and supply the relevant options:
 
-:::tip
-Need to use multiple databases? Use the `useDatabase` method to switch between them on the fly.
+```ts title="src/bootstrap/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase({
+  driver: "postgres",
+  host: "localhost",
+  port: 5432,
+  database: "my-database",
+  username: "my-username",
+  password: "my-password",
+});
+```
+
+:::info
+MySQL is listed as a `DatabaseDriver` union value but is **not yet supported** — `connectToDatabase` will throw if you pass `driver: "mysql"`.
 :::
+
+## 🦸‍♂️ Singleton by Name
+
+Every call to `connectToDatabase` registers a named `DataSource` in the global `dataSourceRegistry`. The first registration (or one explicitly flagged with `isDefault: true`) becomes the **default** data source used by all models automatically.
 
 ## 🤹‍♂️ Multiple Connections
 
-Need more than one connection? Create a new `Connection` instance:
+Need a second database alongside your primary one? Pass a unique `name` and set `isDefault: false`:
 
-```ts
-import { Connection } from "@warlock.js/cascade";
+```ts title="src/bootstrap/database.ts"
+import { connectToDatabase, dataSourceRegistry } from "@warlock.js/cascade";
 
-const connection = new Connection();
-
-connection.connect({
-  // same options as connectToDatabase
+// Primary (default) connection
+await connectToDatabase({
+  driver: "mongodb",
+  host: "localhost",
+  port: 27017,
+  database: "primary-db",
 });
+
+// Secondary connection
+await connectToDatabase({
+  name: "secondary",
+  isDefault: false,
+  driver: "postgres",
+  host: "localhost",
+  port: 5432,
+  database: "secondary-db",
+  username: "pg-user",
+  password: "pg-pass",
+});
+
+// Retrieve any registered source by name
+const secondary = dataSourceRegistry.get("secondary");
 ```
+
+:::tip
+`dataSourceRegistry.get()` returns the default source when called with no arguments, or a specific source by name. It throws `MissingDataSourceError` if the requested source has not been registered.
+:::
 
 ## ⏳ Wait for Connection
 
-Want to run code after connecting? Use `onceConnected`:
+Want to run code only after the database is connected? Use `onceConnected`:
 
-```ts
+```ts title="src/bootstrap/database.ts"
 import { onceConnected } from "@warlock.js/cascade";
 
 onceConnected(() => {
-  // do something awesome!
+  // runs immediately if already connected, or as soon as the connection opens
+  console.log("Database is ready!");
 });
 ```
 
-If the connection isn't ready, your callback will run as soon as it is. Otherwise, it runs immediately!
+If the connection is already open when `onceConnected` is called, the callback fires right away. Otherwise it waits for the `"connected"` event on the registry.
 
 ---
 
 ## 🌟 What's Next?
+
 - [🗺️ Roadmap](./roadmap)
 - [🚀 Back to Introduction](./introduction)
 - [🛠️ Installation](./installation)

@@ -1,0 +1,348 @@
+---
+sidebar_position: 3
+---
+
+# ⚙️ Model Configuration
+
+Every Cascade model is shaped by a set of **static properties** declared directly on the class. These properties tell Cascade where to store data, how to generate IDs, what to validate, how to handle deletion, and much more — all without a single line of runtime code.
+
+This page is the single source of truth for every static configuration knob available on the `Model` base class.
+
+---
+
+## 🗃️ Collection / Table
+
+```ts
+export class Post extends Model {
+  public static collection = "posts"; // MongoDB alias (preferred)
+  // — or —
+  public static table = "posts";       // SQL-style alias, identical behaviour
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `static table` | `string` | The database collection/table name. Required. |
+| `static collection` | `string` | MongoDB-friendly alias for `table`. Use whichever reads better. |
+
+:::tip
+`collection` and `table` are the same property under the hood. Pick the name that matches your driver vocabulary — both work identically.
+:::
+
+---
+
+## 🔑 Primary Key
+
+```ts
+export class Order extends Model {
+  public static collection = "orders";
+  public static primaryKey = "orderId"; // default is "id"
+}
+```
+
+| Property | Type | Default |
+|---|---|---|
+| `static primaryKey` | `string` | `"id"` |
+
+---
+
+## 🔌 Data Source & Query Builder
+
+```ts
+import { DataSource } from "@warlock.js/cascade";
+
+export class AnalyticsEvent extends Model {
+  public static collection = "analytics_events";
+
+  // Use a named connection registered elsewhere in the app
+  public static dataSource: string | DataSource = "analytics";
+
+  // Swap in a custom QueryBuilder subclass
+  public static builder = AnalyticsQueryBuilder;
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `static dataSource` | `string \| DataSource` | Named connection string or a `DataSource` instance. Falls back to the default connection when omitted. |
+| `static builder` | `new (...args) => QueryBuilderContract<Model>` | A custom `QueryBuilder` subclass to use for all queries on this model. |
+
+:::info
+Pass a `string` to `dataSource` when you have registered multiple named connections in your bootstrap configuration. Pass a `DataSource` instance when you need full programmatic control.
+:::
+
+---
+
+## 📦 Serialization & Resource
+
+```ts
+import { UserResource } from "../resources/user-resource";
+
+export class User extends Model {
+  public static collection = "users";
+
+  // Shape JSON output through a dedicated Resource class
+  public static resource = UserResource;
+
+  // Limit which columns the resource exposes
+  public static resourceColumns = ["id", "name", "email", "avatar"];
+
+  // Limit which columns appear in plain toJSON() output
+  public static toJsonColumns = ["id", "name", "email"];
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `static resource` | `any` | A Resource class used to shape the API response. |
+| `static resourceColumns` | `string[]` | Whitelist of columns forwarded to the resource. |
+| `static toJsonColumns` | `string[]` | Whitelist of columns included in `toJSON()` / plain serialisation. |
+
+---
+
+## 🛡️ Schema Validation
+
+```ts
+import { v } from "@warlock.js/seal";
+
+export class Product extends Model {
+  public static collection = "products";
+
+  public static schema = v.object({
+    name:  v.string().required(),
+    price: v.number().min(0).required(),
+    stock: v.number().int().min(0).default(0),
+  });
+
+  // What happens when an unknown field arrives
+  public static strictMode: "strip" | "fail" | "allow" = "strip";
+}
+```
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `static schema` | `ObjectValidator` | — | A `@warlock.js/seal` validator run before every `save()`. |
+| `static strictMode` | `"strip" \| "fail" \| "allow"` | `"strip"` | How to handle fields not declared in the schema. |
+
+### `strictMode` values
+
+| Value | Behaviour |
+|---|---|
+| `"strip"` | Unknown fields are silently removed before saving. |
+| `"fail"` | A `ValidationError` is thrown when unknown fields are present. |
+| `"allow"` | Unknown fields pass through unchanged. |
+
+:::tip
+`"strip"` is the safest default — it protects against accidental mass-assignment without breaking your API callers.
+:::
+
+---
+
+## 🆔 ID Generation
+
+Cascade auto-generates a friendly numeric `id` alongside MongoDB's `_id`. Several properties control exactly how that numeric ID is produced.
+
+```ts
+export class Invoice extends Model {
+  public static collection = "invoices";
+
+  // Enable / disable auto-generation (default: true)
+  public static autoGenerateId = true;
+
+  // Start IDs at 100001 instead of 1
+  public static initialId = 100001;
+
+  // Or let Cascade pick a random starting point
+  public static randomInitialId = true;
+
+  // Increment by 5 each time
+  public static incrementIdBy = 5;
+
+  // Or randomise the increment amount each time
+  public static randomIncrement = true;
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `static autoGenerateId` | `boolean` | Set to `false` to skip numeric ID generation entirely. |
+| `static initialId` | `number` | Fixed starting value for the first generated ID. |
+| `static randomInitialId` | `boolean \| (() => number)` | Pick a random starting ID. Pass a function to provide your own random logic. |
+| `static incrementIdBy` | `number` | Fixed amount added to the last ID on each insert. |
+| `static randomIncrement` | `boolean \| (() => number)` | Randomise the increment. Pass a function to provide your own logic. |
+
+:::info
+`initialId` and `randomInitialId` are mutually exclusive. If both are set, `randomInitialId` takes precedence.
+:::
+
+---
+
+## 🕒 Timestamps
+
+Cascade automatically writes `createdAt` and `updatedAt` timestamps. Set a property to `false` to disable that column entirely.
+
+```ts
+export class AuditLog extends Model {
+  public static collection = "audit_logs";
+
+  // Custom column names
+  public static createdAtColumn = "created_at";
+  public static updatedAtColumn = "updated_at";
+}
+
+export class Session extends Model {
+  public static collection = "sessions";
+
+  // Disable updatedAt for append-only collections
+  public static updatedAtColumn = false;
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `static createdAtColumn` | `string \| false` | Column name for the creation timestamp. Set to `false` to disable. |
+| `static updatedAtColumn` | `string \| false` | Column name for the last-update timestamp. Set to `false` to disable. |
+
+---
+
+## 🗑️ Delete Strategy
+
+```ts
+export class Comment extends Model {
+  public static collection = "comments";
+
+  public static deleteStrategy: "trash" | "permanent" | "soft" = "soft";
+
+  // Column written when deleteStrategy is "soft" or "trash"
+  public static deletedAtColumn: string | false = "deletedAt";
+
+  // Separate collection used when deleteStrategy is "trash"
+  public static trashTable = "comments_trash";
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `static deleteStrategy` | `"trash" \| "permanent" \| "soft"` | How `destroy()` behaves. |
+| `static deletedAtColumn` | `string \| false` | Column stamped with the deletion date. Set to `false` to disable. |
+| `static trashTable` | `string` | Target collection for moved documents when `deleteStrategy` is `"trash"`. |
+
+### `deleteStrategy` values
+
+| Value | Behaviour |
+|---|---|
+| `"permanent"` | Document is hard-deleted from the collection. |
+| `"soft"` | Document stays in the collection; `deletedAtColumn` is stamped. |
+| `"trash"` | Document is moved to `trashTable` and can be restored later. |
+
+---
+
+## 🔭 Scopes
+
+Scopes are reusable query constraints. **Global scopes** apply automatically to every query; **local scopes** are opt-in.
+
+```ts
+import { GlobalScopeDefinition, LocalScopeCallback } from "@warlock.js/cascade";
+
+export class Article extends Model {
+  public static collection = "articles";
+
+  // Applied automatically before every query
+  public static globalScopes: Map<string, GlobalScopeDefinition> = new Map([
+    ["published", {
+      callback: (query) => query.where("status", "published"),
+      timing: "before",
+    }],
+  ]);
+
+  // Called explicitly via .scope("active")
+  public static localScopes: Map<string, LocalScopeCallback> = new Map([
+    ["active", (query) => query.where("isActive", true)],
+    ["byAuthor", (query, authorId) => query.where("authorId", authorId)],
+  ]);
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `static globalScopes` | `Map<string, GlobalScopeDefinition>` | Named scopes automatically injected into every query for this model. |
+| `static localScopes` | `Map<string, LocalScopeCallback>` | Named scopes applied only when explicitly activated on a query. |
+
+### `GlobalScopeDefinition` shape
+
+| Field | Type | Description |
+|---|---|---|
+| `callback` | `(query: QueryBuilderContract) => void` | Mutates the query. |
+| `timing` | `"before" \| "after"` | Whether the scope is applied before or after other query constraints. |
+
+---
+
+## 🔗 Relations
+
+Declare all relationships the model can load in one place.
+
+```ts
+import { hasMany, belongsTo } from "@warlock.js/cascade";
+
+export class Post extends Model {
+  public static collection = "posts";
+
+  public static relations: Record<string, any> = {
+    author:   belongsTo(User, "authorId"),
+    comments: hasMany(Comment, "postId"),
+    tags:     hasMany(Tag, "postId"),
+  };
+}
+
+// Eager-load at query time
+const posts = await Post.with("author", "comments").all();
+
+// Lazy-load on an existing instance
+await post.load("tags");
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `static relations` | `Record<string, any>` | Map of relation names to relation definitions (e.g. `hasMany`, `belongsTo`). |
+
+---
+
+## 📎 Embedded Documents
+
+When a model is embedded inside another document, `embed` controls which fields are copied into the parent at write time.
+
+```ts
+export class User extends Model {
+  public static collection = "users";
+
+  // These fields are written into the embedding parent document
+  public static embed = ["id", "name", "avatar", "email"];
+}
+
+export class Post extends Model {
+  public static collection = "posts";
+
+  public static relations: Record<string, any> = {
+    author: belongsTo(User, "authorId"),
+  };
+}
+```
+
+| Property | Type | Description |
+|---|---|---|
+| `static embed` | `string[]` | List of field names included when this model is embedded inside another document via `embedData`. |
+
+:::tip
+Keep `embed` lean — only include fields the parent document actually needs. This avoids bloating embedded sub-documents with unnecessary data.
+:::
+
+---
+
+## 🌟 What's Next?
+
+- [✨ Creating Documents](./create-document)
+- [🔮 Casting Data](./casting-data)
+- [🧩 Embedded Documents](./embedded-documents)
+- [💾 Saving Models](./saving-models)
+- [🗑️ Destroying Models](./destroying-models)
+- [🔍 Fetching Documents](./fetching-documents)

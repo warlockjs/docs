@@ -38,33 +38,14 @@ pnpm add @warlock.js/cascade
 </Tabs>
 
 :::info
-Cascade depends on [Mongez Config](https://github.com/hassanzohdy/mongez-config) for easy configuration. Make sure it's installed and set up!
+Cascade requires a database driver peer dependency. Install the one that matches your database:
+
+- **MongoDB:** `npm i mongodb`
+- **PostgreSQL:** `npm i pg`
 :::
 
 :::tip
 We highly recommend using **Typescript** for the best developer experience. All docs and examples use Typescript.
-:::
-
-## 🌍 Timezone Support
-
-Want your dates to always be correct? Set your timezone in your app config:
-
-```ts {5}
-import config from '@mongez/config';
-
-config.set({
-    app: {
-        timezone: 'Africa/Cairo', 
-    }
-})
-```
-
-## 🦄 MongoDB Version
-
-- MongoDB Version : **6.0.6** or higher
-
-:::tip
-Cascade will always keep up with the latest MongoDB releases!
 :::
 
 ---

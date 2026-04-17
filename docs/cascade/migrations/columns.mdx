@@ -1,0 +1,473 @@
+---
+sidebar_position: 4
+---
+
+# 🧱 Column Builder
+
+Every column you declare inside a migration table callback returns a `ColumnBuilder` instance. That instance exposes a fully fluent API — every method returns `this` — so you can chain as many modifiers as you need before moving on to the next column.
+
+```ts title="basic-chain.ts"
+table.string("email", 255).notNullable().unique().comment("User login email");
+```
+
+---
+
+## 🚫 Nullability
+
+### `nullable()`
+
+Marks the column as `NULL`-able. This is often the default for most drivers, but calling it explicitly makes intent clear in a diff.
+
+```ts title="nullable.ts"
+table.string("middle_name").nullable();
+```
+
+### `notNullable()`
+
+Adds a `NOT NULL` constraint to the column.
+
+```ts title="not-nullable.ts"
+table.string("username").notNullable();
+```
+
+---
+
+## 🏷️ Default Values
+
+### `default(value)`
+
+Sets a **raw SQL** default. The value is written directly into the DDL statement, so you can pass SQL keywords, numbers, booleans, or quoted strings.
+
+```ts title="default-raw.ts"
+table.integer("score").default(0);
+table.boolean("is_active").default(true);
+table.string("status").default("'pending'"); // raw SQL string literal
+```
+
+:::info
+Use `default()` when you need a SQL expression or a numeric/boolean literal. For plain string defaults use `defaultString()` instead.
+:::
+
+### `defaultString(value)`
+
+Sets an **escaped literal string** default. The driver wraps the value in quotes so you don't have to.
+
+```ts title="default-string.ts"
+table.string("role").defaultString("viewer");
+```
+
+### `useCurrent()`
+
+Shorthand for `DEFAULT CURRENT_TIMESTAMP`. Commonly used on `created_at` columns.
+
+```ts title="use-current.ts"
+table.timestamp("created_at").notNullable().useCurrent();
+```
+
+### `useCurrentOnUpdate()`
+
+Adds `ON UPDATE CURRENT_TIMESTAMP` (MySQL/MariaDB). The column's value is automatically refreshed whenever the row is updated.
+
+```ts title="use-current-on-update.ts"
+table.timestamp("updated_at").notNullable().useCurrent().useCurrentOnUpdate();
+```
+
+:::tip
+Chain `useCurrent()` and `useCurrentOnUpdate()` together on an `updated_at` timestamp column to get classic "auto-managed" audit timestamps with zero application logic.
+:::
+
+---
+
+## 🔐 Constraints
+
+### `unique()`
+
+Registers a unique index for the column. The index is queued on the migration and executed alongside the table DDL.
+
+```ts title="unique.ts"
+table.string("email").notNullable().unique();
+```
+
+### `index()`
+
+Registers a regular (non-unique) index for the column.
+
+```ts title="index.ts"
+table.string("last_name").index();
+```
+
+### `primary()`
+
+Marks the column as the primary key.
+
+```ts title="primary.ts"
+table.uuid("id").primary();
+```
+
+### `autoIncrement()`
+
+Marks the column as auto-incrementing. Typically combined with an integer type and `primary()`.
+
+```ts title="auto-increment.ts"
+table.integer("id").primary().autoIncrement().unsigned();
+```
+
+### `unsigned()`
+
+Marks a numeric column as `UNSIGNED` (MySQL/MariaDB). Doubles the positive range and prevents negative values.
+
+```ts title="unsigned.ts"
+table.integer("view_count").unsigned().default(0);
+```
+
+---
+
+## 🔮 Vector Index
+
+### `vectorIndex(options?)`
+
+Registers a vector-search index for an AI embedding column. Pass any `VectorIndexOptions` fields except `dimensions` (those are inferred from the column type).
+
+```ts title="vector-index.ts"
+table
+  .vector("embedding", { dimensions: 1536 })
+  .vectorIndex({ metric: "cosine" });
+```
+
+:::info
+`vectorIndex()` queues a pending vector index operation on the migration, just like `index()` and `unique()` do for regular indexes.
+:::
+
+---
+
+## 💬 Metadata
+
+### `comment(text)`
+
+Attaches a column comment in the database. Useful for self-documenting schemas.
+
+```ts title="comment.ts"
+table.string("slug").notNullable().unique().comment("URL-safe identifier");
+```
+
+### `check(expression, name?)`
+
+Adds a `CHECK` constraint inline. Pass the raw SQL expression and an optional constraint name.
+
+```ts title="check.ts"
+table.integer("age").check("age >= 0", "chk_age_positive");
+table.decimal("price", 10, 2).check("price > 0");
+```
+
+---
+
+## 📍 Position (MySQL)
+
+### `after(columnName)`
+
+Positions the new column immediately after `columnName` in the table definition. MySQL/MariaDB only.
+
+```ts title="after.ts"
+table.string("middle_name").nullable().after("first_name");
+```
+
+### `first()`
+
+Positions the new column as the very first column in the table. MySQL/MariaDB only.
+
+```ts title="first.ts"
+table.uuid("id").primary().first();
+```
+
+---
+
+## ✏️ Modification
+
+### `change()` / `modify()`
+
+Converts the column declaration into a **modify-column** operation instead of an add-column operation. Use this inside `alterTable` when you want to change an existing column's type or constraints.
+
+`modify()` is an alias for `change()` — they behave identically.
+
+```ts title="change.ts"
+await db.schema.alterTable("users", (table) => {
+  table.string("email", 320).notNullable().unique().change();
+});
+```
+
+```ts title="modify.ts"
+await db.schema.alterTable("products", (table) => {
+  table.decimal("price", 12, 4).notNullable().modify();
+});
+```
+
+:::tip
+Always call `.change()` or `.modify()` as the **last** method in the chain. It flushes the accumulated definition into the migration's pending operations queue.
+:::
+
+---
+
+## ⚙️ Generated Columns
+
+Generated columns derive their value from a SQL expression evaluated by the database engine — no application code required.
+
+### `generatedAs(expression)`
+
+Marks the column as generated and sets the SQL expression used to compute the value.
+
+```ts title="generated-as.ts"
+table
+  .string("full_name")
+  .generatedAs("CONCAT(first_name, ' ', last_name)");
+```
+
+### `stored()`
+
+Marks the generated column as **STORED** (persisted on disk). Must be called after `generatedAs()`.
+
+```ts title="stored.ts"
+table
+  .string("full_name")
+  .generatedAs("CONCAT(first_name, ' ', last_name)")
+  .stored();
+```
+
+### `virtual()`
+
+Marks the generated column as **VIRTUAL** (computed on read, not stored). Must be called after `generatedAs()`.
+
+```ts title="virtual.ts"
+table
+  .decimal("discounted_price", 10, 2)
+  .generatedAs("price * (1 - discount_rate)")
+  .virtual();
+```
+
+:::info
+The difference between `stored()` and `virtual()` is a storage vs. compute trade-off. `stored()` writes the computed value to disk (faster reads, uses space); `virtual()` recalculates on every read (saves space, tiny read overhead).
+:::
+
+---
+
+## 🔗 Foreign Keys via Column
+
+You can declare a foreign key constraint directly on a column builder rather than using a separate `ForeignKeyBuilder`. The chain reads almost like English.
+
+### `references(tableOrModel)`
+
+Declares a foreign key relationship. Accepts a table name string or an object with a `table` property (e.g., a model class).
+
+```ts title="references.ts"
+table.integer("user_id").unsigned().references("users");
+```
+
+### `on(column)`
+
+Sets the referenced column on the foreign table. Defaults to `id` when omitted in most drivers.
+
+```ts title="on.ts"
+table.integer("user_id").unsigned().references("users").on("id");
+```
+
+### `onDelete(action)`
+
+Sets the `ON DELETE` referential action.
+
+```ts title="on-delete.ts"
+table
+  .integer("post_id")
+  .unsigned()
+  .references("posts")
+  .on("id")
+  .onDelete("CASCADE");
+```
+
+### `onUpdate(action)`
+
+Sets the `ON UPDATE` referential action.
+
+```ts title="on-update.ts"
+table
+  .integer("category_id")
+  .unsigned()
+  .references("categories")
+  .on("id")
+  .onUpdate("RESTRICT");
+```
+
+### `cascadeAll()`
+
+Shorthand that sets both `ON DELETE CASCADE` and `ON UPDATE CASCADE` in one call.
+
+```ts title="cascade-all.ts"
+table
+  .integer("user_id")
+  .unsigned()
+  .notNullable()
+  .references("users")
+  .on("id")
+  .cascadeAll();
+```
+
+:::tip
+`cascadeAll()` is the most common pattern for tight parent-child relationships where deleting or renaming the parent should automatically propagate to children.
+:::
+
+---
+
+## 🔑 ForeignKeyBuilder (Standalone)
+
+When you want to define a foreign key that spans multiple columns, or you prefer to keep FK declarations separate from column declarations, use `ForeignKeyBuilder` directly via `table.foreign()`.
+
+### Methods
+
+| Method | Description |
+|---|---|
+| `name(name)` | Optional constraint name |
+| `references(table, column?)` | Sets the referenced table (and optionally column); registers the FK |
+| `onDelete(action)` | Sets the `ON DELETE` action |
+| `onUpdate(action)` | Sets the `ON UPDATE` action |
+| `cascadeAll()` | Sets both actions to `CASCADE` |
+
+```ts title="foreign-key-builder.ts"
+await db.schema.alterTable("orders", (table) => {
+  table
+    .foreign("customer_id")
+    .name("fk_orders_customer")
+    .references("customers", "id")
+    .onDelete("RESTRICT")
+    .onUpdate("CASCADE");
+});
+```
+
+```ts title="foreign-key-builder-cascade.ts"
+await db.schema.createTable("comments", (table) => {
+  table.integer("id").primary().autoIncrement();
+  table.integer("post_id").unsigned().notNullable();
+  table.text("body").notNullable();
+
+  table
+    .foreign("post_id")
+    .name("fk_comments_post")
+    .references("posts", "id")
+    .cascadeAll();
+});
+```
+
+:::info
+`ForeignKeyBuilder.references()` immediately registers the FK operation on the migration. Calling `.name()` after `.references()` will not apply — always set `.name()` first.
+:::
+
+---
+
+## 🧩 DetachedColumnBuilder
+
+`DetachedColumnBuilder` extends `ColumnBuilder` with its own self-contained migration sink. It lets you define and reuse column definitions **outside** of any migration class — for example, in shared schema blueprints, model definitions, or factory helpers.
+
+The standalone column helpers (`string`, `integer`, `uuid`, `vector`, `enumCol`, etc.) all return a `DetachedColumnBuilder`.
+
+```ts title="detached-column-builder.ts"
+import {
+  string,
+  integer,
+  uuid,
+  timestamp,
+  boolean,
+  vector,
+  enumCol,
+  decimal,
+} from "@warlock.js/cascade";
+
+// Define reusable column blueprints
+const idColumn = uuid("id").primary();
+
+const auditColumns = [
+  timestamp("created_at").notNullable().useCurrent(),
+  timestamp("updated_at").notNullable().useCurrent().useCurrentOnUpdate(),
+];
+
+const statusColumn = enumCol("status", ["draft", "published", "archived"])
+  .notNullable()
+  .defaultString("draft");
+
+const embeddingColumn = vector("embedding", { dimensions: 1536 })
+  .vectorIndex({ metric: "cosine" });
+```
+
+```ts title="reuse-in-migration.ts"
+import { string, integer, boolean } from "@warlock.js/cascade";
+
+// A shared "soft-delete" column blueprint used across multiple tables
+const deletedAt = timestamp("deleted_at").nullable().comment("Soft-delete timestamp");
+
+await db.schema.createTable("posts", (table) => {
+  table.importColumn(deletedAt);
+  // ... other columns
+});
+
+await db.schema.createTable("comments", (table) => {
+  table.importColumn(deletedAt);
+  // ... other columns
+});
+```
+
+:::tip
+`DetachedColumnBuilder` is ideal for defining shared column patterns — audit timestamps, soft-delete flags, embedding columns — once and importing them into many migrations. Pending indexes and foreign keys are collected on the detached sink and merged when the column is attached to a real migration.
+:::
+
+---
+
+## 📋 Full Example
+
+A complete table definition showing multiple `ColumnBuilder` features together:
+
+```ts title="full-example.ts"
+await db.schema.createTable("articles", (table) => {
+  // Primary key
+  table.integer("id").primary().autoIncrement().unsigned();
+
+  // Author FK with cascade
+  table.integer("author_id").unsigned().notNullable()
+    .references("users").on("id")
+    .cascadeAll();
+
+  // Category FK with restrict
+  table.integer("category_id").unsigned().nullable()
+    .references("categories").on("id")
+    .onDelete("SET NULL")
+    .onUpdate("CASCADE");
+
+  // String columns
+  table.string("title", 255).notNullable().index().comment("Article headline");
+  table.string("slug", 255).notNullable().unique().comment("URL slug");
+
+  // Content
+  table.longText("body").notNullable();
+  table.text("excerpt").nullable();
+
+  // Status with check
+  table.string("status", 20).notNullable().defaultString("draft")
+    .check("status IN ('draft','published','archived')", "chk_articles_status");
+
+  // Numeric
+  table.integer("view_count").unsigned().default(0);
+  table.decimal("read_time_minutes", 5, 2).unsigned().nullable();
+
+  // Boolean
+  table.boolean("is_featured").notNullable().default(false);
+
+  // Generated column
+  table.string("title_slug")
+    .generatedAs("LOWER(REPLACE(title, ' ', '-'))")
+    .stored();
+
+  // AI embedding vector
+  table.vector("embedding", { dimensions: 1536 }).nullable()
+    .vectorIndex({ metric: "cosine" });
+
+  // Audit timestamps
+  table.timestamp("published_at").nullable();
+  table.timestamp("created_at").notNullable().useCurrent();
+  table.timestamp("updated_at").notNullable().useCurrent().useCurrentOnUpdate();
+});
+```

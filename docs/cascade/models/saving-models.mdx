@@ -38,22 +38,6 @@ Or use the static `update` method:
 const category = await Category.update(1, { name: "Sports" });
 ```
 
-## 🧩 Passing Options to Save
-
-You can pass options to `save()` for extra control:
-
-```ts title="src/app.ts"
-await category.save({ refresh: true });
-```
-
-## 🚫 Disabling Casts
-
-Need to save without triggering casts? Pass `{ cast: false }` as the second argument:
-
-```ts title="src/app.ts"
-await category.save({}, { cast: false });
-```
-
 ## ⚡ Model Events: Hooks for Everything!
 
 Cascade's event system lets you run code before/after every action. Listen to events like `onCreating`, `onUpdating`, `onSaving`, `onCreated`, `onUpdated`, `onSaved`, `onDeleting`, `onDeleted`, and more!
@@ -84,18 +68,6 @@ async function calculateCategoryProducts(categoryId) {
   await Category.update(categoryId, { productsCount: count });
 }
 ```
-
-## 🤫 Silent Saving
-
-Use `silentSaving()` to save without triggering any events:
-
-```ts title="src/app.ts"
-await category.silentSaving();
-```
-
-:::tip
-Use `silentSaving` when you want to update a model without firing events (e.g., internal updates).
-:::
 
 ---
 

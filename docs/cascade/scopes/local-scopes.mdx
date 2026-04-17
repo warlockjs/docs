@@ -1,0 +1,186 @@
+---
+sidebar_position: 2
+---
+
+# 🔬 Local Scopes
+
+Local scopes are **named, reusable query modifications** that you register on a model and invoke explicitly when you need them. Unlike global scopes, they are never applied automatically — you call them by name on a query builder instance, passing any extra arguments the scope needs.
+
+:::info When to use local scopes
+Use local scopes to encapsulate common filtering logic that you want to reuse across multiple call sites, but that should not run on every query. Examples: `active`, `forUser(userId)`, `withinDateRange(from, to)`.
+:::
+
+---
+
+## 🔧 Registering a Local Scope
+
+Use the static `Model.addScope(name, callback)` method to register a local scope on a model class.
+
+```ts title="models/order.model.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Order extends Model {
+  public static table = "orders";
+
+  static {
+    Order.addScope("pending", query => {
+      query.where("status", "pending");
+    });
+
+    Order.addScope("forUser", (query, userId: number) => {
+      query.where("userId", userId);
+    });
+
+    Order.addScope("withinDateRange", (query, from: Date, to: Date) => {
+      query.whereBetween("createdAt", [from, to]);
+    });
+  }
+}
+```
+
+### Method Signature
+
+```ts title="type signature"
+static addScope(name: string, callback: LocalScopeCallback): void
+```
+
+### `LocalScopeCallback`
+
+```ts title="model.types.ts"
+type LocalScopeCallback = (query: QueryBuilderContract, ...args: any[]) => void;
+```
+
+The first argument is always the query builder. Any additional parameters are forwarded from the `query.scope(name, ...args)` call site.
+
+---
+
+## 🗑️ Removing a Local Scope
+
+To permanently unregister a local scope from a model class, call `Model.removeScope(name)`.
+
+```ts title="Remove a local scope"
+Order.removeScope("pending");
+```
+
+### Method Signature
+
+```ts title="type signature"
+static removeScope(name: string): void
+```
+
+This mutates the model class's internal `localScopes` map. The scope becomes unavailable for all future queries on that model.
+
+---
+
+## 🚀 Calling a Local Scope on a Query
+
+Apply a registered scope to a live query using `query.scope(name, ...args)`.
+
+```ts title="Using a local scope"
+// No extra args
+const pendingOrders = await Order.query()
+  .scope("pending")
+  .all();
+
+// With extra args
+const userOrders = await Order.query()
+  .scope("forUser", 42)
+  .all();
+
+// Chained scopes
+const results = await Order.query()
+  .scope("pending")
+  .scope("forUser", 42)
+  .orderByDesc("createdAt")
+  .all();
+```
+
+### Method Signature
+
+```ts title="query-builder.ts"
+scope(scopeName: string, ...args: any[]): this
+```
+
+`scope` returns `this` for fluent chaining. It throws an `Error` if no local scopes are registered on the model or if the requested scope name does not exist.
+
+:::tip Scopes are just callbacks
+Under the hood, calling `query.scope("pending")` is equivalent to calling the registered `LocalScopeCallback` with the current query builder. There is no magic — you get full type-safe fluent access inside the callback.
+:::
+
+---
+
+## 📦 Scopes with Arguments
+
+Local scopes can accept any number of extra arguments after `query`, making them highly flexible.
+
+```ts title="models/product.model.ts"
+export class Product extends Model {
+  public static table = "products";
+
+  static {
+    Product.addScope("pricedBetween", (query, min: number, max: number) => {
+      query.whereBetween("price", [min, max]);
+    });
+
+    Product.addScope("inCategories", (query, ...categoryIds: number[]) => {
+      query.whereIn("categoryId", categoryIds);
+    });
+  }
+}
+```
+
+```ts title="Calling scopes with arguments"
+const affordableWidgets = await Product.query()
+  .scope("pricedBetween", 10, 50)
+  .scope("inCategories", 3, 7, 12)
+  .all();
+```
+
+---
+
+## ⚠️ Error Behaviour
+
+`query.scope()` throws if the scope cannot be found:
+
+```ts title="Error thrown on unknown scope"
+// Throws: Error — scope "nonExistent" not found
+await Order.query().scope("nonExistent").all();
+```
+
+:::info No silent failures
+Cascade throws immediately when an unknown scope is requested, so typos and missing registrations are caught at development time rather than producing empty result sets silently.
+:::
+
+---
+
+## 🏗️ Practical Example: User-Scoped Queries
+
+```ts title="models/post.model.ts"
+export class Post extends Model {
+  public static table = "posts";
+
+  static {
+    Post.addScope("published", query => {
+      query.where("status", "published");
+    });
+
+    Post.addScope("byAuthor", (query, authorId: number) => {
+      query.where("authorId", authorId);
+    });
+
+    Post.addScope("tagged", (query, ...tags: string[]) => {
+      query.whereIn("tag", tags);
+    });
+  }
+}
+
+// Compose scopes as needed
+const techPostsByAlice = await Post.query()
+  .scope("published")
+  .scope("byAuthor", aliceId)
+  .scope("tagged", "typescript", "nodejs")
+  .orderByDesc("publishedAt")
+  .paginate({ page: 1, limit: 20 });
+```
+
+Each scope stays small and focused. Composition at the call site keeps query logic readable and maintainable.

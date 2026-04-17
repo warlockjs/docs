@@ -6,9 +6,9 @@ sidebar_position: 9
 
 Sometimes, you need to say goodbye to your data. Cascade makes deleting (and restoring!) models safe, easy, and powerful. 💥
 
-## 🧹 Deleting a Model
+## 🧹 Deleting a Model Instance
 
-Just call `destroy()` on a model instance:
+Call `destroy()` on any model instance to remove it from the database:
 
 ```ts title="src/app.ts"
 const category = await Category.find(1);
@@ -17,70 +17,141 @@ if (category) {
 }
 ```
 
-Or use the static `destroy` method:
+`destroy()` accepts an optional `options` object. Pass `strategy: "permanent"` to override the model's configured delete strategy for this single call:
 
 ```ts title="src/app.ts"
-await Category.destroy(1); // By ID
-await Category.destroy({ name: "Sports" }); // By filter
+await category.destroy({ strategy: "permanent" });
 ```
 
-## 🦺 Soft Deletes (The Safety Net!)
+## 🗂️ Bulk Deletes
 
-By default, Cascade uses **soft deletes**—your data isn't really gone, just marked as deleted! (Unless you say otherwise.)
+To delete many records at once, use the static `delete` and `deleteOne` helpers:
+
+```ts title="src/app.ts"
+// Delete all records matching a filter
+await Category.delete({ isActive: false });
+
+// Delete a single record matching a filter
+await Category.deleteOne({ name: "Sports" });
+
+// Delete every record in the table (no filter)
+await Category.delete();
+```
+
+:::info
+`Model.delete(filter?)` and `Model.deleteOne(filter?)` return the number of rows affected. They bypass model events and work directly on the driver.
+:::
+
+## 🦺 Delete Strategies
+
+Cascade supports three deletion strategies, controlled by the static `deleteStrategy` property:
+
+| Strategy | Behaviour |
+|---|---|
+| `"soft"` | Sets `deletedAt` timestamp; record stays in the same table |
+| `"trash"` | Moves the record to a separate trash table |
+| `"permanent"` | Removes the record from the database immediately |
 
 ```ts title="src/models/category.ts"
 export class Category extends Model {
-  public static collection = "categories";
-  public softDelete = true; // This is the default!
+  public static table = "categories";
+
+  // Choose one of: "soft" | "trash" | "permanent"
+  public static deleteStrategy: "soft" | "trash" | "permanent" = "soft";
+
+  // Column that stores the deletion timestamp (soft strategy)
+  public static deletedAtColumn = "deletedAt";
+
+  // Table to move records to (trash strategy only)
+  public static trashTable = "categories_trash";
 }
 ```
 
-When you destroy a model, it sets the `deletedAt` field instead of removing the document. You can still query, restore, or force-delete it later!
+:::tip
+`deletedAtColumn` defaults to `"deletedAt"`. Override it if your schema uses a different column name. `trashTable` is only required when `deleteStrategy` is `"trash"`.
+:::
 
-## ♻️ Restoring Soft-Deleted Models
+## ♻️ Restoring Deleted Records
 
-Bring your data back from the grave:
+### Restore a single record by ID
 
 ```ts title="src/app.ts"
-const category = await Category.find(1, { withTrashed: true });
-if (category && category.isTrashed()) {
-  await category.restore();
+const category = await Category.restore(1);
+```
+
+Pass options as the second argument (e.g. to control conflict handling):
+
+```ts title="src/app.ts"
+const category = await Category.restore(1, { /* RestorerOptions */ });
+```
+
+`restore` throws if the strategy is `"permanent"`, if the record is not found, or if there is a primary-key conflict in `fail` mode.
+
+### Restore all deleted records
+
+```ts title="src/app.ts"
+const categories = await Category.restoreAll();
+```
+
+Pass options to control the restore behaviour:
+
+```ts title="src/app.ts"
+const categories = await Category.restoreAll({ /* RestorerOptions */ });
+```
+
+`restoreAll` returns an empty array when no deleted records are found.
+
+:::info
+Restore emits `restoring` and `restored` events for each record, keeping the rest of your system in sync automatically.
+:::
+
+## 💣 Permanent Delete (No Going Back!)
+
+To permanently delete a record regardless of the model's configured strategy, pass `strategy: "permanent"` to the instance `destroy()` call:
+
+```ts title="src/app.ts"
+const category = await Category.find(1);
+if (category) {
+  await category.destroy({ strategy: "permanent" });
 }
 ```
 
-Or restore many at once:
+Or configure the entire model to always delete permanently:
 
-```ts title="src/app.ts"
-await Category.restore({ isActive: false });
-```
-
-## 💣 Force Delete (No Going Back!)
-
-Want to really, truly, permanently delete? Use `forceDelete`:
-
-```ts title="src/app.ts"
-await category.forceDelete(); // Instance method
-await Category.forceDelete(1); // Static method
+```ts title="src/models/category.ts"
+export class Category extends Model {
+  public static table = "categories";
+  public static deleteStrategy = "permanent" as const;
+}
 ```
 
 :::danger
-Force delete is permanent! Use with care. (There's no undo.)
+Permanent deletion cannot be undone. There is no restore path once a record is removed this way.
 :::
 
 ## ⚡ Model Events: Deletion Hooks
 
-Cascade's event system lets you hook into deletion actions:
+Cascade's event system lets you hook into deletion actions at the class level:
 
 ```ts title="src/app/main.ts"
 Category.events()
-  .onDeleting((category) => console.log("Deleting!"))
-  .onDeleted((category) => console.log("Deleted!"));
+  .onDeleting((category) => console.log("Deleting!", category.id))
+  .onDeleted((category) => console.log("Deleted!", category.id));
+```
+
+And at the instance level:
+
+```ts title="src/app.ts"
+const category = await Category.find(1);
+category.on("deleting", (cat) => console.log("About to delete", cat.id));
+await category.destroy();
 ```
 
 Use these for logging, cleanup, or syncing related data.
 
 ## 🧙‍♂️ Pro Tip
-Soft deletes are great for audit trails and accidental-deletion recovery. But if you need to save space or comply with regulations, use force delete!
+
+Soft deletes and trash strategies are great for audit trails and accidental-deletion recovery. Use `"permanent"` only when you need to comply with data-removal regulations or reclaim storage for records that will never be needed again.
 
 ---
 

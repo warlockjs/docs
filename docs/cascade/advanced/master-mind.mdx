@@ -2,129 +2,181 @@
 sidebar_position: 3
 ---
 
-# 🧠 MasterMind: Auto-Increment ID Manager
+# 🔢 ID Generation Internals
 
-The `MasterMind` class is Cascade's behind-the-scenes wizard for managing auto-incrementing numeric IDs! It keeps track of the last used ID for each collection, ensuring your auto-increment IDs are always unique and collision-free. 🪄
+Cascade's auto-increment ID system is built on a clean contract-and-implementation layered architecture. Instead of a single monolithic class, ID generation is handled by the `IdGeneratorContract` interface and its concrete implementations (such as `MongoIdGenerator`). Models expose a high-level `generateNextId()` instance method that delegates all the heavy lifting to the configured generator. 🪄
 
-## 🚦 What Does MasterMind Do?
-- Stores the last used numeric ID for each collection in a special `MasterMind` collection.
-- Generates the next unique ID for new documents (auto-increment).
-- Lets you get, set, or update the last ID for any collection.
-- Handles renaming collections and syncing IDs.
+## 🚦 How It Works
 
-## 🏗️ How to Use MasterMind
+1. Each model has a configured **ID generator** (set at the driver level).
+2. When a new document is saved, the model calls `generateNextId()` internally.
+3. The generator atomically increments a counter stored in a dedicated **counter collection** (e.g. `counters`) and returns the next integer.
+4. The returned integer becomes the document's `id`.
 
-### Get the Last Used ID
-```ts title="src/app.ts"
-import { masterMind } from "@warlock.js/cascade";
-
-const lastId = await masterMind.getLastId("categories");
-console.log(lastId); // e.g., 42
-```
-
-### Set the Last Used ID
-```ts title="src/app.ts"
-await masterMind.setLastId("categories", 100);
-```
-
-### Generate the Next Auto-Increment ID
-```ts title="src/app.ts"
-const nextId = await masterMind.generateNextId("categories", 1, 1);
-console.log(nextId); // e.g., 43
-```
-- The second argument is the increment step (default: 1).
-- The third argument is the initial value if the collection is new (default: 1).
-
-### Rename a Collection in MasterMind
-```ts title="src/app.ts"
-await masterMind.renameCollection("oldName", "newName");
-```
-
-### Sync All Collections
-```ts title="src/app.ts"
-await masterMind.updateAllLastId();
-```
-
-## 🧙‍♂️ Pro Tip
-You rarely need to use `masterMind` directly—Cascade models handle auto-increment for you! But it's great for migrations, data repair, or advanced admin tools.
-
-## ⚠️ Best Practices
-- Use `generateNextId` for custom auto-increment logic.
-- Use `setLastId` if you manually insert data and need to update the counter.
-- Don't use MasterMind for multi-tenancy or tenant isolation—it's just for ID management!
-
-:::info
-MasterMind is the secret sauce behind Cascade's reliable, auto-incrementing numeric IDs. No more duplicate keys or manual tracking!
+:::tip
+For SQL people, think of the counter collection as the equivalent of an auto-increment sequence or `INFORMATION_SCHEMA` sequence tracker — it stores the last-used ID per collection.
 :::
 
 ---
 
-## 🌟 What's Next?
+## 📄 `GenerateIdOptions` Type
 
-## Introduction
+Options passed to the generator whenever a new ID is needed.
 
-`MasterMind` is helper class that is fully dedicated to manage the model `id` field, it is used internally by the model class to keep tracking of generated ids and gets the proper next id.
+```ts
+type GenerateIdOptions = {
+  /** Target collection / table name. */
+  table: string;
+  /** Starting value for the very first record. Defaults to 1. */
+  initialId?: number;
+  /** Step between consecutive IDs. Defaults to 1. */
+  incrementIdBy?: number;
+};
+```
+
+---
+
+## 🤝 `IdGeneratorContract`
+
+The interface every ID generator must implement. Import it from `@warlock.js/cascade` when writing a custom generator.
+
+```ts
+import type { IdGeneratorContract, GenerateIdOptions } from "@warlock.js/cascade";
+```
+
+### Methods
+
+| Method | Signature | Description |
+|---|---|---|
+| `generateNextId` | `(options: GenerateIdOptions) => Promise<number>` | Atomically increments the counter and returns the next ID. Throws on concurrent write failure. |
+| `getLastId` | `(table: string) => Promise<number>` | Returns the last generated ID for the given collection. Returns `0` if no IDs have been generated yet. |
+| `setLastId` | `(table: string, id: number) => Promise<void>` | Overwrites the stored counter for a collection. Useful for migrations or data repairs. |
+
+### Writing a Custom Generator
+
+```ts title="src/my-id-generator.ts"
+import type { IdGeneratorContract, GenerateIdOptions } from "@warlock.js/cascade";
+
+export class MyIdGenerator implements IdGeneratorContract {
+  async generateNextId(options: GenerateIdOptions): Promise<number> {
+    const { table, initialId = 1, incrementIdBy = 1 } = options;
+    // your atomic increment logic here …
+    return nextId;
+  }
+
+  async getLastId(table: string): Promise<number> {
+    // read from your counter store …
+    return lastId;
+  }
+
+  async setLastId(table: string, id: number): Promise<void> {
+    // write to your counter store …
+  }
+}
+```
+
+---
+
+## 🍃 `MongoIdGenerator`
+
+The built-in MongoDB implementation of `IdGeneratorContract`. It stores one counter document per collection inside a dedicated **counter collection** (default name: `counters`).
+
+```ts
+import { MongoIdGenerator } from "@warlock.js/cascade";
+```
+
+### Constructor
+
+```ts
+new MongoIdGenerator(driver: MongoDbDriver, counterCollection?: string)
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `driver` | `MongoDbDriver` | — | The active MongoDB driver instance. |
+| `counterCollection` | `string` | `"counters"` | Name of the collection used to store ID counters. |
+
+### How It Stores Counters
+
+Each document in the counter collection looks like:
+
+```json
+{ "_id": "categories", "seq": 42 }
+```
+
+`generateNextId` uses MongoDB's `findOneAndUpdate` with `$inc` and `upsert: true` to guarantee atomic, collision-free increments even under high concurrency.
+
+### Reading and Writing Counters Directly
+
+:::info
+You should rarely need to call these directly — the model handles ID generation automatically. Use them only for migrations, data repair, or admin tooling.
+:::
+
+```ts title="src/scripts/repair-counters.ts"
+import { MongoIdGenerator } from "@warlock.js/cascade";
+import { connection } from "./db";
+
+const generator = new MongoIdGenerator(connection.driver);
+
+// Read the current counter for a collection
+const last = await generator.getLastId("categories");
+console.log(last); // e.g. 42
+
+// Manually set the counter (e.g. after a bulk import)
+await generator.setLastId("categories", 1000);
+
+// Generate the next ID (increments the counter atomically)
+const next = await generator.generateNextId({
+  table: "categories",
+  initialId: 1,
+  incrementIdBy: 1,
+});
+console.log(next); // 1001
+```
+
+---
+
+## 🏷️ `model.generateNextId()`
+
+The model-level method that orchestrates ID generation. It reads the model's static configuration (`initialId`, `incrementIdBy`) and delegates to the driver's configured `IdGeneratorContract` implementation.
+
+```ts title="src/models/category.ts"
+import { Model } from "@warlock.js/cascade";
+
+export class Category extends Model {
+  public static collection = "categories";
+}
+
+// Inside a custom save flow:
+const category = new Category();
+await category.generateNextId();
+console.log(category.id); // e.g. 43
+```
 
 :::tip
-For SQL People, consider it more likely the `INFORMATION_SCHEMA` table.
+You almost never call `generateNextId()` manually. Cascade's `save()` method calls it automatically whenever `autoGenerateId` is `true` (the default) and the document has no existing `id`.
 :::
 
-## Master Mind Collection
+### Relevant Static Model Properties
 
-Any model that is being saved, the model's collection name and the last saved id are stored in `MasterMind` collection, the purpose of this collection is to keep tracking of the last saved id for each collection
+These statics influence what `generateNextId()` passes to the underlying generator:
 
-## Get last id
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `autoGenerateId` | `boolean` | `true` | Whether to auto-generate an ID on save. |
+| `initialId` | `number` | `1` | The very first ID value for a new collection. |
+| `incrementIdBy` | `number` | `1` | Step between consecutive IDs. |
+| `randomInitialId` | `boolean` | `false` | Start from a random initial ID. |
+| `randomIncrement` | `boolean` | `false` | Use a random increment step. |
 
-If you want to get the last id of any collection, consider the following snippet:
+---
 
-```ts src/app.ts
-import { masterMind } from "@warlock.js/cascade";
+## ⚠️ Best Practices
 
-async function main() {
-  const lastId = await masterMind.getLastId("categories");
+- **Do not** call `setLastId` while active traffic is writing to the collection — always drain writes first.
+- **Do** use `setLastId` after bulk imports to advance the counter past the highest imported ID, preventing future collisions.
+- **Do not** share a counter collection across databases that may have conflicting collection names — use a unique `counterCollection` name per database context.
 
-  console.log(lastId); // 512344
-}
-
-main();
-```
-
-:::note
-We imported `masterMind` as an object, if you want to create a new instance of it, you may import `MasterMind` class instead.
+:::info
+All ID generation is atomic at the database level. Even under high concurrency, no two documents will receive the same auto-increment ID for the same collection.
 :::
-
-## Generate next id
-
-To generate the next id of any collection, consider the following snippet:
-
-```ts src/app.ts
-import { masterMind } from "@warlock.js/cascade";
-
-async function main() {
-  const initialId = 1;
-  const incrementBy = 1;
-  const nextId = await masterMind.getNextId(
-    "categories",
-    initialId,
-    incrementBy
-  );
-
-  console.log(nextId); // 1
-
-  const nextId2 = await masterMind.getNextId(
-    "categories",
-    initialId,
-    incrementBy
-  );
-
-  console.log(nextId); // 2
-}
-
-main();
-```
-
-`getNextId` method accepts three arguments:
-
-- `collectionName`: The collection name
-- `initialId`: The initial id value, it will be used if the collection name does not exist in the `MasterMind` collection
-- `incrementBy`: The increment value, it will be used if the collection name does not exist in the `MasterMind` collection

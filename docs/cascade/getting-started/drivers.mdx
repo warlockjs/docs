@@ -1,0 +1,215 @@
+---
+sidebar_position: 3
+---
+
+# 🔌 Drivers
+
+Cascade is database-agnostic by design. You pick the driver that matches your stack, install the peer dependency, and pass it into `connectToDatabase`. This page explains every driver option and what each one supports.
+
+---
+
+## 🗂️ The `DatabaseDriver` Type
+
+```ts
+type DatabaseDriver = "mongodb" | "postgres" | "mysql";
+```
+
+`DatabaseDriver` is the union of all recognised driver name strings. Pass one of these as the `driver` field inside your `connectToDatabase` call.
+
+:::warning MySQL is reserved
+`"mysql"` is accepted by the type system but **not yet implemented**. Passing it to `connectToDatabase` will throw an error at runtime. Use `"mongodb"` or `"postgres"` for production workloads.
+:::
+
+---
+
+## ⚙️ Specifying the Driver
+
+The `driver` field is part of `ConnectionOptions`, the second argument to `connectToDatabase`:
+
+```ts title="src/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase({
+  driver: "mongodb", // or "postgres"
+  // ... driver-specific options
+});
+```
+
+Cascade reads `driver`, instantiates the matching internal driver class, registers it in the data-source registry, and opens the connection — all in one call.
+
+---
+
+## 🍃 MongoDB
+
+### Install the peer dependency
+
+```bash
+npm i mongodb
+```
+
+### Connect
+
+```ts title="src/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase({
+  driver: "mongodb",
+  url: "mongodb://localhost:27017",
+  database: "my_app",
+});
+```
+
+### `MongoDriverOptions`
+
+Pass an optional `driverOptions` object to tune MongoDB-specific behaviour:
+
+```ts title="src/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+import type { MongoDriverOptions } from "@warlock.js/cascade";
+
+const mongoOptions: MongoDriverOptions = {
+  autoGenerateId: true,       // enable numeric auto-increment ID generation
+  counterCollection: "counters", // collection used to store ID counters
+  transactionOptions: {       // default TransactionOptions forwarded to MongoDB
+    readConcern: { level: "majority" },
+    writeConcern: { w: "majority" },
+  },
+};
+
+await connectToDatabase({
+  driver: "mongodb",
+  url: "mongodb://localhost:27017",
+  database: "my_app",
+  driverOptions: mongoOptions,
+});
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `autoGenerateId` | `boolean` | `false` | Generates numeric auto-increment IDs instead of ObjectIds |
+| `counterCollection` | `string` | — | Name of the collection used as the ID counter store |
+| `transactionOptions` | `TransactionOptions` | — | Default options forwarded to every MongoDB transaction |
+
+:::tip Replica set required for transactions
+MongoDB transactions require a replica set (or a mongos with sharding). A standalone `mongod` will throw when you call `.transaction()`.
+:::
+
+---
+
+## 🐘 PostgreSQL
+
+### Install the peer dependency
+
+```bash
+npm i pg
+```
+
+### Connect
+
+```ts title="src/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase({
+  driver: "postgres",
+  host: "localhost",
+  port: 5432,
+  database: "my_app",
+  user: "postgres",
+  password: "secret",
+});
+```
+
+### `PostgresConnectionConfig`
+
+The base connection fields accepted by the PostgreSQL driver:
+
+| Field | Type | Description |
+|---|---|---|
+| `database` | `string` | **Required.** Database name |
+| `host` | `string` | Server hostname (default: `localhost`) |
+| `port` | `number` | Server port (default: `5432`) |
+| `user` | `string` | Database user |
+| `password` | `string` | Database password |
+| `connectionString` | `string` | Full DSN string; overrides individual fields |
+| `ssl` | `boolean \| object` | TLS options (`rejectUnauthorized`, `ca`, `cert`, `key`) |
+| `logging` | `boolean` | Log every query |
+
+### `PostgresPoolConfig`
+
+`PostgresPoolConfig` extends `PostgresConnectionConfig` with connection-pool sizing:
+
+```ts title="src/database.ts"
+import { connectToDatabase } from "@warlock.js/cascade";
+
+await connectToDatabase({
+  driver: "postgres",
+  host: "localhost",
+  database: "my_app",
+  user: "postgres",
+  password: "secret",
+  // pool options
+  max: 10,
+  min: 2,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  maxUses: 7_500,
+  application_name: "my-app",
+});
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `max` | `number` | Maximum pool connections |
+| `min` | `number` | Minimum pool connections kept alive |
+| `idleTimeoutMillis` | `number` | Time (ms) a client may sit idle before being closed |
+| `connectionTimeoutMillis` | `number` | Time (ms) to wait when acquiring a connection |
+| `maxUses` | `number` | Number of uses before a connection is retired |
+| `application_name` | `string` | Reported to PostgreSQL as the application name |
+
+---
+
+## 📊 Driver Comparison
+
+| Capability | MongoDB | PostgreSQL |
+|---|:---:|:---:|
+| CRUD operations | ✅ | ✅ |
+| Transactions | ✅ (replica set) | ✅ |
+| Query builder | ✅ | ✅ |
+| Raw SQL queries | ❌ | ✅ |
+| Schema migrations | ✅ | ✅ |
+| Auto-increment IDs | ✅ (`autoGenerateId`) | ✅ (native) |
+| Connection pool | ❌ | ✅ |
+| Atomic operations | ✅ | ✅ |
+
+:::info
+Raw SQL (`driver.query()`) is unsupported on MongoDB — it will always throw. Use the query builder or aggregation pipeline helpers instead.
+:::
+
+---
+
+## 🔍 `getDatabaseDriver()`
+
+After a successful `connectToDatabase` call you can retrieve the active driver instance anywhere in your app:
+
+```ts title="src/somewhere.ts"
+import { getDatabaseDriver } from "@warlock.js/cascade";
+
+const driver = getDatabaseDriver();
+
+console.log(driver.name);        // "mongodb" | "postgres"
+console.log(driver.isConnected); // true
+```
+
+`getDatabaseDriver` returns the typed driver from the default registered `DataSource`. Use this when you need direct access to driver-level methods (e.g. `driver.query()` for raw PostgreSQL queries, or `driver.getDatabase()` for a live MongoDB `Db` instance).
+
+:::tip
+You rarely need to call `getDatabaseDriver()` directly. Models and the query builder resolve the driver automatically through the data-source registry.
+:::
+
+---
+
+## 🌟 What's Next?
+
+- [🔌 Connecting to Database](./connecting-to-database)
+- [🛠️ Installation](./installation)
+- [🗺️ Roadmap](./roadmap)
