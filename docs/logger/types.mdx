@@ -115,7 +115,6 @@ interface BasicLogConfigurations {
     time?: string;
   };
   filter?: (data: LoggingData) => boolean;
-  context?: (data: LoggingData) => Promise<Record<string, any>>;
 }
 ```
 
@@ -125,27 +124,6 @@ interface BasicLogConfigurations {
 | `dateFormat.date` | Custom date format string applied to every log entry |
 | `dateFormat.time` | Custom time format string applied to every log entry |
 | `filter` | Predicate called before writing; return `false` to suppress the entry |
-| `context` | Async function that merges extra fields into every log entry's context |
-
-**Using `context` for async enrichment**
-
-The `context` field is particularly useful for injecting request-scoped data — such as a trace ID or authenticated user — without threading it through every call site:
-
-```ts
-import { logger, type LoggingData } from "@warlock.js/logger";
-
-logger.configure({
-  context: async (data: LoggingData) => {
-    // Return any extra fields to merge into data.context
-    return {
-      requestId: AsyncLocalStorage.getStore()?.requestId ?? "n/a",
-      env: process.env.NODE_ENV,
-    };
-  },
-});
-```
-
-The returned object is merged into the `context` of every `LogMessage` before it is handed to channels.
 
 ---
 
@@ -162,7 +140,6 @@ interface LogMessage {
   action: string;
   stack?: string;
   context?: Record<string, any>;
-  timestamp?: string;
 }
 ```
 
@@ -174,8 +151,7 @@ interface LogMessage {
 | `module` | yes | Source module identifier from the original `LoggingData` |
 | `action` | yes | Action name from the original `LoggingData` |
 | `stack` | no | Stack trace string, populated when `message` is an `Error` |
-| `context` | no | Merged context — combines caller-supplied data with `BasicLogConfigurations.context` output |
-| `timestamp` | no | ISO timestamp of when the entry was processed |
+| `context` | no | Merged context — combines caller-supplied data with channel-level enrichment |
 
 This is the type you work with when implementing a custom channel via `LogContract` or extending `LogChannel`.
 
@@ -234,7 +210,6 @@ interface Log {
 
   // Utilities
   channel(name: string): LogChannel | undefined;
-  flushSync(): void;
 }
 ```
 
@@ -245,4 +220,3 @@ interface Log {
 | `(data)` | Call `log` directly with a `LoggingData` object |
 | `log.info / debug / warn / error / success` | Shorthand methods; each accepts either an `OmittedLoggingData` object or `(module, action, message)` |
 | `log.channel(name)` | Retrieve a registered channel instance by its `name`; returns `undefined` if not found |
-| `log.flushSync()` | Synchronously drain all buffered entries across every registered channel |

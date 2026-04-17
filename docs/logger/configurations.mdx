@@ -210,14 +210,3 @@ logger.configure({
 });
 ```
 
-Retrieve a specific channel by name to inspect or flush it individually:
-
-```ts
-import { log } from "@warlock.js/logger";
-
-// Built-in channel names: "console", "file", "fileJson"
-const fileChannel = log.channel("file");
-if (fileChannel) {
-  fileChannel.flushSync?.();
-}
-```

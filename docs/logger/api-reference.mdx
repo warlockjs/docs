@@ -14,13 +14,12 @@ sidebar_position: 4
 | `configure` | `(config: { channels: LogChannel[] }): this` | Set base configuration including the initial channel list |
 | `setChannels` | `(channels: LogChannel[]): this` | Replace all currently registered channels |
 | `log` | `(data: LoggingData): Promise<this>` | Process a fully formed `LoggingData` object through all channels |
-| `debug` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at the `debug` level |
-| `info` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at the `info` level |
-| `warn` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at the `warn` level |
-| `error` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at the `error` level |
-| `success` | `(dataOrModule, action?, message?, context?): Promise<this>` | Log at the `success` level |
+| `debug` | `(dataOrModule, action?, message?): Promise<this>` | Log at the `debug` level |
+| `info` | `(dataOrModule, action?, message?): Promise<this>` | Log at the `info` level |
+| `warn` | `(dataOrModule, action?, message?): Promise<this>` | Log at the `warn` level |
+| `error` | `(dataOrModule, action?, message?): Promise<this>` | Log at the `error` level |
+| `success` | `(dataOrModule, action?, message?): Promise<this>` | Log at the `success` level |
 | `channel` | `(name: string): LogChannel \| undefined` | Find a registered channel by its `name` property |
-| `flushSync` | `(): void` | Synchronously drain buffered data in every channel that supports it |
 
 ---
 
@@ -53,7 +52,6 @@ interface Log {
   success(module: string, action: string, message: any): Promise<Logger>;
 
   channel(name: string): LogChannel | undefined;
-  flushSync(): void;
 }
 ```
 
@@ -113,7 +111,6 @@ Extend `LogChannel` (the abstract base class) when you want the built-in handlin
 | `action` | `string` | yes | Action or operation name |
 | `stack` | `string` | no | Stack trace, present when the message is an `Error` |
 | `context` | `Record<string, any>` | no | Arbitrary contextual metadata |
-| `timestamp` | `string` | no | ISO 8601 timestamp |
 
 ---
 

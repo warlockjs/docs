@@ -71,23 +71,6 @@ new ConsoleLog({
 
 `ConsoleLog` accepts the full `BasicLogConfigurations` shape: `levels`, `filter`, `dateFormat`, and `context`.
 
-### Context enrichment
-
-The `context` field on `BasicLogConfigurations` accepts an async callback that adds extra metadata to every log entry before it reaches the channel:
-
-```ts
-import { ConsoleLog } from "@warlock.js/logger";
-
-new ConsoleLog({
-  context: async (data) => ({
-    requestId: getCurrentRequestId(),
-    env: process.env.NODE_ENV,
-  }),
-});
-```
-
-The returned object is merged into the `LoggingData.context` field that your channel receives.
-
 ---
 
 ## FileLog
@@ -119,7 +102,7 @@ Error: Card declined
 ### All config options
 
 ```ts
-import { FileLog, type FileLogConfig } from "@warlock.js/logger";
+import { FileLog } from "@warlock.js/logger";
 
 new FileLog({
   /**
@@ -146,8 +129,6 @@ new FileLog({
    *   "single"  — one file for everything (e.g. app.log)
    *   "daily"   — one file per day      (e.g. 15-03-2024.log)
    *   "hourly"  — one file per hour     (e.g. 15-03-2024-10-00-00-am.log)
-   *   "monthly" — one file per month
-   *   "yearly"  — one file per year
    * @default "single"
    */
   chunk: "daily",
@@ -248,31 +229,6 @@ Adding `"action"` as a third level pushes each action into its own sub-directory
 ```ts
 groupBy: ["level", "module", "action"],
 // → storage/logs/error/payments/charge/app.log
-```
-
-### Flushing before process exit
-
-`FileLog` buffers writes in memory (up to `maxMessagesToWrite` entries, or 5 seconds, whichever comes first). Call `flushSync()` before your process exits to drain any remaining buffered messages synchronously.
-
-```ts
-import { log } from "@warlock.js/logger";
-
-// Drain all channels that support synchronous flushing
-process.on("beforeExit", () => {
-  log.flushSync();
-});
-```
-
-You can also flush a specific channel instance directly:
-
-```ts
-import { FileLog } from "@warlock.js/logger";
-
-const fileChannel = new FileLog({ storagePath: "./logs" });
-
-process.on("beforeExit", () => {
-  fileChannel.flushSync();
-});
 ```
 
 ---
@@ -429,7 +385,6 @@ export class DatabaseLog extends LogChannel {
 | `description` | `string?` | Optional human-readable description |
 | `terminal` | `boolean` | `true` if output goes to a terminal; ANSI codes are preserved. `false` (default) strips them via `clearMessage()` |
 | `log(data)` | abstract method | Implement your write/send logic here |
-| `flushSync()` | optional method | Implement if your channel buffers writes that must be drained synchronously |
 | `shouldBeLogged(data)` | protected method | Returns `false` if `data.type` is not in `levels` or if `filter` returns `false` |
 | `config(key)` | protected method | Type-safe accessor that merges provided options with channel defaults |
 | `getDateAndTimeFormat()` | protected method | Returns `{ date, time }` Day.js format strings from config |

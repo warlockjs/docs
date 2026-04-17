@@ -109,17 +109,10 @@ Both `log` and `logger` target the same underlying instance. The `log` object is
 Two utilities ship alongside the core logger:
 
 ```ts
-import { captureAnyUnhandledRejection, log } from "@warlock.js/logger";
+import { captureAnyUnhandledRejection } from "@warlock.js/logger";
 
 // Automatically log unhandledRejection and uncaughtException events
 captureAnyUnhandledRejection();
-
-// Force all buffered log entries to disk before the process exits
-process.on("beforeExit", () => {
-  log.flushSync();
-});
 ```
 
 `captureAnyUnhandledRejection()` hooks into Node.js's `unhandledRejection` and `uncaughtException` process events and routes them through `log.error()`. Both events are logged with module `"app"` — rejections under action `"unhandledRejection"`, exceptions under action `"uncaughtException"`. Call it once during app startup.
-
-`log.flushSync()` is a synchronous flush that drains the in-memory buffer of file-based channels. Use it in `beforeExit` or shutdown hooks to make sure nothing is lost when the process stops.
