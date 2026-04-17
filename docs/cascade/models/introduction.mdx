@@ -27,15 +27,10 @@ import { Model } from "@warlock.js/cascade";
 
 export class User extends Model {
     /**
-    * The table/collection name (required for all drivers)
+    * The table name — used by every driver (required)
     */
     public static table = "users";
 }
-```
-
-:::tip MongoDB alias
-When using the MongoDB driver, `collection` is accepted as an alias for `table` for convenience. The canonical, cross-driver property is always `static table`.
-:::
 
 ## 📋 Optional: Schema Validation
 

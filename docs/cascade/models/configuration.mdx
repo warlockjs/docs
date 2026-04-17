@@ -20,11 +20,7 @@ export class Post extends Model {
 
 | Property | Type | Description |
 |---|---|---|
-| `static table` | `string` | The database table/collection name. **Required.** |
-
-:::info MongoDB alias
-The MongoDB driver also accepts `static collection` as an alias for `table` for legacy compatibility. Always prefer `table` in new code — it works for both MongoDB and PostgreSQL.
-:::
+| `static table` | `string` | The database table name. **Required.** |
 
 ---
 
@@ -32,7 +28,7 @@ The MongoDB driver also accepts `static collection` as an alias for `table` for 
 
 ```ts
 export class Order extends Model {
-  public static collection = "orders";
+  public static table = "orders";
   public static primaryKey = "orderId"; // default is "id"
 }
 ```
@@ -49,7 +45,7 @@ export class Order extends Model {
 import { DataSource } from "@warlock.js/cascade";
 
 export class AnalyticsEvent extends Model {
-  public static collection = "analytics_events";
+  public static table = "analytics_events";
 
   // Use a named connection registered elsewhere in the app
   public static dataSource: string | DataSource = "analytics";
@@ -76,7 +72,7 @@ Pass a `string` to `dataSource` when you have registered multiple named connecti
 import { UserResource } from "../resources/user-resource";
 
 export class User extends Model {
-  public static collection = "users";
+  public static table = "users";
 
   // Shape JSON output through a dedicated Resource class
   public static resource = UserResource;
@@ -103,7 +99,7 @@ export class User extends Model {
 import { v } from "@warlock.js/seal";
 
 export class Product extends Model {
-  public static collection = "products";
+  public static table = "products";
 
   public static schema = v.object({
     name:  v.string().required(),
@@ -141,7 +137,7 @@ Cascade auto-generates a friendly numeric `id` alongside MongoDB's `_id`. Severa
 
 ```ts
 export class Invoice extends Model {
-  public static collection = "invoices";
+  public static table = "invoices";
 
   // Enable / disable auto-generation (default: true)
   public static autoGenerateId = true;
@@ -180,7 +176,7 @@ Cascade automatically writes `createdAt` and `updatedAt` timestamps. Set a prope
 
 ```ts
 export class AuditLog extends Model {
-  public static collection = "audit_logs";
+  public static table = "audit_logs";
 
   // Custom column names
   public static createdAtColumn = "created_at";
@@ -188,7 +184,7 @@ export class AuditLog extends Model {
 }
 
 export class Session extends Model {
-  public static collection = "sessions";
+  public static table = "sessions";
 
   // Disable updatedAt for append-only collections
   public static updatedAtColumn = false;
@@ -206,7 +202,7 @@ export class Session extends Model {
 
 ```ts
 export class Comment extends Model {
-  public static collection = "comments";
+  public static table = "comments";
 
   public static deleteStrategy: "trash" | "permanent" | "soft" = "soft";
 
@@ -242,7 +238,7 @@ Scopes are reusable query constraints. **Global scopes** apply automatically to 
 import { GlobalScopeDefinition, LocalScopeCallback } from "@warlock.js/cascade";
 
 export class Article extends Model {
-  public static collection = "articles";
+  public static table = "articles";
 
   // Applied automatically before every query
   public static globalScopes: Map<string, GlobalScopeDefinition> = new Map([
@@ -282,7 +278,7 @@ Declare all relationships the model can load in one place.
 import { hasMany, belongsTo } from "@warlock.js/cascade";
 
 export class Post extends Model {
-  public static collection = "posts";
+  public static table = "posts";
 
   public static relations: Record<string, any> = {
     author:   belongsTo(User, "authorId"),
@@ -310,14 +306,14 @@ When a model is embedded inside another document, `embed` controls which fields 
 
 ```ts
 export class User extends Model {
-  public static collection = "users";
+  public static table = "users";
 
   // These fields are written into the embedding parent document
   public static embed = ["id", "name", "avatar", "email"];
 }
 
 export class Post extends Model {
-  public static collection = "posts";
+  public static table = "posts";
 
   public static relations: Record<string, any> = {
     author: belongsTo(User, "authorId"),
