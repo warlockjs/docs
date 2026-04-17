@@ -106,9 +106,13 @@ await herald().channel("order.placed").subscribe(async (message, ctx) => {
 - Use `nack()` when you can't process it right now but might be able to later
 - Use `reject()` when the message is fundamentally invalid
 
-## reply(payload) — RPC Response
+## reply\<T\>(payload) — RPC Response
 
 Use `reply()` when you're implementing the responder side of an RPC pattern. This sends a response back to the requester.
+
+```typescript
+reply<T>(payload: T): Promise<void>
+```
 
 ```typescript title="src/services/fulfillment.service.ts"
 await herald()
@@ -127,9 +131,13 @@ await herald()
 See the [Request-Reply](/docs/herald/request-reply) page for complete RPC examples. The responder automatically calls `ack()` after your handler returns successfully.
 :::
 
-## retry() — Manual Retry
+## retry(delay?) — Manual Retry
 
-Manually trigger a retry with an incremented `retryCount`.
+Manually trigger a retry with an incremented `retryCount`. An optional `delay` in milliseconds can be passed to wait before requeueing.
+
+```typescript
+retry(delay?: number): Promise<void>
+```
 
 ```typescript title="src/services/webhook.service.ts"
 let attempts = 0;
@@ -142,8 +150,8 @@ await herald().channel("webhook.event").subscribe(async (message, ctx) => {
   } catch (err) {
     if (attempts < maxAttempts) {
       attempts++;
-      // Increment counter and requeue
-      await ctx.retry();
+      // Increment counter and requeue after 2 seconds
+      await ctx.retry(2000);
     } else {
       // Give up
       await ctx.nack(false);
@@ -160,14 +168,38 @@ Every message carries metadata about itself and its journey through the system:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `messageId` | `string` | Unique identifier for this message instance |
-| `correlationId` | `string \| undefined` | Groups related messages; used in RPC to link request-response |
-| `replyTo` | `string \| undefined` | Queue name where responses should be sent (RPC only) |
-| `priority` | `number \| undefined` | Priority level (broker-specific; higher = more urgent) |
-| `timestamp` | `Date` | When the message was published |
-| `headers` | `Record<string, any>` | Arbitrary key-value pairs set by the publisher |
-| `retryCount` | `number` | How many times this message has been retried |
-| `originalChannel` | `string \| undefined` | Original channel if this message came from a dead letter queue |
+| `messageId` | `string` | Unique message identifier |
+| `correlationId` | `string \| undefined` | Correlate related messages; used in RPC to link request and response |
+| `replyTo` | `string \| undefined` | Response routing channel (set automatically for RPC) |
+| `priority` | `number \| undefined` | Message processing priority |
+| `timestamp` | `Date` | Message creation timestamp |
+| `headers` | `Record<string, string> \| undefined` | Custom metadata headers |
+| `retryCount` | `number \| undefined` | Delivery attempt counter |
+| `originalChannel` | `string \| undefined` | Dead-letter original channel |
+
+## Message\<TPayload\> Reference
+
+`Message<TPayload>` is the object your handler receives. It wraps the broker payload with typed metadata and, optionally, the broker-native message object.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `metadata` | `MessageMetadata` | Routing and identification metadata (see table above) |
+| `payload` | `TPayload` | Generic message body typed by the channel's payload type |
+| `raw` | `unknown \| undefined` | Broker-native message object (e.g. the `amqplib` message for RabbitMQ) |
+
+All three fields are `readonly` — do not mutate the message object inside your handler.
+
+## MessageContext Reference
+
+`MessageContext` is the control object passed as the second argument to every handler. All operations return a `Promise<void>`.
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `ack` | `(): Promise<void>` | Acknowledge successful processing |
+| `nack` | `(requeue?: boolean): Promise<void>` | Reject with optional requeue |
+| `reject` | `(): Promise<void>` | Reject without requeue (semantic alias for `nack(false)`) |
+| `reply` | `<T>(payload: T): Promise<void>` | Send reply to requester (RPC pattern) |
+| `retry` | `(delay?: number): Promise<void>` | Increment retry counter and requeue, with optional delay in ms |
 
 ### Using Metadata for Idempotency
 

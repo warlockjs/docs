@@ -1,0 +1,296 @@
+---
+sidebar_position: 7
+title: Health Checks & Lifecycle
+description: Verify broker connection liveness, guard publishes with isConnected, and shut down gracefully with startConsuming and stopConsuming
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+A message broker is a long-lived network dependency. Herald gives you first-class tools to **verify it is alive**, **guard against publishing to a dead connection**, and **cleanly stop consuming messages** before your process exits.
+
+## `broker.healthCheck()`
+
+`healthCheck()` asks the underlying driver whether the connection is live and responsive. It returns a `HealthCheckResult` object that tells you the status at a glance.
+
+### `HealthCheckResult` shape
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `healthy` | `boolean` | `true` when the broker is reachable and responding |
+| `latency` | `number` _(optional)_ | Round-trip time in milliseconds measured during the check |
+| `error` | `string` _(optional)_ | Human-readable error message when `healthy` is `false` |
+| `details` | `Record<string, unknown>` _(optional)_ | Additional driver-specific metadata |
+
+### Checking health and logging the result
+
+```typescript title="src/diagnostics/broker-health.ts"
+import { herald } from "@warlock.js/herald";
+import type { HealthCheckResult } from "@warlock.js/herald";
+
+async function checkBrokerHealth(): Promise<void> {
+  const broker = herald();
+
+  const result: HealthCheckResult = await broker.healthCheck();
+
+  if (result.healthy) {
+    console.log(
+      `Broker "${broker.name}" is healthy` +
+        (result.latency !== undefined ? ` (${result.latency}ms)` : "")
+    );
+  } else {
+    console.error(
+      `Broker "${broker.name}" is unhealthy: ${result.error ?? "unknown error"}`
+    );
+  }
+}
+```
+
+### Periodic health monitoring
+
+You can run `healthCheck()` on a schedule to surface degraded connections early:
+
+```typescript title="src/diagnostics/health-monitor.ts"
+import { herald } from "@warlock.js/herald";
+
+function startHealthMonitor(intervalMs = 30_000): NodeJS.Timeout {
+  return setInterval(async () => {
+    const result = await herald().healthCheck();
+
+    if (!result.healthy) {
+      console.error("Herald health check failed:", result.error);
+      // Trigger alerts, metrics, or reconnection logic here
+    }
+  }, intervalMs);
+}
+```
+
+:::tip
+Expose `healthCheck()` behind an HTTP `/health` endpoint so your orchestrator (Kubernetes, ECS, etc.) can route traffic away from an unhealthy pod before your users notice.
+:::
+
+---
+
+## `broker.isConnected`
+
+`isConnected` is a synchronous boolean getter that reflects the driver's current connection state. Use it as a lightweight guard before performing operations that require an active connection.
+
+```typescript
+import { herald } from "@warlock.js/herald";
+
+const broker = herald();
+
+if (broker.isConnected) {
+  await broker.publish(event);
+} else {
+  console.warn("Broker is not connected — skipping publish");
+}
+```
+
+### Guard before publishing
+
+A common pattern is to check `isConnected` at the start of any method that publishes, so you get a clear, intentional error instead of a silent failure or an obscure driver exception:
+
+```typescript title="src/services/NotificationService.ts"
+import { herald } from "@warlock.js/herald";
+import type { EventMessage } from "@warlock.js/herald";
+
+export class NotificationService {
+  async sendNotification<TPayload>(event: EventMessage<TPayload>): Promise<void> {
+    const broker = herald();
+
+    if (!broker.isConnected) {
+      throw new Error(
+        `Cannot publish — broker "${broker.name}" is not connected`
+      );
+    }
+
+    await broker.publish(event);
+  }
+}
+```
+
+:::note
+`isConnected` reflects the driver's internal connection flag. It is updated synchronously as the driver detects connect and disconnect events. For a confirmed round-trip liveness test, use `healthCheck()` instead.
+:::
+
+---
+
+## `broker.startConsuming()` and `broker.stopConsuming()`
+
+These two methods control the **message consumption lifecycle** of the broker. They delegate directly to the underlying driver.
+
+| Method | What it does |
+|--------|--------------|
+| `startConsuming()` | Instructs the driver to begin pulling or subscribing to incoming messages and routing them to registered consumers |
+| `stopConsuming()` | Instructs the driver to stop accepting new messages. In-flight messages already dispatched to consumers continue to completion |
+
+### When to call them
+
+- Call `startConsuming()` **after** your consumers are registered and the broker is connected. This ensures no messages arrive before your handlers are ready.
+- Call `stopConsuming()` **before** disconnecting, so the driver has a chance to drain in-flight work cleanly.
+
+```typescript title="src/main.ts"
+import { connectToBroker } from "@warlock.js/herald";
+import { OrderPlacedConsumer } from "./consumers/OrderPlacedConsumer";
+
+async function main() {
+  const broker = await connectToBroker({
+    driver: "rabbitmq",
+    host: process.env.MESSAGE_BROKER_HOST || "localhost",
+    port: parseInt(process.env.MESSAGE_BROKER_PORT || "5672"),
+  });
+
+  // Register consumers before starting consumption
+  broker.subscribe(OrderPlacedConsumer);
+
+  // Now tell the driver to start routing messages
+  await broker.startConsuming();
+
+  console.log(`Broker "${broker.name}" is consuming messages`);
+}
+
+main().catch(console.error);
+```
+
+---
+
+## Graceful Shutdown
+
+Combining `stopConsuming()` and `disconnect()` gives you a clean, ordered shutdown that avoids dropped messages and resource leaks. Hook into Node's process signals to trigger it automatically.
+
+### SIGTERM handler
+
+```typescript title="src/main.ts"
+import { connectToBroker } from "@warlock.js/herald";
+import { OrderPlacedConsumer } from "./consumers/OrderPlacedConsumer";
+
+async function main() {
+  const broker = await connectToBroker({
+    driver: "rabbitmq",
+    host: process.env.MESSAGE_BROKER_HOST || "localhost",
+    port: parseInt(process.env.MESSAGE_BROKER_PORT || "5672"),
+  });
+
+  broker.subscribe(OrderPlacedConsumer);
+  await broker.startConsuming();
+
+  console.log("Application ready");
+
+  // Graceful shutdown on SIGTERM (sent by Docker, Kubernetes, etc.)
+  process.on("SIGTERM", async () => {
+    console.log("SIGTERM received — shutting down gracefully");
+
+    await broker.stopConsuming();
+    await broker.disconnect();
+
+    process.exit(0);
+  });
+}
+
+main().catch(console.error);
+```
+
+### Handling both SIGTERM and SIGINT
+
+In development you typically stop a process with `Ctrl+C` (SIGINT). Wire both signals to the same handler so shutdown is consistent in every environment:
+
+```typescript title="src/main.ts"
+import { connectToBroker } from "@warlock.js/herald";
+
+async function main() {
+  const broker = await connectToBroker({
+    driver: "rabbitmq",
+    host: process.env.MESSAGE_BROKER_HOST || "localhost",
+    port: parseInt(process.env.MESSAGE_BROKER_PORT || "5672"),
+  });
+
+  await broker.startConsuming();
+
+  async function shutdown(signal: string): Promise<void> {
+    console.log(`${signal} received — shutting down`);
+
+    await broker.stopConsuming();
+    await broker.disconnect();
+
+    process.exit(0);
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+}
+
+main().catch(console.error);
+```
+
+### Complete production startup pattern
+
+Here is a full example combining startup, health monitoring, and graceful shutdown:
+
+```typescript title="src/main.ts"
+import { connectToBroker, herald } from "@warlock.js/herald";
+import { OrderPlacedConsumer } from "./consumers/OrderPlacedConsumer";
+
+async function main() {
+  // 1. Connect
+  const broker = await connectToBroker({
+    driver: "rabbitmq",
+    host: process.env.MESSAGE_BROKER_HOST || "localhost",
+    port: parseInt(process.env.MESSAGE_BROKER_PORT || "5672"),
+    username: process.env.MESSAGE_BROKER_USERNAME || "guest",
+    password: process.env.MESSAGE_BROKER_PASSWORD || "guest",
+  });
+
+  // 2. Verify the connection is alive before proceeding
+  const health = await broker.healthCheck();
+  if (!health.healthy) {
+    console.error("Initial health check failed:", health.error);
+    process.exit(1);
+  }
+  console.log(`Broker healthy (latency: ${health.latency}ms)`);
+
+  // 3. Register consumers and begin consuming
+  broker.subscribe(OrderPlacedConsumer);
+  await broker.startConsuming();
+  console.log("Consuming messages");
+
+  // 4. Periodic health monitoring
+  const healthTimer = setInterval(async () => {
+    const result = await herald().healthCheck();
+    if (!result.healthy) {
+      console.error("Broker health check failed:", result.error);
+    }
+  }, 30_000);
+
+  // 5. Graceful shutdown
+  async function shutdown(signal: string): Promise<void> {
+    console.log(`${signal} received — shutting down gracefully`);
+    clearInterval(healthTimer);
+
+    await broker.stopConsuming();
+    await broker.disconnect();
+
+    process.exit(0);
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+}
+
+main().catch((error) => {
+  console.error("Failed to start application:", error);
+  process.exit(1);
+});
+```
+
+:::tip
+In Kubernetes, SIGTERM is sent when a pod is evicted or updated. Set `terminationGracePeriodSeconds` in your pod spec to a value that gives your consumers enough time to drain — typically 15–30 seconds.
+:::
+
+---
+
+## Up next
+
+- **[Connecting to a Broker](./connecting.mdx)** — Set up and register your broker instance
+- **[Broker Events](./broker-events.mdx)** — Listen for `connected`, `disconnected`, `error`, and `reconnecting` events
+- **[Publishing Events](./publishing.mdx)** — Publish events through channels

@@ -40,10 +40,10 @@ interface OrderPayload {
 const channel = herald().channel<OrderPayload>("order.placed");
 
 // ✅ Valid — matches the type
-channel.publish({ orderId: 1, customerId: "user-123", total: 99.99, items: [] });
+await channel.publish({ orderId: 1, customerId: "user-123", total: 99.99, items: [] });
 
 // ❌ TypeScript error — missing required fields
-channel.publish({ orderId: 1 });
+await channel.publish({ orderId: 1 });
 ```
 
 ## `heraldChannel()` Shorthand vs `herald().channel()`
@@ -82,7 +82,7 @@ class OrderService {
     // These all get the same cached channel instance
     const channel = herald().channel<OrderPayload>("order.placed");
     
-    channel.publish({ orderId: order.id, customerId: order.customerId, total: order.total, items: order.items });
+    await channel.publish({ orderId: order.id, customerId: order.customerId, total: order.total, items: order.items });
   }
 }
 
@@ -203,7 +203,7 @@ Use `channel.stats()` to inspect the channel's current state:
 ```typescript title="src/admin/ChannelMonitor.ts"
 import { orderPlacedChannel } from "@/config/channels";
 
-const stats = orderPlacedChannel.stats();
+const stats = await orderPlacedChannel.stats();
 
 console.log(stats);
 // {
@@ -212,6 +212,14 @@ console.log(stats);
 //   consumerCount: 3         // Active subscribers
 // }
 ```
+
+### `ChannelStats` Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `messageCount` | `number` | Current queued messages |
+| `consumerCount` | `number` | Active consumer subscriptions |
+| `name` | `string` | Channel or queue identifier |
 
 This is useful for monitoring, debugging, and ensuring your channels are being consumed properly:
 
@@ -224,7 +232,7 @@ export async function checkChannelHealth() {
   ];
 
   for (const channel of channels) {
-    const stats = channel.stats();
+    const stats = await channel.stats();
     
     // Alert if messages are piling up
     if (stats.messageCount > 1000) {
@@ -241,20 +249,22 @@ export async function checkChannelHealth() {
 
 ## Closing Channels
 
-Channels can be explicitly closed with `channel.close()`. This is useful for cleanup, testing, or when a channel is no longer needed.
+Depending on your intent, Herald provides two distinct methods to stop channel activity:
+
+- **`channel.stopConsuming()`** — cancels all active subscriptions gracefully, but leaves the queue/topic intact so new messages can still be published and consumers can re-subscribe later.
+- **`channel.delete()`** — removes the queue/topic entirely from the broker. Use with caution — all pending messages are lost.
 
 ```typescript title="src/services/OrderService.ts"
-// Close a channel when done with it
-orderPlacedChannel.close();
+// Stop all consumers on the channel (queue remains intact)
+await orderPlacedChannel.stopConsuming();
 
-// After closing, subscriptions are cancelled and no new messages can be published
-// (attempting to publish will throw an error)
+// Remove the queue/topic entirely from the broker
+await orderPlacedChannel.delete();
 ```
 
-:::info When to Close Channels
-- **Testing**: clean up channels between test suites
-- **Graceful shutdown**: close channels when your application is shutting down
-- **Resource cleanup**: for temporary or short-lived channels
+:::info When to Use Each
+- **`stopConsuming()`** — graceful shutdown, pausing consumption during deploys, or stopping listeners in tests without destroying the queue
+- **`delete()`** — permanent teardown of temporary or short-lived channels, or cleaning up test queues between suites
 - **Rarely needed** in production — let your broker manage channel lifecycle
 :::
 

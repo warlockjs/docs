@@ -131,6 +131,74 @@ export class OrderNotificationConsumer extends EventConsumer<OrderPayload> {
 If validation fails, **handle() is NOT called**. The message is nacked and goes to the dead letter queue (if configured). This prevents invalid data from being processed.
 :::
 
+## EventConsumer Static Members
+
+Every `EventConsumer` subclass carries a set of static members that Herald reads to wire up routing, versioning, and identity. These are part of the `EventConsumerClass` contract defined in `types`.
+
+| Member | Type | Required | Description |
+|--------|------|----------|-------------|
+| `eventName` | `string` | Yes | The event channel this consumer subscribes to. Herald reads this at registration time. |
+| `consumerId` | `string` | No | A stable identifier for this consumer. Auto-generated as a lazy UUID on first access if not overridden. |
+| `minVersion` | `number` | No | Minimum accepted event version (inclusive). Events below this version are skipped. |
+| `maxVersion` | `number` | No | Maximum accepted event version (inclusive). Events above this version are skipped. |
+| `isAcceptedVersion(version)` | `boolean` | — | Checks whether a given version falls within `[minVersion, maxVersion]`. Called by Herald before invoking `handle()`. |
+
+### consumerId — Lazy UUID and Stability Guarantee
+
+When you do not override `consumerId`, Herald generates a UUID on the first access via the static getter and caches it on the class (`_consumerId`). This means:
+
+- The ID is **stable within a single process lifetime** — every call within the same run returns the same value.
+- The ID is **regenerated on every restart** — a new UUID is produced because `_consumerId` is not persisted.
+
+:::warning
+Do not use the auto-generated `consumerId` for deduplication across restarts. Because it changes on each process start, Herald cannot correlate a restarted consumer with its previous queue position using the generated value alone. Always set an explicit `consumerId` string when cross-restart identity matters.
+:::
+
+### isAcceptedVersion(version)
+
+`isAcceptedVersion` is a static method on `EventConsumer` that evaluates both bounds:
+
+```typescript
+// Pseudocode of the check Herald performs before calling handle():
+if (!ConsumerClass.isAcceptedVersion(event.version)) {
+  // message is skipped — handle() is never called
+  return;
+}
+```
+
+Neither bound is required. Omitting `minVersion` removes the lower bound; omitting `maxVersion` removes the upper bound. Omitting both means all versions are accepted.
+
+### Version-Gating Example
+
+Use `minVersion` and `maxVersion` together to pin a consumer to a specific range of schema versions:
+
+```typescript
+import { EventConsumer, ConsumedEventMessage } from "@warlock.js/herald";
+
+interface UserPayload {
+  userId: string;
+  email: string;
+  displayName: string; // added in v2
+}
+
+export class UserCreatedConsumer extends EventConsumer<UserPayload> {
+  public static eventName = "user.created";
+  public static minVersion = 2;
+  public static maxVersion = 3;
+
+  public async handle(payload: UserPayload, event: ConsumedEventMessage) {
+    // Only called for events with version 2 or 3
+    await context.ack();
+  }
+}
+```
+
+Herald calls `UserCreatedConsumer.isAcceptedVersion(event.version)` before dispatching. Events at version 1 or version 4+ are silently skipped — `handle()` is never invoked for them.
+
+:::tip
+Run a V1 consumer (`maxVersion = 1`) and a V2 consumer (`minVersion = 2`) in parallel during a migration window. Each processes only the events it understands, with no coordination required between them.
+:::
+
 ## Version Filtering
 
 Use `minVersion` and `maxVersion` static properties to filter events by version. This is essential for handling schema migrations without downtime.

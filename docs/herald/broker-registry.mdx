@@ -1,0 +1,288 @@
+---
+sidebar_position: 6
+title: Broker Registry
+description: Understand the brokerRegistry singleton and BrokerRegistry class for managing all named broker instances
+---
+
+Every broker you connect lives in one central place — the `brokerRegistry` singleton. It is the source of truth for all registered brokers in your application. Under the hood, `connectToBroker()` calls it automatically, but you can also work with it directly for advanced use cases like testing, health checks, or runtime broker introspection.
+
+## What is `brokerRegistry`?
+
+`brokerRegistry` is the global singleton instance of the internal `BrokerRegistry` class. It maintains a map of all named `Broker` instances and exposes methods to register, look up, and observe them.
+
+```typescript
+import { brokerRegistry } from "@warlock.js/herald";
+```
+
+You do not need to instantiate anything — `brokerRegistry` is ready to use as soon as you import it.
+
+## Registration
+
+### `brokerRegistry.register(options: BrokerOptions): Broker`
+
+Registers a new broker instance from a `BrokerOptions` object and returns the created `Broker`. It also emits the `"registered"` event (and `"default-registered"` if `isDefault` is `true`), and forwards driver-level connection events back through the registry.
+
+```typescript
+import { brokerRegistry } from "@warlock.js/herald";
+
+const broker = brokerRegistry.register({
+  driver: "rabbitmq",
+  name: "orders",
+  isDefault: true,
+  host: "localhost",
+  port: 5672,
+});
+```
+
+:::note
+In practice you will almost never call `register()` directly. `connectToBroker()` calls it internally after establishing the connection. Direct use is intended for advanced scenarios such as pre-registering a broker instance before connecting, or writing custom bootstrap logic.
+:::
+
+## Lookup methods
+
+### `brokerRegistry.get(name?: string): Broker`
+
+Returns the broker registered under the given name. If `name` is omitted, it returns the default broker.
+
+Throws `MissingBrokerError` if no broker with that name exists.
+
+```typescript
+import { brokerRegistry } from "@warlock.js/herald";
+
+// Get a named broker
+const orders = brokerRegistry.get("orders");
+
+// Get the default broker (name omitted)
+const defaultBroker = brokerRegistry.get();
+```
+
+---
+
+### `brokerRegistry.has(name: string): boolean`
+
+Returns `true` if a broker with the given name is registered, `false` otherwise.
+
+```typescript
+if (brokerRegistry.has("analytics")) {
+  console.log("Analytics broker is available");
+}
+```
+
+---
+
+### `brokerRegistry.hasAny(): boolean`
+
+Returns `true` if at least one broker has been registered, regardless of name.
+
+```typescript
+if (!brokerRegistry.hasAny()) {
+  throw new Error("No brokers connected — did you call connectToBroker()?");
+}
+```
+
+---
+
+### `brokerRegistry.getAll(): Broker[]`
+
+Returns an array of all registered `Broker` instances.
+
+```typescript
+const brokers = brokerRegistry.getAll();
+
+for (const broker of brokers) {
+  console.log(`${broker.name} (default: ${broker.isDefault})`);
+}
+```
+
+---
+
+### `brokerRegistry.getNames(): string[]`
+
+Returns an array of all registered broker names.
+
+```typescript
+const names = brokerRegistry.getNames();
+// e.g. ["orders", "analytics", "notifications"]
+console.log("Connected brokers:", names.join(", "));
+```
+
+---
+
+### `brokerRegistry.getDefault(): Broker | undefined`
+
+Returns the default broker if one has been registered, or `undefined` if none has been marked as default.
+
+```typescript
+const defaultBroker = brokerRegistry.getDefault();
+
+if (defaultBroker) {
+  console.log(`Default broker: ${defaultBroker.name}`);
+} else {
+  console.warn("No default broker set");
+}
+```
+
+## `MissingBrokerError`
+
+`brokerRegistry.get()` throws a `MissingBrokerError` when it cannot find the requested broker. The error carries an optional `brokerName` field so you can identify exactly which name was missing.
+
+```typescript
+class MissingBrokerError extends Error {
+  public readonly brokerName?: string;
+  constructor(message: string, brokerName?: string);
+}
+```
+
+### Catching the error
+
+```typescript
+import { brokerRegistry, MissingBrokerError } from "@warlock.js/herald";
+
+try {
+  const broker = brokerRegistry.get("payments");
+} catch (error) {
+  if (error instanceof MissingBrokerError) {
+    console.error(
+      `Broker not found: "${error.brokerName}". ` +
+        `Registered brokers: ${brokerRegistry.getNames().join(", ")}`
+    );
+  } else {
+    throw error;
+  }
+}
+```
+
+Use `brokerRegistry.has()` when you want to avoid the exception entirely:
+
+```typescript
+const brokerName = "payments";
+
+if (brokerRegistry.has(brokerName)) {
+  const broker = brokerRegistry.get(brokerName);
+  // safe to use
+}
+```
+
+## Event methods
+
+`brokerRegistry` is an event emitter. You can subscribe to lifecycle events to react when brokers are registered or their connection state changes.
+
+### Event types
+
+| Event | `BrokerRegistryEvent` value | When it fires |
+|---|---|---|
+| Broker registered | `"registered"` | A broker is added to the registry |
+| Default broker set | `"default-registered"` | A broker with `isDefault: true` is registered |
+| Connection established | `"connected"` | A broker's driver connects successfully |
+| Connection closed | `"disconnected"` | A broker's driver disconnects |
+
+Every listener receives the relevant `Broker` instance as its only argument (`BrokerRegistryListener`: `(broker: Broker) => void`).
+
+### `brokerRegistry.on(event, listener)`
+
+Subscribes to a registry event. The listener is called every time the event fires.
+
+```typescript
+import { brokerRegistry } from "@warlock.js/herald";
+
+brokerRegistry.on("registered", (broker) => {
+  console.log(`Broker registered: ${broker.name}`);
+});
+
+brokerRegistry.on("default-registered", (broker) => {
+  console.log(`Default broker set: ${broker.name}`);
+});
+
+brokerRegistry.on("connected", (broker) => {
+  console.log(`Broker connected: ${broker.name}`);
+});
+
+brokerRegistry.on("disconnected", (broker) => {
+  console.warn(`Broker disconnected: ${broker.name}`);
+});
+```
+
+### `brokerRegistry.once(event, listener)`
+
+Subscribes to a registry event, but removes the listener automatically after the first invocation.
+
+```typescript
+brokerRegistry.once("connected", (broker) => {
+  console.log(`First broker to connect: ${broker.name}`);
+});
+```
+
+### `brokerRegistry.off(event, listener)`
+
+Removes a previously registered listener.
+
+```typescript
+function onConnected(broker) {
+  console.log(`Connected: ${broker.name}`);
+}
+
+brokerRegistry.on("connected", onConnected);
+
+// Later, stop listening
+brokerRegistry.off("connected", onConnected);
+```
+
+### Logging all lifecycle events
+
+```typescript
+import { brokerRegistry, BrokerRegistryEvent } from "@warlock.js/herald";
+
+const events: BrokerRegistryEvent[] = [
+  "registered",
+  "default-registered",
+  "connected",
+  "disconnected",
+];
+
+for (const event of events) {
+  brokerRegistry.on(event, (broker) => {
+    console.log(`[brokerRegistry] ${event}: ${broker.name}`);
+  });
+}
+```
+
+## `brokerRegistry.clear()`
+
+Removes all registered brokers and resets the default. This is primarily useful in test suites where each test needs to start from a clean slate.
+
+```typescript
+brokerRegistry.clear();
+```
+
+### Test setup example
+
+```typescript
+import { brokerRegistry, connectToBroker } from "@warlock.js/herald";
+
+beforeEach(async () => {
+  // Start fresh so brokers from one test don't leak into the next
+  brokerRegistry.clear();
+
+  await connectToBroker({
+    driver: "in-memory",
+    name: "test",
+    isDefault: true,
+  });
+});
+
+afterEach(() => {
+  brokerRegistry.clear();
+});
+```
+
+:::caution
+`clear()` does not disconnect any underlying drivers — it only removes the broker references from the registry. If your driver holds open connections, close them before calling `clear()` to avoid resource leaks.
+:::
+
+---
+
+## Up next
+
+- **[Managing Multiple Brokers](./multiple-brokers.mdx)** — Register and use several brokers side by side
+- **[Broker Events](./broker-events.mdx)** — Listen for connection and error events on individual brokers
+- **[Error Handling](./error-handling.mdx)** — Handle `MissingBrokerError` and other failures gracefully

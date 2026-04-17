@@ -6,6 +6,17 @@ description: Monitor connection status, detect errors, and implement health chec
 
 Herald emits events at two levels: **registry level** (global, across all brokers) and **driver level** (per individual broker). Understanding these events is critical for monitoring, logging, and graceful error handling.
 
+## `BrokerRegistryEvent`
+
+`BrokerRegistryEvent` is the union type for all lifecycle events that `brokerRegistry` can emit. Every listener registered via `brokerRegistry.on()`, `brokerRegistry.once()`, or `brokerRegistry.off()` uses the `BrokerRegistryListener` callback signature `(broker: Broker) => void`.
+
+| Event | When it fires |
+|---|---|
+| `"registered"` | Any broker is registered via `brokerRegistry.register()` |
+| `"default-registered"` | A broker is registered as the default |
+| `"connected"` | Forwarded from the driver when a broker connects |
+| `"disconnected"` | Forwarded from the driver when a broker disconnects |
+
 ## Registry events
 
 The global `brokerRegistry` emits events whenever brokers are registered or their connection status changes:
@@ -15,23 +26,59 @@ import { brokerRegistry } from "@warlock.js/herald";
 
 // Fires when a broker is registered (before connection)
 brokerRegistry.on("registered", (broker) => {
-  console.log(`Broker registered: ${broker.name}`);
+  console.log(`Broker "${broker.name}" registered`);
 });
 
 // Fires when a broker becomes the default
 brokerRegistry.on("default-registered", (broker) => {
-  console.log(`Default broker set: ${broker.name}`);
+  console.log(`Default broker set to "${broker.name}"`);
 });
 
 // Fires when a broker successfully connects
 brokerRegistry.on("connected", (broker) => {
-  console.log(`Broker connected: ${broker.name}`);
+  console.log(`Broker "${broker.name}" connected`);
 });
 
 // Fires when a broker disconnects
 brokerRegistry.on("disconnected", (broker) => {
-  console.log(`Broker disconnected: ${broker.name}`);
+  console.log(`Broker "${broker.name}" disconnected`);
 });
+```
+
+### One-time listeners with `once()`
+
+Use `brokerRegistry.once()` when you only need to react to an event the first time it fires — for example, performing initialization work the first time any broker connects:
+
+```typescript
+import { brokerRegistry } from "@warlock.js/herald";
+
+// Runs only the first time any broker connects
+brokerRegistry.once("connected", (broker) => {
+  console.log(`First broker connected: "${broker.name}". Starting consumers...`);
+});
+
+// Runs only the first time a default broker is registered
+brokerRegistry.once("default-registered", (broker) => {
+  console.log(`Default broker is "${broker.name}"`);
+});
+```
+
+### Removing listeners with `off()`
+
+Use `brokerRegistry.off()` to remove a previously registered listener. You must hold a reference to the original function:
+
+```typescript
+import { brokerRegistry } from "@warlock.js/herald";
+
+function onBrokerRegistered(broker) {
+  console.log(`Broker "${broker.name}" registered`);
+}
+
+// Subscribe
+brokerRegistry.on("registered", onBrokerRegistered);
+
+// Later — unsubscribe
+brokerRegistry.off("registered", onBrokerRegistered);
 ```
 
 Registry events fire **before driver events** during the connection lifecycle. When you call `connectToBroker()`:

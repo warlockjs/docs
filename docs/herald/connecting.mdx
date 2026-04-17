@@ -38,7 +38,7 @@ async function main() {
 
   // Now you can use herald() anywhere
   const channel = herald().channel("orders");
-  await channel.publish("order.placed", { orderId: 123 });
+  await channel.publish({ orderId: 123 });
 }
 
 main().catch(console.error);
@@ -60,7 +60,7 @@ export class OrderService {
 
     // Get the broker and publish an event
     const channel = herald().channel("orders");
-    await channel.publish("order.placed", { orderId: order.id });
+    await channel.publish({ orderId: order.id });
 
     return order;
   }
@@ -80,7 +80,7 @@ import { heraldChannel } from "@warlock.js/herald";
 // herald().channel("orders").publish(...)
 
 // Use:
-heraldChannel("orders").publish("order.placed", { orderId: 123 });
+heraldChannel("orders").publish({ orderId: 123 });
 ```
 
 **When to use it:** `heraldChannel()` is great for one-off publishes or when you don't need to hold a reference to the channel. For consuming events or repeated publishes, get the channel once with `herald().channel()` and store it.
@@ -240,7 +240,7 @@ app.post("/api/orders", async (req, res) => {
 
     // Publish order.placed event
     const ordersChannel = herald().channel("orders");
-    await ordersChannel.publish("order.placed", {
+    await ordersChannel.publish({
       orderId: order.id,
       userId: order.userId,
       total: order.total,

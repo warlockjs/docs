@@ -448,6 +448,93 @@ export class PaymentProcessorConsumer extends EventConsumer<PaymentPayload> {
 }
 ```
 
+## ConsumedEventMessage Fields
+
+Every consumer `handle()` method receives a `ConsumedEventMessage` as its second parameter. This envelope carries the event-level fields alongside the broker's raw message:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `messageId` | `string` | Unique message identifier |
+| `eventName` | `string` | Name of the event |
+| `payload` | `Record<string, any>` | Event-specific data |
+| `message` | `Message<any>` | Original broker message (contains `metadata` and `raw`) |
+| `version` | `number \| undefined` | Optional event schema version |
+| `occurredAt` | `Date \| undefined` | Optional event occurrence timestamp |
+| `metadata` | `Record<string, any> \| undefined` | Optional event metadata dictionary (includes `retryCount`, `headers`, etc.) |
+
+```typescript title="Accessing ConsumedEventMessage fields in a handler"
+import { EventConsumer, ConsumedEventMessage } from "@warlock.js/herald";
+
+export class OrderConsumer extends EventConsumer<OrderPayload> {
+  public static eventName = "order.placed";
+
+  public async handle(payload: OrderPayload, event: ConsumedEventMessage) {
+    // Core identifiers
+    console.log(event.messageId);   // e.g. "msg_01HXYZ..."
+    console.log(event.eventName);   // "order.placed"
+
+    // Event versioning (set by the publisher)
+    if (event.version && event.version > 2) {
+      // Handle newer schema
+    }
+
+    // When the event occurred on the publisher side
+    const lag = Date.now() - (event.occurredAt?.getTime() ?? Date.now());
+
+    // Retry tracking (populated by Herald's retry logic)
+    const attempt = event.metadata?.retryCount ?? 0;
+
+    // Original broker message — access low-level broker metadata
+    const traceId = event.message.metadata.headers?.traceId;
+  }
+}
+```
+
+:::note
+`event.metadata` here is Herald's event-level metadata bag. The underlying broker metadata (correlation IDs, broker headers, retry count) lives on `event.message.metadata`, which is a [`MessageMetadata`](/docs/herald/consuming#message-metadata) object.
+:::
+
+## subscribeConsumer() and Unsubscribing
+
+`subscribeConsumer(Consumer: EventConsumerClass): Promise<() => void>` registers a consumer class with the default broker and returns a synchronous **unsubscribe function**. Call it when the consumer is no longer needed to stop receiving messages.
+
+```typescript
+import { subscribeConsumer } from "@warlock.js/herald";
+import { UserCreatedConsumer } from "./consumers/user-created.consumer";
+
+// Subscribe and store the unsubscribe function
+const unsubscribe = await subscribeConsumer(UserCreatedConsumer);
+
+// Later, unsubscribe when no longer needed
+unsubscribe();
+```
+
+A common pattern is to unsubscribe on application shutdown:
+
+```typescript title="src/main.ts"
+import { subscribeConsumer } from "@warlock.js/herald";
+import { OrderConsumer } from "./consumers/order.consumer";
+import { PaymentConsumer } from "./consumers/payment.consumer";
+
+async function main() {
+  const unsubscribeOrder = await subscribeConsumer(OrderConsumer);
+  const unsubscribePayment = await subscribeConsumer(PaymentConsumer);
+
+  // Graceful shutdown
+  process.on("SIGTERM", () => {
+    unsubscribeOrder();
+    unsubscribePayment();
+    process.exit(0);
+  });
+}
+
+main();
+```
+
+:::tip
+When using the `@Consumable` decorator and auto-registration, Herald manages subscriptions for you. Manual `subscribeConsumer()` calls (and therefore manual unsubscribing) are only needed when you register consumers programmatically.
+:::
+
 ## Combining Options: Reference Table
 
 | Scenario | Options |

@@ -1,0 +1,352 @@
+---
+sidebar_position: 8
+title: Channel Lifecycle & Management
+description: Manage channel lifecycle with batch publishing, queue inspection, graceful shutdown, and safe teardown methods
+---
+
+# Channel Lifecycle & Management
+
+Beyond publishing and subscribing, `ChannelContract` exposes a set of management methods that let you inspect queue state, bulk-publish messages, gracefully stop consumers, and safely tear down channels when they are no longer needed.
+
+These methods are available on every channel instance regardless of the underlying broker.
+
+## Batch Publishing
+
+### `publishBatch(messages, options?)`
+
+```typescript
+publishBatch(messages: TPayload[], options?: PublishOptions): Promise<void>
+```
+
+Publishes an array of messages to the channel in a single call. Use `publishBatch` when you need to emit multiple related events at once — it avoids the overhead of calling `publish` in a loop and lets the broker optimise the delivery.
+
+```typescript title="src/orders/OrderService.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+interface OrderPlacedPayload {
+  orderId: number;
+  customerId: string;
+  total: number;
+}
+
+const orderChannel = heraldChannel<OrderPlacedPayload>("order.placed");
+
+// Publish a batch after importing orders from a CSV upload
+const importedOrders: OrderPlacedPayload[] = [
+  { orderId: 1001, customerId: "user-001", total: 59.99 },
+  { orderId: 1002, customerId: "user-002", total: 129.50 },
+  { orderId: 1003, customerId: "user-003", total: 14.00 },
+];
+
+await orderChannel.publishBatch(importedOrders);
+```
+
+You can pass the same `PublishOptions` you would use with a single `publish` call:
+
+```typescript title="src/sync/InventorySync.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+interface InventoryUpdatedPayload {
+  sku: string;
+  quantity: number;
+  change: number;
+  reason: "order" | "restock" | "adjustment";
+}
+
+const inventoryChannel = heraldChannel<InventoryUpdatedPayload>("inventory.updated");
+
+const updates: InventoryUpdatedPayload[] = pendingAdjustments.map((adj) => ({
+  sku: adj.sku,
+  quantity: adj.newQty,
+  change: adj.delta,
+  reason: "adjustment",
+}));
+
+// Deliver with a custom expiry so stale sync messages are discarded
+await inventoryChannel.publishBatch(updates, { expiration: 30_000 });
+```
+
+## Queue Metrics
+
+### `stats()`
+
+```typescript
+stats(): Promise<ChannelStats>
+```
+
+Returns a snapshot of the channel's current runtime metrics. The resolved value is a `ChannelStats` object:
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `string` | Channel or queue identifier |
+| `messageCount` | `number` | Number of messages currently sitting in the queue |
+| `consumerCount` | `number` | Number of active consumer subscriptions |
+
+```typescript title="src/admin/ChannelMonitor.ts"
+import { orderChannel, paymentChannel } from "@/config/channels";
+
+const stats = await orderChannel.stats();
+
+console.log(stats);
+// {
+//   name: "order.placed",
+//   messageCount: 342,
+//   consumerCount: 2
+// }
+```
+
+### Queue Maintenance Example
+
+A common pattern is to fetch `stats()` before deciding whether to `purge()` — for instance, clearing a queue that has accumulated stale messages during a deployment window:
+
+```typescript title="src/maintenance/QueueMaintenance.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+interface OrderPlacedPayload {
+  orderId: number;
+  customerId: string;
+  total: number;
+}
+
+const orderChannel = heraldChannel<OrderPlacedPayload>("order.placed");
+
+async function drainStaleQueue(threshold: number): Promise<void> {
+  const stats = await orderChannel.stats();
+
+  console.log(
+    `Channel "${stats.name}" has ${stats.messageCount} messages ` +
+    `and ${stats.consumerCount} active consumers.`
+  );
+
+  if (stats.consumerCount === 0 && stats.messageCount > threshold) {
+    console.warn(
+      `No consumers are listening and ${stats.messageCount} messages ` +
+      `are queued — purging.`
+    );
+
+    const purged = await orderChannel.purge();
+
+    console.log(`Purged ${purged} stale messages from "${stats.name}".`);
+  }
+}
+
+// Run during a maintenance window
+await drainStaleQueue(500);
+```
+
+## Purging Messages
+
+### `purge()`
+
+```typescript
+purge(): Promise<number>
+```
+
+Deletes all pending messages from the queue and returns the count of messages that were removed.
+
+```typescript title="src/maintenance/QueueMaintenance.ts"
+import { orderChannel } from "@/config/channels";
+
+const deletedCount = await orderChannel.purge();
+
+console.log(`Removed ${deletedCount} messages from the queue.`);
+```
+
+:::danger Destructive Operation
+`purge()` permanently deletes every pending message that has not yet been delivered to a consumer. This action **cannot be undone**. Only call it when you are certain those messages should be discarded — for example, during a controlled maintenance window or a test suite teardown. Never call it in production code paths that execute on every request.
+:::
+
+## Checking Channel Existence
+
+### `exists()`
+
+```typescript
+exists(): Promise<boolean>
+```
+
+Resolves to `true` if the underlying queue or topic exists in the broker, `false` otherwise. Use this to guard operations that depend on a channel being present.
+
+```typescript title="src/bootstrap/ChannelSetup.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+const legacyChannel = heraldChannel("legacy.orders");
+
+const channelExists = await legacyChannel.exists();
+
+if (!channelExists) {
+  console.log("Legacy channel does not exist — skipping migration step.");
+} else {
+  // Proceed with reading from the legacy queue
+  await migrateLegacyOrders(legacyChannel);
+}
+```
+
+## Deleting a Channel
+
+### `delete()`
+
+```typescript
+delete(): Promise<void>
+```
+
+Permanently removes the queue or topic from the broker, including all messages it contains and all consumer bindings.
+
+```typescript title="src/maintenance/Cleanup.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+const tempChannel = heraldChannel("temp.batch-import-2024-12");
+
+// Remove the temporary channel once the import job is complete
+await tempChannel.delete();
+
+console.log("Temporary import channel removed.");
+```
+
+:::danger Destructive Operation
+`delete()` removes the channel and **all of its messages** from the broker. Any consumers still subscribed to the channel will stop receiving messages. This action cannot be reversed. Reserve it for intentional cleanup — such as removing temporary channels after a one-off job — and never call it on channels that are actively serving production traffic.
+:::
+
+## Asserting a Channel
+
+### `assert()`
+
+```typescript
+assert(): Promise<void>
+```
+
+Creates the channel in the broker if it does not already exist, or verifies that the broker's existing definition matches the options the channel was configured with. If both the channel and the options agree, `assert()` is a no-op. If the options conflict with what the broker already has, it throws an error.
+
+This makes `assert()` safe to call repeatedly — it is **idempotent**. The standard pattern is to call `assert()` once during application startup before any producers or consumers begin work, ensuring the broker topology matches what your code expects.
+
+```typescript title="src/bootstrap/broker.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+const orderChannel = heraldChannel<OrderPlacedPayload>("order.placed", {
+  type: "queue",
+  durable: true,
+  messageTtl: 86_400_000, // 24 hours
+});
+
+const notificationChannel = heraldChannel<NotificationSentPayload>("notification.sent", {
+  type: "fanout",
+  durable: true,
+});
+
+// Assert all channels before the server starts accepting traffic
+await Promise.all([
+  orderChannel.assert(),
+  notificationChannel.assert(),
+]);
+
+console.log("Broker topology verified — starting server.");
+```
+
+Because `assert()` is idempotent, calling it multiple times across service restarts or rolling deployments is safe — it only creates the channel once and then quietly confirms the configuration on every subsequent call.
+
+## Stopping Consumers
+
+### `stopConsuming()`
+
+```typescript
+stopConsuming(): Promise<void>
+```
+
+Cancels **all** active subscriptions on the channel gracefully. In-flight messages that are already being processed are allowed to finish; no new messages are dispatched after `stopConsuming()` resolves.
+
+### `unsubscribeById(consumerId)`
+
+```typescript
+unsubscribeById(consumerId: string): Promise<void>
+```
+
+Cancels a single subscription identified by its consumer ID. The consumer ID is returned inside the `Subscription` object when you call `channel.subscribe()`.
+
+```typescript title="src/workers/OrderWorker.ts"
+import { orderChannel } from "@/config/channels";
+
+// Subscribe and keep a reference to the subscription
+const subscription = await orderChannel.subscribe(async (payload) => {
+  await processOrder(payload);
+});
+
+// Later — cancel just this one consumer
+await orderChannel.unsubscribeById(subscription.consumerId);
+
+console.log("Order worker subscription cancelled.");
+```
+
+## Graceful Shutdown
+
+When your application receives a shutdown signal (for example, `SIGTERM` from a container orchestrator), you should stop all channel consumers before the process exits. This prevents messages from being re-queued or dropped mid-processing.
+
+```typescript title="src/bootstrap/shutdown.ts"
+import { heraldChannel } from "@warlock.js/herald";
+import {
+  orderChannel,
+  paymentChannel,
+  inventoryChannel,
+  notificationChannel,
+} from "@/config/channels";
+
+const activeChannels = [
+  orderChannel,
+  paymentChannel,
+  inventoryChannel,
+  notificationChannel,
+];
+
+async function gracefulShutdown(signal: string): Promise<void> {
+  console.log(`Received ${signal} — starting graceful shutdown.`);
+
+  // Stop dispatching new messages to all consumers on every channel
+  await Promise.all(
+    activeChannels.map((channel) => channel.stopConsuming())
+  );
+
+  console.log("All consumers stopped. Shutting down.");
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+```
+
+For more granular control you can combine `stopConsuming()` on the channels your service owns with `unsubscribeById()` for any supplementary subscriptions you opened dynamically:
+
+```typescript title="src/workers/DynamicWorker.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+interface TaskPayload {
+  taskId: string;
+  type: string;
+}
+
+const taskChannel = heraldChannel<TaskPayload>("tasks.queued");
+
+// Register a primary consumer
+const primarySub = await taskChannel.subscribe(async (payload) => {
+  await runTask(payload);
+});
+
+// Register a secondary consumer for priority tasks
+const prioritySub = await taskChannel.subscribe(async (payload) => {
+  if (payload.type === "urgent") await runUrgentTask(payload);
+});
+
+async function shutdown(): Promise<void> {
+  // Cancel the secondary consumer first
+  await taskChannel.unsubscribeById(prioritySub.consumerId);
+
+  // Then stop all remaining consumers on this channel
+  await taskChannel.stopConsuming();
+
+  console.log("Worker shut down cleanly.");
+}
+```
+
+## Next Steps
+
+- [Publishing Messages](./publishing.mdx) — Send single and batched messages to channels
+- [Consuming Messages](./consuming.mdx) — Subscribe and process messages with fine-grained control
+- [Channel Options](./channel-options.mdx) — Configure durability, TTL, dead-letter queues, and more
+- [Request-Reply](./request-reply.mdx) — Use channels for RPC-style request-response patterns

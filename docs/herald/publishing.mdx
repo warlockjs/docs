@@ -79,6 +79,42 @@ await publishPromise; // Broker has accepted the message
 Always await the promise returned by `publish()` to catch broker errors. If the broker is down or overloaded, the promise will reject, and you'll know immediately that the message wasn't sent.
 :::
 
+## Publishing Multiple Messages with publishBatch()
+
+When you have an array of payloads to publish to the same channel, `publishBatch()` lets you pass them all at once rather than calling `publish()` in a loop yourself.
+
+```typescript title="src/services/order-service.ts"
+import { herald } from '@warlock.js/herald';
+import type { OrderPayload } from '../types/events';
+
+const channel = herald().channel<OrderPayload>("order.placed");
+
+await channel.publishBatch([
+  { orderId: 1, total: 99.99 },
+  { orderId: 2, total: 149.99 },
+  { orderId: 3, total: 29.99 },
+]);
+```
+
+### How publishBatch() works
+
+`publishBatch()` iterates over the `messages` array and calls `publish()` internally for each entry, in order. Any `PublishOptions` you pass are forwarded to every individual `publish()` call, so options such as priority, TTL, and delay apply uniformly to all messages in the batch.
+
+```typescript
+// Same PublishOptions are applied to every message
+await channel.publishBatch(
+  [
+    { orderId: 4, total: 59.99 },
+    { orderId: 5, total: 199.99 },
+  ],
+  { priority: 5, ttl: 60_000 },
+);
+```
+
+:::warning publishBatch() is not atomic
+Because each message is published individually in sequence, `publishBatch()` provides **no atomicity guarantee**. If the broker rejects or the process crashes while the array is being iterated, messages that have already been sent will not be rolled back, and messages that have not yet been reached will not be sent. Handle errors accordingly and consider idempotency on the consumer side.
+:::
+
 ## Publishing via EventMessage
 
 For more control over serialization, versioning, and type safety, you can publish structured `EventMessage` objects. This approach wraps your payload in an envelope and supports event versioning.

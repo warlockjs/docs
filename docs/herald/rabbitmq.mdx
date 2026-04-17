@@ -248,7 +248,16 @@ await connectToBroker({
 
 Use virtual hosts to safely share one RabbitMQ cluster across dev, staging, and production without data leakage or queue name collisions.
 
-## Client options
+## `RabbitMQClientOptions`
+
+Protocol-level options passed to amqplib as the `clientOptions` field on `RabbitMQConnectionOptions`.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `frameMax` | `number` | `0` | Maximum AMQP frame size in bytes. `0` = unlimited. Increase for large messages. |
+| `channelMax` | `number` | `0` | Maximum number of channels per connection. `0` = unlimited. |
+| `locale` | `string` | `"en_US"` | Client locale preference for broker error messages. |
+| `socket` | `RabbitMQSocketOptions` | — | Socket-level TLS and connection configuration. |
 
 ```typescript title="src/main.ts"
 await connectToBroker({
@@ -262,25 +271,49 @@ await connectToBroker({
 });
 ```
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `frameMax` | `number` | `0` | Max AMQP frame size in bytes. `0` = unlimited. Increase for large messages. |
-| `channelMax` | `number` | `0` | Max channels per connection. `0` = unlimited. |
-| `locale` | `string` | `"en_US"` | Locale for broker error messages. |
+## `RabbitMQSocketOptions`
 
-## Socket options
+Socket-level options passed to `clientOptions.socket` on `RabbitMQConnectionOptions`. Controls TLS certificates, TCP behaviour, and connection timeouts.
+
+### TLS options
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `keepAlive` | `boolean` | Enable TCP keep-alive probes to detect dead connections. |
+| `ca` | `string \| Buffer \| Array<string \| Buffer>` | Certificate authority for verifying the server. |
+| `cert` | `string \| Buffer` | Client certificate for mutual TLS (mTLS). |
+| `key` | `string \| Buffer` | Client private key. |
+| `passphrase` | `string` | Passphrase to decrypt an encrypted private key. |
+| `servername` | `string` | SNI hostname for TLS virtual hosting. |
+| `rejectUnauthorized` | `boolean` | Validate the server certificate chain. Set `false` only in dev/test. |
+
+### TCP options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `keepAlive` | `boolean \| number` | Enable TCP keep-alive probes to detect dead connections. Pass a number to set the initial delay in milliseconds. |
 | `noDelay` | `boolean` | Disable Nagle's algorithm — send data immediately (reduces latency). |
 | `timeout` | `number` | Socket timeout in milliseconds. |
-| `ca` | `string[]` | TLS CA certificate(s) for verifying the server. |
-| `cert` | `string` | TLS client certificate for mutual TLS (mTLS). |
-| `key` | `string` | TLS client private key. |
-| `passphrase` | `string` | Passphrase to decrypt an encrypted private key. |
-| `servername` | `string` | TLS SNI server name for virtual hosting. |
-| `rejectUnauthorized` | `boolean` | Verify server certificate. Set `false` only in dev/test. |
+
+### Minimal mTLS example
+
+```typescript title="src/main.ts"
+import { connectToBroker } from '@warlock.js/herald';
+import fs from 'fs';
+
+await connectToBroker({
+  driver: "rabbitmq",
+  host: "rabbitmq.example.com",
+  port: 5671,
+  clientOptions: {
+    socket: {
+      ca: fs.readFileSync("ca.pem"),
+      cert: fs.readFileSync("client.pem"),
+      key: fs.readFileSync("client-key.pem"),
+      rejectUnauthorized: true,
+    },
+  },
+});
+```
 
 ## Delayed messages
 

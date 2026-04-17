@@ -1,0 +1,460 @@
+---
+sidebar_position: 23
+title: Custom Drivers
+description: Implement BrokerDriverContract to build a custom Herald driver for Redis Streams, SQS, in-memory testing, or any other message transport
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Herald ships with a built-in RabbitMQ driver, but the `BrokerDriverContract` interface lets you plug in any message transport you need. Writing a custom driver is the right move when:
+
+- You want to target a transport Herald does not yet support natively — **Redis Streams**, **AWS SQS**, **Google Pub/Sub**, **NATS**, etc.
+- You need a **lightweight in-memory driver** for unit and integration tests that runs without any broker infrastructure.
+- Your organisation maintains an **internal or proprietary messaging system** and you want Herald's unified publish/subscribe API on top of it.
+- You need **fine-grained control** over connection behaviour, retry logic, or channel semantics that the built-in drivers do not expose.
+
+Once registered, a custom driver is indistinguishable from a built-in one: `connectToBroker`, `herald()`, `heraldChannel`, event consumers, and health checks all work exactly the same way.
+
+## `BrokerDriverContract` interface
+
+Every driver must implement the `BrokerDriverContract` interface. Below is the complete contract, sourced directly from `src/contracts/broker-driver.contract.ts`.
+
+```typescript
+import type { EventMessage } from '../message-managers/event-message';
+import type { EventConsumerClass } from '../message-managers/types';
+import type {
+  BrokerDriverType,
+  BrokerEvent,
+  BrokerEventListener,
+  ChannelOptions,
+  HealthCheckResult,
+} from '../types';
+import type { ChannelContract } from './channel.contract';
+
+interface BrokerDriverContract {
+  /**
+   * Driver identifier string.
+   * Must match one of the values in BrokerDriverType.
+   */
+  readonly name: BrokerDriverType;
+
+  /**
+   * Whether the driver currently has an active connection.
+   */
+  readonly isConnected: boolean;
+
+  /**
+   * Open the connection. Throws Error if connection fails.
+   */
+  connect(): Promise<void>;
+
+  /**
+   * Close the connection gracefully.
+   */
+  disconnect(): Promise<void>;
+
+  /**
+   * Subscribe to a broker lifecycle event.
+   */
+  on(event: BrokerEvent, listener: BrokerEventListener): void;
+
+  /**
+   * Remove a previously registered lifecycle event listener.
+   */
+  off(event: BrokerEvent, listener: BrokerEventListener): void;
+
+  /**
+   * Register an event consumer class. Returns an unsubscribe function.
+   */
+  subscribe(consumer: EventConsumerClass): () => void;
+
+  /**
+   * Unregister a previously subscribed event consumer class.
+   */
+  unsubscribe(consumer: EventConsumerClass): void;
+
+  /**
+   * Publish an event message onto the bus.
+   */
+  publish<TPayload>(event: EventMessage<TPayload>): void;
+
+  /**
+   * Retrieve (or lazily create) a named channel.
+   * The returned channel is cached for the lifetime of the driver.
+   */
+  channel<TPayload>(
+    name: string,
+    options?: ChannelOptions<TPayload>,
+  ): ChannelContract<TPayload>;
+
+  /**
+   * Begin consuming messages from all registered channels and consumers.
+   */
+  startConsuming(): Promise<void>;
+
+  /**
+   * Stop consuming messages gracefully.
+   */
+  stopConsuming(): Promise<void>;
+
+  /**
+   * Report the current health of the broker connection.
+   */
+  healthCheck(): Promise<HealthCheckResult>;
+
+  /**
+   * Return the names of all active channels managed by this driver.
+   */
+  getChannelNames(): string[];
+
+  /**
+   * Close a single channel by name and release its resources.
+   */
+  closeChannel(name: string): Promise<void>;
+}
+```
+
+### Supporting types
+
+The contract relies on several types from `src/types/driver.types.ts`:
+
+```typescript
+/** Supported broker driver names */
+type BrokerDriverType = "rabbitmq" | "kafka" | "redis-streams" | "sqs";
+
+/** Broker lifecycle events emitted during connection management */
+type BrokerEvent = "connected" | "disconnected" | "error" | "reconnecting";
+
+/** Event handler callback signature */
+type BrokerEventListener = (...args: unknown[]) => void;
+
+/** Broker health status response */
+interface HealthCheckResult {
+  healthy: boolean;
+  latency?: number;
+  error?: string;
+  details?: Record<string, unknown>;
+}
+```
+
+`BrokerDriverType` is a closed union. Because `"redis-streams"` and `"sqs"` are already listed, you can use them as the `name` for those transports. For a purely custom or in-memory driver you would extend the union in your own type declarations — see the skeleton below.
+
+## Skeleton implementation
+
+The following class shows the minimal structure of a complete `BrokerDriverContract` implementation using an **in-memory driver** as a concrete, dependency-free example. Every method body is a placeholder — replace the internals with your actual transport logic.
+
+```typescript title="src/drivers/in-memory.driver.ts"
+import { EventEmitter } from 'node:events';
+import type { ChannelContract } from '@warlock.js/herald';
+import type {
+  BrokerDriverContract,
+  BrokerDriverType,
+  BrokerEvent,
+  BrokerEventListener,
+  ChannelOptions,
+  EventConsumerClass,
+  EventMessage,
+  HealthCheckResult,
+} from '@warlock.js/herald';
+
+// ---------------------------------------------------------------------------
+// Minimal in-memory ChannelContract implementation
+// ---------------------------------------------------------------------------
+
+class InMemoryChannel<TPayload> implements ChannelContract<TPayload> {
+  readonly name: string;
+  readonly options: ChannelOptions<TPayload>;
+
+  constructor(name: string, options: ChannelOptions<TPayload> = {}) {
+    this.name = name;
+    this.options = options;
+  }
+
+  async publish(_payload: TPayload): Promise<void> {
+    // Deliver to in-process subscribers
+  }
+
+  async publishBatch(_messages: TPayload[]): Promise<void> {
+    // Deliver each message in sequence
+  }
+
+  async subscribe(_handler: unknown, _options?: unknown): Promise<unknown> {
+    return { id: crypto.randomUUID() };
+  }
+
+  async unsubscribeById(_consumerId: string): Promise<void> {}
+
+  async request<TResponse = unknown>(
+    _payload: TPayload,
+    _options?: unknown,
+  ): Promise<TResponse> {
+    throw new Error('request-reply not supported on InMemoryChannel');
+  }
+
+  async respond<TResponse = unknown>(_handler: unknown): Promise<unknown> {
+    return { id: crypto.randomUUID() };
+  }
+
+  async stats(): Promise<unknown> {
+    return { messageCount: 0, consumerCount: 0 };
+  }
+
+  async purge(): Promise<number> {
+    return 0;
+  }
+
+  async exists(): Promise<boolean> {
+    return true;
+  }
+
+  async delete(): Promise<void> {}
+
+  async assert(): Promise<void> {}
+
+  async stopConsuming(): Promise<void> {}
+}
+
+// ---------------------------------------------------------------------------
+// InMemoryDriver — implements BrokerDriverContract
+// ---------------------------------------------------------------------------
+
+export class InMemoryDriver implements BrokerDriverContract {
+  // Herald uses this string to look the driver up in the registry.
+  // Cast as BrokerDriverType or augment the union for truly custom names.
+  readonly name: BrokerDriverType = 'sqs' as BrokerDriverType;
+
+  private _isConnected = false;
+  private readonly _emitter = new EventEmitter();
+  private readonly _channels = new Map<string, InMemoryChannel<unknown>>();
+  private readonly _consumers = new Set<EventConsumerClass>();
+
+  // ---------- connection lifecycle -----------------------------------------
+
+  get isConnected(): boolean {
+    return this._isConnected;
+  }
+
+  async connect(): Promise<void> {
+    if (this._isConnected) return;
+
+    // Perform any initialisation your transport needs here.
+    this._isConnected = true;
+    this._emitter.emit('connected');
+  }
+
+  async disconnect(): Promise<void> {
+    if (!this._isConnected) return;
+
+    // Tear down open connections / subscriptions.
+    this._isConnected = false;
+    this._emitter.emit('disconnected');
+  }
+
+  // ---------- lifecycle events ---------------------------------------------
+
+  on(event: BrokerEvent, listener: BrokerEventListener): void {
+    this._emitter.on(event, listener);
+  }
+
+  off(event: BrokerEvent, listener: BrokerEventListener): void {
+    this._emitter.off(event, listener);
+  }
+
+  // ---------- event consumers ----------------------------------------------
+
+  subscribe(consumer: EventConsumerClass): () => void {
+    this._consumers.add(consumer);
+    return () => this.unsubscribe(consumer);
+  }
+
+  unsubscribe(consumer: EventConsumerClass): void {
+    this._consumers.delete(consumer);
+  }
+
+  // ---------- publishing ---------------------------------------------------
+
+  publish<TPayload>(event: EventMessage<TPayload>): void {
+    // Route the event to any matching registered consumers.
+    // In production you would push to your transport here.
+    for (const Consumer of this._consumers) {
+      const instance = new Consumer();
+      if (instance.event === event.name) {
+        instance.handle(event);
+      }
+    }
+  }
+
+  // ---------- channels -----------------------------------------------------
+
+  channel<TPayload>(
+    name: string,
+    options?: ChannelOptions<TPayload>,
+  ): ChannelContract<TPayload> {
+    if (!this._channels.has(name)) {
+      this._channels.set(name, new InMemoryChannel<unknown>(name, options));
+    }
+    return this._channels.get(name) as InMemoryChannel<TPayload>;
+  }
+
+  // ---------- consuming lifecycle ------------------------------------------
+
+  async startConsuming(): Promise<void> {
+    // Begin polling / subscribing on your transport.
+  }
+
+  async stopConsuming(): Promise<void> {
+    // Cancel all active subscriptions / pollers.
+    for (const name of this._channels.keys()) {
+      await this.closeChannel(name);
+    }
+  }
+
+  // ---------- health & introspection ---------------------------------------
+
+  async healthCheck(): Promise<HealthCheckResult> {
+    const start = Date.now();
+
+    // Replace with an actual ping to your transport.
+    const reachable = this._isConnected;
+
+    return {
+      healthy: reachable,
+      latency: Date.now() - start,
+      details: { driver: 'in-memory', channelCount: this._channels.size },
+    };
+  }
+
+  getChannelNames(): string[] {
+    return [...this._channels.keys()];
+  }
+
+  async closeChannel(name: string): Promise<void> {
+    const ch = this._channels.get(name);
+    if (ch) {
+      await ch.stopConsuming();
+      this._channels.delete(name);
+    }
+  }
+}
+```
+
+:::tip Keep `InMemoryDriver` in your test helpers
+The in-memory driver shown above has no network dependency, making it ideal as a drop-in replacement during unit tests. Create it once in a `beforeAll` block, register it, and tear it down in `afterAll` — no broker container required.
+:::
+
+## Registering a custom driver
+
+Herald resolves drivers through `brokerRegistry`. Call `brokerRegistry.register()` with your driver instance **before** calling `connectToBroker` so the registry can find it when the driver name is requested.
+
+```typescript title="src/main.ts"
+import { brokerRegistry, connectToBroker } from '@warlock.js/herald';
+import { InMemoryDriver } from './drivers/in-memory.driver';
+
+// 1. Instantiate your driver.
+const inMemoryDriver = new InMemoryDriver();
+
+// 2. Register it with the broker registry so Herald can resolve it.
+brokerRegistry.register(inMemoryDriver);
+
+// 3. Connect using the same name your driver exposes via `driver.name`.
+await connectToBroker({
+  driver: inMemoryDriver.name,
+  // Any additional options your driver reads from the config.
+});
+```
+
+After registration the full Herald API works against your driver without modification:
+
+```typescript title="src/services/order.service.ts"
+import { herald, heraldChannel } from '@warlock.js/herald';
+
+// Publish through the custom driver.
+await heraldChannel('order.placed').publish({ orderId: 'ord-001' });
+
+// Read lifecycle events.
+herald().driver.on('connected', () => {
+  console.log('Custom driver connected');
+});
+
+// Health-check the custom driver.
+const health = await herald().driver.healthCheck();
+console.log(health.healthy, health.latency);
+```
+
+### Multi-broker setup with a custom driver
+
+You can mix built-in and custom drivers in the same process using the `name` option:
+
+```typescript title="src/main.ts"
+import { brokerRegistry, connectToBroker } from '@warlock.js/herald';
+import { InMemoryDriver } from './drivers/in-memory.driver';
+
+// Register the custom driver under a named slot.
+brokerRegistry.register(new InMemoryDriver());
+
+// Built-in RabbitMQ broker — default for most traffic.
+await connectToBroker({
+  driver: 'rabbitmq',
+  host: process.env.RABBITMQ_HOST,
+  name: 'main',
+  isDefault: true,
+});
+
+// Custom in-memory broker — used for internal test events.
+await connectToBroker({
+  driver: inMemoryDriver.name,
+  name: 'in-memory',
+  isDefault: false,
+});
+```
+
+Then select the broker by name wherever you need it:
+
+```typescript
+import { herald } from '@warlock.js/herald';
+
+const inMemoryBroker = herald('in-memory');
+inMemoryBroker.channel('test.events').publish({ type: 'ping' });
+```
+
+## Health checking a custom driver
+
+`healthCheck()` returns `HealthCheckResult`, which you can expose via any HTTP health endpoint:
+
+```typescript title="src/health/broker.health.ts"
+import { herald } from '@warlock.js/herald';
+
+export async function getBrokerHealth(brokerName?: string) {
+  try {
+    const result = await herald(brokerName).driver.healthCheck();
+    return {
+      status: result.healthy ? 'healthy' : 'unhealthy',
+      latency: result.latency,
+      error: result.error,
+      details: result.details,
+    };
+  } catch (error) {
+    return { status: 'unhealthy', error: (error as Error).message };
+  }
+}
+```
+
+## Checklist before publishing a driver package
+
+| Requirement | Notes |
+|-------------|-------|
+| `readonly name` matches `BrokerDriverType` | Use an existing value or augment the union |
+| `connect()` throws `Error` on failure | Herald relies on this to surface connection problems |
+| `disconnect()` completes without throwing | Graceful shutdown must not reject |
+| `channel()` returns the same instance for the same `name` | The contract specifies lazy-created, cached channels |
+| `healthCheck()` always resolves (never rejects) | Return `{ healthy: false, error: '...' }` on failure |
+| Lifecycle events (`connected`, `disconnected`, `error`, `reconnecting`) emitted at the right moments | Required for `brokerRegistry` monitoring |
+| `startConsuming()` / `stopConsuming()` pair is symmetric | Prevents resource leaks on shutdown |
+
+## Next steps
+
+- **[Multiple Brokers](multiple-brokers)** — Register and address several broker instances simultaneously
+- **[Broker Events](broker-events)** — React to connection lifecycle events from any driver
+- **[Best Practices](best-practices)** — Design patterns for events, consumers, and reliability
+- **[RabbitMQ Driver](rabbitmq)** — Reference for the built-in production driver

@@ -12,11 +12,11 @@ When creating a channel, you can customize its behavior with options. These cont
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `type` | `"queue" \| "topic"` | `"queue"` | Channel type — queue for work distribution, topic for pub-sub |
+| `type` | `"queue" \| "topic" \| "fanout"` | `"queue"` | Channel type — queue for work distribution, topic for pub-sub, fanout to all bound consumers |
 | `durable` | `boolean` | `true` | Messages survive broker restart |
 | `autoDelete` | `boolean` | `false` | Delete channel when last consumer disconnects |
 | `exclusive` | `boolean` | `false` | Only this connection can use this channel |
-| `deadLetter` | `DeadLetterOptions \| string` | — | Dead-letter configuration for failed messages |
+| `deadLetter` | `DeadLetterOptions` | — | Dead-letter configuration for failed messages |
 | `maxMessageSize` | `number` | — | Maximum message size in bytes |
 | `messageTtl` | `number` | — | Message TTL in milliseconds |
 | `maxLength` | `number` | — | Max queue length (oldest messages dropped when exceeded) |
@@ -104,6 +104,41 @@ paymentProcessed.publish({
 // "Reserving inventory for order: 1"
 ```
 
+### Fanout: All Bound Consumers, No Routing Key
+
+A **fanout** delivers each message to **all bound consumers** without inspecting any routing key. Unlike `topic`, there is no pattern-matching — every binding receives a copy unconditionally. Use this for:
+- Broadcasting to an arbitrary number of consumers where routing logic would be wasted overhead
+- System-wide notifications (cache flush, config reload)
+- Mirroring messages to multiple independent pipelines
+
+```typescript title="src/config/channels.ts"
+import { heraldChannel } from "@warlock.js/herald";
+
+// Fanout: every bound consumer gets a copy, no routing key needed
+export const configReloaded = heraldChannel("config.reloaded", {
+  type: "fanout",
+});
+```
+
+```typescript title="src/services/ConfigService.ts"
+import { configReloaded } from "@/config/channels";
+
+// All services that care about config changes subscribe
+configReloaded.subscribe((payload) => {
+  console.log("Service A reloading config:", payload.version);
+});
+
+configReloaded.subscribe((payload) => {
+  console.log("Service B reloading config:", payload.version);
+});
+
+// Publishing delivers to every bound consumer — no routing key required
+configReloaded.publish({ version: "2.4.1", changedKeys: ["featureFlags"] });
+// Output:
+// "Service A reloading config: 2.4.1"
+// "Service B reloading config: 2.4.1"
+```
+
 ## Durability: Surviving Restarts
 
 **`durable: true`** (default) means messages are persisted and survive broker restarts. **`durable: false`** means messages are lost if the broker restarts.
@@ -189,16 +224,16 @@ workerQueue.publish({ id: "task-1", action: "send_email" });
 
 ## Dead-Letter Handling
 
-When message processing fails, send it to a **dead-letter queue** for manual inspection or retry logic. Configure with a string (shorthand) or `DeadLetterOptions` object.
+When message processing fails, send it to a **dead-letter queue** for manual inspection or retry logic. Configure with a `DeadLetterOptions` object.
 
-### Simple Shorthand
+### Basic Configuration
 
 ```typescript title="src/config/channels.ts"
 import { heraldChannel } from "@warlock.js/herald";
 
 // Messages that fail processing go to order.placed.dlq
 export const orderPlaced = heraldChannel("order.placed", {
-  deadLetter: "order.placed.dlq",
+  deadLetter: { channel: "order.placed.dlq" },
 });
 ```
 
@@ -406,7 +441,7 @@ const OrderPlacedSchema = v.object({
 export const orderPlaced = heraldChannel("order.placed", {
   type: "topic", // all interested services should react
   durable: true, // critical business event
-  deadLetter: "order.placed.dlq", // capture failures
+  deadLetter: { channel: "order.placed.dlq" }, // capture failures
   maxLength: 100000, // keep recent orders
   messageTtl: 604800000, // 7 days
   schema: OrderPlacedSchema, // validate payload
@@ -425,7 +460,7 @@ const PaymentProcessedSchema = v.object({
 export const paymentProcessed = heraldChannel("payment.processed", {
   type: "topic",
   durable: true,
-  deadLetter: "payment.processed.dlq",
+  deadLetter: { channel: "payment.processed.dlq" },
   maxLength: 50000,
   schema: PaymentProcessedSchema,
 });
@@ -443,7 +478,7 @@ const InventoryUpdatedSchema = v.object({
 export const inventoryUpdated = heraldChannel("inventory.updated", {
   type: "queue", // one worker processes each update
   durable: true,
-  deadLetter: "inventory.updated.dlq",
+  deadLetter: { channel: "inventory.updated.dlq" },
   maxLength: 50000,
   schema: InventoryUpdatedSchema,
 });
@@ -460,7 +495,7 @@ const NotificationSentSchema = v.object({
 export const notificationSent = heraldChannel("notification.sent", {
   type: "queue",
   durable: true,
-  deadLetter: "notification.sent.dlq",
+  deadLetter: { channel: "notification.sent.dlq" },
   maxLength: 100000,
   messageTtl: 3600000, // 1 hour (no point retrying day-old notifications)
   schema: NotificationSentSchema,
@@ -528,7 +563,7 @@ heraldChannel("analytics.event", {
 heraldChannel("order.placed", {
   type: "topic",
   durable: true, // never lose orders
-  deadLetter: "order.placed.dlq", // capture failures
+  deadLetter: { channel: "order.placed.dlq" }, // capture failures
   maxLength: 100000,
   messageTtl: 604800000, // 7 days retention
   schema: OrderSchema, // strict validation
@@ -540,7 +575,7 @@ heraldChannel("order.placed", {
 heraldChannel("email.send", {
   type: "queue", // distribute work
   durable: true,
-  deadLetter: "email.send.dlq",
+  deadLetter: { channel: "email.send.dlq" },
   maxLength: 50000,
   maxMessageSize: 1000000, // 1MB limit
 });
