@@ -54,7 +54,7 @@ import { Model, Casts, castModel } from "@warlock.js/cascade";
 import { Category } from "./category";
 
 export class Post extends Model {
-  public static collection = "posts";
+  public static table = "posts";
 
   protected casts: Casts = {
     title: "string",
@@ -148,7 +148,7 @@ You can also define a custom getter on the model and point `embed()` at a custom
 import { Model, Casts } from "@warlock.js/cascade";
 
 export class Category extends Model {
-  public static collection = "categories";
+  public static table = "categories";
 
   protected casts: Casts = {
     name: "string",

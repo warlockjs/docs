@@ -155,7 +155,7 @@ async up() {
 
 ## 🧱 Column Operations
 
-### `addColumn(table, column, callback)`
+### `addColumn(table, callback)`
 
 Adds one or more columns to an existing table. The callback receives the same `ColumnBuilder` scope as `createTable`.
 
@@ -259,9 +259,9 @@ async down() {
 
 ## 🔗 Foreign Key Operations
 
-### `addForeignKey(table, column, references, on, options?)`
+### `addForeignKey(table, callback)`
 
-Adds a foreign key constraint to an existing table. Accepts the local column, the referenced column, the referenced table, and optional actions.
+Adds a foreign key constraint to an existing table via a `ForeignKeyBuilder` callback.
 
 ```ts title="src/database/migrations/add_user_fk.ts"
 async up() {

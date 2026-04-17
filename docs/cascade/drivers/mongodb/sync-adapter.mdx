@@ -122,7 +122,7 @@ import { Model } from "@warlock.js/cascade";
 import { syncWith } from "@warlock.js/cascade";
 
 export class User extends Model {
-  static collection = "users";
+  static table = "users";
 
   // When name changes, push the new value to all related comments
   static sync = [

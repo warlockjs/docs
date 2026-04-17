@@ -120,12 +120,12 @@ export default class CreatePostsTable extends Migration {
 
       // Author — hard delete cascades to posts
       table.integer("user_id").unsigned().notNullable()
-        .references("id").on("users")
+        .references("users").on("id")
         .onDelete("CASCADE");
 
       // Category — nullable; if category is deleted, set NULL
       table.integer("category_id").unsigned().nullable()
-        .references("id").on("categories")
+        .references("categories").on("id")
         .onDelete("SET NULL")
         .onUpdate("CASCADE");
 
@@ -241,12 +241,12 @@ export default class CreateCommentsTable extends Migration {
 
       // Inline FK — cascade deletes from post
       table.integer("post_id").unsigned().notNullable()
-        .references("id").on("posts")
+        .references("posts").on("id")
         .cascadeAll();
 
       // Inline FK — set null when author is deleted
       table.integer("author_id").unsigned().nullable()
-        .references("id").on("users")
+        .references("users").on("id")
         .onDelete("SET NULL")
         .onUpdate("CASCADE");
 

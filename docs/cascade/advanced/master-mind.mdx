@@ -144,7 +144,7 @@ The model-level method that orchestrates ID generation. It reads the model's sta
 import { Model } from "@warlock.js/cascade";
 
 export class Category extends Model {
-  public static collection = "categories";
+  public static table = "categories";
 }
 
 // Inside a custom save flow:

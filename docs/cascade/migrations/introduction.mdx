@@ -33,17 +33,18 @@ export class CreateUsersTable extends Migration {
   public tableName = "users";
 
   async up() {
-    await this.createTable(() => {
-      this.bigIncrements("id");
-      this.string("name", 100);
-      this.string("email", 255).unique();
-      this.string("password");
-      this.timestamps();
+    await this.createTable("users", (table) => {
+      table.bigInteger("id").autoIncrement().primary();
+      table.string("name", 100);
+      table.string("email", 255).unique();
+      table.string("password");
+      table.timestamp("created_at").useCurrent();
+      table.timestamp("updated_at").useCurrent().useCurrentOnUpdate();
     });
   }
 
   async down() {
-    await this.dropTableIfExists();
+    await this.dropTableIfExists("users");
   }
 }
 ```

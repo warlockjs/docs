@@ -12,26 +12,23 @@ An embedded document is just a document inside another document. For example, a 
 
 ## 🏗️ How to Embed a Document
 
-1. **Define your models:**
-2. **Just use the model class in your casts!**
+Use `v.embed(Model)` inside your model's `static schema` to declare an embedded relationship:
 
 ```ts title="src/models/post.ts"
-import { Model, Casts } from "@warlock.js/cascade";
+import { Model } from "@warlock.js/cascade";
+import { v } from "@warlock.js/seal";
 import { Category } from "./category";
 
 export class Post extends Model {
-  public static collection = "posts";
-  protected casts: Casts = {
-    title: "string",
-    content: "string",
-    category: Category, // Just pass the model class!
-  };
+  public static table = "posts";
+
+  public static schema = v.object({
+    title: v.string().required(),
+    content: v.string().required(),
+    category: v.embed(Category), // resolves id → full Category embed
+  });
 }
 ```
-
-:::tip Did you know?
-You no longer need to use `castModel(Category)`—just pass the model class directly! This is the new, recommended way. `castModel` is still supported for backward compatibility.
-:::
 
 Now, when you create a post and pass a category id, Cascade will fetch and embed the category data for you!
 
@@ -56,25 +53,6 @@ Or, just list the fields you want:
 ```ts title="src/models/category.ts"
 static embed: string[] = ["id", "name"];
 ```
-
-### 3. `embedAllExceptTimestampsAndUserColumns`
-
-Exclude timestamps and user columns from embedding:
-
-```ts title="src/models/category.ts"
-public embedAllExceptTimestampsAndUserColumns = true;
-```
-
-### 4. `embedAllExcept`
-
-Exclude specific fields:
-
-```ts title="src/models/category.ts"
-public embedAllExcept = ["createdAt", "updatedAt"];
-```
-
-## 🧙‍♂️ Pro Tip
-You can combine these options for fine-grained control over what gets embedded!
 
 :::info
 Embedded documents are perfect for denormalizing data and making reads super fast. But be mindful of document size limits in MongoDB!

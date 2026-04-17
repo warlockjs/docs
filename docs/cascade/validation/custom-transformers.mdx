@@ -18,13 +18,13 @@ import { useModelTransformer } from "@warlock.js/cascade";
 
 ### `ModelTransformCallback` type
 
-`ModelTransformCallback` is the callback signature you provide to `useModelTransformer`. The callback receives the resolved `Model` instance and the seal transform options for that field.
+`ModelTransformCallback` is the callback signature you provide to `useModelTransformer`. The callback receives a single options object containing the resolved `Model` instance, the column name, the current field value, and flags indicating whether the record is new or the field has changed.
 
 ```ts
 import type { ModelTransformCallback } from "@warlock.js/cascade";
 ```
 
-The callback is invoked during the transformer stage of the seal pipeline, after mutators and rules have already run — meaning by the time your callback executes, the value has already been validated and coerced into a `Model` instance.
+The callback is invoked during the transformer stage of the seal pipeline, after mutators and rules have already run — meaning by the time your callback executes, the value has already been validated and coerced into a `Model` instance. The callback must return a `string`.
 
 ---
 
@@ -34,12 +34,12 @@ The callback is invoked during the transformer stage of the seal pipeline, after
 import { useModelTransformer } from "@warlock.js/cascade";
 
 // Build a transformer that extracts a custom projection from the model
-const authorTransformer = useModelTransformer((model, options) => {
-  return {
+const authorTransformer = useModelTransformer(({ model, column, value, isChanged, isNew }) => {
+  return JSON.stringify({
     id:     model.id,
     name:   model.get("name"),
     handle: model.get("handle"),
-  };
+  });
 });
 ```
 
@@ -120,7 +120,7 @@ import { useModelTransformer } from "@warlock.js/cascade";
 import { v } from "@warlock.js/seal";
 import { Tag } from "../models/tag.model";
 
-const tagSummaryTransformer = useModelTransformer((model) => ({
+const tagSummaryTransformer = useModelTransformer(({ model }) => JSON.stringify({
   id:    model.id,
   label: model.get("label"),
   color: model.get("color"),
@@ -140,7 +140,7 @@ import "@warlock.js/cascade/validation/database-seal-plugins";
 import { Track } from "./track.model";
 
 // Custom transformer: store only id and duration from each Track
-const trackTransformer = useModelTransformer((model) => ({
+const trackTransformer = useModelTransformer(({ model }) => JSON.stringify({
   id:       model.id,
   duration: model.get("duration"),
   title:    model.get("title"),
@@ -170,20 +170,23 @@ function useModelTransformer(
 
 | Parameter | Type | Description |
 |---|---|---|
-| `callback` | `ModelTransformCallback` | Your transform logic — receives the resolved `Model` instance and seal transform options |
+| `callback` | `ModelTransformCallback` | Your transform logic — receives a single options object with the resolved `Model` instance, column name, current value, and change-state flags |
 
 Returns a seal `TransformerCallback` ready to be passed to `.transformer()` on any seal validator.
 
 ### `ModelTransformCallback`
 
 ```ts
-type ModelTransformCallback = (
-  model: Model,
-  options: TransformOptions
-) => unknown;
+type ModelTransformCallback = (options: {
+  model: Model;
+  column: string;
+  value: any;
+  isChanged: boolean;
+  isNew: boolean;
+}) => string;
 ```
 
-The return value becomes the stored field value. Return anything serializable to your database column type.
+The return value becomes the stored field value. The callback must return a `string` — serialize any complex object (e.g. with `JSON.stringify`) before returning.
 
 ### `databaseModelTransformer`
 

@@ -23,7 +23,7 @@ export class User extends Model {
   /**
    * Collection name
    */
-  public static collection = "users";
+  public static table = "users";
 
   /**
    * {@inheritDoc}
@@ -47,7 +47,7 @@ export class Comment extends Model {
   /**
    * Collection name
    */
-  public static collection = "comments";
+  public static table = "comments";
 
   /**
    * {@inheritDoc}
@@ -69,7 +69,7 @@ export class Post extends Model {
   /**
    * Collection name
    */
-  public static collection = "posts";
+  public static table = "posts";
 
   /**
    * {@inheritDoc}
@@ -151,7 +151,7 @@ export class User extends Model {
   /**
    * Collection name
    */
-  public static collection = "users";
+  public static table = "users";
 
   /**
    * {@inheritDoc}
@@ -193,7 +193,7 @@ export class User extends Model {
   /**
    * Collection name
    */
-  public static collection = "users";
+  public static table = "users";
 
   /**
    * Columns included when this model is embedded in another document.
@@ -215,7 +215,7 @@ export class User extends Model {
 This is the recommended shorthand when you just need to whitelist a set of fields — no need to write a full getter.
 
 :::tip
-When using [castModel](./../models/casting-data#castmodel), the `embedData` getter is used automatically to produce the nested payload, so you do not need to call it manually.
+When embedding via `v.embed(Model)` in `static schema`, the `embedData` getter is used automatically to produce the nested payload, so you do not need to call it manually.
 :::
 
 ## 🗂️ Embedding Multiple Documents
@@ -237,7 +237,7 @@ export class Post extends Model {
   /**
    * Collection name
    */
-  public static collection = "posts";
+  public static table = "posts";
 
   /**
    * Columns that contain embedded sub-documents.
@@ -299,7 +299,7 @@ export class Comment extends Model {
   /**
    * Collection name
    */
-  public static collection = "comments";
+  public static table = "comments";
 
   /**
    * {@inheritDoc}
@@ -324,7 +324,7 @@ Or use the static shorthand:
 import { Model, Casts } from "@warlock.js/cascade";
 
 export class Comment extends Model {
-  public static collection = "comments";
+  public static table = "comments";
 
   /**
    * Fields included when this comment is embedded inside a parent document.

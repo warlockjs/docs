@@ -20,7 +20,7 @@ export class User extends Model {
   /**
    * Collection name
    */
-  public static collection = "users";
+  public static table = "users";
 
   /**
    * {@inheritDoc}
@@ -85,16 +85,14 @@ This id is auto generated when the model is saved for the first time, and it's a
 
 ## Getting model _id
 
-This is the builtin MongoDB id, it's a unique string for each document in the database.
-
-To get model _id, you can use the `_id` property:
+This is the builtin MongoDB id, it's a unique string for each document in the database. It is not a first-class getter on the Model — access it via the generic `get()` method:
 
 ```ts
-console.log(user._id); // ObjectId("5f9b1b3c1b9c4e0b4c7b23a1")
+console.log(user.get("_id")); // ObjectId("5f9b1b3c1b9c4e0b4c7b23a1")
 ```
 
 :::warning Be aware
-If you're creating a new user using the new operator, the **_id** will be `undefined` until you save the model.
+If you're creating a new user using the new operator, `_id` will be `undefined` until you save the model.
 :::
 
 ## Getting a specified field

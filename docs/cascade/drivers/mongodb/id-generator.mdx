@@ -144,7 +144,7 @@ You can seed the starting ID and increment step at the model level using model c
 import { Model } from "@warlock.js/cascade";
 
 export class Order extends Model {
-  static collection = "orders";
+  static table = "orders";
 
   // Start IDs at 1000 and increment by 1
   static initialId = 1000;

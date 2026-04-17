@@ -52,7 +52,7 @@ export class AnalyticsEvent extends Model {
   // always use the "analytics" PostgreSQL source
   static dataSource = "analytics";
 
-  static collection = "analytics_events";
+  static table = "analytics_events";
 }
 ```
 
@@ -63,7 +63,7 @@ import { Model } from "@warlock.js/cascade";
 
 export class User extends Model {
   // no dataSource override — uses the default MongoDB source
-  static collection = "users";
+  static table = "users";
 }
 ```
 
@@ -76,7 +76,7 @@ const analyticsSource = dataSourceRegistry.get("analytics");
 
 export class Report extends Model {
   static dataSource = analyticsSource;
-  static collection = "reports";
+  static table = "reports";
 }
 ```
 
@@ -162,7 +162,7 @@ import { Model } from "@warlock.js/cascade";
 
 // Uses the default MongoDB source
 export class User extends Model {
-  static collection = "users";
+  static table = "users";
 }
 ```
 
@@ -172,7 +172,7 @@ import { Model } from "@warlock.js/cascade";
 // Uses the named PostgreSQL source
 export class PageView extends Model {
   static dataSource = "analytics";
-  static collection = "page_views";
+  static table = "page_views";
 }
 ```
 

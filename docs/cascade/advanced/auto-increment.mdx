@@ -14,7 +14,7 @@ Every model has a `static primaryKey` property that defaults to `"id"`. You can 
 import { Model } from "@warlock.js/cascade";
 
 export class Order extends Model {
-  public static collection = "orders";
+  public static table = "orders";
   public static primaryKey = "orderId";
 }
 ```
@@ -33,7 +33,7 @@ Set `static autoGenerateId = true` to enable Cascade's built-in auto-increment c
 import { Model } from "@warlock.js/cascade";
 
 export class Order extends Model {
-  public static collection = "orders";
+  public static table = "orders";
   public static autoGenerateId = true;
 }
 ```
@@ -44,7 +44,7 @@ Use `static initialId` to start counting from a specific number instead of `1`:
 
 ```ts title="src/models/order.ts"
 export class Order extends Model {
-  public static collection = "orders";
+  public static table = "orders";
   public static autoGenerateId = true;
   public static initialId = 1000; // first document gets id: 1000
 }
@@ -56,7 +56,7 @@ Use `static incrementIdBy` to control how much the counter increases with each n
 
 ```ts title="src/models/order.ts"
 export class Order extends Model {
-  public static collection = "orders";
+  public static table = "orders";
   public static autoGenerateId = true;
   public static initialId = 100;
   public static incrementIdBy = 10; // 100, 110, 120, ...
@@ -69,7 +69,7 @@ If you want unpredictability in your sequence, Cascade supports randomised varia
 
 ```ts title="src/models/session.ts"
 export class Session extends Model {
-  public static collection = "sessions";
+  public static table = "sessions";
   public static autoGenerateId = true;
   public static randomInitialId = true;  // picks a random starting number
   public static randomIncrement = true;  // increments by a random amount each time
@@ -95,7 +95,7 @@ When you need globally unique, distributed-safe IDs, use the `get uuid` getter o
 import { Model } from "@warlock.js/cascade";
 
 export class User extends Model {
-  public static collection = "users";
+  public static table = "users";
 }
 
 // Reading the UUID of a saved document:

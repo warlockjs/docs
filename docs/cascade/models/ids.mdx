@@ -29,7 +29,7 @@ By default, Cascade uses an atomic counter to generate sequential integer IDs. T
 import { Model } from "@warlock.js/cascade";
 
 export class Invoice extends Model {
-  public static collection = "invoices";
+  public static table = "invoices";
 
   // IDs start at 100001 and increment by 1 (the defaults)
   public static initialId = 100001;
@@ -42,7 +42,7 @@ export class Invoice extends Model {
 import { Model } from "@warlock.js/cascade";
 
 export class Order extends Model {
-  public static collection = "orders";
+  public static table = "orders";
 
   public static initialId = 1000;
   public static incrementIdBy = 10; // IDs: 1000, 1010, 1020 …
@@ -55,7 +55,7 @@ export class Order extends Model {
 import { Model } from "@warlock.js/cascade";
 
 export class Token extends Model {
-  public static collection = "tokens";
+  public static table = "tokens";
 
   // Cascade picks a random starting ID
   public static randomInitialId = true;
@@ -77,7 +77,7 @@ The numeric counter ID is stored in the field named by `primaryKey` (default `"i
 import { Model } from "@warlock.js/cascade";
 
 export class Subscription extends Model {
-  public static collection = "subscriptions";
+  public static table = "subscriptions";
 
   public static primaryKey = "subscriptionId"; // stored as "subscriptionId"
 }
@@ -110,7 +110,7 @@ type UuidStrategy = "v4" | "v7";
 import { Model } from "@warlock.js/cascade";
 
 export class Session extends Model {
-  public static collection = "sessions";
+  public static table = "sessions";
 
   // Switch from integer IDs to UUIDs
   public static autoGenerateId = false; // disable integer counter
